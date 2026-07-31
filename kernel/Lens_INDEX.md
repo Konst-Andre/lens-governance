@@ -23,10 +23,16 @@
 
 ## §0 Канон живе в репозиторії — і як його звіряти
 
-**Джерело правди:** `https://github.com/Konst-Andre/lens-governance` → тека `kernel/`
-**Raw-база для читання:**
+**Джерело правди:** `https://github.com/Konst-Andre/lens-governance`
+
+| тека репо | що там | у Project |
+|---|---|---|
+| **`kernel/`** | 13 файлів ядра (штамп `KERNEL vN`) + маніфести методів + буфери — усе **переносне** в новий Project | ✅ підключена |
+| **`products/`** | `*_MASTER_LOCK` · `*_valuesLOCK` · FINDINGS · реєстри — прив'язані до продукту, **нікуди не переносяться** | ✅ підключена |
+| **`archive/`** | `summaries/` · `stands/` · `superseded/` — те, що відслужило «живе доки» | ❌ **свідомо НЕ підключена** (§8) |
+**Raw-база для читання (будь-яка тека):**
 ```
-https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/kernel/<файл>
+https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/<тека>/<файл>
 ```
 
 Копія в Project — для швидкого локального читання. **Канон правиться в репо**, не в Project.
@@ -122,7 +128,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 | продукт | файли |
 |---|---|
 | **StockCheck** | `StockCheck_MASTER_LOCK.md` · `StockCheck_brand_valuesLOCK.md` · `StockCheck_materiality_valuesLOCK.md` · `StockCheck_glyph_valuesLOCK.md` · `StockCheck_tails_valuesLOCK.md` · `StockCheck_money_home_valuesLOCK.md` · `StockCheck_island_glass_FINDINGS.md` · `StockCheck_NETS_register.md` |
-| **QR Lens** | `QR_Lens_srpill_valuesLOCK.md` · `QR_Lens_srmotion_valuesLOCK.md` · `QR_Lens_probrow_PARAMS_LOCK.md` · `QR_Lens_statusgauge_BENCHLOCK.md` · `QR_Lens_CTA_mechanic_LOCK.md` · `QR_Lens_export_contract_v1.md` |
+| **QR Lens** | `QR_Lens_srpill_valuesLOCK.md` · `QR_Lens_srmotion_valuesLOCK.md` · `QR_Lens_probrow_PARAMS_LOCK.md` · `QR_Lens_statusgauge_BENCHLOCK.md` · `QR_Lens_CTA_mechanic_LOCK.md` · `QR_Lens_export_contract_v1_1.md` *(v1 витіснено B59)* |
 | **Фармастор** *(попередня назва StockCheck)* | `Фармастор_v2_MASTER_LOCK.md` · `Фармастор_history_badge_valuesLOCK.md` · `Фармастор_v2_PORT_REGISTER.md` |
 | **Drive Lens** | `Drive_Lens_concept_v1_3.md` · `Drive_Lens_logic_audit_findings.md` |
 | **PharmaLens** *(5-й продукт; ребренд робочої назви VTM Lens, 30.07.2026)* | `PharmaLens_Claude_Handover.md` — консолідований контекст напрацювань · `PharmaLens_Independent_Design_Research_Handover.md` — бриф на пошук варіативності (токени/мова/структура). **Ще не читані Claude** — читаються на старті арку PharmaLens, після governance-паса. Джерела-попередники (VTM) — §7 |
@@ -145,9 +151,9 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 
 | буфер | канон-ціль | стан |
 |---|---|---|
-| `Lens_cookbook_delta_running.md` | Cookbook | 🟡 2 записи (A73/A75 cand.) |
-| `Lens_stagebench_delta_running.md` | `Lens_stagebench_manifest.md` | 🟡 4 записи (додано Д-В з b27 §2) |
-| `wsd_delta_running.md` | `Work_Standard.md` | 🟡 3 записи (4 відкриті кандидати + Д-1) |
+| `Lens_cookbook_delta_running.md` | Cookbook | 🟡 3 записи (A76 · A77 · A78 cand.) |
+| `Lens_stagebench_delta_running.md` | `Lens_stagebench_manifest.md` | 🟡 5 записів (додано Д-Г HARNESS-ШАБЛОН) |
+| `wsd_delta_running.md` | `Work_Standard.md` | 🟢 спорожнено 01.08 (мердж v2.27) · 3 нові кандидати Д-4/Д-5/Д-6 з b28 |
 
 **Правило:** буфер — не архів. Лежить довше 2–3 сесій → мерджити як є.
 
@@ -157,8 +163,8 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 
 | продукт | білд | стан |
 |---|---|---|
-| **StockCheck** | `StockCheck_port_b27.html` — v2.16.0 · b27 | 🟢 device✓, проєкт зафіксовано |
-| **QR Lens** | `QR_Lens_preview_batch58_2.html` | 🟡 відкрита черга Phase 3 |
+| **StockCheck** | `StockCheck_port_b28.html` — v2.17.0 · b28 | 🟡 xlsx-експорт, **чекає device-тест** |
+| **QR Lens** | `QR_Lens_preview_batch59.html` + `QR_Lens_template_v3.html` | 🟢 device✓ B59 · черга Phase 3 відкрита |
 | **KPI Lens** | `KPI_Lens_v2_preview_batch15_2.html` | 🟡 VBA/PQ у черзі |
 | **Drive Lens** | — | 🟡 Tab-3 / Tab-4 відкриті |
 
@@ -166,10 +172,10 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 
 | продукт | живі самері |
 |---|---|
-| **StockCheck** | `StockCheck_session_summary_b27.md` · `StockCheck_session_summary_b26_1_maintPort.md` |
-| **QR Lens** | `QR_Lens_session_summary_B59_perf_MICROSCOPE_WEB.md` · `QR_Lens_session_summary_B58_2ship_template_perfBug.md` |
+| **StockCheck** | `StockCheck_session_summary_b28_xlsxExport.md` · `StockCheck_session_summary_b27.md` |
+| **QR Lens** | `QR_Lens_session_summary_B59.md` · `QR_Lens_session_summary_B59_perf_MICROSCOPE_WEB.md` |
 | **KPI Lens** | `KPI_Lens_session_summary_Batch15_2.md` |
-| **Lens** *(governance)* | `Lens_session_summary_governance_B.md` · `Lens_session_summary_governance_A.md` |
+| **Lens** *(governance)* | `Lens_session_summary_governance_D.md` · `Lens_session_summary_governance_C.md` |
 | **Фармастор** | `АРХІВ-УСІ` — продукт перейменовано на StockCheck; канон живе у `Фармастор_v2_MASTER_LOCK.md` і `Фармастор_v2_PORT_REGISTER.md`, самері не потрібні жодні |
 
 **Як це працює.** Живе те, що названо **тут**. Усе інше G10 сам назве на виселення —
@@ -188,10 +194,11 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 | сесія | зміст | стан |
 |---|---|---|
 | **A** | виселення історії з wsd · `Lens_INDEX` · `Lens_PROFILE` · `wsd_delta_running` · розділ TODO | ✅ 30.07.2026 |
-| B | Cookbook → тематичні томи + `Lens_cookbook_INDEX.md`; розібрати cookbook-буфер тим самим проходом | ⬜ |
-| C | прополка wsd за К1/К2 · злиття дублів 12.x/13.x | ⬜ |
-| D | `Lens_matrix_INDEX.md` + `Lens_jsdom_boot.js` + `Lens_module_maint_v1` + A-запис на handoff-sweep | ⬜ |
-| E | чистка теки за wsd 1.8 · мердж stagebench-буфера · MASTER_LOCK refresh | ⬜ |
+| B | Cookbook → тематичні томи + `Lens_cookbook_INDEX.md` | ✅ 31.07.2026 |
+| C | звірка переносу · гейти G7–G10 · вісь фізичних місць (§8) | ✅ 31.07.2026 |
+| **D** | **прополка wsd → v2.27** · мердж буфера · 7 прецедентів · схема репо↔Project | ✅ 01.08.2026 |
+| E | `Lens_matrix_INDEX.md` + `Lens_jsdom_boot.js` + `Lens_module_maint_v1` + A-запис на handoff-sweep | ⬜ |
+| F | мердж stagebench-буфера · MASTER_LOCK refresh · розбір §7 | ⬜ |
 
 ---
 
@@ -231,6 +238,37 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 | **локальний ПК** | усе, що вижило своє «живе доки» | звалище; звідти нічого не видаляється |
 
 **Одним рядком:** репо — джерело · Project — читальня · ПК — архів.
+
+### Ціна підключення репо до Project *(заведено 01.08.2026)*
+
+**Механізм.** Підключення теки GitHub — **копіювання вмісту** в сховище Project, не посилання.
+Project під час розмови в GitHub не ходить: він тримає знімок, зроблений у момент підключення
+або останнього Sync. Тому підключена тека коштує рівно стільки, скільки важить.
+
+**Наслідки, які з цього випливають:**
+1. **`archive/` не підключається.** Коштував 29% capacity й не давав нічого, чого не дає
+   raw-виклик. Відключено 01.08.2026: 76% → 44%.
+2. **Ручних копій підключених файлів у Project не тримати.** Ручне завантаження і
+   GitHub-джерело — два різні механізми; вони не замінюють один одного, а **співіснують**,
+   тобто дають дублі й подвійну плату. Оновлення підключеної теки = кнопка **Sync**, не перезалив.
+3. **Вручну в Project лежить тільки те, чого в репо немає:** живі самері · живі білди `.html` ·
+   jsdom-матриці · `StockCheck_icon_gen.py`.
+4. **capacity Project ≠ контекст чату.** Файл, що лежить у Project, не витрачає контекст
+   сесії, доки його не прочитано. Це два різні бюджети; плутати їх — переоцінювати ціну зберігання.
+
+### Фолбек-драбина доступу до архіву
+
+|рівень|канал|стан|
+|---|---|---|
+|**0**|`kernel/` + `products/` уже в Project | мережа не потрібна взагалі — 95% роботи|
+|**1**|`api.github.com/…/git/trees/main?recursive=1` | увесь список одним запитом, найдешевше. **Ловить `403 rate limit`** — IP спільний|
+|**2**|`github.com/…/tree/main/<тека>` (HTML) | працює, коли API під лімітом — перевірено 01.08.2026|
+|**3**|**`Lens_ARCHIVE_INDEX.md`** → точне ім'я → raw-URL | **справжня страховка**: індекс лежить у `kernel/`, тобто **без мережі**; маючи ім'я, список не потрібен|
+|**4**|Konst скидає файл у чат | спрацьовує завжди|
+
+**Чому рівень 3 головний.** Він не залежить від жодного зовнішнього сервісу для *пошуку* —
+лише для *завантаження*. Це той самий принцип, що й 1.10: **звірка з оголошенням замість
+запиту до системи, яка може не відповісти**.
 
 **Тригер переїзду** — рядок «живе доки» (wsd 1.8) вичерпався:
 буфер змерджено → ПК · самері випало з §5 → ПК · канон-файл розпиляно → репо `archive/`.
