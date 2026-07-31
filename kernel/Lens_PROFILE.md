@@ -1,5 +1,5 @@
 > живе доки: назавжди (вічне, wsd 1.8)
-> KERNEL v1 · 30.07.2026 — спільне ядро сімейства Lens (переносне між Projects, `Lens_NEWPROJECT_bootstrap.md`)
+> KERNEL v2 · 31.07.2026 — спільне ядро сімейства Lens (переносне між Projects, `Lens_NEWPROJECT_bootstrap.md`)
 
 # Lens · PROFILE — робочий профіль оператора
 

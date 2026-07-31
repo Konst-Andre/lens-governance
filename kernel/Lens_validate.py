@@ -3,7 +3,7 @@
 """
 Lens_validate.py — єдиний гейт-скрипт сімейства Lens.
 живе доки: назавжди (вічне, wsd 1.8)
-KERNEL v1 · 30.07.2026
+KERNEL v2 · 31.07.2026
 
 ДВА РЕЖИМИ:
 
@@ -35,8 +35,11 @@ import sys, os, re, glob, subprocess, tempfile
 
 KERNEL_FILES = [
     'Lens_INDEX.md', 'Lens_PROFILE.md', 'Work_Standard.md',
-    'Work_Standard_HISTORY.md', 'Lens_iOS_cookbook.md',
-    'Lens_NEWPROJECT_bootstrap.md',
+    'Work_Standard_HISTORY.md', 'Lens_NEWPROJECT_bootstrap.md',
+    'Lens_cookbook_INDEX.md',
+    'Lens_iOS_cookbook_1_platform.md', 'Lens_iOS_cookbook_2_navigation.md',
+    'Lens_iOS_cookbook_3_material.md', 'Lens_iOS_cookbook_4_components.md',
+    'Lens_iOS_cookbook_5_motion.md',
 ]
 SIGNAL_KB, RED_KB = 120, 200
 

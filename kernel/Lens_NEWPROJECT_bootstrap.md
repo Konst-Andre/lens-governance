@@ -1,4 +1,4 @@
-> KERNEL v1 · 30.07.2026 — спільне ядро сімейства Lens
+> KERNEL v2 · 31.07.2026 — спільне ядро сімейства Lens
 > живе доки: назавжди (вічне, wsd 1.8)
 
 # Lens · NEWPROJECT — рецепт заведення нового Project
@@ -35,7 +35,7 @@
 | 2 | `Lens_PROFILE.md` | профіль оператора — заміна непереносимій пам'яті |
 | 3 | `Work_Standard.md` | протокол |
 | 4 | `Work_Standard_HISTORY.md` | історія протоколу (точкове читання) |
-| 5 | `Lens_iOS_cookbook.md` *(після сесії B — томи + `Lens_cookbook_INDEX.md`)* | патерни |
+| 5 | `Lens_cookbook_INDEX.md` + 5 томів `Lens_iOS_cookbook_N_*.md` | патерни |
 | 6 | `Lens_stagebench_manifest.md` · `Lens_sandbox_manifest.md` · `Lens_fx_candidates.md` | методи роботи |
 | 7 | три буфери `*_delta_running.md` | вхідні лотки |
 
@@ -94,7 +94,7 @@
 1. Lens_INDEX.md — маршрутизатор, завжди першим
 2. останнє <НАЗВА>_session_summary_*.md — контекст попередньої сесії
 3. Work_Standard.md (wsd) — протокол, цілком
-4. Lens_iOS_cookbook.md — точково за індексом, якщо задача торкається iOS/PWA/UI
+4. Lens_cookbook_INDEX.md → потрібний том Lens_iOS_cookbook_N_*.md — точково, том цілком не читати
 
 МАРКЕР НАВАНТАЖЕННЯ ЧАТУ — жорстко останнім рядком КОЖНОЇ відповіді (wsd 1.2),
 і дубльований у полі question віджета ask_user_input_v0:

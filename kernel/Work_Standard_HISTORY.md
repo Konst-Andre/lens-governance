@@ -1,5 +1,9 @@
 > живе доки: назавжди (вічне, 1.8) · читається ТОЧКОВО, не на старті сесії
-> KERNEL v1 · 30.07.2026 — спільне ядро сімейства Lens (переносне між Projects, `Lens_NEWPROJECT_bootstrap.md`)
+> KERNEL v2 · 31.07.2026 — спільне ядро сімейства Lens (переносне між Projects, `Lens_NEWPROJECT_bootstrap.md`)
+
+> **KERNEL v2 (31.07.2026), сесія B:** `Lens_iOS_cookbook.md` розпиляно на 5 томів +
+> `Lens_cookbook_INDEX.md`. Згадки моноліту нижче — **історичні**: читати як «Cookbook»,
+> маршрут номер→том брати в індексі. Нумерація A-записів наскрізна, посилання дійсні.
 
 # Work Standard — HISTORY
 

@@ -1,9 +1,9 @@
 > живе доки: назавжди (вічне, wsd 1.8) · **читається ПЕРШИМ у кожній сесії** (wsd 1.1)
-> KERNEL v1 · 30.07.2026 — спільне ядро сімейства Lens (переносне між Projects, `Lens_NEWPROJECT_bootstrap.md`)
+> KERNEL v2 · 31.07.2026 — спільне ядро сімейства Lens (переносне між Projects, `Lens_NEWPROJECT_bootstrap.md`)
 
 # Lens · INDEX — маршрутизатор бази знань
 
-**Ядро: KERNEL v1 (30.07.2026).** Усі файли §3 «Вічне» мусять нести цей самий штамп у 2-му рядку.
+**Ядро: KERNEL v2 (31.07.2026).** Усі файли §3 «Вічне» мусять нести цей самий штамп у 2-му рядку.
 Штамп не збігається → ядро розійшлось між Projects → правити ДО початку роботи ( §3).
 
 > **Що це.** Єдина карта: *яке питання → який файл*. Коштує ~6 KB і скорочує решту читань,
@@ -43,7 +43,10 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/kernel/<фа�
 ```bash
 B=https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/kernel
 for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md \
-         Lens_iOS_cookbook.md Lens_NEWPROJECT_bootstrap.md; do
+         Lens_cookbook_INDEX.md Lens_NEWPROJECT_bootstrap.md \
+         Lens_iOS_cookbook_1_platform.md Lens_iOS_cookbook_2_navigation.md \
+         Lens_iOS_cookbook_3_material.md Lens_iOS_cookbook_4_components.md \
+         Lens_iOS_cookbook_5_motion.md; do
   c=$(curl -s -o /tmp/f -w "%{http_code}" "$B/$f")
   echo "$c $(head -3 /tmp/f | grep -o 'KERNEL v[0-9]*' | head -1) $f"; done
 ```
@@ -60,7 +63,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 | 1 | **`Lens_INDEX.md`** | завжди |
 | 2 | **останнє самері продукту** | завжди (відкриті питання — зверху) |
 | 3 | **`Work_Standard.md`** | завжди, цілком — це протокол |
-| 4 | `Lens_iOS_cookbook.md` | точково за індексом, якщо задача торкається iOS/PWA/UI |
+| 4 | `Lens_cookbook_INDEX.md` → потрібний том | точково за індексом, якщо задача торкається iOS/PWA/UI. **Том цілком не читати** |
 | 5 | `<Product>_MASTER_LOCK.md` + релевантні `*_valuesLOCK.md` | якщо торкаємось локнутого компонента |
 | 6 | `Work_Standard_HISTORY.md` | **лише** якщо правило посилається на `14.x` і треба контекст |
 
@@ -71,7 +74,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 | роль | питання | дім |
 |---|---|---|
 | **протокол** | *як ми працюємо* | `Work_Standard.md` |
-| **патерн** | *як робиться ця річ* | `Lens_iOS_cookbook.md` (том за темою) |
+| **патерн** | *як робиться ця річ* | `Lens_cookbook_INDEX.md` → том за темою |
 | **значення** | *які саме числа* | `*_valuesLOCK.md` · `*_MASTER_LOCK.md` |
 | **код** | *дай робочий фрагмент* | донор-модуль `Lens_module_*` |
 
@@ -91,7 +94,12 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 ### Патерни
 | файл | що в ньому |
 |---|---|
-| `Lens_iOS_cookbook.md` | A1–A72 універсальні iOS/PWA/UI патерни + Частина B продукт-специфічне + Частина C deploy-чек-ліст |
+| `Lens_cookbook_INDEX.md` | **вхід**: мапа томів · задача→запис→том · номер→том · ланцюги залежностей · глобальний контекст |
+| `Lens_iOS_cookbook_1_platform.md` | оболонка, viewport, safe-area, теми-інфраструктура, іконки, середовище + Частина C deploy |
+| `Lens_iOS_cookbook_2_navigation.md` | bottom sheet, nav, app-bar, свайп рядка, календарі/пікери |
+| `Lens_iOS_cookbook_3_material.md` | матеріал, elevation, recess, поверхні, колірна семантика |
+| `Lens_iOS_cookbook_4_components.md` | контроли: селект, тогл, чіп, плитка, тост, нативні поля + Частина B продукт-специфічне |
+| `Lens_iOS_cookbook_5_motion.md` | motion-мова, press, жест/axis-lock, stagger, scroll-linked |
 
 ### Методи роботи (не код продукту)
 | файл | що в ньому |
