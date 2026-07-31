@@ -3,8 +3,14 @@
 
 # Lens · INDEX — маршрутизатор бази знань
 
-**Ядро: KERNEL v2 (31.07.2026).** Усі файли §3 «Вічне» мусять нести цей самий штамп у 2-му рядку.
-Штамп не збігається → ядро розійшлось між Projects → правити ДО початку роботи ( §3).
+**Ядро: KERNEL v2 (31.07.2026).** Штамп несуть **13 файлів ядра** — 12 `.md` зі списку §0
++ `Lens_validate.py`. Це **переносний** між Projects набір. Решта вічних файлів (маніфести
+методів, `*_valuesLOCK`, `*_MASTER_LOCK`) штампа НЕ несуть: вони прив'язані до продукту,
+а не до ядра. Штамп не збігається → ядро розійшлось → правити ДО початку роботи.
+
+> **Чому не «всі вічні»:** штамп означає «мене можна цілком перенести в новий Project».
+> `StockCheck_MASTER_LOCK` переносити нікуди — він помре разом із продуктом.
+> Гейт **G2** перевіряє рівно ці 12 і мовчить про решту — це задумано, не прогалина.
 
 > **Що це.** Єдина карта: *яке питання → який файл*. Коштує ~6 KB і скорочує решту читань,
 > бо називає адресата задачі одразу, замість «прочитати wsd наосліп і сподіватись».
@@ -43,7 +49,7 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/kernel/<фа�
 ```bash
 B=https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/kernel
 for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md \
-         Lens_cookbook_INDEX.md Lens_NEWPROJECT_bootstrap.md \
+         Lens_cookbook_INDEX.md Lens_NEWPROJECT_bootstrap.md Lens_ARCHIVE_INDEX.md \
          Lens_iOS_cookbook_1_platform.md Lens_iOS_cookbook_2_navigation.md \
          Lens_iOS_cookbook_3_material.md Lens_iOS_cookbook_4_components.md \
          Lens_iOS_cookbook_5_motion.md; do
@@ -119,6 +125,11 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 | **QR Lens** | `QR_Lens_srpill_valuesLOCK.md` · `QR_Lens_srmotion_valuesLOCK.md` · `QR_Lens_probrow_PARAMS_LOCK.md` · `QR_Lens_statusgauge_BENCHLOCK.md` · `QR_Lens_CTA_mechanic_LOCK.md` · `QR_Lens_export_contract_v1.md` |
 | **Фармастор** *(попередня назва StockCheck)* | `Фармастор_v2_MASTER_LOCK.md` · `Фармастор_history_badge_valuesLOCK.md` · `Фармастор_v2_PORT_REGISTER.md` |
 | **Drive Lens** | `Drive_Lens_concept_v1_3.md` · `Drive_Lens_logic_audit_findings.md` |
+| **PharmaLens** *(5-й продукт; ребренд робочої назви VTM Lens, 30.07.2026)* | `PharmaLens_Claude_Handover.md` — консолідований контекст напрацювань · `PharmaLens_Independent_Design_Research_Handover.md` — бриф на пошук варіативності (токени/мова/структура). **Ще не читані Claude** — читаються на старті арку PharmaLens, після governance-паса. Джерела-попередники (VTM) — §7 |
+
+> **⌛ Названі тут, але фізично поза Project** (у локальному архіві — підняти при дотику до компонента):
+> `QR_Lens_probrow_PARAMS_LOCK.md` · `QR_Lens_statusgauge_BENCHLOCK.md` · `QR_Lens_CTA_mechanic_LOCK.md`.
+> Гейт **G8** показує їх як ⚠, і це коректний стан, не помилка.
 
 ### Код і інструменти
 | файл | що це |
@@ -151,6 +162,21 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 | **KPI Lens** | `KPI_Lens_v2_preview_batch15_2.html` | 🟡 VBA/PQ у черзі |
 | **Drive Lens** | — | 🟡 Tab-3 / Tab-4 відкриті |
 
+### Живі самері — стеля 2 на продукт (wsd 1.8, дім оголошення для гейта **G10**)
+
+| продукт | живі самері |
+|---|---|
+| **StockCheck** | `StockCheck_session_summary_b27.md` · `StockCheck_session_summary_b26_1_maintPort.md` |
+| **QR Lens** | `QR_Lens_session_summary_B59_perf_MICROSCOPE_WEB.md` · `QR_Lens_session_summary_B58_2ship_template_perfBug.md` |
+| **KPI Lens** | `KPI_Lens_session_summary_Batch15_2.md` |
+| **Lens** *(governance)* | `Lens_session_summary_governance_B.md` · `Lens_session_summary_governance_A.md` |
+| **Фармастор** | `АРХІВ-УСІ` — продукт перейменовано на StockCheck; канон живе у `Фармастор_v2_MASTER_LOCK.md` і `Фармастор_v2_PORT_REGISTER.md`, самері не потрібні жодні |
+
+**Як це працює.** Живе те, що названо **тут**. Усе інше G10 сам назве на виселення —
+рішення «що архівне» не приймається в голові й не вгадується за датою (при завантаженні
+в Project дати губляться; алфавіт ставить `b27` перед `b9` → гейт пропонував би
+виселити найновіше). Оголошення замість вгадування — той самий механізм, що й G3.
+
 Плани продуктів: `QR_Lens_forward_plan.md` *(колишній `wsd_TODO_running.md`)*.
 
 ---
@@ -182,9 +208,33 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 | `wsd_TODO_delta_collapsible-cat-levers.md` | буфер → злити у `wsd_delta_running.md` |
 | `QR_Lens_bannerJank_external_brief.md` | одноразове (закрито) → архів |
 | `KPI_Lens_categories_Excel_impl_Batch15.md` | одноразове → архів |
-| `Drive_Lens_concept_v1.md` · `_v1_2.md` | витіснені `_v1_3` → архів |
-| `VTM_Lens_foundation_spec_v0_3.md` · `VTM_Lens_deep-research-report_GPT.md` · `Аналіз_Дизайну_ВТМ_Lens_Gemini__3_6.md` | **VTM Lens** — п'ятий продукт, ще не заведений; свій Project |
+| `Drive_Lens_concept_v1.md` · `Drive_Lens_concept_v1_2.md` | витіснені `Drive_Lens_concept_v1_3.md` → архів |
+| `VTM_Lens_foundation_spec_v0_3.md` · `VTM_Lens_deep-research-report_GPT.md` · `Аналіз_Дизайну_ВТМ_Lens_Gemini__3_6.md` · `vtm_lens_spa_with_gemini_ai.html` | **джерела-попередники PharmaLens** (писані Gemini / GPT, Claude їх не читав). Живуть **до 1–2 читання Claude** на старті арку PharmaLens: консолідація в `PharmaLens_*_Handover.md` могла їх витіснити, але це не доведено, доки не звірено. Тригер архівації = звірка виконана |
 
 **Детектор (К2):** `python3 Lens_validate.py --gov .` → гейт G3 валить кожен .md,
 не названий у цьому файлі. Секція §7 — легальний дім для «ще не розібраного»,
 але вона мусить порожніти, а не рости.
+
+
+---
+
+## §8 Фізичні місця — де файл ЛЕЖИТЬ (⟂ §2, де він за роллю)
+
+> Заведено 31.07.2026. §2 відповідає «в який файл писати». §8 — «де цей файл живе
+> і куди він переїжджає». Дві різні осі; плутанина виникає рівно тоді, коли їх злити.
+
+| місце | що там живе | хто і як править |
+|---|---|---|
+| **репо `kernel/`** | 13 файлів ядра (§0) | **джерело правди.** Канон правиться тут |
+| **репо `archive/`** | канон-файли, що відслужили (моноліт Cookbook) | `git mv`, **не** `rm` — нічого не гине |
+| **Project knowledge** | копія ядра · `*_valuesLOCK` / `*_MASTER_LOCK` продуктів · непорожні буфери · **живі самері (§5)** · живі білди й стенди | завантаження копій; читальня |
+| **локальний ПК** | усе, що вижило своє «живе доки» | звалище; звідти нічого не видаляється |
+
+**Одним рядком:** репо — джерело · Project — читальня · ПК — архів.
+
+**Тригер переїзду** — рядок «живе доки» (wsd 1.8) вичерпався:
+буфер змерджено → ПК · самері випало з §5 → ПК · канон-файл розпиляно → репо `archive/`.
+
+**Детектор (К2).** Не тримати цей маршрут у голові: гейти рахують його самі —
+**G10** називає самері на виселення, **G7** ловить буфер, що пережив ціль,
+**G8** показує посилання на те, чого в Project уже немає.

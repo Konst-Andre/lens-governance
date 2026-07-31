@@ -15,6 +15,11 @@ KERNEL v2 · 31.07.2026
       G4 посилання 14.x з wsd резолвляться у Work_Standard_HISTORY.md
       G5 вік буферів: непорожній *_delta_running.md → нагадування про стелю 2-3 сесії
       G6 стеля обсягу: >120KB сигнал, >200KB червона межа
+      G7 мертвий буфер: «Куди канонити/мерджити» вказує на неіснуючий файл
+         АБО цільовий A-запис уже стоїть у томі Cookbook
+      G8 сирота-посилання: `Ім'я.md` у канон-файлі, а файлу в теці немає
+      G9 дубль A-номера між томами Cookbook
+      G10 перепис самері: >2 на продукт → друкує список найстаріших на архів
 
   python3 Lens_validate.py --html <file.html>
       Перед-видачні гейти білда (wsd Кластер 3 / 10).
@@ -39,7 +44,7 @@ KERNEL_FILES = [
     'Lens_cookbook_INDEX.md',
     'Lens_iOS_cookbook_1_platform.md', 'Lens_iOS_cookbook_2_navigation.md',
     'Lens_iOS_cookbook_3_material.md', 'Lens_iOS_cookbook_4_components.md',
-    'Lens_iOS_cookbook_5_motion.md',
+    'Lens_iOS_cookbook_5_motion.md', 'Lens_ARCHIVE_INDEX.md',
 ]
 SIGNAL_KB, RED_KB = 120, 200
 
@@ -154,6 +159,110 @@ def gov(root):
             warn(f'{f} — {kb:.0f} KB > {SIGNAL_KB} KB сигнал: планувати розпил'); big = True
     if not big:
         ok(f'усі файли ≤ {SIGNAL_KB} KB')
+
+    # ── G7 — мертвий буфер ────────────────────────────────────────────────
+    # Тригер: файл несе рядок «Куди канонити» / «Куди мерджити».
+    # Самері виключені: там це переказ чужого маршруту, не власна ціль (Д-1).
+    print('\n[G7] мертвий буфер — ціль уже закрита')
+    vols = {f: open(os.path.join(root, f), encoding='utf-8').read()
+            for f in mds if re.match(r'Lens_iOS_cookbook_\d', f)}
+    g7 = False
+    for f in mds:
+        if 'session_summary' in f:
+            continue
+        body = open(os.path.join(root, f), encoding='utf-8').read()
+        lines = [l for l in body.splitlines() if re.search(r'Куди (канонити|мерджити)', l)]
+        # секційний заголовок «## Куди канонити» → брати абзац під ним
+        if re.search(r'^#+\s*Куди (канонити|мерджити)', body, re.M):
+            for m in re.finditer(r'^#+\s*Куди (?:канонити|мерджити).*?$(.*?)(?=^#|\Z)',
+                                 body, re.M | re.S):
+                lines += m.group(1).splitlines()
+        if not lines:
+            continue
+        head = '\n'.join(body.splitlines()[:12])
+        # Закриття, задокументоване у файлі, — правильний стан, не порушення.
+        # Без цієї гілки гейт валив би буфер саме за те, що той виконав вимогу (Д-1).
+        closed = 'ЗАКРИТО' in head or 'ПЕРЕНАВЕДЕНО' in head
+        blob = '\n'.join(lines)
+        for tgt in set(re.findall(r'`([^`]+\.md)`', blob)):
+            if tgt not in mds and not closed:
+                fail(f'{f} → ціль `{tgt}` не існує в теці (розпиляна/перейменована)'); g7 = True
+        for num in sorted(set(re.findall(r'\bA(\d+)\b', blob))):
+            hit = [v for v, t in vols.items() if re.search(rf'^## A{num}\.', t, re.M)]
+            if hit and not closed:
+                fail(f'{f} → A{num} уже канонізовано ({hit[0]}) — буфер пережив ціль (wsd 1.8)')
+                g7 = True
+            elif hit:
+                warn(f'{f} → ціль A{num} закрито й задокументовано; лишився один прохід → архів')
+                g7 = True
+    if not g7:
+        ok('живих буферів з мертвою ціллю немає')
+
+    # ── G8 — сирота-посилання ─────────────────────────────────────────────
+    print('\n[G8] сирота-посилання в канон-файлах')
+    canon = [f for f in mds if f in KERNEL_FILES]
+    orphans = {}
+    for f in canon:
+        body = open(os.path.join(root, f), encoding='utf-8').read()
+        for ref in set(re.findall(r'`([A-Za-zА-Яа-яЇїІіЄєҐґ0-9_\-\.]+\.(?:md|py|js))`', body)):
+            if not os.path.exists(os.path.join(root, ref)):
+                orphans.setdefault(ref, []).append(f)
+    if orphans:
+        for ref, src in sorted(orphans.items()):
+            warn(f'`{ref}` — згаданий у {", ".join(src)}, файлу в теці немає '
+                 f'(норма, якщо в архіві; ✗, якщо ціль живого маршруту)')
+    else:
+        ok('усі посилання канон-файлів резолвляться')
+
+    # ── G9 — дубль A-номера між томами ────────────────────────────────────
+    print('\n[G9] унікальність A-номерів між томами')
+    seen, dup = {}, False
+    for v, t in vols.items():
+        for num in re.findall(r'^## (A\d+(?:\.\d+)?)\.', t, re.M):
+            if num in seen:
+                fail(f'{num} — і в {seen[num]}, і в {v}: дубль після розпилу'); dup = True
+            else:
+                seen[num] = v
+    if vols and not dup:
+        ok(f'{len(seen)} A-записів, дублів немає')
+    elif not vols:
+        warn('томів Cookbook у теці немає — гейт пропущено')
+
+    # ── G10 — перепис самері (wsd 1.8: ≤2 на продукт) ─────────────────────
+    print('\n[G10] перепис самері — що виселяти')
+    groups = {}
+    for f in mds:
+        m = re.match(r'(.+?)_session_summary', f)
+        if m:
+            groups.setdefault(m.group(1), []).append(f)
+    if not groups:
+        ok('самері в теці немає')
+    # Живі самері ОГОЛОШУЮТЬСЯ в Lens_INDEX.md §5, не вгадуються за датою:
+    # при завантаженні в Project mtime губиться, а алфавіт ставить b27 перед
+    # b9 → гейт пропонував би виселити найновіше (клас помилки Д-1).
+    idx = open(idxp, encoding='utf-8').read() if os.path.exists(idxp) else ''
+    for prod, fs in sorted(groups.items()):
+        live = [f for f in fs if f in idx]
+        dead = [f for f in fs if f not in idx]
+        retired = re.search(rf'\*\*{re.escape(prod)}\*\*[^|]*\|[^|]*АРХІВ-УСІ', idx) \
+                  or re.search(rf'{re.escape(prod)}[^\n]*АРХІВ-УСІ', idx)
+        if retired:
+            warn(f'{prod} — оголошено АРХІВ-УСІ ({len(fs)} шт. на виселення):')
+            for f in sorted(fs):
+                print(f'      · {f}')
+            continue
+        if not live and len(fs) > 2:
+            warn(f'{prod} — {len(fs)} самері, жодне не оголошене живим у Lens_INDEX.md §5. '
+                 f'Оголоси 1–2 → гейт назве решту сам')
+            continue
+        if len(live) > 2:
+            warn(f'{prod} — живими оголошено {len(live)} самері, стеля 2 (wsd 1.8)')
+        if dead:
+            warn(f'{prod} — НА АРХІВ ({len(dead)} з {len(fs)}); живі: {", ".join(live) or "—"}')
+            for f in dead:
+                print(f'      · {f}')
+        else:
+            ok(f'{prod} — {len(fs)} шт., усі оголошені живими')
 
 
 # ────────────────────────────────── HTML ──────────────────────────────────
