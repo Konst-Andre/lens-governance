@@ -1,0 +1,483 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>StockCheck · island-harness v1</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --font:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --ah:162;
+  --benchbg:#dfe3e6; --benchpanel:#f4f6f7; --benchink:#232a2e; --benchmut:#6a767c; --benchbord:#cdd4d8;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--benchbg);color:var(--benchink);-webkit-font-smoothing:antialiased}
+
+/* ===== THEME TOKENS (per-frame) ===== */
+.frame[data-theme=light]{
+  --bg:#eef3f1; --bg-soft:#e4ece9; --card:#ffffff; --surface-2:#f4f8f6; --surface-3:#eef4f1;
+  --text:#182c28; --text-2:#3c574f; --muted:#6b8c84; --border:#d4e5df; --border-subtle:#e1ebe7;
+  --ok:#1f9d57; --crit:#c0392b; --warn:#c8811b;
+  --accent:hsl(var(--ah) 82% 28%); --accent-ink:hsl(var(--ah) 82% 16%);
+  --comet-a:hsl(var(--ah) 72% 30%); --comet-b:hsl(var(--ah) 55% 66%);
+  --tilebord:rgba(20,50,42,.10);
+  /* island material — light physics */
+  --islBaseR:245; --islBaseG:249; --islBaseB:247;   /* neutral surface rgb */
+  --islTintR:210; --islTintG:238; --islTintB:230;   /* accent-tinted rgb */
+  --liftShadow:0 6px 20px -6px rgba(20,50,42,.22),0 2px 6px rgba(20,50,42,.10);
+  --rimCol:rgba(20,50,42,.10);
+}
+.frame[data-theme=dark]{
+  --bg:#0d1512; --bg-soft:#151e1a; --card:#18221e; --surface-2:#1c2723; --surface-3:#212d28;
+  --text:#e8f0ec; --text-2:#a7c0b8; --muted:#7c968d; --border:#2a3833; --border-subtle:#222e29;
+  --ok:#33c06f; --crit:#e0685c; --warn:#e0a94a;
+  --accent:hsl(var(--ah) 50% 46%); --accent-ink:hsl(var(--ah) 46% 68%);
+  --comet-a:hsl(var(--ah) 48% 42%); --comet-b:hsl(var(--ah) 40% 68%);
+  --tilebord:rgba(255,255,255,.10);
+  /* island material — dark physics (tone-lift, no drop) */
+  --islBaseR:38; --islBaseG:51; --islBaseB:46;
+  --islTintR:30; --islTintG:58; --islTintB:52;
+  --liftShadow:0 8px 22px -8px rgba(0,0,0,.5);
+  --rimCol:rgba(255,255,255,.08);
+}
+
+/* ===== BENCH SHELL ===== */
+.top{display:flex;align-items:center;gap:8px;padding:7px 12px;background:#fff;border-bottom:1px solid var(--benchbord);position:sticky;top:0;z-index:50}
+.top h1{font-size:13.5px;font-weight:800;letter-spacing:-.2px;white-space:nowrap}
+.top .sub{font-size:11px;color:var(--benchmut);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:230px}
+.top .sp{flex:1}
+.btn{font-family:var(--font);font-weight:700;font-size:12px;border:1px solid var(--benchbord);background:#fff;color:var(--benchink);border-radius:8px;padding:6px 10px;cursor:pointer;white-space:nowrap}
+.btn:active{transform:scale(.96)}
+.btn.pri{background:#1f9d57;color:#fff;border-color:transparent}
+.wrap{display:flex;gap:0;align-items:flex-start}
+.stage{flex:1;min-width:0;padding:16px;display:flex;gap:26px;flex-wrap:wrap;justify-content:center;overflow:auto;height:calc(100vh - 44px)}
+.panel{width:352px;flex:none;background:var(--benchpanel);border-left:1px solid var(--benchbord);height:calc(100vh - 44px);overflow:auto;padding:16px 16px 80px;transition:width .24s ease,padding .24s ease}
+.wrap.pcol .panel{width:0;padding:0;border-left:0;overflow:hidden}
+@media(max-width:760px){.top .sub{display:none}}
+
+/* ===== DEVICE FRAME ===== */
+.dev{display:flex;flex-direction:column;align-items:center;gap:8px}
+.dev-cap{font-size:11px;font-weight:800;letter-spacing:.3px;color:var(--benchmut);text-transform:uppercase}
+.dev-cap b{color:var(--benchink)}
+.dev-sel{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;max-width:220px}
+.dev-sel button{font-family:var(--font);font-size:10.5px;font-weight:700;border:1px solid var(--benchbord);background:#fff;color:var(--benchmut);border-radius:7px;padding:4px 8px;cursor:pointer}
+.dev-sel button.on{background:var(--benchink);color:#fff;border-color:transparent}
+
+.frame{position:relative;background:#000;border-radius:44px;padding:11px;box-shadow:0 18px 40px -12px rgba(0,0,0,.4),0 3px 10px rgba(0,0,0,.2);transform-origin:top center}
+.screen{position:relative;background:var(--bg);border-radius:34px;overflow:hidden;display:flex;flex-direction:column}
+.frame[data-device=xs]  .screen{width:375px;height:812px}
+.frame[data-device=pro] .screen{width:393px;height:852px}
+
+.osbar{position:relative;flex:none;display:flex;align-items:flex-end;justify-content:space-between;padding:0 30px 6px;color:var(--text);font-weight:700;z-index:30}
+.frame[data-device=xs]  .osbar{height:44px;font-size:15px}
+.frame[data-device=pro] .osbar{height:59px;font-size:16px}
+.osbar .time{letter-spacing:-.3px}
+.osbar .ind{display:flex;align-items:center;gap:6px}
+.cutout{position:absolute;left:50%;transform:translateX(-50%);background:#000;z-index:31}
+.frame[data-device=xs]  .cutout{top:0;width:164px;height:30px;border-radius:0 0 20px 20px}
+.frame[data-device=pro] .cutout{top:11px;width:122px;height:35px;border-radius:20px}
+
+/* ===== APP AREA (scroll behind island) ===== */
+.app{position:relative;flex:1;overflow:hidden}
+.scroll{position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 14px 40px}
+.spacer{flex:none}
+
+/* ===== ISLAND (floating glass) ===== */
+.isl{position:absolute;left:var(--isl-inset);right:var(--isl-inset);z-index:20;
+  border-radius:var(--isl-radius);
+  background:var(--isl-bg);
+  -webkit-backdrop-filter:blur(var(--isl-blur)) saturate(var(--isl-sat));
+  backdrop-filter:blur(var(--isl-blur)) saturate(var(--isl-sat));
+  box-shadow:var(--isl-lift);
+  border:1px solid var(--isl-rim);
+  overflow:hidden;transition:none}
+.frame[data-theme=dark] .isl::before{content:"";position:absolute;inset:0 0 auto 0;height:1px;background:rgba(255,255,255,var(--isl-ridge,.06));z-index:2;pointer-events:none}
+.frame[data-glass=off] .isl{-webkit-backdrop-filter:none;backdrop-filter:none;background:var(--bg);box-shadow:none;border-color:var(--border)}
+.frame[data-glass=off][data-scroll=A] .isl{border-radius:0;border:0;border-bottom:1px solid var(--border);left:0;right:0}
+
+.isl-brand{display:flex;align-items:center;gap:var(--gap)px;padding:11px 12px 11px;overflow:hidden;
+  height:var(--brandH,auto);opacity:var(--brandOp,1)}
+.brand{display:flex;align-items:center;min-width:0;flex:1;gap:inherit}
+.brand .ic{flex:none;display:grid;place-items:center}
+.brand .wm{font-weight:var(--wm-weight,800);letter-spacing:var(--wm-space,-1.2px);white-space:nowrap;line-height:1;filter:brightness(var(--val-b,1))}
+.wm .s1{color:var(--text)} .wm .s2{color:var(--accent)}
+.hbtn,.netbtn{flex:none;display:grid;place-items:center;background:var(--surface-2);border:1px solid var(--border);border-radius:12px;cursor:pointer;width:var(--btn,44px);height:var(--btn,44px)}
+.hbtn:active,.netbtn:active{transform:scale(.9)}
+.dots{display:flex}.dots i{width:4px;height:4px;border-radius:50%;background:var(--text-2);display:block}
+
+/* net tile + protection */
+.ntile{display:grid;place-items:center;overflow:hidden;flex:none;position:relative;box-shadow:var(--bdg-lift,none)}
+.ntile .mono{font-weight:800;line-height:1;text-align:center}
+.plate{display:grid;place-items:center;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:3px}
+
+/* in-island filter bar (model B / and search) */
+.isl-filt{padding:0 10px 10px;display:flex;flex-direction:column;gap:8px;opacity:var(--filtOp,1)}
+.frow{display:flex;align-items:center;gap:7px}
+.pill{display:flex;align-items:center;gap:5px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:6px 10px;font-size:12.5px;font-weight:700;color:var(--text-2);filter:brightness(var(--mut-b,1))}
+.cnt{margin-left:auto;color:var(--muted);font-size:12.5px;font-weight:700;filter:brightness(var(--mut-b,1))}
+.chips{display:flex;gap:7px;overflow:hidden}
+.chip{flex:none;font-size:12.5px;font-weight:700;padding:6px 12px;border-radius:20px;background:var(--surface-2);border:1px solid var(--border);color:var(--text-2)}
+.chip.on{background:linear-gradient(180deg,hsl(var(--ah) 82% 31%),hsl(var(--ah) 82% 26%));color:#fff;border-color:transparent}
+.frame[data-theme=dark] .chip.on{background:linear-gradient(180deg,hsl(var(--ah) 46% 50%),hsl(var(--ah) 46% 44%))}
+.well{display:flex;align-items:center;gap:8px;background:var(--bg-soft);border:1px solid var(--border-subtle);border-radius:14px;padding:11px 13px;color:var(--muted);font-size:14px;font-weight:600;box-shadow:inset 0 1px 2px rgba(20,50,42,.05);filter:brightness(var(--mut-b,1))}
+.frame[data-theme=dark] .well{box-shadow:inset 0 1px 3px rgba(0,0,0,.35)}
+
+/* free-flow filter block (model A — scrolls) */
+.flow-filt{display:flex;flex-direction:column;gap:9px;margin-bottom:10px}
+
+/* pharmacy card */
+.pcard{background:var(--card);border:1px solid var(--border-subtle);border-radius:20px;padding:12px 13px;margin-bottom:10px;box-shadow:0 1px 2px rgba(20,50,42,.06);position:relative}
+.frame[data-theme=dark] .pcard{background:linear-gradient(180deg,#1c2723,#18221e);box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}
+.pcard .addr{font-size:15px;font-weight:700;color:var(--text);line-height:1.25}
+.pcard .city{font-size:12.5px;color:var(--muted);font-weight:600;margin-top:1px}
+.pcard .cats{display:flex;gap:12px;margin-top:8px;font-size:12px;font-weight:800;color:var(--accent)}
+.pcard .foot{display:flex;align-items:center;margin-top:12px;padding-top:10px;border-top:1px solid var(--border-subtle)}
+.pcard .anch{font-size:11.5px;color:var(--muted);font-weight:700}
+.pcard .hist{margin-left:auto;font-size:12px;font-weight:700;color:var(--text-2);background:var(--surface-2);border:1px solid var(--border);border-radius:9px;padding:5px 9px}
+.homeind{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);width:134px;height:5px;border-radius:3px;background:var(--text);opacity:.28;z-index:30}
+
+/* ===== CONTROL PANEL ===== */
+.grp{background:#fff;border:1px solid var(--benchbord);border-radius:12px;padding:12px 12px;margin-bottom:12px}
+.grp h3{font-size:11px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--benchmut);margin-bottom:9px}
+.row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.row label{font-size:12px;font-weight:700;width:88px;flex:none;color:var(--benchink)}
+.row input[type=range]{flex:1;accent-color:#1f9d57;min-width:0}
+.row .val{width:44px;flex:none;text-align:right;font-size:11.5px;font-weight:800;color:#1f9d57}
+.segbtns{display:flex;gap:5px;flex-wrap:wrap;flex:1}
+.segbtns button{font-family:var(--font);font-size:11px;font-weight:700;border:1px solid var(--benchbord);background:#fff;color:var(--benchmut);border-radius:8px;padding:5px 9px;cursor:pointer}
+.segbtns button.on{background:#1f9d57;color:#fff;border-color:transparent}
+.presets{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.presets button{font-family:var(--font);font-size:11.5px;font-weight:800;border:1px solid var(--benchbord);background:#fff;color:var(--benchink);border-radius:9px;padding:7px 10px;cursor:pointer}
+.presets button.on{background:var(--benchink);color:#fff;border-color:transparent}
+.leg{font-size:11px;line-height:1.45;color:var(--benchmut);margin-top:6px}
+.leg b{color:var(--benchink)}
+.chk{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;margin-bottom:6px;cursor:pointer}
+.cpArea{position:absolute;left:-9999px}
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>island-harness <span style="color:var(--benchmut);font-weight:600">v2</span></h1>
+  <span class="sub">scroll A⇄B × P0–P3 · живий скрол під склом</span>
+  <span class="sp"></span>
+  <button class="btn" id="zoomOut">−</button>
+  <button class="btn" id="zoomIn">+</button>
+  <button class="btn" id="panelTgl">⚙ Сховати</button>
+  <button class="btn pri" id="copyBtn">📋</button>
+</div>
+
+<div class="wrap">
+  <div class="stage" id="stage"></div>
+
+  <div class="panel">
+    <div class="presets" id="presets">
+      <button data-preset="p0">P0 · Attached solid</button>
+      <button data-preset="p1">P1 · Frost</button>
+      <button data-preset="p2">P2 · Liquid</button>
+      <button data-preset="p3">P3 · Tinted</button>
+    </div>
+
+    <div class="grp">
+      <h3>Scroll-модель</h3>
+      <div class="row"><label>Модель</label><div class="segbtns" data-k="scrollModel">
+        <button data-v="A">A · unlock</button><button data-v="B">B · collapse</button>
+      </div></div>
+      <label class="chk"><input type="checkbox" id="c_glass"> Скло УВІМК (інакше суцільний)</label>
+      <p class="leg"><b>A</b> = search+фільтри скролляться, пінниться лише острівець. <b>B</b> = на скрол бренд згортається, search+фільтри лишаються піннутим glass-баром. Крути сам скрол у фреймі, щоб відчути різницю.</p>
+    </div>
+
+    <div class="grp">
+      <h3>Острівець — скло (per-theme фізика)</h3>
+      <div class="row"><label>blur</label><input type="range" id="s_blur" min="0" max="12" step="0.5"><div class="val" id="v_blur"></div></div>
+      <div class="row"><label>sat %</label><input type="range" id="s_sat" min="100" max="200" step="5"><div class="val" id="v_sat"></div></div>
+      <div class="row"><label>bg-opacity</label><input type="range" id="s_op" min="0.35" max="1" step="0.01"><div class="val" id="v_op"></div></div>
+      <div class="row"><label>tint</label><div class="segbtns" data-k="tint">
+        <button data-v="neutral">нейтр.</button><button data-v="accent">accent-162</button>
+      </div></div>
+      <div class="row"><label>rim</label><input type="range" id="s_rim" min="0" max="1.6" step="0.05"><div class="val" id="v_rim"></div></div>
+      <div class="row"><label>lift</label><input type="range" id="s_lift" min="0" max="1.6" step="0.05"><div class="val" id="v_lift"></div></div>
+      <div class="row"><label>inset</label><input type="range" id="s_inset" min="0" max="18" step="1"><div class="val" id="v_inset"></div></div>
+      <div class="row"><label>radius</label><input type="range" id="s_radius" min="0" max="30" step="1"><div class="val" id="v_radius"></div></div>
+      <p class="leg"><b>blur</b>≤12 (стеля — шимер). <b>op</b> нижче = прозоріше = сильніше «плаває», але бейдж мусить бути якорем. <b>lift</b> per-theme: світла=тінь, темна=tone-lift.</p>
+    </div>
+
+    <div class="grp">
+      <h3>Бейдж-захист (незалежний від скла)</h3>
+      <div class="row"><label>badge-op</label><input type="range" id="s_bop" min="0.3" max="1" step="0.02"><div class="val" id="v_bop"></div></div>
+      <div class="row"><label>badge-lift</label><input type="range" id="s_blift" min="0" max="1.4" step="0.05"><div class="val" id="v_blift"></div></div>
+      <label class="chk"><input type="checkbox" id="c_plate"> contrast-floor plate (суцільна підкладка)</label>
+      <div class="row"><label>net</label><div class="segbtns"><button id="netPrev">‹</button><span id="netName" style="flex:1;text-align:center;font-size:12px;font-weight:800"></span><button id="netNext">›</button></div></div>
+      <p class="leg"><b>badge-op</b> знизь → бачиш «drown»: колір бейджа тоне у склі. <b>plate</b> = гарантований контраст-floor. Гортай <b>net</b> крізь edge-кольори (світлий/темний/колізія з accent).</p>
+    </div>
+
+    <div class="grp">
+      <h3>Текст на острівці (wsd 2.4)</h3>
+      <div class="row"><label>val-L</label><input type="range" id="s_valb" min="0.7" max="1.3" step="0.02"><div class="val" id="v_valb"></div></div>
+      <div class="row"><label>mut-L</label><input type="range" id="s_mutb" min="0.7" max="1.3" step="0.02"><div class="val" id="v_mutb"></div></div>
+      <p class="leg">Читабельність тексту/сабтексту на прозорому склі (яскравість). Обидві теми.</p>
+    </div>
+
+    <div class="grp">
+      <h3>Фрейми (device · theme)</h3>
+      <div class="row"><label>Лівий</label><div class="segbtns" data-side="L" data-axis="device"><button data-v="xs">XS</button><button data-v="pro">15 Pro</button></div></div>
+      <div class="row"><label></label><div class="segbtns" data-side="L" data-axis="theme"><button data-v="light">☀</button><button data-v="dark">☾</button></div></div>
+      <div class="row"><label>Правий</label><div class="segbtns" data-side="R" data-axis="device"><button data-v="xs">XS</button><button data-v="pro">15 Pro</button></div></div>
+      <div class="row"><label></label><div class="segbtns" data-side="R" data-axis="theme"><button data-v="light">☀</button><button data-v="dark">☾</button></div></div>
+    </div>
+  </div>
+</div>
+
+<textarea class="cpArea" id="cpArea"></textarea>
+
+<script>
+/* ===== NETS: 1 real anchor (Фармастор/доброго дня) + edge-case stubs ===== */
+const SUN='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.4M12 19.1v2.4M4.2 4.2l1.7 1.7M18.1 18.1l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.2 19.8l1.7-1.7M18.1 5.9l1.7-1.7"/></svg>';
+const NETS = [
+  {label:"Фармастор", real:true, svg:SUN, bg:"#3fae5a", fg:"#fff"},                       /* АДД+соц під одним юрназвою */
+  {label:"АНЦ", mono:"АНЦ", tsize:8.5, bg:"#c0392b", fg:"#fff", text:"АНЦ"},               /* коротка */
+  {label:"Аптека Низьких Цін Плюс Подорожник", mono:"АЦ", bg:"#2660c8", fg:"#fff"},        /* довга → mono-fallback */
+  {label:"Світла мережа", mono:"СМ", bg:"#f2e08a", fg:"#5a4a12"},                          /* світлий бейдж (contrast-floor тест) */
+  {label:"Нічна", mono:"Н", bg:"#1a2430", fg:"#cfe0ff"},                                   /* темний бейдж */
+  {label:"Тіва (teal)", mono:"Т", bg:"#1f9d84", fg:"#fff"}                                 /* колізія з accent-tint */
+];
+
+/* ===== STATE — locked brand + island/badge/scroll levers ===== */
+const DEF = {
+  /* locked brand (StockCheck_brand_valuesLOCK) */
+  iconStyle:"comet", word:"bicaps", caseMode:"camel", ah:162,
+  wSize:24, wWeight:800, wSpace:-12, iconSize:34, gap:4,
+  gapC:335, gapW:62, checkTilt:0, cometTail:"taper", cometW:6.2, checkW:4.4,
+  tileSize:35, tileRadius:16, badgeInset:4, badgeScale:1.28, btnSize:44,
+  /* island material */
+  glass:true, scrollModel:"B", tint:"neutral",
+  blur:12, sat:180, op:0.72, rim:0.7, lift:0.7, inset:8, radius:22, ridge:0.06,
+  /* badge protection */
+  bop:1, blift:0.5, plate:false, netIdx:0,
+  /* text */
+  valb:1, mutb:1,
+  zoom:0.80
+};
+let S = Object.assign({}, DEF);
+const sides = {L:{device:"xs",theme:"light"}, R:{device:"pro",theme:"dark"}};
+
+/* ===== PRESETS (targets) ===== */
+const PRE = {
+  p0:{glass:false, tint:"neutral", op:1,    blur:0,  sat:100, rim:0.4, lift:0.4, inset:0,  radius:0,  bop:1, blift:0.3, plate:false},
+  p1:{glass:true,  tint:"neutral", op:0.82, blur:12, sat:170, rim:0.7, lift:0.7, inset:8,  radius:22, bop:1, blift:0.5, plate:false},
+  p2:{glass:true,  tint:"neutral", op:0.62, blur:12, sat:190, rim:1.0, lift:1.1, inset:12, radius:24, bop:1, blift:0.8, plate:true},
+  p3:{glass:true,  tint:"accent",  op:0.75, blur:12, sat:185, rim:0.8, lift:0.8, inset:10, radius:22, bop:1, blift:0.6, plate:false}
+};
+
+/* ===== helpers ===== */
+function hexToRgb(h){h=h.replace('#','');return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)];}
+
+/* ===== icon (comet — locked geometry) ===== */
+function iconSVG(sz){
+  const lid='l'+Math.random().toString(36).slice(2,7);
+  const D=Math.PI/180, cx=24, cy=24, r=16, cw=S.cometW;
+  const gc=S.gapC, gw=S.gapW, tl=S.checkTilt;
+  const hDeg=gc+gw/2;
+  const hx=cx+r*Math.cos(hDeg*D), hy=cy+r*Math.sin(hDeg*D);
+  const tDeg=gc-gw/2, txp=cx+r*Math.cos(tDeg*D), typ=cy+r*Math.sin(tDeg*D);
+  const N=20, w=cw; let out='',inn='';
+  for(let i=0;i<=N;i++){const f=i/N,th=(hDeg+(360-gw)*f)*D,hw=(w/2)*(1-f);
+    out+=(i?'L':'M')+(cx+(r+hw)*Math.cos(th)).toFixed(2)+' '+(cy+(r+hw)*Math.sin(th)).toFixed(2);}
+  for(let i=N;i>=0;i--){const f=i/N,th=(hDeg+(360-gw)*f)*D,hw=(w/2)*(1-f);
+    inn+='L'+(cx+(r-hw)*Math.cos(th)).toFixed(2)+' '+(cy+(r-hw)*Math.sin(th)).toFixed(2);}
+  const grad=`<linearGradient id="${lid}" gradientUnits="userSpaceOnUse" x1="${hx.toFixed(2)}" y1="${hy.toFixed(2)}" x2="${txp.toFixed(2)}" y2="${typ.toFixed(2)}"><stop offset="0" stop-color="var(--comet-a)"/><stop offset="1" stop-color="var(--comet-b)"/></linearGradient>`;
+  return `<svg width="${sz}" height="${sz}" viewBox="0 0 48 48"><defs>${grad}</defs>
+    <path d="${out}${inn}Z" fill="url(#${lid})"/>
+    <path d="M17.5 25l4.7 4.7L32 18.5" fill="none" stroke="var(--text)" stroke-width="${S.checkW}" stroke-linecap="round" stroke-linejoin="round" transform="rotate(${tl} 24 22)"/>
+  </svg>`;
+}
+
+/* ===== wordmark (SC-caps locked) ===== */
+function wordmarkHTML(){
+  let a="Stock", b="Check";
+  return `<span class="s1"><span style="font-size:1.16em">${a[0]}</span>${a.slice(1)}</span><span class="s2"><span style="font-size:1.16em">${b[0]}</span>${b.slice(1)}</span>`;
+}
+
+/* ===== net badge ===== */
+function badgeHTML(net,size,radius,inset){
+  const inner=size-inset*2;
+  const [r,g,b]=hexToRgb(net.bg);
+  const bg=`rgba(${r},${g},${b},${S.bop})`;
+  const useMono = !net.svg && (net.label.length>14 || !net.text) && !net.svg;
+  let content;
+  if(net.svg && !net.forceMono){ content=`<div style="transform:scale(${S.badgeScale})">${net.svg.replace('width="18" height="18"',`width="${(inner*0.5).toFixed(0)}" height="${(inner*0.5).toFixed(0)}"`)}</div>`; }
+  else if(net.text){ content=`<span class="mono" style="color:${net.fg};font-size:${(net.tsize||10)/24*inner}px;letter-spacing:-.3px">${net.text}</span>`; }
+  else { content=`<span class="mono" style="color:${net.fg};font-size:${inner*0.42}px">${net.mono}</span>`; }
+  const tile=`<div class="ntile" style="width:${size}px;height:${size}px;border-radius:${radius}px;background:${bg};box-shadow:var(--bdg-lift)">${content}</div>`;
+  return S.plate ? `<div class="plate">${tile}</div>` : tile;
+}
+
+/* ===== filter block (shared markup) ===== */
+function filtRows(){
+  return `<div class="frow"><span class="pill">Дніпропетровська ▾</span><span class="pill">◍ Усі ▾</span><span class="cnt">47 апт.</span></div>
+    <div class="chips"><span class="chip on">Всі</span><span class="chip">Дніпро</span><span class="chip">Новомосковськ</span><span class="chip">Павлоград</span></div>
+    <div class="well">🔍 Пошук вулиці / Proxima…</div>`;
+}
+function cardHTML(addr,city,n1,n2){
+  return `<div class="pcard"><div class="addr">${addr}</div><div class="city">${city}</div>
+    <div class="cats">OTC ${n1} · IW ${n2}</div>
+    <div class="foot"><span class="anch">Оновлено 3 дні тому</span><span class="hist">Історія ▾</span></div></div>`;
+}
+const CARDS=[["вул. Робоча, 148","Дніпро",12,7],["просп. Яворницького, 55","Дніпро",9,4],["вул. Січеславська, 12","Новомосковськ",15,6],["вул. Центральна, 3","Павлоград",8,3],["вул. Шевченка, 90","Дніпро",11,5],["бул. Слави, 21","Дніпро",6,2],["вул. Миру, 7","Кам'янське",13,8],["просп. Гагаріна, 110","Дніпро",10,4]];
+
+/* ===== island builder ===== */
+function islandHTML(){
+  const net=NETS[S.netIdx];
+  const brand=`<div class="isl-brand" style="--gap:${S.gap}">
+    <div class="brand" style="gap:${S.gap}px">
+      <span class="ic">${iconSVG(S.iconSize)}</span>
+      <span class="wm" style="font-size:${S.wSize}px;--wm-weight:${S.wWeight};--wm-space:${(S.wSpace/10).toFixed(1)}px">${wordmarkHTML()}</span>
+    </div>
+    <div class="netbtn">${badgeHTML(net,S.tileSize,S.tileRadius,S.badgeInset)}</div>
+    <div class="hbtn"><span class="dots" style="gap:${(S.btnSize*0.068).toFixed(1)}px">${`<i style="width:${(S.btnSize*0.092).toFixed(1)}px;height:${(S.btnSize*0.092).toFixed(1)}px"></i>`.repeat(3)}</span></div>
+  </div>`;
+  /* model B = island also carries filter bar; model A = island is brand-only */
+  const filt = S.scrollModel==='B' ? `<div class="isl-filt">${filtRows()}</div>` : '';
+  return `<div class="isl" style="--btn:${S.btnSize}px">${brand}${filt}</div>`;
+}
+
+/* ===== frame ===== */
+function frameHTML(cfg){
+  const osbar=`<div class="osbar"><span class="time">9:41</span><span class="ind">
+     <svg width="18" height="12" viewBox="0 0 18 12"><rect x="0" y="7" width="3" height="5" rx="1" fill="currentColor"/><rect x="5" y="4" width="3" height="8" rx="1" fill="currentColor"/><rect x="10" y="1" width="3" height="11" rx="1" fill="currentColor"/><rect x="15" y="0" width="3" height="12" rx="1" fill="currentColor" opacity=".35"/></svg>
+     <svg width="26" height="13" viewBox="0 0 26 13"><rect x="1" y="1" width="21" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="1" opacity=".5"/><rect x="2.5" y="2.5" width="15" height="8" rx="1.5" fill="currentColor"/></svg>
+   </span></div>`;
+
+  /* model A → filters scroll in flow; model B → spacer only (filters pinned in island) */
+  const flowFilt = S.scrollModel==='A' ? `<div class="flow-filt">${filtRows()}</div>` : '';
+  const cards = CARDS.map(c=>cardHTML(c[0],c[1],c[2],c[3])).join('');
+  const scroll=`<div class="scroll"><div class="spacer" data-spacer></div>${flowFilt}${cards}</div>`;
+
+  return `<div class="frame" data-device="${cfg.device}" data-theme="${cfg.theme}" data-glass="${S.glass?'on':'off'}" data-scroll="${S.scrollModel}">
+    <div class="cutout"></div>
+    <div class="screen">${osbar}
+      <div class="app">${scroll}${islandHTML()}</div>
+      <div class="homeind"></div>
+    </div>
+  </div>`;
+}
+
+/* ===== apply CSS vars to a frame ===== */
+function applyVars(fr){
+  const theme=fr.getAttribute('data-theme');
+  fr.style.setProperty('--isl-blur', S.blur+'px');
+  fr.style.setProperty('--isl-sat', S.sat+'%');
+  fr.style.setProperty('--isl-inset', S.inset+'px');
+  fr.style.setProperty('--isl-radius', S.radius+'px');
+  fr.style.setProperty('--isl-ridge', S.ridge);
+  fr.style.setProperty('--val-b', S.valb);
+  fr.style.setProperty('--mut-b', S.mutb);
+  /* bg from tint+op */
+  const baseVar = S.tint==='accent'
+    ? [getCS(fr,'--islTintR'),getCS(fr,'--islTintG'),getCS(fr,'--islTintB')]
+    : [getCS(fr,'--islBaseR'),getCS(fr,'--islBaseG'),getCS(fr,'--islBaseB')];
+  fr.style.setProperty('--isl-bg', `rgba(${baseVar[0]},${baseVar[1]},${baseVar[2]},${S.op})`);
+  /* rim + lift scaled per theme */
+  const rimAlpha = (theme==='dark'? 0.08 : 0.12) * (S.rim/0.7);
+  fr.style.setProperty('--isl-rim', theme==='dark'?`rgba(255,255,255,${rimAlpha.toFixed(3)})`:`rgba(20,50,42,${rimAlpha.toFixed(3)})`);
+  if(theme==='dark'){
+    fr.style.setProperty('--isl-lift', `0 ${(8*S.lift).toFixed(0)}px ${(22*S.lift).toFixed(0)}px -8px rgba(0,0,0,${(0.5*S.lift).toFixed(2)})`);
+  } else {
+    fr.style.setProperty('--isl-lift', `0 ${(6*S.lift).toFixed(0)}px ${(20*S.lift).toFixed(0)}px -6px rgba(20,50,42,${(0.22*S.lift).toFixed(2)}),0 2px 6px rgba(20,50,42,${(0.10*S.lift).toFixed(2)})`);
+  }
+  /* badge lift */
+  const bl=S.blift;
+  fr.style.setProperty('--bdg-lift', theme==='dark'
+    ? `0 ${(3*bl).toFixed(0)}px ${(9*bl).toFixed(0)}px rgba(0,0,0,${(0.4*bl).toFixed(2)}),inset 0 1px 0 rgba(255,255,255,${(0.12*bl).toFixed(2)})`
+    : `0 ${(2*bl).toFixed(0)}px ${(7*bl).toFixed(0)}px rgba(20,50,42,${(0.22*bl).toFixed(2)})`);
+}
+function getCS(el,v){return getComputedStyle(el).getPropertyValue(v).trim();}
+
+/* ===== collapse-on-scroll (model B) + spacer sizing ===== */
+function bindScroll(fr){
+  const sc=fr.querySelector('.scroll');
+  const isl=fr.querySelector('.isl');
+  const spacer=fr.querySelector('[data-spacer]');
+  const brand=fr.querySelector('.isl-brand');
+  const filt=fr.querySelector('.isl-filt');
+  function layout(){
+    const h=isl.offsetHeight;
+    spacer.style.height=(h+10)+'px';
+  }
+  layout();
+  requestAnimationFrame(layout);
+  if(S.scrollModel!=='B'){ return; }
+  const brandH=brand.offsetHeight;
+  sc.addEventListener('scroll',()=>{
+    const p=Math.min(1, sc.scrollTop/(brandH*0.9));
+    brand.style.height=(brandH*(1-p*0.86))+'px';
+    brand.style.opacity=(1-p*1.15).toFixed(2);
+    brand.style.paddingTop=(11*(1-p))+'px';
+    brand.style.paddingBottom=(11*(1-p))+'px';
+  },{passive:true});
+}
+
+/* ===== render ===== */
+function render(){
+  const stage=document.getElementById('stage');
+  stage.innerHTML='';
+  ['L','R'].forEach(side=>{
+    const cfg=sides[side];
+    const wrap=document.createElement('div'); wrap.className='dev';
+    wrap.innerHTML=`<div class="dev-cap"><b>${side}</b> · ${cfg.device==='xs'?'XS 375×812':'15 Pro 393×852'} · ${cfg.theme}</div>
+      <div style="transform:scale(${S.zoom});transform-origin:top center;height:${(cfg.device==='xs'?834:874)*S.zoom+20}px">${frameHTML(cfg)}</div>`;
+    stage.appendChild(wrap);
+  });
+  document.querySelectorAll('.frame').forEach(fr=>{ applyVars(fr); bindScroll(fr); });
+  syncControls();
+  document.getElementById('netName').textContent=NETS[S.netIdx].label.slice(0,16);
+}
+
+/* ===== controls sync ===== */
+const SLIDERS=[['s_blur','blur','v_blur',x=>x],['s_sat','sat','v_sat',x=>x],['s_op','op','v_op',x=>(+x).toFixed(2)],
+  ['s_rim','rim','v_rim',x=>(+x).toFixed(2)],['s_lift','lift','v_lift',x=>(+x).toFixed(2)],['s_inset','inset','v_inset',x=>x],
+  ['s_radius','radius','v_radius',x=>x],['s_bop','bop','v_bop',x=>(+x).toFixed(2)],['s_blift','blift','v_blift',x=>(+x).toFixed(2)],
+  ['s_valb','valb','v_valb',x=>(+x).toFixed(2)],['s_mutb','mutb','v_mutb',x=>(+x).toFixed(2)]];
+function syncControls(){
+  SLIDERS.forEach(([id,k,vid,fmt])=>{const el=document.getElementById(id),v=document.getElementById(vid);if(el){el.value=S[k];v.textContent=fmt(S[k]);}});
+  document.getElementById('c_glass').checked=S.glass;
+  document.getElementById('c_plate').checked=S.plate;
+  document.querySelectorAll('.segbtns[data-k]').forEach(g=>{const k=g.dataset.k;g.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v===String(S[k])));});
+  document.querySelectorAll('.segbtns[data-side]').forEach(g=>{const s=g.dataset.side,a=g.dataset.axis;g.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v===sides[s][a]));});
+}
+
+/* ===== wiring ===== */
+SLIDERS.forEach(([id,k])=>{const el=document.getElementById(id);el.addEventListener('input',()=>{S[k]=parseFloat(el.value);document.querySelectorAll('.presets button').forEach(b=>b.classList.remove('on'));render();});});
+document.getElementById('c_glass').addEventListener('change',e=>{S.glass=e.target.checked;render();});
+document.getElementById('c_plate').addEventListener('change',e=>{S.plate=e.target.checked;render();});
+document.querySelectorAll('.segbtns[data-k]').forEach(g=>{g.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{S[g.dataset.k]=b.dataset.v;render();}));});
+document.querySelectorAll('.segbtns[data-side]').forEach(g=>{g.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{sides[g.dataset.side][g.dataset.axis]=b.dataset.v;render();}));});
+document.getElementById('netPrev').addEventListener('click',()=>{S.netIdx=(S.netIdx-1+NETS.length)%NETS.length;render();});
+document.getElementById('netNext').addEventListener('click',()=>{S.netIdx=(S.netIdx+1)%NETS.length;render();});
+document.querySelectorAll('.presets button').forEach(b=>b.addEventListener('click',()=>{
+  Object.assign(S,PRE[b.dataset.preset]);
+  document.querySelectorAll('.presets button').forEach(x=>x.classList.remove('on'));b.classList.add('on');render();
+}));
+document.getElementById('panelTgl').addEventListener('click',()=>{
+  const w=document.querySelector('.wrap');const on=w.classList.toggle('pcol');
+  document.getElementById('panelTgl').textContent=on?'⚙ Панель':'⚙ Сховати';
+});
+document.getElementById('zoomIn').addEventListener('click',()=>{S.zoom=Math.min(1.1,S.zoom+0.06);render();});
+document.getElementById('zoomOut').addEventListener('click',()=>{S.zoom=Math.max(0.45,S.zoom-0.06);render();});
+
+document.getElementById('copyBtn').addEventListener('click',()=>{
+  const str=`StockCheck island-harness · bet
+scrollModel:${S.scrollModel} glass:${S.glass} tint:${S.tint}
+island: blur:${S.blur} sat:${S.sat}% op:${S.op} rim:${S.rim} lift:${S.lift} inset:${S.inset} radius:${S.radius}
+badge: op:${S.bop} lift:${S.blift} plate:${S.plate} (net:${NETS[S.netIdx].label})
+text: val-L:${S.valb} mut-L:${S.mutb}
+frames: L=${sides.L.device}/${sides.L.theme} R=${sides.R.device}/${sides.R.theme}`;
+  const ta=document.getElementById('cpArea');ta.value=str;ta.select();
+  navigator.clipboard?.writeText(str).catch(()=>{});try{document.execCommand('copy');}catch(e){}
+  const btn=document.getElementById('copyBtn');const t=btn.textContent;btn.textContent='✓ Copied';setTimeout(()=>btn.textContent=t,1200);
+});
+
+render();
+</script>
+</body>
+</html>

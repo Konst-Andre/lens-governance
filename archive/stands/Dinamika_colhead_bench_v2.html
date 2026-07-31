@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>colhead bench v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script>(function(){try{var t=localStorage.getItem('ch2_theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;-webkit-user-select:none}
+input,textarea{-webkit-user-select:text}
+:root{
+  --font:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --bg:#eef3f1; --card:#ffffff; --surface:#f4f8f6; --text:#182c28; --muted:#6b8c84; --border:#d4e5df;
+  --accent:#1f9d57; --accentInk:#168543; --ok:#1f9d57; --warn:#c8811b; --crit:#c0392b;
+  /* спільний grid: [назва 1fr][val][val][Δ] */
+  --gVal:46px; --gDelta:56px; --gGap:6px;
+  /* ЖИВІ важелі (дефолт = моя ставка tile) */
+  --chTone:9;        /* тон панелі: біле% у surface (0 = plain) */
+  --chDateVis:100;   /* видимість дат: 0=muted → 100=text */
+  --chChangeVis:100; /* сила ЗМІНА: 0=muted → 100=accentInk */
+  --chBord:100;      /* рамки top/bottom opacity% */
+  --chLift:0;        /* drop-тінь панелі (світла), px */
+}
+[data-theme="dark"]{
+  --bg:#0d1512; --card:#18221e; --surface:#1c2723; --text:#e8f0ec; --muted:#7c968d; --border:#2a3833;
+  --accent:#33c06f; --accentInk:#2fc969; --ok:#33c06f; --warn:#e0a94a; --crit:#e0685c;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0d1512; --card:#18221e; --surface:#1c2723; --text:#e8f0ec; --muted:#7c968d; --border:#2a3833;
+  --accent:#33c06f; --accentInk:#2fc969; --ok:#33c06f; --warn:#e0a94a; --crit:#e0685c;
+}}
+html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased}
+body{display:flex;flex-direction:column;overflow:hidden}
+.hdr{padding:11px 14px 8px;border-bottom:1px solid var(--border);background:var(--bg)}
+.hdr h1{font:800 18px/1.1 var(--font)}
+.hdr .sub{font:600 10.5px/1 var(--font);color:var(--muted);margin-top:3px}
+
+/* scroll-контейнер (для sticky-тесту) */
+.stage{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;background:var(--bg);padding:14px}
+.brand{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+.bhdr{display:flex;align-items:center;justify-content:space-between;padding:9px 12px 7px;gap:6px;background:var(--card);
+  position:sticky;top:0;z-index:6;border-bottom:1px solid transparent}
+.bhdr .arr{color:var(--muted);font-weight:700;font-size:13px}
+.bhdr .bnm{font:700 13.5px/1 var(--font);flex:1;overflow:hidden;text-overflow:ellipsis}
+.bhdr .bcnt{font:700 11px/1 var(--font);color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+
+/* === colhead + row: СПІЛЬНИЙ grid → вирівнювання гарантоване === */
+.grid{display:grid;grid-template-columns:minmax(0,1fr) var(--gVal) var(--gVal) var(--gDelta);gap:var(--gGap);align-items:center}
+.colhead{padding:5px 12px 5px;
+  background:color-mix(in srgb,#fff calc(var(--chTone)*1%),var(--surface));
+  border-top:1px solid color-mix(in srgb,var(--border) calc(var(--chBord)*1%),transparent);
+  border-bottom:1px solid color-mix(in srgb,var(--border) calc(var(--chBord)*0.6%),transparent);
+  box-shadow:0 calc(var(--chLift)*1px) calc(var(--chLift)*1.6px) rgba(20,50,42,.10)}
+[data-theme="dark"] .colhead{background:color-mix(in srgb,#fff calc(var(--chTone)*1%),var(--surface));box-shadow:none;
+  border-top-color:color-mix(in srgb,#fff calc(var(--chBord)*0.09%),transparent);
+  border-bottom-color:color-mix(in srgb,#000 calc(var(--chBord)*0.14%),transparent)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .colhead{background:color-mix(in srgb,#fff calc(var(--chTone)*1%),var(--surface));box-shadow:none;
+  border-top-color:color-mix(in srgb,#fff calc(var(--chBord)*0.09%),transparent);
+  border-bottom-color:color-mix(in srgb,#000 calc(var(--chBord)*0.14%),transparent)}}
+.colhead.sticky{position:sticky;top:34px;z-index:5}
+.colhead .hc{font:800 10px/1 var(--font);text-align:center;font-variant-numeric:tabular-nums;letter-spacing:.2px;
+  color:color-mix(in srgb,var(--text) calc(var(--chDateVis)*1%),var(--muted))}
+.colhead .hc.hd{text-transform:uppercase;letter-spacing:.4px;font-size:8.5px;font-weight:800;
+  color:color-mix(in srgb,var(--accentInk) calc(var(--chChangeVis)*1%),var(--muted))}
+.colhead .hc.empty{}
+
+.rows{padding:0}
+.row{padding:8px 12px;font-size:12px;border-bottom:1px solid color-mix(in srgb,var(--border) 45%,transparent)}
+.row:last-child{border-bottom:0}
+.row .sku{color:var(--text);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.row .v{text-align:center;color:var(--text);font-variant-numeric:tabular-nums}
+.row .d{text-align:center;font-variant-numeric:tabular-nums;font-weight:700}
+.row .d.up{color:var(--ok)} .row .d.dn{color:var(--warn)} .row .d.fl{color:var(--muted)}
+
+/* ===== control panel ===== */
+.ctl{flex:0 0 auto;background:var(--surface);border-top:1px solid var(--border);padding:8px 12px calc(8px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:7px}
+[data-theme="dark"] .ctl{background:#212d28}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .ctl{background:#212d28}}
+.crow{display:flex;align-items:center;gap:8px}
+.clbl{font:800 8.5px/1.1 var(--font);text-transform:uppercase;letter-spacing:.4px;color:var(--muted);flex:0 0 auto;width:72px}
+.sld{display:flex;align-items:center;gap:8px;flex:1}
+.sld input{flex:1;accent-color:var(--accent)}
+.sld .v{font:700 10.5px/1 var(--font);color:var(--text);width:30px;text-align:right;font-variant-numeric:tabular-nums}
+.tg{display:flex;gap:3px;background:var(--bg);border-radius:8px;padding:2px;flex:1}
+.tg button{flex:1;padding:6px 4px;border:0;border-radius:6px;background:transparent;color:var(--text);font:700 10.5px/1 var(--font);cursor:pointer;opacity:.55}
+.tg button.on{background:var(--accent);color:#fff;opacity:1}
+[data-theme="dark"] .tg button.on{color:#0d1512}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .tg button.on{color:#0d1512}}
+.copy{background:var(--accent);color:#fff;border:0;border-radius:8px;padding:7px 12px;font:800 11px/1 var(--font);cursor:pointer;flex:0 0 auto}
+[data-theme="dark"] .copy{color:#0d1512}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .copy{color:#0d1512}}
+#cbox{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+</style>
+</head>
+<body>
+
+<div class="hdr"><h1>Динаміка · colhead bench</h1><div class="sub">спільний grid (вирівняно) · крути важелі · обидві теми</div></div>
+
+<div class="stage" id="stage"></div>
+
+<div class="ctl">
+  <div class="crow"><span class="clbl">Тема</span>
+    <div class="tg" id="tgTheme"><button data-v="light">☀ Світла</button><button data-v="dark">☾ Темна</button></div>
+    <button class="copy" id="btnCopy">📋</button>
+  </div>
+  <div class="crow"><span class="clbl">Тон панелі</span><div class="sld"><input type="range" id="s_chTone" min="0" max="30" value="9"><span class="v" id="v_chTone">9</span></div>
+    <span class="clbl" style="width:52px">Sticky</span><div class="tg" id="tgSticky" style="flex:0 0 96px"><button data-v="0" class="on">ні</button><button data-v="1">так</button></div></div>
+  <div class="crow"><span class="clbl">Видим. дат</span><div class="sld"><input type="range" id="s_chDateVis" min="0" max="100" value="100"><span class="v" id="v_chDateVis">100</span></div></div>
+  <div class="crow"><span class="clbl">Сила ЗМІНА</span><div class="sld"><input type="range" id="s_chChangeVis" min="0" max="100" value="100"><span class="v" id="v_chChangeVis">100</span></div></div>
+  <div class="crow"><span class="clbl">Рамки</span><div class="sld"><input type="range" id="s_chBord" min="0" max="100" value="100"><span class="v" id="v_chBord">100</span></div></div>
+  <div class="crow"><span class="clbl">Drop (світла)</span><div class="sld"><input type="range" id="s_chLift" min="0" max="20" value="0"><span class="v" id="v_chLift">0</span></div></div>
+  <textarea id="cbox" readonly></textarea>
+</div>
+
+<script>
+var LEVERS=['chTone','chDateVis','chChangeVis','chBord','chLift'];
+var STICK=false;
+
+var SKUS=[
+  {n:'Таблетки 200мг №12',a:12,b:15},
+  {n:'Таблетки 200мг №24',a:8,b:8},
+  {n:'Капсули 200мг №10',a:5,b:6},
+  {n:'Гель 5% 50г',a:3,b:2},
+  {n:'Сироп 100мл',a:10,b:14},
+  {n:'Супозиторії дит.',a:6,b:6},
+  {n:'Експрес 400мг №10',a:2,b:5},
+  {n:'Форте 400мг №20',a:9,b:7},
+  {n:'Дитячий 100мл',a:4,b:4},
+  {n:'Лонг 12год №8',a:7,b:11}
+];
+
+function rowHTML(s){
+  var d=s.b-s.a, cls=d>0?'up':d<0?'dn':'fl', txt=d>0?'+'+d:(''+d);
+  return '<div class="grid row"><div class="sku">'+s.n+'</div><div class="v">'+s.a+'</div><div class="v">'+s.b+'</div><div class="d '+cls+'">'+txt+'</div></div>';
+}
+function render(){
+  var h='<div class="brand">'+
+    '<div class="bhdr"><span class="arr">▾</span><span class="bnm">Нурофен Плюс</span><span class="bcnt">'+SKUS.length+' скус</span></div>'+
+    '<div class="grid colhead'+(STICK?' sticky':'')+'"><div class="hc empty"></div><div class="hc">18.06</div><div class="hc">02.07</div><div class="hc hd">ЗМІНА</div></div>'+
+    '<div class="rows">'+SKUS.map(rowHTML).join('')+'</div>'+
+    '</div>';
+  document.getElementById('stage').innerHTML=h;
+}
+
+function curTheme(){var a=document.documentElement.getAttribute('data-theme');if(a)return a;return(window.matchMedia&&matchMedia('(prefers-color-scheme:dark)').matches)?'dark':'light';}
+function setTheme(v){document.documentElement.setAttribute('data-theme',v);try{localStorage.setItem('ch2_theme',v);}catch(e){}
+  [].forEach.call(document.getElementById('tgTheme').children,function(b){b.classList.toggle('on',b.getAttribute('data-v')===v);});}
+
+LEVERS.forEach(function(k){
+  var s=document.getElementById('s_'+k);
+  s.addEventListener('input',function(){document.documentElement.style.setProperty('--'+k,s.value);document.getElementById('v_'+k).textContent=s.value;});
+});
+document.getElementById('tgTheme').addEventListener('click',function(e){var b=e.target.closest('button');if(b)setTheme(b.getAttribute('data-v'));});
+document.getElementById('tgSticky').addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;
+  STICK=b.getAttribute('data-v')==='1';
+  [].forEach.call(document.getElementById('tgSticky').children,function(c){c.classList.toggle('on',c===b);});
+  render();});
+document.getElementById('btnCopy').addEventListener('click',function(){
+  var parts=LEVERS.map(function(k){return k+'='+document.getElementById('s_'+k).value;});
+  parts.push('sticky='+(STICK?1:0));parts.push('theme='+curTheme());
+  var str=parts.join(' · ');
+  var box=document.getElementById('cbox');box.value=str;box.select();
+  try{navigator.clipboard.writeText(str);}catch(e){}try{document.execCommand('copy');}catch(e){}
+  var btn=document.getElementById('btnCopy');btn.textContent='✓';setTimeout(function(){btn.textContent='📋';},900);
+});
+
+if(!document.documentElement.getAttribute('data-theme'))setTheme(curTheme());else setTheme(curTheme());
+render();
+</script>
+</body>
+</html>
