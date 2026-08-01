@@ -1,3 +1,5 @@
+> живе доки: назавжди (вічне, wsd 1.8) — рецепт регенерації template, переживає окремі батчі
+
 # QR Lens — Export Contract (template-build recipe)
 
 **Версія:** v1.1 (31.07.2026 — §4 парс адреси переписано під новий формат KPI-файлу) · **Виведено з:** `QR_Lens___html_export.xlsm` (VBA `ExportModule`/`Module1`) + `QR_Lens_preview_batch58_2.html`, 09.07.2026.
