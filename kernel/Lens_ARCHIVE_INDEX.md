@@ -66,36 +66,13 @@ archive/
 
 ---
 
-## §4 Реєстр
+## §4 Реєстр — це «Перепис архіву» нижче
 
-> Порожній. Заповнюється при першій архівації (Konst: «пізніше, зараз не вистачає ресурсу»).
-> Порядок: залити **всі** файли в `archive/` одним рухом → внести рядки сюди →
-> аж тоді чистити project knowledge. Після заливки ціна помилкового видалення = нуль.
-
-### summaries/
-
-| файл | дата | продукт | що всередині | чому в архіві |
-|---|---|---|---|---|
-| — | — | — | — | — |
-
-### benches/
-
-| файл | дата | продукт | що всередині | чому в архіві |
-|---|---|---|---|---|
-| — | — | — | — | — |
-
-### builds/
-
-| файл | дата | продукт | що всередині | чому в архіві |
-|---|---|---|---|---|
-| — | — | — | — | — |
-
-### concepts/ · misc/
-
-| файл | дата | продукт | що всередині | чому в архіві |
-|---|---|---|---|---|
-| — | — | — | — | — |
-
+> ⚠ **Виправлено 01.08.2026 (сесія F).** Тут стояв ДРУГИЙ, порожній реєстр
+> із підзаголовками `benches/ builds/ concepts/ misc/` — тек, яких у репо немає
+> (той самий дефект, що вже виправлявся в §2, але залишений у §4).
+> Два реєстри одного архіву — режим провалу «дублі з різним формулюванням»:
+> незрозуміло, який головний. Єдиний реєстр — **Перепис архіву** нижче.
 
 ---
 
@@ -121,8 +98,12 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
   тому старі посилання «Cookbook A45» дійсні для томів. Піднімати лише
   для археології (звірка, чи щось загубилось при розпилі).
 
-### `archive/summaries/` — 54 файлів
+### `archive/summaries/` — 58 файлів
 
+- `Lens_session_summary_governance_A.md`
+- `Lens_session_summary_governance_B.md`
+- `Lens_session_summary_governance_C.md`
+- `Lens_session_summary_governance_D.md`
 - `QR_Lens_session_summary_A58_harness_v1.md`
 - `QR_Lens_session_summary_A58_portplan_LOCK.md`
 - `QR_Lens_session_summary_A58motion_persist_PLAN.md`
@@ -178,7 +159,7 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 - `Фармастор_session_summary_v2_shell_b3_PORThandoff.md`
 - `Фармастор_session_summary_v2_statusfilter_colhead.md`
 
-### `archive/stands/` — 23 файлів
+### `archive/stands/` — 22 файлів
 
 - `Dinamika_colhead_bench_v2.html`
 - `Farmastor_arc_anim_harness_v1.html`
@@ -204,7 +185,7 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 - `StockCheck_materiality_stagebench_v2.html`
 - `StockCheck_ctareward_bench_v3.html` — 🗄 01.08.2026. Стенд вибору **характеру нагороди** на 📋 (кандидати C/E). Результат канонізовано: Cookbook **A82**. Йти сюди при виборі нагороди для будь-якої «віддавальної» дії — важелі вже знайдені (v1/v2 застарілі, не тягнути)
 
-### `archive/superseded/` — 6 файлів
+### `archive/superseded/` — 5 файлів
 
 - `Drive_Lens_concept_v1.md`
 - `Drive_Lens_concept_v1_2.md`
