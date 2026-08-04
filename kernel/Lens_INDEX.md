@@ -184,10 +184,24 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 
 | продукт | білд | стан |
 |---|---|---|
-| **StockCheck** | `StockCheck_port_b28.html` — v2.17.0 · b28 | 🟢 **device✓ 01.08.2026** (XS/iOS 18 · 15 Pro/iOS 26 · Android; ПК+моб. Excel). Відкрито: лічильник «Перенесені» ⟂ список |
+| **StockCheck** | `StockCheck_port_b30.html` — v2.23.0 · b30 · парна `StockCheck_port_b30_SEED.html` (`DEV_SEED=1`, тільки для сід-залежних гейтів) | 🟢 **device✓ 04.08.2026** — знак money інвертовано (вузол H1) |
 | **QR Lens** | `QR_Lens_preview_batch59.html` + `QR_Lens_template_v3.html` | 🟢 device✓ B59 · черга Phase 3 відкрита |
 | **KPI Lens** | `KPI_Lens_v2_preview_batch15_2.html` | 🟡 VBA/PQ у черзі |
 | **Drive Lens** | — | 🟡 Tab-3 / Tab-4 відкриті |
+
+### Живі стенди й інструменти — оголошення для гейта G3
+
+| файл | роль | живе доки |
+|---|---|---|
+| `StockCheck_journal_stagebench_v3.html` | стенд журналу, пресети P0…P4 | числа P3 винесені в `materiality_valuesLOCK` §10 (04.08.2026) → **обмеження «не архівувати» знято** |
+| `StockCheck_jr_stagebench_smoke_v3.js` | матриця пар для стенда журналу — реалізація-зразок детектора wsd §2.5 | wsd §2.5 живе |
+| `StockCheck_port_b29_5_RULER.html` | лінійка — оверлей заміру геометрії, зразок для wsd §1.12 | шаблон майбутніх замірів |
+| `StockCheck_h1_money_sign.js` | гейт знаку money (11 асертів) | знак не переглянуто вдруге |
+| `StockCheck_maint_jsdom_matrix.js` · `_b29_1_` · `_b27_` · `_b29_3_smoke` · `_b29_5_export` | матриці білда | продукт у розробці |
+| `Lens_xlsx_strict.py` · `StockCheck_icon_gen.py` | гейт цілісності пакета · генератор іконок | назавжди |
+
+> Запускати матриці з read-only теки не можна: `require('jsdom')` шукає `node_modules`
+> відносно скрипта. Копія в `/home/claude` + `npm install jsdom` — див. wsd §3.11.
 
 ### Живі самері — стеля 2 на продукт (wsd 1.8, дім оголошення для гейта **G10**)
 
