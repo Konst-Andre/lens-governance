@@ -31,6 +31,7 @@
 | 6 | **Клас стенду** — device-simulator harness (blueprint) | `Lens_stagebench_manifest.md` | ✅ canonical (крос-Lens) |
 | 7 | **§5-B collapse-on-scroll** — механіка C (composite slide) + rAF-демпфер `K .28 / FMUL 1.35 / GAP 10`, 4 обов'язкові умови | `StockCheck_island_glass_FINDINGS.md` §5-B · механізм → Cookbook **A72** | ✅ DEVICE-LOCKED (b17_4) · SHIPPED + зачищено (b18) |
 | 8 | **PWA-оболонка** — `manifest.json` окремим файлом, набір іконок із локнутого гліфа, генератор | `manifest.json` · `StockCheck_icon_gen.py` · Cookbook delta **A75 (cand.)** | ✅ DEVICE-VERIFIED (b25, 15 Pro / iOS 26) |
+| 9 | **Композиція журналу** — З-6…З-8 + З-4-уточнення; геометрія = пресет P3 | `StockCheck_materiality_valuesLOCK.md` §10 · цей файл §11 | ✅ DEVICE-LOCKED (О-1 закрито 02.08.2026 · порт b29.6 закритий заміром) |
 
 **Стенди-джерела:** `StockCheck_headbench_v1.html` (бренд, v7) · `StockCheck_island_harness_v2.html` (острівець) · `StockCheck_materiality_stagebench_v2.html` (материальність, еталон рендера).
 
@@ -127,6 +128,28 @@ Store дав би ×8–9 — це **іменований симптом** гі�
 -----
 
 ## §11 · ЗАКРИТЕ — рішення, які не переглядаються
+
+### Композиція журналу — З-6 … З-8 + З-4-уточнення
+
+Внесено **після** закриття О-1 (device-прохід на `dataMix=mix`, 02.08.2026) — до того
+це був compare-lock, не канон (wsd 12.9).
+
+- **З-6** · журнал: дуга праворуч · тир кольором у meta · ліва зона віддана тексту ·
+  праворуч дуга + шеврон
+- **З-7** · тир у журналі успадковує представлення активної картки (`--hcOtc*`/`--hcIw*`),
+  а не винаходить своє
+- **З-8** · плита тримається на рамці, не на заливці, в обох темах
+- **З-4 · уточнення** · ціль `hdrGapT ≥ 2:1` звужується до `wrap=flat`; у `wrap=card`
+  роль розділювача груп забирає 12px-стінка
+
+Повні формулювання — `StockCheck_session_summary_F1_2_journal_v3.md` §2.
+
+Числа геометрії — `StockCheck_materiality_valuesLOCK.md` §10 (пресет P3).
+Повні формулювання рішень — `StockCheck_session_summary_F1_2_journal_v3.md` §2.
+
+> *Походження: `Lens_governance_delta_F1_2.md` Блок 3, сесія F1.2. Перенесено 04.08.2026, вузол G1.*
+
+---
 
 ### hole #1 «Дуга / Винагорода» — **WONTFIX** (не «відкладено»)
 
