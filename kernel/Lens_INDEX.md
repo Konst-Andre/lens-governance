@@ -184,7 +184,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 
 | продукт | білд | стан |
 |---|---|---|
-| **StockCheck** | `StockCheck_port_b30.html` — v2.23.0 · b30 · парна `StockCheck_port_b30_SEED.html` (`DEV_SEED=1`, тільки для сід-залежних гейтів) | 🟢 **device✓ 04.08.2026** — знак money інвертовано (вузол H1) |
+| **StockCheck** | `StockCheck_port_b32_0.html` — v2.24.0 · b32.0 · парна `StockCheck_port_b32_0_SEED.html` (`DEV_SEED=1` + суфікс `-SEED` у `APP_BUILD`, тільки для сід-залежних гейтів) | 🟢 **device✓ 08.08.2026** — b32.0 «шов»: `NETS[]` повним масивом · `S.net` + гейт мережі в `topMatch` · `AREA_ORDER` оголошенням · `netScopeLabel` замість хардкоду `Фармастор_` · A69-витік `.ntile` (вузол H4) |
 | **QR Lens** | `QR_Lens_preview_batch59.html` + `QR_Lens_template_v3.html` | 🟢 device✓ B59 · черга Phase 3 відкрита |
 | **KPI Lens** | `KPI_Lens_v2_preview_batch15_2.html` | 🟡 VBA/PQ у черзі |
 | **Drive Lens** | — | 🟡 Tab-3 / Tab-4 відкриті |
@@ -197,6 +197,8 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 | `StockCheck_jr_stagebench_smoke_v3.js` | матриця пар для стенда журналу — реалізація-зразок детектора wsd §2.5 | wsd §2.5 живе |
 | `StockCheck_port_b29_5_RULER.html` | лінійка — оверлей заміру геометрії, зразок для wsd §1.12 | шаблон майбутніх замірів |
 | `StockCheck_h1_money_sign.js` | гейт знаку money (11 асертів) | знак не переглянуто вдруге |
+| `StockCheck_b32_0_matrix_v2.js` + `b32_0_baseline.json` | матриця b32.0: baseline b31 + пост-асерти інертності/змін. Витягує функції з живого білда регексами, **без jsdom і npm** — DOM під тестом не потрібен | b32.1 не пройшов device-тест |
+| `StockCheck_netpick_stagebench_v3_b6.html` + `_smoke_b6.js` + `_live_b6.js` | стенд сітки NetPick v3, числа локнуті b6 | числа не портовані в b32.1 |
 | `StockCheck_maint_jsdom_matrix.js` · `_b29_1_` · `_b27_` · `_b29_3_smoke` · `_b29_5_export` | матриці білда | продукт у розробці |
 | `Lens_xlsx_strict.py` · `StockCheck_icon_gen.py` | гейт цілісності пакета · генератор іконок | назавжди |
 
@@ -207,7 +209,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 
 | продукт | живі самері |
 |---|---|
-| **StockCheck** | `StockCheck_session_summary_b28_xlsxExport.md` · `StockCheck_session_summary_b27.md` |
+| **StockCheck** | `StockCheck_session_summary_H4_2_b32_0_PATCH.md` · `StockCheck_session_summary_H3_9_b6_LOCK.md` *(тримає числа стенда NetPick v3 → входять у b32.1)* |
 | **QR Lens** | `QR_Lens_session_summary_B59.md` · `QR_Lens_session_summary_B59_perf_MICROSCOPE_WEB.md` |
 | **KPI Lens** | `KPI_Lens_session_summary_Batch15_2.md` |
 | **Lens** *(governance)* | `Lens_session_summary_governance_D.md` · `Lens_session_summary_governance_C.md` |
