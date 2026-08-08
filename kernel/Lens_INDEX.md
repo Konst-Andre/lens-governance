@@ -209,7 +209,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 
 | продукт | живі самері |
 |---|---|
-| **StockCheck** | `StockCheck_session_summary_H5_0_O20_stand_PLAN.md` · `StockCheck_session_summary_H3_9_b6_LOCK.md` *(тримає числа стенда NetPick v3 → входять у b32.1)* |
+| **StockCheck** | `StockCheck_session_summary_H5_1_eyebrow_LOCK.md` · `StockCheck_session_summary_H3_9_b6_LOCK.md` *(тримає числа стенда NetPick v3 → входять у b32.1)* |
 | **QR Lens** | `QR_Lens_session_summary_B59.md` · `QR_Lens_session_summary_B59_perf_MICROSCOPE_WEB.md` |
 | **KPI Lens** | `KPI_Lens_session_summary_Batch15_2.md` |
 | **Lens** *(governance)* | `Lens_session_summary_governance_D.md` · `Lens_session_summary_governance_C.md` |
