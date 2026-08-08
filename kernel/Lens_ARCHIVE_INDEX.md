@@ -98,7 +98,7 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
   тому старі посилання «Cookbook A45» дійсні для томів. Піднімати лише
   для археології (звірка, чи щось загубилось при розпилі).
 
-### `archive/summaries/` — 62 файли
+### `archive/summaries/` — 63 файли
 
 - `Lens_session_summary_governance_A.md`
 - `Lens_session_summary_governance_B.md`
@@ -117,6 +117,7 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 - `StockCheck_session_summary_H3_8_b5_channels.md` *(те саме)*
 - `StockCheck_session_summary_H4_0_b32_0_PLAN.md` — розтин порту, закриття О-20, Р-28…Р-32
 - `StockCheck_session_summary_H4_1_b32_0_BASELINE.md` — мікроскоп плану (7 дефектів) + BASELINE b31
+- `StockCheck_session_summary_H4_2_b32_0_PATCH.md` — збірка b32.0 «шов», device✓ 08.08.2026; витіснено `H5_0_O20_stand_PLAN` (§0 і §7 перенесено туди повністю, канон уже змерджено)
 - `StockCheck_session_summary_b16_materialPort.md`
 - `StockCheck_session_summary_b17_collapseC.md`
 - `StockCheck_session_summary_b18_collapseShip_canonMerge.md`
