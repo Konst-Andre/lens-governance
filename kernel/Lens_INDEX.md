@@ -199,6 +199,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 | `StockCheck_h1_money_sign.js` | гейт знаку money (11 асертів) | знак не переглянуто вдруге |
 | `StockCheck_b32_0_matrix_v2.js` + `b32_0_baseline.json` | матриця b32.0: baseline b31 + пост-асерти інертності/змін. Витягує функції з живого білда регексами, **без jsdom і npm** — DOM під тестом не потрібен | b32.1 не пройшов device-тест |
 | `StockCheck_netpick_stagebench_v3_b6.html` + `_smoke_b6.js` + `_live_b6.js` | стенд сітки NetPick v3, числа локнуті b6 | числа не портовані в b32.1 |
+| `StockCheck_netmark_stagebench_v3_7.html` + `lock_smoke_v37.js` | стенд мітки мережі: ярус Р-46 · О-47 шіт/ніша · **ЛОК-регістр (Р-50)**. Числа винесені в `materiality_valuesLOCK` §11/§12 | О-20 не закрито · О-47 не портовано в b32.1 |
 | `StockCheck_maint_jsdom_matrix.js` · `_b29_1_` · `_b27_` · `_b29_3_smoke` · `_b29_5_export` | матриці білда | продукт у розробці |
 | `Lens_xlsx_strict.py` · `StockCheck_icon_gen.py` | гейт цілісності пакета · генератор іконок | назавжди |
 
