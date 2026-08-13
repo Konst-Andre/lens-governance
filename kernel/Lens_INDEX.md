@@ -90,6 +90,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 | 4 | `Lens_cookbook_INDEX.md` → потрібний том | точково за індексом, якщо задача торкається iOS/PWA/UI. **Том цілком не читати** |
 | 5 | `<Product>_MASTER_LOCK.md` + релевантні `*_valuesLOCK.md` | якщо торкаємось локнутого компонента |
 | 6 | `Work_Standard_HISTORY.md` | **лише** якщо правило посилається на `14.x` і треба контекст |
+| `Lens_excel_protocol.md` | Excel-протокол: Power Query (5.x) + HTML/VBA sync (6.x). **Scope: KPI Lens / QR Lens.** Виселено з wsd 13.08.2026 (v2.29), нумерація не мінялась |
 
 ---
 
@@ -164,7 +165,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 
 | файл | що дає |
 |---|---|
-| `Lens_module_maint_v1.md` | блок «Обслуговування»: самоперевірка версії + встановлення на робочий стіл. CSS 182 · HTML 36 · JS 298 рядків, знято з `StockCheck_port_b28.html` (device✓). Патерн-пара: Cookbook **A79** |
+| `Lens_module_1_maint_v1.md` | блок «Обслуговування»: самоперевірка версії + встановлення на робочий стіл. CSS 182 · HTML 36 · JS 298 рядків, знято з `StockCheck_port_b28.html` (device✓). Патерн-пара: Cookbook **A79** |
 
 ---
 
@@ -174,9 +175,14 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 |---|---|---|
 | `Lens_cookbook_delta_running.md` | Cookbook | 🟢 1 запис (A76) · A77→**A80**, A78→**A81** змерджено 01.08 |
 | `Lens_stagebench_delta_running.md` | `Lens_stagebench_manifest.md` | 🟡 5 записів (додано Д-Г HARNESS-ШАБЛОН) |
-| `wsd_delta_running.md` | `Work_Standard.md` | 🟢 порожній · Д-4→**3.11**, Д-5→**10.10**, Д-6→**2.4** (v2.28) |
+| `wsd_delta_running.md` | `Work_Standard.md` | 🟢 порожній · Г-1…Г-7 змерджено 13.08.2026 (**v2.29**): Г-2→**2.7**, Г-3/Г-5/Г-7→**1.15**, Г-4→**3.12**, Г-6→**2.6**, Г-1→`stagebench_manifest` §8.7 |
 
 **Правило:** буфер — не архів. Лежить довше 2–3 сесій → мерджити як є.
+
+> ✅ **Прополка + мердж виконані одним проходом 13.08.2026 (G-2).** `Work_Standard.md`
+> 156 201 → **136 048 B**, версія **2.29**. Це підтвердило правило: буфер із семи записів —
+> не «переповнений буфер», а сигнал, що канон пора чистити, бо мердж без прополки
+> лише дописує в перевантажений файл.
 
 ---
 
@@ -184,24 +190,41 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 
 | продукт | білд | стан |
 |---|---|---|
-| **StockCheck** | `StockCheck_port_b32_0.html` — v2.24.0 · b32.0 · парна `StockCheck_port_b32_0_SEED.html` (`DEV_SEED=1` + суфікс `-SEED` у `APP_BUILD`, тільки для сід-залежних гейтів) | 🟢 **device✓ 08.08.2026** — b32.0 «шов»: `NETS[]` повним масивом · `S.net` + гейт мережі в `topMatch` · `AREA_ORDER` оголошенням · `netScopeLabel` замість хардкоду `Фармастор_` · A69-витік `.ntile` (вузол H4) |
+| **StockCheck** | `StockCheck_port_b32_2_s16_money_net.html` — v2.26.0 · b32.2 | 🟢 **device✓ 13.08.2026** — порт локу s15c: О-49 спліт-капсула грошей (`.money` → `.mny`) · О-51 мітка мережі в шапці філу · чіп дельти симетричний. Смоук `StockCheck_b32_2_port_smoke.js` **82** твердження (76 статичних + 6 у `twins.forEach`, заміряно 13.08). **Норматив гейта: `✓7 · ⚠3 · ✗4`** — заміряно 13.08.2026 повним `--html` **після фіксу H3** (Г-3+Г-5). Старий `✓7·⚠3·✗3` недійсний: один ✗ був артефактом парсера, натомість відкрились два справжні борги. Реальний список без auto-dark близнюка: `.about-logo` · `.jr-grp` · `.jr-row::after` · `.kv` |
 | **QR Lens** | `QR_Lens_preview_batch59.html` + `QR_Lens_template_v3.html` | 🟢 device✓ B59 · черга Phase 3 відкрита |
 | **KPI Lens** | `KPI_Lens_v2_preview_batch15_2.html` | 🟡 VBA/PQ у черзі |
 | **Drive Lens** | — | 🟡 Tab-3 / Tab-4 відкриті |
+
+> **Норматив читається так:** `✗4` — це **оголошений** стан білда, а не «зламано».
+> Розбіжність із ним = подія, яку треба пояснити. Зростання ✗ проти старого `✗3`
+> сталось через **фікс детектора**, не через регрес коду (`G1_REPO_PATCH_block2a_v1.md` §P2).
+> **Крихке:** `⚠ span 208/208` тримається на випадковій компенсації, не на фіксі —
+> будь-яка правка розмітки в JS може повернути його в ⚠, і це не регрес.
 
 ### Живі стенди й інструменти — оголошення для гейта G3
 
 | файл | роль | живе доки |
 |---|---|---|
-| `StockCheck_journal_stagebench_v3.html` | стенд журналу, пресети P0…P4 | числа P3 винесені в `materiality_valuesLOCK` §10 (04.08.2026) → **обмеження «не архівувати» знято** |
-| `StockCheck_jr_stagebench_smoke_v3.js` | матриця пар для стенда журналу — реалізація-зразок детектора wsd §2.5 | wsd §2.5 живе |
-| `StockCheck_port_b29_5_RULER.html` | лінійка — оверлей заміру геометрії, зразок для wsd §1.12 | шаблон майбутніх замірів |
-| `StockCheck_h1_money_sign.js` | гейт знаку money (11 асертів) | знак не переглянуто вдруге |
-| `StockCheck_b32_0_matrix_v2.js` + `b32_0_baseline.json` | матриця b32.0: baseline b31 + пост-асерти інертності/змін. Витягує функції з живого білда регексами, **без jsdom і npm** — DOM під тестом не потрібен | b32.1 не пройшов device-тест |
-| `StockCheck_netpick_stagebench_v3_b6.html` + `_smoke_b6.js` + `_live_b6.js` | стенд сітки NetPick v3, числа локнуті b6 | числа не портовані в b32.1 |
-| `StockCheck_netmark_stagebench_v3_7.html` + `lock_smoke_v37.js` | стенд мітки мережі: ярус Р-46 · О-47 шіт/ніша · **ЛОК-регістр (Р-50)**. Числа винесені в `materiality_valuesLOCK` §11/§12 | О-20 не закрито · О-47 не портовано в b32.1 |
-| `StockCheck_maint_jsdom_matrix.js` · `_b29_1_` · `_b27_` · `_b29_3_smoke` · `_b29_5_export` | матриці білда | продукт у розробці |
+| `StockCheck_money_stagebench_v2.html` | стенд форми грошей О-49 + мітки мережі О-51 (ред. s15c): комбінатор форми, DEPS-таблиця важелів, авто-звірка токен↔DEPS | числа не витіснені новим локом форми |
+| `StockCheck_money_stagebench_v2_smoke.js` | матриця стенда грошей — **103 твердження** (заміряно 13.08.2026) | стенд живий |
+| `StockCheck_money_stagebench_SPEC_v1.md` | спека стенда, ред. v2 | стенд живий |
+| `StockCheck_b32_2_port_smoke.js` | смоук порту b32.2, 82 твердження | b32.2 — живий білд |
+| `StockCheck_msl_gen.py` | генератор DATA-блока з «Файл для замовлення з MSL.xlsx» — єдине джерело бази 965/83/16 | назавжди |
+| `StockCheck_net_pack_v2.py` + `nets_assets_v2.js` + `_MANIFEST.txt` | пакувальник і ассети 15 мереж (mark/mini). У білд b32.2 **не вшиті** — 0 входжень | ассети не влиті в білд |
+| `StockCheck_nets_register_gate.py` | гейт реєстру мереж, пара до `StockCheck_NETS_register.md` | реєстр живий |
+| `manifest.json` | PWA-маніфест StockCheck | назавжди |
+| `QR_Lens___html_export.xlsm` | VBA-шаблон експорту QR Lens (496 KB бінарник; Project його не читає, тримається як робочий артефакт оператора) | QR Lens має Excel-експорт |
+| `QRLens_areachip_halo_stagebench_v1.html` | стенд halo area-чіпа | числа не портовані в `preview_batch59` |
+| `QR_Lens_PeoplePicker_handoff_for_Opus_v1.md` | хендофф A58 SR-селектора | A58 не закрито |
 | `Lens_xlsx_strict.py` · `StockCheck_icon_gen.py` | гейт цілісності пакета · генератор іконок | назавжди |
+
+> 🧹 **Знято 13.08.2026 (G-1) як мертве оголошення, не як архівація (Р-6):**
+> `StockCheck_journal_stagebench_v3.html` · `StockCheck_jr_stagebench_smoke_v3.js` ·
+> `StockCheck_port_b29_5_RULER.html` · `StockCheck_h1_money_sign.js` ·
+> `StockCheck_netpick_stagebench_v3_b6.html` · `StockCheck_maint_jsdom_matrix.js`
+> та сусідні `_b29_1_` / `_b27_` / `_b29_3_smoke` / `_b29_5_export`.
+> Жодного з них немає ні в Project, ні в репо. Якщо вони лежать на ПК оператора —
+> вони там і лишаються; база знань їх не має і не оголошує.
 
 > Запускати матриці з read-only теки не можна: `require('jsdom')` шукає `node_modules`
 > відносно скрипта. Копія в `/home/claude` + `npm install jsdom` — див. wsd §3.11.
@@ -210,7 +233,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 
 | продукт | живі самері |
 |---|---|
-| **StockCheck** | `StockCheck_session_summary_H5_1_eyebrow_LOCK.md` · `StockCheck_session_summary_H3_9_b6_LOCK.md` *(тримає числа стенда NetPick v3 → входять у b32.1)* |
+| **StockCheck** | `StockCheck_session_summary_b32_2_s16_PORT_DONE_HYGIENE_NEXT.md` · `StockCheck_session_summary_G1_HYGIENE.md` |
 | **QR Lens** | `QR_Lens_session_summary_B59.md` · `QR_Lens_session_summary_B59_perf_MICROSCOPE_WEB.md` |
 | **KPI Lens** | `KPI_Lens_session_summary_Batch15_2.md` |
 | **Lens** *(governance)* | `Lens_session_summary_governance_D.md` · `Lens_session_summary_governance_C.md` |
@@ -235,29 +258,38 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 | B | Cookbook → тематичні томи + `Lens_cookbook_INDEX.md` | ✅ 31.07.2026 |
 | C | звірка переносу · гейти G7–G10 · вісь фізичних місць (§8) | ✅ 31.07.2026 |
 | **D** | **прополка wsd → v2.27** · мердж буфера · 7 прецедентів · схема репо↔Project | ✅ 01.08.2026 |
-| **E** | **канонізація StockCheck:** `Lens_module_maint_v1` · A79–A82 · контракт xlsx · hole #1 WONTFIX · рішення по SW · G8-розпил + фікс G5/G7 · мердж wsd→v2.28 | ✅ 01.08.2026 |
+| **E** | **канонізація StockCheck:** `Lens_module_1_maint_v1` · A79–A82 · контракт xlsx · hole #1 WONTFIX · рішення по SW · G8-розпил + фікс G5/G7 · мердж wsd→v2.28 | ✅ 01.08.2026 |
 | F | `Lens_matrix_INDEX.md` + `Lens_jsdom_boot.js` · мердж stagebench-буфера · розбір §7 | ⬜ |
 | G | **PharmaLens** — старт арку (новий чат, свіжий контекст) | ⬜ |
 
 ---
 
-## §7 Некласифіковане — розібрати в сесії F
+## §7 Некласифіковане — розібрати
 
 Файли, що лежать у теці, але не мають дому за wsd 12.11. Кожен → або в дім, або в архів.
 
 | файл | ймовірний дім |
 |---|---|
-| `KONST_MEMORY_FINAL.md` | **перевірити на дублювання з `Lens_PROFILE.md`** → злити або в архів |
-| `Equipment_name_.md` | значення QR Lens → у `QR_Lens_*_LOCK` або архів |
-| `wsd_TODO_delta_collapsible-cat-levers.md` | буфер → злити у `wsd_delta_running.md` |
-| `QR_Lens_bannerJank_external_brief.md` | одноразове (закрито) → архів |
-| `KPI_Lens_categories_Excel_impl_Batch15.md` | одноразове → архів |
-| `Drive_Lens_concept_v1.md` · `Drive_Lens_concept_v1_2.md` | витіснені `Drive_Lens_concept_v1_3.md` → архів |
-| `VTM_Lens_foundation_spec_v0_3.md` · `VTM_Lens_deep-research-report_GPT.md` · `Аналіз_Дизайну_ВТМ_Lens_Gemini__3_6.md` · `vtm_lens_spa_with_gemini_ai.html` | **джерела-попередники PharmaLens** (писані Gemini / GPT, Claude їх не читав). Живуть **до 1–2 читання Claude** на старті арку PharmaLens: консолідація в `PharmaLens_*_Handover.md` могла їх витіснити, але це не доведено, доки не звірено. Тригер архівації = звірка виконана |
+| `PharmaLens_Claude_Handover.md` · `PharmaLens_Independent_Design_Research_Handover.md` | §3 називає їх `products/`-файлами, у репо їх **немає** (404, звірено 13.08.2026) — залити в `products/` або переоголосити як Project-only |
+| `VTM_Lens_foundation_spec_v0_3.md` · `VTM_Lens_deep-research-report_GPT.md` · `Аналіз_Дизайну_ВТМ_Lens_Gemini__3_6.md` · `vtm_lens_spa_with_gemini_ai.html` | **джерела-попередники PharmaLens** (писані Gemini / GPT, Claude їх не читав). Тригер архівації = звірка з `PharmaLens_*_Handover` виконана |
+| `QR_Lens_session_summary_B59_halo_stagebench_REBUILD.md` | третє самері QR при стелі 2 — в архів при першому дотику до QR Lens |
 
-> 🗄 **Виїхали 01.08.2026 (сесія E):** `canon_delta_A45_material_lever_manifest.md` і
-> `StockCheck_collapse_C_CANON_delta.md` — обидва буфери пережили свою ціль (A45 і A72
-> вже в томі 3 / томі 5). → `archive/superseded/`, названі в `Lens_ARCHIVE_INDEX`.
+> 🧹 **Розчищено 13.08.2026 (сесія G-1):** 12 рядків старої редакції знято — жодного
+> з названих файлів у Project немає (`KONST_MEMORY_FINAL` · `Equipment_name_` ·
+> `wsd_TODO_delta_collapsible-cat-levers` · `QR_Lens_bannerJank_external_brief` ·
+> `KPI_Lens_categories_Excel_impl_Batch15` · `Drive_Lens_concept_v1`/`_v1_2`).
+> Знято як **мертве оголошення**, не як архівацію.
+
+> 🗄 **Виїхали 01.08.2026 (сесія E):** `canon_delta_A45_material_lever_manifest.md` —
+> в `archive/superseded/`, названий у `Lens_ARCHIVE_INDEX` (перевірено 13.08: raw дає 200).
+>
+> ❌ **`StockCheck_collapse_C_CANON_delta.md` — ВТРАЧЕНИЙ, закрито 13.08.2026 (Р-5).**
+> Рядок в індексі був, файл до `archive/superseded/` не доїхав (raw 404, на диску немає).
+> **Не шукати й не відновлювати:** ціль буфера — механіка collapse C — уже канонізована
+> як **A72** у `Lens_iOS_cookbook_5_motion.md`, тобто втрачено транспорт, а не зміст.
+> **Ціна інциденту — не файл, а довіра до перепису:** індекс півмісяця стверджував
+> наявність того, чого немає. Тому `Lens_ARCHIVE_INDEX` §3 (рядок пишеться **одночасно**
+> з переміщенням, одним патчем) — не бюрократія, а єдине, що ловить цей клас втрат.
 
 **Детектор (К2):** `python3 Lens_validate.py --gov .` → гейт G3 валить кожен .md,
 не названий у цьому файлі. Секція §7 — легальний дім для «ще не розібраного»,
@@ -305,12 +337,20 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 (том читається цілком при потребі, 200 KB — стеля). Модуль читається **точково за іменем**
 і ніколи цілим списком, тож тематична тека не економить нічого, окрім людського погляду.
 
-Замість тек — **тема в імені**: `Lens_module_<тема>_<назва>_v<N>.md`, де тема збігається
-з номером тому Cookbook, у якому живе парний A-запис.
+Замість тек — **тема в імені**: `Lens_module_<ТЕМА>_<назва>_v<N>.md`, де **ТЕМА — це номер**
+тому Cookbook, у якому живе парний A-запис. Номер стоїть **у імені файлу, не в описі**:
+`Lens_module_1_maint_v1.md`, не `Lens_module_maint_v1.md`.
+
+> ⚠️ **Прецедент Р-4 (13.08.2026).** Індекс тричі називав модуль без номера теми —
+> `Lens_module_maint_v1.md`. Файл існує (49 414 B), але за оголошеним іменем raw давав
+> **404**, і модуль пів дня рахувався втраченим. Конвенція була описана правильно;
+> помилка жила в **посиланнях** на неї. **Детектор (К2):** ім'я файлу, що йде в оголошення,
+> копіюється з `git ls-files` / raw-відповіді 200, а не набирається з голови за конвенцією —
+> конвенція каже, яким ім'я **має бути**, і мовчить про те, яким воно **є**.
 
 | модуль | парний запис | том |
 |---|---|---|
-| `Lens_module_maint_v1.md` | A79 | 1 |
+| `Lens_module_1_maint_v1.md` | A79 | 1 |
 
 **Тригер розпилу на підтеки:** >6 модулів **або** >2 модулі в одній темі. Раніше —
 структура під один файл, тобто порожні теки замість орієнтації.

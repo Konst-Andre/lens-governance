@@ -456,9 +456,32 @@ def html(path):
 
     # H3 — A69 dark-твін
     print('\n[H3] A69 dark-твін-паритет')
-    dark = set(re.findall(r'\[data-theme=["\']?dark["\']?\]\s*([^\{,]+)\{', src))
-    media = ''.join(re.findall(r'@media\s*\(\s*prefers-color-scheme\s*:\s*dark\s*\)\s*\{(.*?)\n\}', src, re.S))
-    miss = [s.strip() for s in dark if s.strip() and s.strip() not in media]
+
+    # Г-5: судимо РОЗІБРАНИЙ CSS без коментарів, не сирий src.
+    # Причина: пояснювальний коментар, що НАЗИВАЄ селектор, читався як його наявність.
+    css = ''.join(re.findall(r'<style[^>]*>(.*?)</style>', src, re.S))
+    css = re.sub(r'/\*.*?\*/', '', css, flags=re.S)
+
+    # Г-3: межа блоку — баланс дужок, не нежадібний регекс.
+    # Старий `[\s\S]*?\n}` завершував @media на ПЕРШІЙ дужці з нульової колонки
+    # і «ковтав» увесь файл — тому близнюк знаходився завжди (хибний ✓).
+    def _media_dark(s):
+        out, pat = [], re.compile(r'@media[^{]*prefers-color-scheme\s*:\s*dark[^{]*\{')
+        for m in pat.finditer(s):
+            i, dep = m.end(), 1
+            while i < len(s) and dep:
+                if s[i] == '{': dep += 1
+                elif s[i] == '}': dep -= 1
+                i += 1
+            out.append(s[m.end():i-1])
+        return ''.join(out)
+
+    media = _media_dark(css)
+    dark = set(re.findall(r'\[data-theme=["\']?dark["\']?\]\s*([^\{,]+)\{', css))
+    # Г-7: збіг по підрядку != збіг сутності. `.mny` "знаходиться" всередині `.mny-x`,
+    # тому близнюк доводиться лише зі знаком межі селектора ({ або ,).
+    miss = [s.strip() for s in dark if s.strip()
+            and not re.search(re.escape(s.strip()) + r'\s*[{,]', media)]
     if not dark:
         warn('правил [data-theme=dark] не знайдено')
     elif miss:

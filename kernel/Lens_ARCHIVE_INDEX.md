@@ -98,7 +98,7 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
   тому старі посилання «Cookbook A45» дійсні для томів. Піднімати лише
   для археології (звірка, чи щось загубилось при розпилі).
 
-### `archive/summaries/` — 64 файли
+### `archive/summaries/` — 77 файлів
 
 - `Lens_session_summary_governance_A.md`
 - `Lens_session_summary_governance_B.md`
@@ -165,7 +165,21 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 - `Фармастор_session_summary_v2_shell_b3_PORThandoff.md`
 - `Фармастор_session_summary_v2_statusfilter_colhead.md`
 
-### `archive/stands/` — 22 файлів
+- `StockCheck_session_summary_H5_5_eb_LOCK_O47.md` · 13.08.2026 · StockCheck · ярус eyebrow ЛОК + О-47
+- `StockCheck_session_summary_H6_0_O47_SHEET.md` · 13.08.2026 · StockCheck · шіт вибору мережі О-47
+- `StockCheck_session_summary_b29_ARCHIVE_ROADMAP.md` · 13.08.2026 · StockCheck · попередня дорожня карта архіву — витіснена `G1_ARCHIVE_MANIFEST_v1.md`
+- `StockCheck_session_summary_b32_1_PORTFIX_PLAN.md` · 13.08.2026 · StockCheck · план порту b32.0→b32.1
+- `StockCheck_session_summary_b32_1_s1s2_DONE_O48_NEXT.md` · 13.08.2026 · StockCheck
+- `StockCheck_session_summary_b32_1_s3_O48_DONE_P8_NEXT.md` · 13.08.2026 · StockCheck · О-48 фільтр мереж за областю
+- `StockCheck_session_summary_b32_1_s4_PICKER_REWORK_PLAN.md` · 13.08.2026 · StockCheck
+- `StockCheck_session_summary_b32_1_s5_CROP_DONE.md` · 13.08.2026 · StockCheck
+- `StockCheck_session_summary_b32_1_s6s11_P8_PICKER_DONE.md` · 13.08.2026 · StockCheck · пікер мереж, числа портовані в b32.1
+- `StockCheck_session_summary_b32_1_s12_ADDR_DONE_O49_SPEC.md` · 13.08.2026 · StockCheck · адресний шум О-50 закрито, спека О-49
+- `StockCheck_session_summary_b32_1_s13_STAGEBENCH_v1_FAIL_v2_SPEC.md` · 13.08.2026 · StockCheck · відбраковка стенда v1 → **народження Г-1**
+- `StockCheck_session_summary_b32_1_s14_STAGEBENCH_v2_DONE.md` · 13.08.2026 · StockCheck · стенд грошей v2 · **єдиний носій повного тексту Г-1…Г-3** до мерджу в буфер 13.08
+- `StockCheck_session_summary_b32_1_s15c_STAGEBENCH_LOCK.md` · 13.08.2026 · StockCheck · ЛОК чисел форми грошей (device-судимо) · **єдиний носій повного тексту Г-4** до мерджу в буфер 13.08
+
+### `archive/stands/` — 28 файлів
 
 - `Dinamika_colhead_bench_v2.html`
 - `Farmastor_arc_anim_harness_v1.html`
@@ -191,13 +205,30 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 - `StockCheck_materiality_stagebench_v2.html`
 - `StockCheck_ctareward_bench_v3.html` — 🗄 01.08.2026. Стенд вибору **характеру нагороди** на 📋 (кандидати C/E). Результат канонізовано: Cookbook **A82**. Йти сюди при виборі нагороди для будь-якої «віддавальної» дії — важелі вже знайдені (v1/v2 застарілі, не тягнути)
 
-### `archive/superseded/` — 5 файлів
+- `StockCheck_port_b32_0.html` — 🗄 13.08.2026. Білд v2.24.0 b32.0 «шов»: `NETS[]` повним масивом, `S.net`, `AREA_ORDER`. Витіснений b32.2 (device✓)
+- `StockCheck_b32_0_matrix_v2.js` + `b32_0_baseline.json` — 🗄 13.08.2026. Матриця b32.0 **без jsdom**: витяг функцій із живого білда регексами + baseline b31. Йти сюди за формою «матриця без DOM», не за числами
+- `StockCheck_netmark_stagebench_v3_7.html` + `lock_smoke_v37.js` — 🗄 13.08.2026. Стенд мітки мережі: ярус Р-46, О-47 шіт/ніша, ЛОК-регістр Р-50. **О-20 закрито** оператором 13.08; числа живуть у `StockCheck_materiality_valuesLOCK` §11/§12
+- `StockCheck_netpick_matrix.js` + `StockCheck_netpick_v3_smoke_b6.js` + `StockCheck_netpick_v3_live_b6.js` — 🗄 13.08.2026. Матриці сітки NetPick v3, числа b6. Портовано в b32.1 (s6–s11)
+- `StockCheck_h2_msl_data.py` — 🗄 13.08.2026. Дані H2; витіснено `StockCheck_msl_gen.py` (b31)
+
+### `archive/superseded/` — 7 файлів
 
 - `Drive_Lens_concept_v1.md`
 - `Drive_Lens_concept_v1_2.md`
 - `KPI_Lens_categories_Excel_impl_Batch15.md`
 - `farmastor_v2_data.js`
 - `canon_delta_A45_material_lever_manifest.md` — 🗄 01.08.2026. Буфер **пережив ціль**: A45 канонізовано в `Lens_iOS_cookbook_3_material.md`. Йти сюди тільки за **сирими важелями компера** матеріальності, яких канон не зберіг
-- `StockCheck_collapse_C_CANON_delta.md` — 🗄 01.08.2026. Те саме: ціль A72 у `Lens_iOS_cookbook_5_motion.md`
 
-**Разом: 81 файлів.**
+- `StockCheck_B32_STAGEBENCH_HANDOFF.md` — 🗄 13.08.2026. Хендофф на побудову стенда грошей. Ціль досягнута: стенд v2 побудовано й залочено (s15c)
+
+### ❌ Втрачене при переїзді — НЕ шукати
+
+Файли, які були **оголошені** як заархівовані, але фізично до архіву не доїхали.
+Тримаються тут іменем, щоб наступний, хто спіткнеться об посилання, не витрачав
+час на пошук і не вирішив, що архів зламався.
+
+- `StockCheck_collapse_C_CANON_delta.md` — оголошений виїзд 01.08.2026 (сесія E),
+  фактично **404**. Втрачено транспорт, не зміст: ціль буфера канонізована як **A72**
+  у `Lens_iOS_cookbook_5_motion.md`. Закрито 13.08.2026 як Р-5, відновлення не потрібне.
+
+**Разом: 113 файлів.** *(лічильники перераховані за фактом рядків 13.08.2026, сесія G-1 — стара цифра 81 розходилась із переліком)*
