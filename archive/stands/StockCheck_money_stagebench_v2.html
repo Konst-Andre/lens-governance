@@ -1,0 +1,1226 @@
+<!DOCTYPE html>
+<html lang="uk" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>StockCheck · money stagebench v2 · ред. s15c ЛОК — О-49 + О-51</title>
+<!--
+  живе доки: форму О-49/О-51 не залочено device-судом і не портовано в b32.1.
+             Після лока числа → products/StockCheck_money_home_valuesLOCK.md, файл → archive/stands/.
+  дім: /mnt/user-data/outputs → Project вручну (живий стенд) + рядок у Lens_INDEX.md §5 (Д5.1 спеки)
+  спека: StockCheck_money_stagebench_SPEC_v1.md (ред. v2) + самері s13 §4 (вимоги до v2)
+  попередник: StockCheck_money_stagebench_v1.html — ВІДБРАКОВАНО на девайсі 12.08 (самері s13 §3)
+
+  ЩО ЗМІНЕНО ПРОТИ v1 (самері s13 §4):
+    1 сцена ПЕРША і в девайс-масштабі; хром згорнутий у «ⓘ»
+    2 зум через zoom (layout-бокс), не transform:scale; фактичний масштаб — з пробника (Д-3)
+    3 панель згортається ЦІЛКОМ однією кнопкою; групи піднімаються нагору «▲»
+    4 gate мертвих важелів — ТАБЛИЦЕЮ DEPS, кожен важіль проходить через неї (§5 правило)
+    5 нові важелі: iwCase · bcntBd/bcntFill · О-51 (netMode/markPx/markPad/netPos/netCase)
+    6 знято longName; сцена натомість має addrCase/netCase на РЕАЛЬНИХ найгірших даних
+    7 сцена — статична розмітка, не innerHTML: важелі ніколи не перебудовують DOM
+
+  РЕДАКЦІЯ s15 — фікси device-раунду 1 (самері s14 §0). Ім'я файлу НЕ мінялось свідомо:
+  два файли одного стенда вже плутались на девайсі (v1 ⟂ v2); редакція названа в <title>.
+
+    В-1 · капсула .bcnt зведена з портом — три причини самері §3, усі перевірені грепом:
+      · старт bcntMin 56 → 34 (р.858 перебиває р.180 «56» за порядком, специфічність рівна)
+      · сегмент bcntState open/done + CSS .bcnt.done 1:1 з р.862, ПІСЛЯ dark-блоків
+      · counterFill і bcntBd оголошені МЕРТВИМИ при done (.done задає тло й рамку константами)
+      ⚠ ВИПРАВЛЕНО ХИБНЕ ТВЕРДЖЕННЯ САМЕРІ §3: «11/11 — це саме стан done» невірно.
+        Білд р.3324/3415: done показує «✓». Стану «11/11» продукт не малює взагалі
+        (filled===total ⇒ done ⇒ «✓»). Відкритий найширший ДОСЯЖНИЙ стан = «10/11».
+        Саме тому в порті min-width:34 — вона тримає ширину під один гліф.
+      done+розгорнутий — досяжна комбінація (toggleBrand р.3350 відкриває done-бренд
+      рукою), тому сцена при done НЕ згортається.
+
+    В-2 · чотири величини в рядок — чотири важелі:
+      · magn (typ/hi/max) — розрядність ПАРОЮ НА ДІМ, усі числа заміряні по MSL білда;
+        6-значне зі спеки ЗНЯТО як фантом (див. блок MAGN нижче)
+      · abbr (off/тис) — «без грн» НЕ заводився: це дублює наявний curr=none
+      · curr отримав 4-те положення «row» замість окремого важеля currPos:
+        currPos був би ДРУГИМ важелем на тій самій осі (wsd 2.5)
+      · faStretch — правий край пари при rows=2
+
+  РЕДАКЦІЯ s15b — device-раунд 2, два дефекти, знайдені оком:
+    Д-1 · чорна жирна рамка пілюлі бренда при bwFB=bwFA. КОРІНЬ НЕ В ТЮНІНГУ:
+      клас-маркер дому стоїть НА САМОМУ .mny (р.492 class="mny fb"), а всі 12 правил
+      бордюра були написані селектором НАЩАДКА «.fb .mny». У домі fa предок випадково
+      є (обгортка .pair.fa), у домі fb його немає (.bright) → жодне правило кольору
+      до пілюлі бренда не доїжджало, border-color падав на currentColor = --text
+      (#182c28). Важіль bdFB був МЕРТВИЙ, виглядаючи живим — auditTokens() цього не
+      бачить: токен у CSS вживається, порожній лише набір елементів під селектором.
+      Фікс: .fa .mny → .mny.fa, .fb .mny → .mny.fb (специфічність не змінилась, 0,2,0).
+    Д-2 · мітка мережі на СВІТЛІЙ показує краї білого well. Заведено важіль підкладки,
+      РОЗЩЕПЛЕНИЙ ПО ТЕМАХ (markPlateL / markPlateD, значення tile/flat/none) — те саме
+      значення на #eef3f1 і на #0d1512 дає різний результат, wsd 2.4.
+
+    Гейт після правок: ✓9 · ⚠1 · ✗0 (⚠ = .row, донор із білда) · H3 паритет 25/25.
+    Смоук: 103 твердження, 0 ✗ (три з них сторожать сам ЛОК старту). Детектори перевірені на СВІДОМО ЗЛАМАНОМУ вході (Г-3):
+    зняте .bcnt.done · текст «11/11» · bcntMin=56 — усі три дають ✗.
+
+  ПРОВЕНАНС (Д-В) — StockCheck_port_b32_1_s12_addr.html:
+    р.36-49 / 84-91  токени        р.155-156  .hdr          р.166-169  .hdr-title .t/.s
+    р.171 .hdr-sub   р.172-177 .tchip/.pair  р.179-180 .bright/.bcnt   р.181-194 .money
+    р.591-596 .ro-flag                       р.673-711 .ntile/.is-mark
+    р.855-862 .bhdr/.bnm(без ellipsis)/.bcnt р.882-918 .row/.fld/.dchip
+    р.1305-1315 розмітка шапки філу          р.2568 fmtMoney
+    р.2769-2784 NETS (label)                 р.2796-2798 NET_PICK_SCALE  р.2806 NET_PICK_DURI
+    р.3281 fillSub у openRO  ⟂  р.3292 fillSub у openFill   (З-1: ДВА місця запису)
+    р.3317-3318 знак у brandCard             р.3339-3343 рядок SKU
+
+  ДАНІ — з DATA БІЛДА (965 рядків), не з farmastor_v2_data.js (Д-1: там лише 15 міст із 63):
+    типове:    Аули · Proxima 4322954                    (мережа Сіріус / «Бажаємо здоров'я»)
+    найгірше:  Верхньодніпровськ · Proxima 2011101        (найдовше місто, 17 симв.)
+    label мереж: «Бажаємо здоров'я» (16) · «Подорожник» (10) — NETS р.2769-2784
+    ассети mini 112² з nets_assets_v2.js: BAZHAEMO 3280 Б · PODOROZHNYK 2492 Б
+
+  ТЕСТ-КЕЙС — ярус D, Стрепсілс (спека §4):
+    short −421.72 → «−422 грн» · over +1947.57 → «+1 948 грн» · legacy (як у білді) «+1 526 грн»
+-->
+<style>
+/* ═════════ 1 · ТОКЕНИ (дослівно з білда р.36-49 / 84-91) ═════════ */
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --font:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mutL:46; --valL:100; --r-pill:9px; --icoBtn:38px; --icoRad:11px; --groupBg:25;
+  --fieldW:60; --fieldH:46; --fieldRadius:15;
+  --chOffX:6; --chOffY:6; --chRad:9; --chPadX:5.5; --chPadY:3; --chSize:10.5; --chBorderInt:55;
+  --rowGap:6; --divA:1; --tintMix:50; --calmTint:69;
+  --bg:#eef3f1; --bg-soft:#e4ece9; --card:#ffffff; --surface-2:#f4f8f6; --surface-3:#eef4f1;
+  --text:#182c28; --text-2:#3c574f; --muted:#6b8c84; --border:#d4e5df; --border-subtle:#e1ebe7;
+  --ok:#1f9d57; --crit:#c0392b; --warn:#c8811b;
+  --accent:hsl(162 82% 27%); --accent-soft:hsl(162 64% 88%); --accent-ink:hsl(162 82% 16%);
+}
+[data-theme="dark"]{
+  --bg:#0d1512; --bg-soft:#151e1a; --card:#18221e; --surface-2:#1c2723; --surface-3:#212d28;
+  --text:#e8f0ec; --text-2:#a7c0b8; --muted:#7c968d; --border:#2a3833; --border-subtle:#222e29;
+  --ok:#33c06f; --crit:#e0685c; --warn:#e0a94a;
+  --accent:hsl(163 46% 46%); --accent-soft:hsl(163 37% 17%); --accent-ink:hsl(163 46% 68%);
+}
+
+/* ═════════ 2 · ВАЖЕЛІ — ГЕОМЕТРІЯ (спільна для тем) ═════════ */
+:root{
+  --mPadX:7; --mPadY:2.5; --mRad:9; --mFs:12; --mGapPx:6; --mDivW:1; --mEmph:100;
+  --faGap:8; --faPairGap:6; --bcntMin:56; --fbGap:2;
+  --counterFill:55; --bcntBd:100;          /* НОВЕ: капсула лічильника (самері §3.4) */
+  --mBwFA:1; --mBwFB:1;                    /* НОВЕ: товщина рамки грошей, окремо fa ⟂ fb */
+  --markPx:18; --markPad:3; --netGap:6;    /* НОВЕ: О-51 · З-5 markPad зчеплений з markPx */
+}
+/* ═════════ 3 · ВАЖЕЛІ — МАТЕРІАЛ, НАБІР LIGHT (A45: тінь + бордюр + тінт) ═════════ */
+:root{
+  --L-shY:1; --L-shBlur:2; --L-shA:.16;
+  --L-fillMix:7; --L-bdFA:37; --L-bdFB:30;
+  --L-valL:100; --L-mutL:46;
+}
+/* ═════════ 4 · ВАЖЕЛІ — МАТЕРІАЛ, НАБІР DARK (A45: заливка + ridge + бордюр; drop-важеля НЕМА) */
+[data-theme="dark"]{
+  --D-fillMix:12; --D-posS:37; --D-posL:17; --D-negS:42; --D-negL:22;
+  --D-ridge:1; --D-ridgeA:.14; --D-bdFA:37; --D-bdFB:28;
+  --D-valL:100; --D-mutL:46;
+}
+
+/* ═════════ 5 · СЦЕНА — вузли з білда 1:1 ═════════ */
+.phone{width:375px;margin:0 auto;background:var(--bg);overflow:hidden;
+  font-family:var(--font);color:var(--text)}
+.hdr{background:var(--bg);padding:12px 14px 10px;border-bottom:1px solid var(--border-subtle)}
+.hdr-row{display:flex;align-items:center;gap:10px;min-height:var(--icoBtn)}
+.icon-btn{flex:0 0 auto;width:var(--icoBtn);height:var(--icoBtn);border-radius:var(--icoRad);
+  border:1px solid rgba(20,50,42,.12);background:color-mix(in srgb,#fff 55%,var(--bg));
+  color:var(--text-2);display:flex;align-items:center;justify-content:center;font-size:17px;
+  box-shadow:0 1.4px 3.6px rgba(20,50,42,.081)}
+[data-theme="dark"] .icon-btn{background:color-mix(in srgb,#fff 6%,var(--surface-3));
+  border-color:rgba(255,255,255,.045);box-shadow:inset 0 1px 0 rgba(255,255,255,.096)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .icon-btn{
+  background:color-mix(in srgb,#fff 6%,var(--surface-3));
+  border-color:rgba(255,255,255,.045);box-shadow:inset 0 1px 0 rgba(255,255,255,.096)}}
+.hdr-title{flex:1;min-width:0}
+.hdr-title .t{font-size:19px;font-weight:800;letter-spacing:-.3px;color:var(--text);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Д-6: .s стає flex-контейнером (мітка+текст), тому обрізання переїхало на .s-txt.
+   Детектор еліпсиса міряє .s-txt; .s лишається носієм overflow. */
+.hdr-title .s{font-size:12px;font-weight:600;margin-top:1px;display:flex;align-items:center;
+  gap:calc(var(--netGap)*1px);overflow:hidden;
+  color:color-mix(in srgb,var(--muted) calc(var(--mutL)*1%),var(--text-2))}
+.s-txt{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;order:5}
+.ntxt{white-space:nowrap;flex:0 0 auto;order:4}
+.ntxt[data-case="upper"]{text-transform:uppercase;letter-spacing:.2px}
+.nmark{flex:0 0 auto;order:3}
+.hdr-title .s[data-pos="after"] .nmark,
+.hdr-title .s[data-pos="after"] .ntxt{order:9}
+.nmark[hidden],.ntxt[hidden]{display:none}
+/* .ro-flag — білд р.591-596. Четвертий рядок шапки в ro-режимі (З-2) */
+.ro-flag{display:flex;align-items:center;gap:6px;margin-top:4px;
+  font:800 10.5px/1.2 var(--font);letter-spacing:.4px;text-transform:uppercase;color:var(--muted)}
+.ro-flag[hidden]{display:none}
+.ro-flag .rf-ic{display:inline-flex;align-items:center;justify-content:center;
+  width:14px;height:14px;border-radius:50%;font-size:9px;font-weight:900;line-height:1;
+  color:var(--ok);border:1px solid color-mix(in srgb,var(--ok) 48%,transparent)}
+/* .ntile.is-mark — білд р.698-711, перемасштабована 35px → --markPx.
+   З-5: padding числом (calc(розмір*pad/100)); при 18px і pad=3 це 0.54px — субпіксель,
+   тому markPad ВАЖІЛЬ, інакше мітка в шапці не збігається з плиткою на дошці без причини. */
+.ntile{width:calc(var(--markPx)*1px);height:calc(var(--markPx)*1px);
+  border-radius:calc(var(--markPx)*12/35*1px);display:grid;place-items:center;overflow:hidden}
+.ntile.is-mark{padding:calc(var(--markPx)*var(--markPad)/100*1px);
+  background:#fff;border:1px solid color-mix(in srgb,var(--border) 73%,transparent);
+  box-shadow:0 2px 5px rgba(20,50,42,.10)}
+.ntile.is-mark img{width:100%;height:100%;object-fit:contain;display:block;
+  transform:scale(var(--ntScale,1));transform-origin:center}
+[data-theme="dark"] .ntile.is-mark{background:#fff;
+  border-color:color-mix(in srgb,var(--border) 50%,transparent);box-shadow:none}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .ntile.is-mark{background:#fff;
+  border-color:color-mix(in srgb,var(--border) 50%,transparent);box-shadow:none}}
+/* markPlate (device-раунд 2): на світлій білий well плитки лежить на майже білому тлі
+   шапки, тому читається не як матеріал, а як недорізаний край гліфа. На темній та сама
+   плитка працює — білий на #0d1512 має за що чіплятись. Отже ПІДКЛАДКА — це вісь,
+   у якої різні значення на різних темах, і важіль розщеплено по темах (wsd 2.4).
+   Стоїть ПІСЛЯ dark-блоків: специфічність .ntile.is-mark[data-plate] (0,3,0) рівна
+   [data-theme="dark"] .ntile.is-mark, тож виграє лише порядком джерела. */
+.ntile.is-mark[data-plate="flat"]{border-color:transparent;box-shadow:none}
+.ntile.is-mark[data-plate="none"]{background:transparent;border-color:transparent;
+  box-shadow:none;padding:0}
+.hdr-sub{display:flex;align-items:center;gap:calc(var(--faGap)*1px);margin-top:9px;flex-wrap:wrap}
+.hdr-sub[data-rows="2"]{flex-direction:column;align-items:flex-start;gap:5px}
+/* faStretch (В-2): при rows=2 колонка лишає праворуч порожнє поле, яке читається
+   як діра. Розтяг пари на всю ширину + space-between кладе гроші на правий край. */
+.hdr-sub[data-rows="2"][data-stretch="on"] .pair.fa{align-self:stretch;display:flex;
+  justify-content:space-between}
+.hdr-sub[data-align="baseline"]{align-items:baseline}
+.hdr-sub[data-wrap="nowrap"]{flex-wrap:nowrap}
+.tchip{font:700 11px/1 var(--font);color:var(--text-2);background:var(--surface-2);
+  border:1px solid var(--border-subtle);border-radius:var(--r-pill);padding:4px 8px;letter-spacing:.2px;
+  white-space:nowrap;flex:0 0 auto}
+[data-theme="dark"] .tchip{background:var(--surface-3);border-color:var(--border)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .tchip{
+  background:var(--surface-3);border-color:var(--border)}}
+.pair{display:inline-flex;align-items:center}
+.pair.fa{gap:calc(var(--faPairGap)*1px)}
+.prow{display:flex;align-items:center;gap:8px;margin-top:9px}
+.progress{flex:1;height:6px;border-radius:3px;background:var(--surface-2);overflow:hidden}
+.progress i{display:block;height:100%;width:38%;background:var(--accent);border-radius:3px}
+.pcount{font:700 11.5px/1 var(--font);color:var(--muted);font-variant-numeric:tabular-nums}
+
+.app{--cardBg:color-mix(in srgb,var(--bg) calc(var(--groupBg)*1%),var(--card))}
+.brand{margin:8px 12px 0;background:var(--cardBg);border-radius:16px;position:relative}
+.bhdr{display:flex;align-items:center;gap:10px;padding:13px 14px;border-radius:16px}
+.bhdr .arr{font-size:13px;color:var(--accent);width:14px;flex:0 0 14px}
+.bhdr .bnm{font-size:15px;font-weight:800;color:var(--text);flex:1;letter-spacing:-.2px;min-width:0}
+.bhdr[data-ell="on"] .bnm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bright{display:inline-flex;align-items:center;gap:calc(var(--fbGap)*1px)}
+.bhdr[data-order="cnt-first"] .bright{flex-direction:row-reverse}
+/* bcntFill / bcntBd — НОВЕ (самері §3.4): капсула лічильника прямий конкурент спліт-пілюлі */
+.bhdr .bcnt{display:inline-flex;align-items:center;justify-content:center;
+  min-width:calc(var(--bcntMin)*1px);padding:3px 9px;border-radius:9px;
+  font:700 12px/1 var(--font);font-variant-numeric:tabular-nums;color:var(--text-2);
+  background:color-mix(in srgb,var(--surface-2) calc(var(--counterFill)*1%),var(--card));
+  border:1px solid color-mix(in srgb,var(--border-subtle) calc(var(--bcntBd)*1%),transparent);
+  flex:0 0 auto}
+[data-theme="dark"] .bhdr .bcnt{
+  background:color-mix(in srgb,var(--surface-3) calc(var(--counterFill)*1%),var(--card));
+  border-color:color-mix(in srgb,var(--border) calc(var(--bcntBd)*1%),transparent)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .bhdr .bcnt{
+  background:color-mix(in srgb,var(--surface-3) calc(var(--counterFill)*1%),var(--card));
+  border-color:color-mix(in srgb,var(--border) calc(var(--bcntBd)*1%),transparent)}}
+/* .bcnt.done — 1:1 з білдом р.862 (В-1 п.3). Стоїть ПІСЛЯ dark-блоків СВІДОМО:
+   специфічність .bhdr .bcnt.done (0,3,0) = [data-theme="dark"] .bhdr .bcnt (0,3,0),
+   тож у темній рамка гаситься лише порядком джерела — рівно як у білді (862 > 861).
+   Твін у @media НЕ потрібен: --accent-ink/--accent-soft самі темозалежні, у білді
+   dark-правила для .done теж немає → H3-паритет не зачіпається. */
+.bhdr .bcnt.done{color:var(--accent-ink);background:var(--accent-soft);border-color:transparent}
+
+.rows{padding:0 6px 8px}
+.row{display:flex;align-items:center;gap:12px;padding:11px 8px;position:relative;
+  margin-bottom:calc(var(--rowGap)*1px)}
+.row+.row::before{content:'';position:absolute;top:calc(var(--rowGap)*-.5px - .5px);left:8px;right:8px;
+  height:1px;background:var(--border-subtle);opacity:var(--divA)}
+.row .info{flex:1;min-width:0}
+.row .rn{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;line-height:1.2;min-width:0}
+.row .rv{font-size:14px;font-weight:700;letter-spacing:-.1px;overflow-wrap:break-word;min-width:0;
+  color:color-mix(in srgb,var(--text) calc(var(--valL)*1%),var(--muted))}
+.rn-tag{display:inline-flex;align-items:baseline;gap:6px;white-space:nowrap;flex:0 0 auto}
+.row .rpk{font-size:12.5px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.2px;
+  flex:0 0 auto;padding:1.5px 7px;border-radius:7px;color:var(--text);background:var(--surface-2);
+  border:1px solid var(--border-subtle)}
+[data-theme="dark"] .row .rpk{background:var(--surface-3);border-color:var(--border)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .row .rpk{
+  background:var(--surface-3);border-color:var(--border)}}
+.row .ck{font-size:11px;font-weight:800;flex:0 0 auto;
+  color:color-mix(in srgb,var(--ok) calc(var(--calmTint)*1%),transparent)}
+.row .rm{font-size:11.5px;margin-top:3px;font-weight:500;
+  color:color-mix(in srgb,var(--muted) calc(var(--mutL)*1%),var(--text-2))}
+.row .rm .nm{color:var(--text-2);font-weight:700}
+.row.lv-crit{--sig:var(--crit)} .row.lv-low{--sig:var(--warn)}
+.row.lv-ok{--sig:var(--accent)} .row.lv-none{--sig:transparent}
+.row.settled.tint{background:color-mix(in srgb,var(--accent-soft) calc(var(--tintMix)*1%),transparent);
+  border-radius:12px}
+.fwrap{flex:0 0 auto;display:flex;align-items:center;gap:8px;justify-content:flex-end;position:relative}
+.fld{flex:0 0 auto;width:calc(var(--fieldW)*1px);height:calc(var(--fieldH)*1px);
+  border-radius:calc(var(--fieldRadius)*1px);display:flex;align-items:center;justify-content:center;
+  background:color-mix(in srgb,var(--bg-soft) 82%,var(--card));
+  box-shadow:inset 0 1px 3.6px rgba(0,0,0,.28);border:1px solid var(--border-subtle);
+  font-size:20px;font-weight:800;color:var(--text);font-variant-numeric:tabular-nums;letter-spacing:-.5px}
+[data-theme="dark"] .fld{background:color-mix(in srgb,var(--card),#000 24%);
+  box-shadow:inset 0 2px 5px rgba(0,0,0,.55),inset 0 -1px 0 rgba(255,255,255,.12);
+  border:1px solid color-mix(in srgb,var(--border),#000 20%)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .fld{
+  background:color-mix(in srgb,var(--card),#000 24%);
+  box-shadow:inset 0 2px 5px rgba(0,0,0,.55),inset 0 -1px 0 rgba(255,255,255,.12);
+  border:1px solid color-mix(in srgb,var(--border),#000 20%)}}
+.dchip{position:absolute;z-index:2;white-space:nowrap;font-family:var(--font);font-weight:800;
+  font-variant-numeric:tabular-nums;top:calc(var(--chOffY)*-1px);right:calc(var(--chOffX)*-1px);
+  font-size:calc(var(--chSize)*1px);line-height:1;
+  padding:calc(var(--chPadY)*1px) calc(var(--chPadX)*1px);border-radius:calc(var(--chRad)*1px);
+  color:var(--sig);background:var(--cardBg);
+  border:1px solid color-mix(in srgb,var(--sig) calc(var(--chBorderInt)*1%),transparent)}
+.dchip[data-pos="inline"]{position:static;order:9}
+
+/* ═════════ 6 · ОБ'ЄКТ СУДУ — .mny (комбінатор форми) ═════════ */
+.mny{display:inline-flex;align-items:center;font:700 calc(var(--mFs)*1px)/1 var(--font);
+  font-variant-numeric:tabular-nums;letter-spacing:.1px;white-space:nowrap}
+.mny.empty{display:none}
+.mh{display:inline-flex;align-items:center;white-space:nowrap;
+  padding:calc(var(--mPadY)*1px) calc(var(--mPadX)*1px);border-radius:calc(var(--mRad)*1px)}
+.mh.off{display:none}
+.mdiv{display:none;flex:0 0 auto;align-self:stretch;width:calc(var(--mDivW)*1px)}
+.mny[data-shape="two"]{gap:calc(var(--mGapPx)*1px)}
+.fa{--mBw:var(--mBwFA)} .fb{--mBw:var(--mBwFB)}
+.mny[data-shape="two"] .mh{border-width:calc(var(--mBw,1)*1px);border-style:solid}
+.mny[data-shape="split"]{border-width:calc(var(--mBw,1)*1px);border-style:solid;border-radius:calc(var(--mRad)*1px);
+  padding:0;overflow:hidden}
+.mny[data-shape="split"] .mh{border:none;border-radius:0}
+.mny[data-shape="split"] .mdiv{display:block}
+.mny[data-shape="split"][data-div="none"] .mdiv{display:none}
+.mny[data-shape="split"][data-div="notch"] .mdiv{background:transparent;width:calc(var(--mDivW)*3px)}
+.mny[data-shape="lead"]{gap:calc(var(--mGapPx)*1px)}
+.mny[data-shape="lead"] .mh-lead{border-width:calc(var(--mBw,1)*1px);border-style:solid}
+.mny[data-shape="lead"] .mh-sat{border:none;padding:0;font-size:calc(var(--mFs)*var(--mEmph)*.01px);opacity:.92}
+.mny[data-order="over-first"]{flex-direction:row-reverse}
+
+/* ═════════ 7 · МАТЕРІАЛ — LIGHT (тінь + бордюр + тінт) ═════════ */
+/* B2 (самері §2): власний токен --base. У властивості color currentColor бере
+   УСПАДКОВАНЕ значення від батька, тому color-mix(...currentColor...) знебарвлював гроші. */
+.mh-short{--base:var(--crit)}
+.mh-over{--base:hsl(162 82% 27%)}
+.mny .mh{color:color-mix(in srgb,var(--base) calc(var(--L-valL)*1%),var(--muted))}
+.mny[data-shape="lead"] .mh-sat{color:color-mix(in srgb,var(--base) calc(var(--L-mutL)*1%),var(--muted))}
+.mny[data-shape="two"] .mh-short,
+.mny[data-shape="lead"] .mh-short.mh-lead{
+  background:color-mix(in srgb,#eab8b2 calc(var(--L-fillMix)*1%),var(--card));
+  box-shadow:0 calc(var(--L-shY)*1px) calc(var(--L-shBlur)*1px) rgba(80,20,20,var(--L-shA))}
+.mny[data-shape="two"] .mh-over,
+.mny[data-shape="lead"] .mh-over.mh-lead{
+  background:color-mix(in srgb,var(--accent-soft) calc(var(--L-fillMix)*1%),var(--card));
+  box-shadow:0 calc(var(--L-shY)*1px) calc(var(--L-shBlur)*1px) rgba(20,50,42,var(--L-shA))}
+.mny[data-shape="split"]{background:var(--card);
+  box-shadow:0 calc(var(--L-shY)*1px) calc(var(--L-shBlur)*1px) rgba(20,50,42,var(--L-shA))}
+.mny[data-shape="split"][data-div="tone"] .mh-short{background:color-mix(in srgb,#eab8b2 calc(var(--L-fillMix)*1%),var(--card))}
+.mny[data-shape="split"][data-div="tone"] .mh-over{background:color-mix(in srgb,var(--accent-soft) calc(var(--L-fillMix)*1%),var(--card))}
+.mdiv{background:var(--border-subtle)}
+.mny[data-div="hairline"] .mdiv{background:color-mix(in srgb,var(--border) 80%,transparent)}
+/* бордюри — РОЗЩЕПЛЕНІ по домах (Д3.2: у білді fa 37% ⟂ fb 30/28%) */
+.mny.fa,.mny.fa .mh{border-color:color-mix(in srgb,var(--muted) calc(var(--L-bdFA)*1%),transparent)}
+.mny.fa .mh-short{border-color:color-mix(in srgb,var(--crit) calc(var(--L-bdFA)*1%),transparent)}
+.mny.fa .mh-over{border-color:color-mix(in srgb,var(--accent) calc(var(--L-bdFA)*1%),transparent)}
+.mny.fa[data-shape="split"]{border-color:color-mix(in srgb,var(--muted) calc(var(--L-bdFA)*1%),transparent)}
+.mny.fb,.mny.fb .mh{border-color:color-mix(in srgb,var(--muted) calc(var(--L-bdFB)*1%),transparent)}
+.mny.fb .mh-short{border-color:color-mix(in srgb,var(--crit) calc(var(--L-bdFB)*1%),transparent)}
+.mny.fb .mh-over{border-color:color-mix(in srgb,var(--accent) calc(var(--L-bdFB)*1%),transparent)}
+.mny.fb[data-shape="split"]{border-color:color-mix(in srgb,var(--muted) calc(var(--L-bdFB)*1%),transparent)}
+
+/* ═════════ 8 · МАТЕРІАЛ — DARK (заливка + ridge + бордюр; drop-важеля НЕМА, A45) ═════════ */
+[data-theme="dark"] .mh-short{--base:#e07a6f}
+[data-theme="dark"] .mh-over{--base:hsl(163 52% 60%)}
+[data-theme="dark"] .mny .mh{color:color-mix(in srgb,var(--base) calc(var(--D-valL)*1%),var(--muted))}
+[data-theme="dark"] .mny[data-shape="lead"] .mh-sat{color:color-mix(in srgb,var(--base) calc(var(--D-mutL)*1%),var(--muted))}
+[data-theme="dark"] .mny[data-shape="two"] .mh-short,
+[data-theme="dark"] .mny[data-shape="lead"] .mh-short.mh-lead{
+  background-color:color-mix(in srgb,hsl(6 calc(var(--D-negS)*1%) calc(var(--D-negL)*1%)) calc(var(--D-fillMix)*1%),transparent);
+  background-image:linear-gradient(180deg,rgba(255,255,255,var(--D-ridgeA)) 0,transparent calc(var(--D-ridge)*1px));
+  box-shadow:none}
+[data-theme="dark"] .mny[data-shape="two"] .mh-over,
+[data-theme="dark"] .mny[data-shape="lead"] .mh-over.mh-lead{
+  background-color:color-mix(in srgb,hsl(163 calc(var(--D-posS)*1%) calc(var(--D-posL)*1%)) calc(var(--D-fillMix)*1%),transparent);
+  background-image:linear-gradient(180deg,rgba(255,255,255,var(--D-ridgeA)) 0,transparent calc(var(--D-ridge)*1px));
+  box-shadow:none}
+[data-theme="dark"] .mny[data-shape="split"]{
+  background-color:color-mix(in srgb,var(--surface-3) calc(var(--D-fillMix)*2%),transparent);
+  background-image:linear-gradient(180deg,rgba(255,255,255,var(--D-ridgeA)) 0,transparent calc(var(--D-ridge)*1px));
+  box-shadow:none}
+[data-theme="dark"] .mny[data-shape="split"][data-div="tone"] .mh-short{
+  background:color-mix(in srgb,hsl(6 calc(var(--D-negS)*1%) calc(var(--D-negL)*1%)) calc(var(--D-fillMix)*1%),transparent)}
+[data-theme="dark"] .mny[data-shape="split"][data-div="tone"] .mh-over{
+  background:color-mix(in srgb,hsl(163 calc(var(--D-posS)*1%) calc(var(--D-posL)*1%)) calc(var(--D-fillMix)*1%),transparent)}
+[data-theme="dark"] .mdiv{background:var(--border)}
+[data-theme="dark"] .mny.fa,[data-theme="dark"] .mny.fa .mh{border-color:color-mix(in srgb,var(--muted) calc(var(--D-bdFA)*1%),transparent)}
+[data-theme="dark"] .mny.fa .mh-short{border-color:color-mix(in srgb,#e07a6f calc(var(--D-bdFA)*1%),transparent)}
+[data-theme="dark"] .mny.fa .mh-over{border-color:color-mix(in srgb,var(--accent) calc(var(--D-bdFA)*1%),transparent)}
+[data-theme="dark"] .mny.fa[data-shape="split"]{border-color:color-mix(in srgb,var(--muted) calc(var(--D-bdFA)*1%),transparent)}
+[data-theme="dark"] .mny.fb,[data-theme="dark"] .mny.fb .mh{border-color:color-mix(in srgb,var(--muted) calc(var(--D-bdFB)*1%),transparent)}
+[data-theme="dark"] .mny.fb .mh-short{border-color:color-mix(in srgb,#e07a6f calc(var(--D-bdFB)*1%),transparent)}
+[data-theme="dark"] .mny.fb .mh-over{border-color:color-mix(in srgb,var(--accent) calc(var(--D-bdFB)*1%),transparent)}
+[data-theme="dark"] .mny.fb[data-shape="split"]{border-color:color-mix(in srgb,var(--muted) calc(var(--D-bdFB)*1%),transparent)}
+
+/* ── DARK, форма 2: AUTO-DARK БЛИЗНЮКИ (A69 / Д-Б) ──
+   Записані канонічно: закривна дужка блоку @media — з нульової колонки окремим рядком.
+   Це не стиль: H3 у Lens_validate.py шукає межу блоку регексом до переводу рядка з дужкою,
+   і без цієї форми перший @media проковтує решту файлу як текст,
+   а детектор дає ХИБНИЙ ✓ (перевірено на цьому файлі 12.08). */
+@media(prefers-color-scheme:dark){
+  :root:not([data-theme="light"]) .mh-short{--base:#e07a6f}
+  :root:not([data-theme="light"]) .mh-over{--base:hsl(163 52% 60%)}
+  :root:not([data-theme="light"]) .mny .mh{color:color-mix(in srgb,var(--base) calc(var(--D-valL)*1%),var(--muted))}
+  :root:not([data-theme="light"]) .mny[data-shape="lead"] .mh-sat{color:color-mix(in srgb,var(--base) calc(var(--D-mutL)*1%),var(--muted))}
+  :root:not([data-theme="light"]) .mny[data-shape="two"] .mh-short,
+  :root:not([data-theme="light"]) .mny[data-shape="lead"] .mh-short.mh-lead{background-color:color-mix(in srgb,hsl(6 calc(var(--D-negS)*1%) calc(var(--D-negL)*1%)) calc(var(--D-fillMix)*1%),transparent);
+  background-image:linear-gradient(180deg,rgba(255,255,255,var(--D-ridgeA)) 0,transparent calc(var(--D-ridge)*1px));
+  box-shadow:none}
+  :root:not([data-theme="light"]) .mny[data-shape="two"] .mh-over,
+  :root:not([data-theme="light"]) .mny[data-shape="lead"] .mh-over.mh-lead{background-color:color-mix(in srgb,hsl(163 calc(var(--D-posS)*1%) calc(var(--D-posL)*1%)) calc(var(--D-fillMix)*1%),transparent);
+  background-image:linear-gradient(180deg,rgba(255,255,255,var(--D-ridgeA)) 0,transparent calc(var(--D-ridge)*1px));
+  box-shadow:none}
+  :root:not([data-theme="light"]) .mny[data-shape="split"]{background-color:color-mix(in srgb,var(--surface-3) calc(var(--D-fillMix)*2%),transparent);
+  background-image:linear-gradient(180deg,rgba(255,255,255,var(--D-ridgeA)) 0,transparent calc(var(--D-ridge)*1px));
+  box-shadow:none}
+  :root:not([data-theme="light"]) .mny[data-shape="split"][data-div="tone"] .mh-short{background:color-mix(in srgb,hsl(6 calc(var(--D-negS)*1%) calc(var(--D-negL)*1%)) calc(var(--D-fillMix)*1%),transparent)}
+  :root:not([data-theme="light"]) .mny[data-shape="split"][data-div="tone"] .mh-over{background:color-mix(in srgb,hsl(163 calc(var(--D-posS)*1%) calc(var(--D-posL)*1%)) calc(var(--D-fillMix)*1%),transparent)}
+  :root:not([data-theme="light"]) .mdiv{background:var(--border)}
+  :root:not([data-theme="light"]) .mny.fa,
+  :root:not([data-theme="light"]) .mny.fa .mh{border-color:color-mix(in srgb,var(--muted) calc(var(--D-bdFA)*1%),transparent)}
+  :root:not([data-theme="light"]) .mny.fa .mh-short{border-color:color-mix(in srgb,#e07a6f calc(var(--D-bdFA)*1%),transparent)}
+  :root:not([data-theme="light"]) .mny.fa .mh-over{border-color:color-mix(in srgb,var(--accent) calc(var(--D-bdFA)*1%),transparent)}
+  :root:not([data-theme="light"]) .mny.fa[data-shape="split"]{border-color:color-mix(in srgb,var(--muted) calc(var(--D-bdFA)*1%),transparent)}
+  :root:not([data-theme="light"]) .mny.fb,
+  :root:not([data-theme="light"]) .mny.fb .mh{border-color:color-mix(in srgb,var(--muted) calc(var(--D-bdFB)*1%),transparent)}
+  :root:not([data-theme="light"]) .mny.fb .mh-short{border-color:color-mix(in srgb,#e07a6f calc(var(--D-bdFB)*1%),transparent)}
+  :root:not([data-theme="light"]) .mny.fb .mh-over{border-color:color-mix(in srgb,var(--accent) calc(var(--D-bdFB)*1%),transparent)}
+  :root:not([data-theme="light"]) .mny.fb[data-shape="split"]{border-color:color-mix(in srgb,var(--muted) calc(var(--D-bdFB)*1%),transparent)}
+}
+
+/* ═════════ 9 · ХРОМ СТЕНДА v2 — сцена перша, панель згортається цілком ═════════ */
+body{background:#20262b;font-family:var(--font);color:#dfe7e4;min-height:100dvh;
+  padding-bottom:calc(var(--panelH,150px) + env(safe-area-inset-bottom,0px))}
+/* §4 п.2 — сцена в ДЕВАЙС-масштабі: на вузькому екрані жодних бокових полів,
+   375 CSS-px девайса = 375 CSS-px сцени. zoom (а не transform:scale) міняє
+   layout-бокс, тому обгортка росте разом зі сценою й нічого не перекриває. */
+#stage{overflow-x:auto;padding:0}
+#zoombox{zoom:var(--zoom,1);width:max-content;margin:0 auto}
+#probe{position:absolute;width:1px;height:100px;visibility:hidden;pointer-events:none}
+.hudbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  padding:8px 10px;background:#171c20;border-bottom:1px solid #2b3439;
+  font:600 11px/1.4 ui-monospace,monospace;color:#b9c8c3}
+#hudTop{position:sticky;top:0;z-index:20;border-top:1px solid #2b3439}
+#hudTop .lev{flex:1 1 190px;gap:6px}
+#hudTop .lev label{flex:0 0 auto;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px}
+#hudTop .lev .why{display:none}
+#hudTop .seg{flex:0 1 auto;min-width:0}
+#hudTop input[type=range]{flex:1 1 70px;min-width:70px}
+.hudbar .dlbl{font:700 10px/1 var(--font);color:#7e918c;letter-spacing:.4px;text-transform:uppercase}
+.mtr{display:flex;gap:10px;flex-wrap:wrap}
+.mtr span.ok{color:#5fd39a} .mtr span.bad{color:#ff8a7a} .mtr span.dim{color:#71827d}
+#info{display:none;padding:10px 12px;background:#141a1d;border-bottom:1px solid #2b3439;
+  font:500 11px/1.55 var(--font);color:#b9c8c3}
+#info b{color:#e8f0ec}
+#info .prov{font-family:ui-monospace,monospace;font-size:10px;color:#7e918c;display:block;margin-top:5px}
+#runout{padding:8px 12px;font:600 11px/1.5 ui-monospace,monospace;color:#b9c8c3;
+  background:#141a1d;border-bottom:1px solid #2b3439;display:none}
+
+/* панель — згортається ЦІЛКОМ однією кнопкою (§4 п.3) */
+.panel{position:fixed;left:0;right:0;bottom:0;background:#12171a;border-top:1px solid #2b3439;
+  max-height:52dvh;overflow:auto;padding:0 12px calc(14px + env(safe-area-inset-bottom,0px));z-index:50}
+.panel.shut{max-height:none;overflow:visible}
+.panel.shut .gr,.panel.shut #dump,.panel.shut .barx{display:none}
+.panel .bar{position:sticky;top:0;background:#12171a;padding:8px 0;display:flex;gap:6px;flex-wrap:wrap;
+  align-items:center;border-bottom:1px solid #232b30;z-index:2}
+.gr{margin-top:10px}
+.gr>h3{font:700 10.5px/1 var(--font);letter-spacing:.6px;text-transform:uppercase;color:#7e918c;
+  margin-bottom:8px;cursor:pointer;user-select:none;display:flex;align-items:center;gap:8px}
+.gr>h3::before{content:'▾';color:#4d5c57}
+.gr.folded>h3::before{content:'▸'}
+.gr.folded .grbody{display:none}
+.gr .up{margin-left:auto;background:#1b2226;border:1px solid #2b3439;border-radius:7px;color:#8fa39e;
+  font:700 10px/1 var(--font);padding:4px 7px;cursor:pointer}
+.grbody{display:grid;grid-template-columns:repeat(auto-fill,minmax(228px,1fr));gap:8px 16px}
+.lev{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font:600 11.5px/1 var(--font);color:#9fb3ad}
+.lev label{flex:0 0 76px;color:#8fa39e}
+.lev input[type=range]{flex:1 1 90px;min-width:90px;height:26px;accent-color:#3aa88a}
+.lev output{flex:0 0 44px;text-align:right;font-family:ui-monospace,monospace;color:#dfe7e4}
+.lev.dead{opacity:.34}
+.lev .why{flex:1 0 100%;font:500 10.5px/1.3 var(--font);color:#c98b6a;padding-left:84px;margin-top:-4px}
+.lev .why:empty{display:none}
+.seg{display:flex;background:#1b2226;border:1px solid #2b3439;border-radius:9px;overflow:hidden;
+  flex:1 1 118px;min-width:118px}
+.seg button{flex:1;padding:6px 4px;background:transparent;border:none;color:#8fa39e;
+  font:700 11px/1 var(--font);cursor:pointer;white-space:nowrap}
+.seg button.on{background:#2b6f5e;color:#eaf5f1}
+.mb-btn{padding:7px 10px;background:#1b2226;border:1px solid #2b3439;border-radius:9px;color:#cfdcd8;
+  font:700 11px/1 var(--font);cursor:pointer}
+.mb-btn.pri{background:#2b6f5e;border-color:#367f6c;color:#eaf5f1}
+.mb-btn.warnb{border-color:#6b4a2f;color:#e0a94a}
+#undecl{flex:1 0 100%;font:600 10.5px/1.4 ui-monospace,monospace;color:#e0a94a;margin-top:2px}
+#undecl:empty{display:none}
+#dump{width:100%;height:110px;margin-top:8px;background:#0d1113;color:#9fb3ad;border:1px solid #2b3439;
+  border-radius:9px;padding:9px;font:500 10.5px/1.45 ui-monospace,monospace;display:none}
+@media(min-width:821px){
+  body{padding-left:14px;padding-right:14px}
+  .phone{border:1px solid var(--border);border-radius:22px}
+  .grbody{gap:8px 16px}
+}
+@media(max-width:820px){
+  .lev label{flex:0 0 68px;font-size:12px}
+  .lev input[type=range]{height:32px}
+  .seg button{padding:10px 4px;font-size:11.5px}
+  .lev .why{padding-left:0}
+  .grbody{grid-template-columns:1fr;gap:12px}
+  .mb-btn{padding:9px 11px;font-size:11.5px}
+}
+</style>
+</head>
+<body>
+<div id="probe"></div>
+
+<!-- ── СЦЕНА — ПЕРША в DOM (§4 п.1). Статична розмітка: важелі НІКОЛИ не перебудовують DOM ── -->
+<div class="hudbar" id="hudTop">
+  <button class="mb-btn" id="btnTheme">тема: light</button>
+  <span id="hudlev"></span>
+</div>
+
+<div id="stage">
+  <div id="zoombox">
+    <div class="phone app" id="scene">
+      <div class="hdr">
+        <div class="hdr-row">
+          <div class="icon-btn">‹</div>
+          <div class="hdr-title">
+            <div class="t" id="scT">Аптека №14</div>
+            <div class="s" id="scS" data-pos="before">
+              <span class="nmark" id="scMark" hidden><span class="ntile is-mark" style="--ntScale:1.11"><img id="scImg" alt=""></span></span>
+              <span class="ntxt" id="scNtxt" hidden data-case="as">Бажаємо здоров'я ·</span>
+              <span class="s-txt" id="scTxt">Аули · Proxima 4322954</span>
+            </div>
+            <div class="ro-flag" id="scRo" hidden><span class="rf-ic">✓</span><span class="rf-t">Перенесено · 11.08</span></div>
+          </div>
+          <div class="icon-btn">⋯</div>
+        </div>
+        <div class="hdr-sub" id="scSub">
+          <span class="pair fa"><span class="tchip">OTC D</span><span class="mny fa" id="mOtc"><span class="mh mh-short mh-lead" data-h="short"></span><span class="mdiv"></span><span class="mh mh-over mh-sat" data-h="over"></span></span></span>
+          <span class="pair fa" id="pairIw"><span class="tchip">IW C</span><span class="mny fa" id="mIw"><span class="mh mh-short mh-lead" data-h="short"></span><span class="mdiv"></span><span class="mh mh-over mh-sat" data-h="over"></span></span></span>
+        </div>
+        <div class="prow"><div class="progress"><i></i></div><span class="pcount">31 / 83</span></div>
+      </div>
+      <div class="brand">
+        <div class="bhdr" id="scBhdr" data-ell="off" data-order="money-first">
+          <span class="arr">▾</span>
+          <span class="bnm">Стрепсілс</span>
+          <span class="bright"><span class="mny fb" id="mBr"><span class="mh mh-short mh-lead" data-h="short"></span><span class="mdiv"></span><span class="mh mh-over mh-sat" data-h="over"></span></span><span class="bcnt" id="scBcnt">10/11</span></span>
+        </div>
+        <div class="rows">
+          <div class="row settled tint lv-crit">
+            <div class="info"><div class="rn"><span class="rv">Інтенсив мед-лимон</span><span class="rn-tag"><span class="rpk">№16</span><span class="ck">✓</span></span></div><div class="rm">MSL <span class="nm">2</span></div></div>
+            <div class="fwrap"><div class="fld">0</div><span class="dchip" data-kind="short">-2</span></div>
+          </div>
+          <div class="row settled tint lv-ok">
+            <div class="info"><div class="rn"><span class="rv">Інтенсив спрей</span><span class="rn-tag"><span class="rpk">20 мл</span><span class="ck">✓</span></span></div><div class="rm">MSL <span class="nm">1</span></div></div>
+            <div class="fwrap"><div class="fld">6</div><span class="dchip" data-kind="over">+5</span></div>
+          </div>
+          <div class="row settled tint lv-ok">
+            <div class="info"><div class="rn"><span class="rv">Мед-лимон</span><span class="rn-tag"><span class="rpk">№24</span><span class="ck">✓</span></span></div><div class="rm">MSL <span class="nm">2</span></div></div>
+            <div class="fwrap"><div class="fld">2</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── СМУГА ДЕТЕКТОРІВ + «ⓘ» (хром другорядний, §4 п.1) ── -->
+<div class="hudbar" id="hudBot">
+  <span class="dlbl" id="hudDev">XS · 375</span>
+  <span class="mtr" id="mout">—</span>
+  <button class="mb-btn" id="btnInfo">ⓘ</button>
+</div>
+<div id="info"></div>
+<div id="runout"></div>
+
+<!-- ── ПАНЕЛЬ ── -->
+<div class="panel" id="panel">
+  <div class="bar">
+    <button class="mb-btn pri" id="btnShut">важелі ▾</button>
+    <span class="barx" style="display:contents">
+      <button class="mb-btn" id="btnTheme">тема: light</button>
+      <button class="mb-btn" data-preset="A">A · дві</button>
+      <button class="mb-btn" data-preset="B">B · спліт</button>
+      <button class="mb-btn" data-preset="C">C · лід</button>
+      <button class="mb-btn" data-preset="D">D · чистий</button>
+      <button class="mb-btn" id="f1s">F1 ▸</button><button class="mb-btn" id="f1l">◂ F1</button>
+      <button class="mb-btn warnb" id="btnRun">прогін 3×3</button>
+      <button class="mb-btn warnb" id="btnBase">переміряти базу</button>
+      <button class="mb-btn pri" id="btnCopy">Copy-ALL</button>
+    </span>
+    <span id="undecl"></span>
+  </div>
+  <div class="gr" id="g-form"><h3>1 · форма грошей — комбінатор<button class="up" data-up="1">▲</button></h3><div class="grbody"></div></div>
+  <div class="gr" id="g-mat"><h3>6 · матеріал — набір активної теми (A45)<button class="up" data-up="1">▲</button></h3><div class="grbody"></div></div>
+  <div class="gr" id="g-fa"><h3>2 · дім fa — шапка філу<button class="up" data-up="1">▲</button></h3><div class="grbody"></div></div>
+  <div class="gr" id="g-fb"><h3>3 · дім fb — хедер бренда<button class="up" data-up="1">▲</button></h3><div class="grbody"></div></div>
+  <div class="gr" id="g-sku"><h3>4 · рядок SKU — чіп δ<button class="up" data-up="1">▲</button></h3><div class="grbody"></div></div>
+  <div class="gr" id="g-net"><h3>5 · О-51 — мережа у філі<button class="up" data-up="1">▲</button></h3><div class="grbody"></div></div>
+  <div class="gr" id="g-scene"><h3>7 · сцена<button class="up" data-up="1">▲</button></h3><div class="grbody"></div></div>
+  <textarea id="dump" readonly></textarea>
+</div>
+<script>
+/* ═══ ДАНІ — реальні, з DATA білда (Д-1: 965 рядків, 63 міста) ═══ */
+var CASE={short:'\u2212422 грн', over:'+1 948 грн', legacy:'+1 526 грн'};
+/* ═══ MAGN · РОЗРЯДНІСТЬ (В-2) — усі числа ЗАМІРЯНІ по MSL білда (83 SKU, р.1484-1568) ═══
+   Замір (python, ціни 53.51…409.37):
+     fb · Стрепсілс, 11 SKU:  ΣD×p = 2 081 · ΣA×p = 6 515 · Σp×3 (надлишок +3шт/SKU) = 4 568
+     fa · OTC, 38 SKU:        ΣD×p = 9 368 · ΣA×p = 26 462 · Σp×3 = 19 177
+     fa · IW, 45 SKU:         ΣD×p = 7 079 · ΣA×p = 22 236 · Σp×3 = 27 660
+   6-ЗНАЧНЕ ЗНЯТО як фантом: 128 300 грн вимагає ~+16 шт надлишку на КОЖЕН із 38 OTC SKU.
+   Судити форму на числі, якого система не породжує, заборонено (wsd 2.5).
+   Пара НА ДІМ, не спільна: fa (сума 3 брендів, catMoney) завжди на порядок більша
+   за fb (один бренд, brandMoney) — спільне число робило сцену недостовірною.
+   legacy рахується з тих самих чисел (over+short) — база заміру не має відставати
+   від сцени на розрядність. */
+var MAGN={
+  typ:{fa:{short:-422,  over:1948},  fb:{short:-422, over:1948}},
+  hi :{fa:{short:-9368, over:19177}, fb:{short:-422, over:1948}},
+  max:{fa:{short:-26462,over:19177}, fb:{short:-6515,over:4568}}
+};
+var ADDR={
+  typ:'Аули \u00b7 Proxima 4322954',
+  worst:'Верхньодніпровськ \u00b7 Proxima 2011101'   /* найдовше місто DATA, 17 симв. */
+};
+var NETS={
+  BAZHAEMO:{label:"Бажаємо здоров'я", scale:1.11, img:'data:image/webp;base64,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'},
+  PODOROZHNYK:{label:'Подорожник', scale:1.28, img:'data:image/webp;base64,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'}
+};
+
+/* ═══ СТАН ═══ */
+/* ═══════════ СТАРТ = ЛОК ДЕВАЙС-РАУНДУ 3 (s15c) ═══════════
+   Значення нижче — НЕ дефолти автора стенда, а вирок Konst на iPhone XS iOS 18,
+   375pt, тема судилась в обох. Стенд відкривається одразу в залоченому вигляді:
+   перенесення в порт іде зі стенда, тож стартовий стан і є те, що переноситься.
+   ЩО САМЕ ПОРТУЄТЬСЯ — розібрано в самері s15c §2. Коротко тут, щоб не помилитись:
+     · форма грошей (shape/order/div/sign/zeroMode/curr + геометрія + bd/bw) — ПОРТУЄТЬСЯ
+     · О-51 (netMode/netPos/netCase/markPx/markPad/markPlateL/D)                — ПОРТУЄТЬСЯ
+     · bcntBd 82 — ПРАВКА ПОРТУ: у білді р.861 стоїть 100 (var(--border) без міксу)
+     · magn/abbr/caseMode/iwCase/bcntState/faPairs/faRows/addrCase/roFlag       — тестовий
+       кейс стенда, НЕ властивість продукту; у порт не їде нічого з цього рядка
+     · devW/zoom — оптика огляду. zoom лишено 1: 0.75 із раунду 3 — це лупа, якою
+       Konst дивився, а не рішення про продукт. Стенд не має відкриватись зменшеним. */
+var S={
+  /* ФОРМА · лок раунду 3 */
+  shape:'split', order:'over-first', div:'tone', sign:'none', zeroMode:'dash', curr:'row',
+  /* тестовий кейс (не портується) */
+  magn:'max', abbr:'off',
+  /* геометрія пілюлі · лок */
+  mPadX:3, mPadY:3.5, mRad:9, mFs:11, mGapPx:4, mDivW:1, mEmph:100, mBwFA:1, mBwFB:1,
+  /* дім fa · лок */
+  faPairs:2, faRows:1, faWrap:'nowrap', faAlign:'center', faGap:4, faPairGap:3, faStretch:'off',
+  caseMode:'both', iwCase:'both',
+  /* дім fb · лок. bcntMin 34 = значення порту (р.858 перебиває р.180 «56»).
+     bcntBd 82 — ВІДХИЛЕННЯ від порту (там 100), свідоме: при 100 рамка капсули
+     важча за рамку пілюлі грошей поруч і тягне око на лічильник. */
+  bnmEllipsis:'off', fbOrder:'money-first', bcntMin:34, fbGap:5, counterFill:55, bcntBd:82,
+  bcntState:'open',
+  dchipMode:'both', dchipSign:'glyph', dchipPos:'absolute',
+  /* О-51 · лок. markPlate розщеплено по темах свідомо: на світлій білий well без
+     рамки й тіні (flat), на темній повна плитка (tile) — див. s15b Д-2. */
+  netMode:'mark', netWhich:'BAZHAEMO', markPx:24, markPad:3,
+  markPlateL:'flat', markPlateD:'tile', netPos:'before', netCase:'as', netGap:4,
+  devW:375, addrCase:'typ', roFlag:0, zoom:1,
+  /* матеріал · лок обох тем (A45). bdFA=bdFB у кожній темі: після фіксу мертвого
+     селектора (s15b Д-1) доми нарешті порівнювані, і розводити їх нема причини. */
+  L:{shY:1.5,shBlur:1.5,shA:.16,fillMix:7,bdFA:14,bdFB:14,valL:100,mutL:46},
+  D:{fillMix:12,posS:37,posL:14,negS:42,negL:17,ridge:7,ridgeA:.14,bdFA:37,bdFB:37,valL:100,mutL:46}
+};
+var PRESETS={
+  A:{shape:'two',div:'none',mGapPx:6,mEmph:100},
+  B:{shape:'split',div:'hairline',mDivW:1,mEmph:100},
+  C:{shape:'lead',div:'none',mGapPx:5,mEmph:82},
+  D:{shape:'two',div:'none',sign:'none',curr:'none',mGapPx:4,mPadX:6,mRad:7,mEmph:100}
+};
+var BASE={fa:0,fb:0,ell:false}, FAV=null, RUN='';
+
+/* ═══ §5-ПРАВИЛО · ТАБЛИЦЯ ЗАЛЕЖНОСТЕЙ ═══════════════════════════════
+   «Мертвий важіль оголошується ТАБЛИЦЕЮ, не списком» (самері s13 §5).
+   Кожен важіль інструмента проходить через DEPS. Важіль, якого тут немає,
+   НЕ рендериться взагалі — і його ім'я друкується в рядок #undecl,
+   інакше зникнення не відрізнити від «забули завести» (Д-7).
+   tok — CSS-змінна важеля; потрібна авто-звірці (Д-8).
+   req — предикати, які я СТВЕРДЖУЮ; авто-звірка порівнює їх із селекторами CSS. */
+var A=function(){return true;};
+var DEPS={
+  /* — форма — */
+  shape:{alive:A},
+  order:{alive:function(){return S.caseMode==='both'||S.iwCase==='both';},
+         why:function(){return 'жоден дім не має двох половин — переставляти нічого';}},
+  div:{alive:function(){return S.shape==='split';},
+       why:function(){return 'не діє при shape='+S.shape+' — роздільник живе лише всередині спліт-капсули';}},
+  /* req НЕ оголошено свідомо: .mdiv{width:var(--mDivW)} стоїть без предиката,
+     а смерть важеля приходить від .mdiv{display:none} — тобто не з того селектора,
+     де живе токен. Авто-звірка не має чим це довести, і сильніше твердження вона
+     чесно відхилила (перевірено: вона так і сказала). Умова лишається ручною. */
+  mDivW:{tok:'--mDivW',
+       alive:function(){return S.shape==='split'&&S.div!=='none';},
+       why:function(){return S.shape!=='split'?'не діє при shape='+S.shape:'не діє при div=none — роздільника немає';}},
+  mGapPx:{tok:'--mGapPx',
+       alive:function(){return S.shape!=='split';},
+       why:function(){return 'не діє при shape=split — половини в одній капсулі, зазору між ними немає';}},
+  mEmph:{tok:'--mEmph',req:['[data-shape="lead"]'],
+       alive:function(){return S.shape==='lead';},
+       why:function(){return 'не діє при shape='+S.shape+' — супутник меншим кеглем є лише в lead';}},
+  sign:{alive:function(){return !(S.caseMode==='zero'&&S.iwCase==='zero');},
+       why:function(){return 'обидва доми в стані zero — знака немає на чому показати';}},
+  zeroMode:{alive:function(){return S.caseMode==='zero'||S.iwCase==='zero';},
+       why:function(){return 'жоден дім не в стані zero — гілка порожнього значення не досягається';}},
+  /* curr дістав 4-те положення «row» замість окремого важеля currPos: «грн» один раз
+     на весь ряд fa (на останньому ВИДИМОМУ домі). Окремий важіль був би ДРУГИМ важелем
+     на тій самій осі — панель із двох незалежних на вигляд сегментів на одній осі
+     оголошує простір, якого немає (wsd 2.5). При faPairs=1 «row» вироджується в «last»
+     — це вироджене положення, не мертвий важіль, тому не гаситься. */
+  curr:{alive:A},
+  magn:{alive:A}, abbr:{alive:A},
+  mPadX:{tok:'--mPadX',alive:A}, mPadY:{tok:'--mPadY',alive:A},
+  mRad:{tok:'--mRad',alive:A}, mFs:{tok:'--mFs',alive:A},
+  /* товщина рамки розщеплена по домах: у білді бордюр fa (37%) і fb (30/28%) вже
+     різні за інтенсивністю, тож один важіль товщини на обидва доми брехав би
+     так само, як брехав би один borderL (Д3.2 спеки · wsd 2.6). */
+  mBwFA:{tok:'--mBwFA',alive:A}, mBwFB:{tok:'--mBwFB',alive:A},
+  /* — дім fa — */
+  faPairs:{alive:A},
+  faRows:{alive:function(){return S.faPairs===2;},
+       why:function(){return 'одна пара — другого рядка нема з чого зробити';}},
+  faWrap:{alive:function(){return S.faPairs===2&&S.faRows===1;},
+       why:function(){return S.faPairs!==2?'одна пара — переносити нічого'
+                                          :'при rows=2 напрям колонковий, flex-wrap не діє';}},
+  faAlign:{alive:function(){return S.faRows===1;},
+       why:function(){return 'при rows=2 align-items перебито на flex-start (правило .hdr-sub[data-rows="2"])';}},
+  faGap:{tok:'--faGap',over:'gap',
+       alive:function(){return S.faPairs===2&&S.faRows===1;},
+       why:function(){return S.faPairs!==2?'одна пара — зазор ні між чим'
+                                          :'при rows=2 gap перебито на 5px (перебиття, не відсутність)';}},
+  faPairGap:{tok:'--faPairGap',alive:A},
+  faStretch:{alive:function(){return S.faRows===2;},
+       why:function(){return 'при rows=1 пари стоять в один ряд — правого краю, який можна розтягнути, немає';}},
+  iwCase:{alive:function(){return S.faPairs===2;},
+       why:function(){return 'пари IW немає в кадрі при pairs=1';}},
+  /* — дім fb — */
+  bnmEllipsis:{alive:function(){return ELL.bnm;},
+       why:function(){return 'назва вміщається — обрізати нічого (гейт за ВИМІРОМ, не за списком)';}},
+  fbOrder:{alive:A}, bcntMin:{tok:'--bcntMin',alive:A}, fbGap:{tok:'--fbGap',alive:A},
+  bcntState:{alive:A},
+  /* при done правило .bcnt.done (білд р.862) перебиває і тло, і рамку константами
+     --accent-soft / transparent — обидва важелі стають мертві. МЕЖА АВТО-ЗВІРКИ
+     названа: PRED ловить лише [data-*="…"], а .done — клас, тому довести цю умову
+     може лише смоук, не auditTokens(). */
+  counterFill:{tok:'--counterFill',alive:function(){return S.bcntState==='open';},
+       why:function(){return 'при bcntState=done тло бере --accent-soft (білд р.862)';}},
+  bcntBd:{tok:'--bcntBd',alive:function(){return S.bcntState==='open';},
+       why:function(){return 'при bcntState=done рамка прозора (border-color:transparent, білд р.862)';}},
+  /* — рядок SKU — */
+  dchipMode:{alive:A},
+  dchipSign:{alive:function(){return S.dchipMode!=='off';},why:function(){return 'чіп вимкнено (dchipMode=off)';}},
+  dchipPos:{alive:function(){return S.dchipMode!=='off';},why:function(){return 'чіп вимкнено (dchipMode=off)';}},
+  /* — О-51 — */
+  netMode:{alive:A},
+  netWhich:{alive:function(){return S.netMode!=='none';},why:function(){return 'мережа не показується (netMode=none)';}},
+  markPx:{tok:'--markPx',alive:function(){return S.netMode==='mark';},
+       why:function(){return 'розмір плитки діє лише при netMode=mark';}},
+  markPad:{tok:'--markPad',alive:function(){return S.netMode==='mark';},
+       why:function(){return 'поле плитки діє лише при netMode=mark';}},
+  /* підкладка мітки — ДВА важелі, по одному на тему: те саме значення дає різний
+     результат на #eef3f1 і на #0d1512, тож один важіль на обидві теми брехав би
+     так само, як один borderL (wsd 2.4, правило двох осей). */
+  markPlateL:{alive:function(){return S.netMode==='mark';},
+       why:function(){return 'підкладка діє лише при netMode=mark';}},
+  markPlateD:{alive:function(){return S.netMode==='mark';},
+       why:function(){return 'підкладка діє лише при netMode=mark';}},
+  netPos:{alive:function(){return S.netMode!=='none';},why:function(){return 'мережа не показується (netMode=none)';}},
+  netCase:{alive:function(){return S.netMode==='text';},why:function(){return 'регістр діє лише для текстової форми';}},
+  netGap:{tok:'--netGap',alive:function(){return S.netMode!=='none';},why:function(){return 'мережа не показується (netMode=none)';}},
+  /* — сцена — */
+  devW:{alive:A}, caseMode:{alive:A}, addrCase:{alive:A}, roFlag:{alive:A}, zoom:{alive:A},
+  /* — матеріал LIGHT (A45) — */
+  'L.shY':{tok:'--L-shY',alive:A}, 'L.shBlur':{tok:'--L-shBlur',alive:A}, 'L.shA':{tok:'--L-shA',alive:A},
+  'L.fillMix':{tok:'--L-fillMix',
+       alive:function(){return S.shape!=='split'||S.div==='tone';},
+       why:function(){return 'при shape=split тло капсули бере --card; тінт вмикається лише при div=tone';}},
+  'L.bdFA':{tok:'--L-bdFA',alive:A}, 'L.bdFB':{tok:'--L-bdFB',alive:A}, 'L.valL':{tok:'--L-valL',alive:A},
+  'L.mutL':{tok:'--L-mutL',req:['[data-shape="lead"]'],
+       alive:function(){return S.shape==='lead';},
+       why:function(){return 'застосовано лише до .mh-sat — супутник існує тільки в lead';}},
+  /* — матеріал DARK (A45: заливка+ridge, drop-важеля немає) — */
+  'D.fillMix':{tok:'--D-fillMix',alive:A},
+  'D.posS':{tok:'--D-posS',alive:function(){return S.shape!=='split'||S.div==='tone';},
+       why:function(){return 'при split тло бере --surface-3; хроми половин діють лише при div=tone';}},
+  'D.posL':{tok:'--D-posL',alive:function(){return S.shape!=='split'||S.div==='tone';},
+       why:function(){return 'при split тло бере --surface-3; світлота половин діє лише при div=tone';}},
+  'D.negS':{tok:'--D-negS',alive:function(){return S.shape!=='split'||S.div==='tone';},
+       why:function(){return 'при split тло бере --surface-3; хроми половин діють лише при div=tone';}},
+  'D.negL':{tok:'--D-negL',alive:function(){return S.shape!=='split'||S.div==='tone';},
+       why:function(){return 'при split тло бере --surface-3; світлота половин діє лише при div=tone';}},
+  'D.ridge':{tok:'--D-ridge',alive:A}, 'D.ridgeA':{tok:'--D-ridgeA',alive:A},
+  'D.bdFA':{tok:'--D-bdFA',alive:A}, 'D.bdFB':{tok:'--D-bdFB',alive:A},
+  'D.valL':{tok:'--D-valL',alive:A},
+  'D.mutL':{tok:'--D-mutL',req:['[data-shape="lead"]'],
+       alive:function(){return S.shape==='lead';},
+       why:function(){return 'застосовано лише до .mh-sat — супутник існує тільки в lead';}}
+};
+var ELL={bnm:false, sTxt:false};
+
+/* ═══ Д-8 · АВТО-ЗВІРКА ТОКЕН ↔ DEPS ═════════════════════════════════
+   Перелік мертвих важелів, складений очима, — та сама вибірка, якою v1
+   і зробив свій неповний gate. Тут CSS читається як дані: для кожного
+   токена збираються селектори, що його вживають, і виводиться спільний
+   предикат. Розбіжність із полем req = дефект таблиці, не коду.
+   МЕЖА ДЕТЕКТОРА (названа свідомо): перебиття правилом більшої
+   специфічності ловиться лише як ⚠ «можливе перебиття», бо порівняння
+   специфічності регексом не доводиться однозначно (wsd К2). */
+function auditTokens(){
+  var css=document.querySelector('style').textContent;
+  /* @media вирізається ПАРСЕРОМ З БАЛАНСОМ ДУЖОК, не регексом: нежадібний
+     [\s\S]*?\n} з'їдає все до наступної дужки з нульової колонки — рівно та
+     пастка, на якій H3 у Lens_validate.py дає хибний ✓. Спіймано тут же, s14. */
+  var flat='',dep=0,st=0,i=0;
+  while(i<css.length){
+    if(!dep&&css.substr(i,6)==='@media'){
+      var ob=css.indexOf('{',i); flat+=css.slice(st,i); dep=1; i=ob+1;
+      while(i<css.length&&dep){ if(css[i]==='{')dep++; else if(css[i]==='}')dep--; i++; }
+      st=i; continue;
+    }
+    i++;
+  }
+  flat+=css.slice(st);
+  var rules=[],m,re=/([^{}]+)\{([^{}]*)\}/g;
+  while((m=re.exec(flat))) rules.push([m[1].trim(),m[2]]);
+  var PREDS='\\[data-(?:shape|div|rows|order|pos|ell)="[^"]*"\\]';
+  var PRED=new RegExp(PREDS,'g');
+  var msg=[];
+  for(var k in DEPS){
+    var t=DEPS[k].tok; if(!t) continue;
+    var used=rules.filter(function(r){return r[1].indexOf('var('+t+')')>=0;});
+    if(!used.length){msg.push(k+': токен '+t+' не вживається в CSS');continue;}
+    var common=null;
+    used.forEach(function(r){
+      var p=r[0].match(PRED)||[];
+      common = common===null ? p.slice() : common.filter(function(x){return p.indexOf(x)>=0;});
+    });
+    var req=DEPS[k].req||[];
+    var extra=common.filter(function(x){return req.indexOf(x)<0;});
+    var lost=req.filter(function(x){return common.indexOf(x)<0;});
+    if(extra.length) msg.push(k+': CSS вужчий за DEPS — токен живе лише при '+extra.join(''));
+    if(lost.length)  msg.push(k+': DEPS стверджує '+lost.join('')+', а CSS цього не підтверджує');
+    /* можливе перебиття: та сама властивість задається правилом із предикатом без токена */
+    if(DEPS[k].over){
+      var ov=rules.filter(function(r){
+        return r[1].indexOf(DEPS[k].over+':')>=0 && r[1].indexOf('var('+t+')')<0
+               && new RegExp(PREDS).test(r[0]);
+      });
+      /* симетрично до req: збіг = тиша, розбіжність = крик. Твердження про
+         перебиття перевіряється так само, як і твердження про предикат. */
+      if(!ov.length) msg.push(k+': DEPS стверджує перебиття «'+DEPS[k].over
+        +'», а в CSS такого правила немає');
+    }
+  }
+  return msg;
+}
+
+/* ═══ ЗАСТОСУВАННЯ ВАЖЕЛІВ — без rebuild DOM ═══ */
+/* тіло числа: fmtMoney білда (р.2568) — toLocaleString('uk-UA') із нерозривним
+   пробілом, заміненим на звичайний. abbr=тис дає десяткову КОМУ (uk-UA), не крапку. */
+function fmtM(v){
+  var a=Math.abs(v);
+  if(S.abbr==='тис') return (a/1000).toFixed(1).replace('.',',')+' тис';
+  return Math.round(a).toLocaleString('uk-UA').replace(/\u00A0/g,' ');
+}
+/* house — 'fa' або 'fb': розрядність у домів РІЗНА (MAGN).
+   rowLast — чи цей дім останній видимий у ряду fa; потрібно лише для curr='row'. */
+function txt(kind,house,rowLast){
+  var m=MAGN[S.magn][house], v=(kind==='short'?m.short:m.over);
+  var sgn = v<0?'\u2212':'+';
+  if(S.sign==='arrow') sgn=(kind==='short'?'\u2193':'\u2191');
+  else if(S.sign==='none') sgn='';
+  var raw=sgn+fmtM(v), curr=false;
+  if(S.curr==='both') curr=true;
+  else if(S.curr!=='none'){
+    var isLast=(S.order==='short-first')?(kind==='over'):(kind==='short');
+    curr=isLast;
+    /* row: у ряду fa «грн» лишає лише останній ВИДИМИЙ дім; fb — окрема поверхня,
+       одна пілюля, тож там row тотожний last. */
+    if(S.curr==='row'&&house==='fa') curr=isLast&&rowLast;
+  }
+  return raw+(curr?' грн':'');
+}
+function shapeOne(m,mode,house,rowLast){
+  m.dataset.shape=S.shape; m.dataset.order=S.order; m.dataset.div=S.div;
+  var sh=m.querySelector('[data-h="short"]'), ov=m.querySelector('[data-h="over"]');
+  var hasS=mode==='both'||mode==='short', hasO=mode==='both'||mode==='over';
+  if(mode==='zero'){hasS=false;hasO=false;}
+  sh.textContent=txt('short',house,rowLast); ov.textContent=txt('over',house,rowLast);
+  sh.classList.toggle('off',!hasS); ov.classList.toggle('off',!hasO);
+  m.classList.toggle('empty', S.zeroMode==='hide'&&!hasS&&!hasO);
+  if(S.zeroMode==='dash'&&!hasS&&!hasO){sh.classList.remove('off');sh.textContent='\u2014';}
+  if(S.zeroMode==='keep0'&&!hasS&&!hasO){sh.classList.remove('off');sh.textContent=txt('short',house,rowLast).replace(/\d[\d\s]*/,'0');}
+  m.querySelector('.mdiv').style.display=(S.shape==='split'&&S.div!=='none'&&hasS&&hasO)?'block':'none';
+  if(S.shape==='lead'){
+    var leadIsShort=S.order==='short-first';
+    sh.classList.toggle('mh-lead',leadIsShort); sh.classList.toggle('mh-sat',!leadIsShort);
+    ov.classList.toggle('mh-lead',!leadIsShort); ov.classList.toggle('mh-sat',leadIsShort);
+  } else {
+    sh.classList.add('mh-lead'); sh.classList.remove('mh-sat');
+    ov.classList.add('mh-lead'); ov.classList.remove('mh-sat');
+  }
+}
+function apply(){
+  var r=document.documentElement.style;
+  ['mPadX','mPadY','mRad','mFs','mGapPx','mDivW','mEmph','faGap','faPairGap','bcntMin','fbGap',
+   'counterFill','bcntBd','markPx','markPad','netGap','mBwFA','mBwFB'].forEach(function(k){r.setProperty('--'+k,S[k]);});
+  var dark=document.documentElement.getAttribute('data-theme')==='dark', k2;
+  if(dark){for(k2 in S.D) r.setProperty('--D-'+k2,S.D[k2]);}
+  else {for(k2 in S.L) r.setProperty('--L-'+k2,S.L[k2]);}
+  r.setProperty('--zoom',S.zoom);
+
+  /* останній ВИДИМИЙ дім fa для curr='row': пара IW може бути прибрана (faPairs=1)
+     або порожня (iwCase=zero) — тоді «грн» мусить лишитись на OTC, інакше валюта
+     зникне з ряду взагалі. */
+  var iwLive = S.faPairs===2 && S.iwCase!=='zero';
+  shapeOne(document.getElementById('mOtc'),S.caseMode,'fa',!iwLive);
+  shapeOne(document.getElementById('mIw'),S.iwCase,'fa',true);
+  shapeOne(document.getElementById('mBr'),S.caseMode,'fb',true);
+
+  var sub=document.getElementById('scSub');
+  sub.dataset.rows=S.faRows; sub.dataset.wrap=S.faWrap; sub.dataset.align=S.faAlign;
+  sub.dataset.stretch=S.faStretch;
+  document.getElementById('pairIw').style.display=S.faPairs===2?'':'none';
+
+  var bh=document.getElementById('scBhdr');
+  bh.dataset.ell=S.bnmEllipsis;
+  bh.dataset.order=S.fbOrder==='money-first'?'money-first':'cnt-first';
+  /* В-1: у білді (р.3324/3415) done показує «✓», а НЕ «11/11» — стану «11/11»
+     продукт не малює взагалі. Відкритий найширший ДОСЯЖНИЙ стан = «10/11». */
+  var bc=document.getElementById('scBcnt');
+  bc.classList.toggle('done',S.bcntState==='done');
+  bc.textContent=S.bcntState==='done'?'\u2713':'10/11';
+
+  [].forEach.call(document.querySelectorAll('.dchip'),function(c){
+    var over=c.dataset.kind==='over';
+    var on=S.dchipMode==='both'||(S.dchipMode==='short'&&!over);
+    c.style.display=on?'':'none';
+    c.dataset.pos=S.dchipPos;
+    var t=c.textContent.replace(/^[-+\u2193\u2191\u2212]/,'');
+    c.textContent=(S.dchipSign==='arrow'?(over?'\u2191':'\u2193'):(over?'+':'-'))+t;
+  });
+
+  /* — О-51 — */
+  var net=NETS[S.netWhich];
+  var mk=document.getElementById('scMark'), nt=document.getElementById('scNtxt');
+  mk.hidden=S.netMode!=='mark'; nt.hidden=S.netMode!=='text';
+  nt.textContent=net.label+' \u00b7'; nt.dataset.case=S.netCase;
+  var tile=mk.querySelector('.ntile');
+  tile.style.setProperty('--ntScale',net.scale);
+  tile.dataset.plate = dark ? S.markPlateD : S.markPlateL;
+  var img=document.getElementById('scImg');
+  if(img.getAttribute('src')!==net.img) img.setAttribute('src',net.img);
+  document.getElementById('scS').dataset.pos=S.netPos;
+  document.getElementById('scTxt').textContent=ADDR[S.addrCase];
+  document.getElementById('scRo').hidden=!S.roFlag;
+  document.getElementById('scene').style.width=S.devW+'px';
+  document.getElementById('hudDev').textContent=S.devW===375?'XS · 375':'15 Pro · 393';
+
+  gate(); measure();
+}
+
+/* ═══ ГЕЙТ ВАЖЕЛІВ — за таблицею, не за списком ═══ */
+function gate(){
+  [].forEach.call(document.querySelectorAll('.lev'),function(el){
+    var k=el.dataset.k, d=DEPS[k]; if(!d)return;
+    var dead=!d.alive();
+    el.classList.toggle('dead',dead);
+    var w=el.querySelector('.why'); if(w) w.textContent=dead&&d.why?d.why():'';
+  });
+}
+
+/* ═══ ДЕТЕКТОРИ ═══════════════════════════════════════════════════════
+   Д-3: масштаб береться ЗАМІРОМ із пробника висотою 100px, а не з S.zoom —
+   трактування zoom у getBoundingClientRect різне між рушіями. */
+function scale(){
+  var p=document.getElementById('probe');
+  return (p.getBoundingClientRect().height/100)||1;
+}
+function H(sel){
+  var e=document.querySelector('#scene '+sel);
+  return e?Math.round(e.getBoundingClientRect().height/scale()):0;
+}
+function measureBase(){
+  /* Д2.2 — база = ПОТОЧНИЙ білд: одна пілюля, знаковий підсумок, БЕЗ мережі.
+     Д-5 — roFlag і devW у базу входять (контекст), netMode НЕ входить (судиться). */
+  var keep={netMode:S.netMode}, saved=[];
+  [].forEach.call(document.querySelectorAll('#scene .mny'),function(m){
+    saved.push([m,m.getAttribute('data-shape'),
+                m.querySelector('[data-h="short"]').textContent,
+                m.querySelector('[data-h="over"]').className,m.className]);
+    m.setAttribute('data-shape','two');
+    /* legacy = знаковий підсумок ПОТОЧНОГО білда = over+short того самого дому.
+       Константа «+1 526 грн» тримала базу на 4-значному, поки сцена йшла на 5-значне,
+       і дельта висоти міряла б різні числа (CASE.legacy лишено як провенанс: для
+       magn=typ це рівно 1948−422=1526). */
+    var hs=m.classList.contains('fb')?'fb':'fa', mg=MAGN[S.magn][hs], lv=mg.over+mg.short;
+    m.querySelector('[data-h="short"]').textContent=
+      (lv<0?'\u2212':'+')+fmtM(lv)+(S.curr==='none'?'':' грн');
+    m.querySelector('[data-h="short"]').classList.remove('off');
+    m.querySelector('[data-h="over"]').classList.add('off');
+    m.querySelector('.mdiv').style.display='none';
+    m.classList.remove('empty');
+  });
+  S.netMode='none'; applyNetOnly();
+  BASE.fa=H('.hdr-sub'); BASE.fb=H('.bhdr');
+  BASE.ell=overflowed(document.getElementById('scTxt'));
+  S.netMode=keep.netMode;
+  saved.forEach(function(a){
+    a[0].setAttribute('data-shape',a[1]);
+    a[0].querySelector('[data-h="short"]').textContent=a[2];
+    a[0].querySelector('[data-h="over"]').className=a[3];
+    a[0].className=a[4];
+  });
+  apply();
+}
+function applyNetOnly(){
+  document.getElementById('scMark').hidden=S.netMode!=='mark';
+  document.getElementById('scNtxt').hidden=S.netMode!=='text';
+}
+function overflowed(el){return el.scrollWidth>el.clientWidth+0.5;}
+function measure(){
+  var fa=H('.hdr-sub'), fb=H('.bhdr'), dfa=fa-BASE.fa, dfb=fb-BASE.fb;
+  ELL.bnm=overflowed(document.querySelector('#scene .bnm'));
+  ELL.sTxt=overflowed(document.getElementById('scTxt'));
+  /* Д2.1 — еліпсис судиться ДЕЛЬТОЮ: довгі міста обрізаються й без мережі,
+     тому ✗ ставиться лише коли мережа ДОДАЛА обрізання, якого не було. */
+  var ellVerdict = (ELL.sTxt&&!BASE.ell)
+    ? '<span class="bad">мережа додала обрізання</span>'
+    : (ELL.sTxt?'<span class="dim">обрізано й без мережі (база)</span>':'<span class="ok">вміщається</span>');
+  var f=function(v,d){return v+'px <span class="'+(d===0?'ok':'bad')+'">'+(d>0?'+':'')+d+'</span>';};
+  document.getElementById('mout').innerHTML=
+    '<span>.hdr-sub '+f(fa,dfa)+'</span><span>.bhdr '+f(fb,dfb)+'</span>'
+   +'<span class="dim">база '+BASE.fa+'/'+BASE.fb+'</span>'
+   +'<span>.s-txt '+ellVerdict+'</span>'
+   +'<span class="dim">масштаб ×'+scale().toFixed(2)+'</span>';
+  if(RUN) document.getElementById('runout').innerHTML=RUN;
+}
+/* Д-4 — прогін 3×3: з появою iwCase простір став двовимірним.
+   Прогін по одній осі виносив би вирок клітинці, якої стенд не рендерив (wsd 2.5, форма B). */
+function run3x3(){
+  var kc=S.caseMode, ki=S.iwCase, M=['both','short','over'], res=[], fa=[], fb=[];
+  M.forEach(function(a){M.forEach(function(b){
+    S.caseMode=a; S.iwCase=b; applyQuiet();
+    var h=[H('.hdr-sub'),H('.bhdr')];
+    res.push([a+'×'+b,h[0],h[1]]); fa.push(h[0]); fb.push(h[1]);
+  });});
+  S.caseMode=kc; S.iwCase=ki; applyQuiet();
+  var sp=function(a){return Math.max.apply(null,a)-Math.min.apply(null,a);};
+  var sfa=sp(fa), sfb=sp(fb);
+  var worst=res.reduce(function(w,r){return r[1]>w[1]?r:w;},res[0]);
+  var v=function(s){return s===0?'<span class="ok">стабільно</span>'
+                                :'<span class="bad">стрибок '+s+'px — ВИБУВАЄ</span>';};
+  RUN='прогін 3×3 (caseMode × iwCase) · fa: '+fa.join('/')+' → '+v(sfa)
+     +' · fb: '+fb.join('/')+' → '+v(sfb)
+     +' · найвища пара: '+worst[0]+' = '+worst[1]+'px'
+     +' · <span class="dim">стан zero поза відсівом (Д2.3): пілюля зникає легітимно, білд р.182</span>';
+  document.getElementById('runout').style.display='block';
+  measure();
+}
+function applyQuiet(){var m=measure;measure=function(){};apply();measure=m;}
+
+/* ═══ ПАНЕЛЬ ═══ */
+var SPEC={
+ 'g-form':[['seg','shape','shape',['two','split','lead']],
+   ['seg','order','order',['short-first','over-first']],
+   ['seg','div','div',['none','hairline','notch','tone']],
+   ['seg','sign','sign',['glyph','arrow','none']],
+   ['seg','zeroMode','zeroMode',['hide','dash','keep0']],
+   ['seg','curr','curr (row = «грн» раз на ряд fa)',['both','last','row','none']],
+   ['seg','magn','magn · typ=fb-реальність · hi=fa-стеля D · max=ярус A',['typ','hi','max']],
+   ['seg','abbr','abbr',['off','тис']],
+   ['rng','mDivW','divW',0,3,.5],['rng','mGapPx','gapPx',0,12,1],['rng','mEmph','emph',70,100,1],
+   ['rng','mPadX','padX',3,14,.5],['rng','mPadY','padY',0,8,.5],
+   ['rng','mRad','radius',0,16,1],['rng','mFs','fontSz',10,15,.5],
+   ['rng','mBwFA','bwFA',0,3,.5],['rng','mBwFB','bwFB',0,3,.5]],
+ 'g-fa':[['seg','faPairs','pairs',[1,2]],['seg','faRows','rows',[1,2]],
+   ['seg','faWrap','wrap',['wrap','nowrap']],['seg','faAlign','align',['center','baseline']],
+   ['seg','iwCase','iwCase',['both','short','over','zero']],
+   ['seg','faStretch','faStretch (правий край при rows=2)',['off','on']],
+   ['rng','faGap','faGap',0,16,1],['rng','faPairGap','pairGap',0,12,1]],
+ 'g-fb':[['seg','bnmEllipsis','ellipsis',['off','on']],
+   ['seg','fbOrder','order',['money-first','cnt-first']],
+   ['seg','bcntState','bcntState (done = «✓», білд р.3324)',['open','done']],
+   ['rng','bcntMin','bcntMin · 34 = порт (р.858 перебиває р.180)',34,80,1],
+   ['rng','fbGap','fbGap',0,10,1],
+   ['rng','counterFill','bcntFill',0,100,1],
+   ['rng','bcntBd','bcntBd · 100 = порт (р.861 border-color:var(--border))',0,100,1]],
+ 'g-sku':[['seg','dchipMode','dchipMode',['off','short','both']],
+   ['seg','dchipSign','dchipSign',['glyph','arrow']],
+   ['seg','dchipPos','dchipPos',['absolute','inline']]],
+ 'g-net':[['seg','netMode','netMode',['none','text','mark']],
+   ['seg','netWhich','мережа',['BAZHAEMO','PODOROZHNYK']],
+   ['seg','netPos','netPos',['before','after']],
+   ['seg','netCase','netCase',['as','upper']],
+   ['seg','markPlateL','підкладка · СВІТЛА',['tile','flat','none']],
+   ['seg','markPlateD','підкладка · ТЕМНА',['tile','flat','none']],
+   ['rng','markPx','markPx',10,28,1],['rng','markPad','markPad',0,12,.5],
+   ['rng','netGap','netGap',0,12,1]],
+ 'g-scene':[['seg','caseMode','caseMode(OTC/бренд)',['both','short','over','zero']],
+   ['seg','addrCase','адреса',['typ','worst']],
+   ['seg','roFlag','ro-рядок',[0,1]]]
+};
+var MAT_L=[['rng','shY','shY',0,4,.5],['rng','shBlur','shBlur',0,10,.5],['rng','shA','shA',0,.5,.01],
+  ['rng','fillMix','fillMix',0,40,1],['rng','bdFA','bdFA',0,90,1],['rng','bdFB','bdFB',0,90,1],
+  ['rng','valL','val-L',40,100,1],['rng','mutL','mut-L',0,100,1]];
+var MAT_D=[['rng','fillMix','fillMix',0,60,1],['rng','posS','posS',0,80,1],['rng','posL','posL',5,45,1],
+  ['rng','negS','negS',0,80,1],['rng','negL','negL',5,45,1],
+  ['rng','ridge','ridge',0,10,.5],['rng','ridgeA','ridgeA',0,.4,.01],
+  ['rng','bdFA','bdFA',0,90,1],['rng','bdFB','bdFB',0,90,1],
+  ['rng','valL','val-L',40,100,1],['rng','mutL','mut-L',0,100,1]];
+
+var UNDECL=[];
+function get(k){return k.indexOf('.')>0?S[k.split('.')[0]][k.split('.')[1]]:S[k];}
+function set(k,v){if(k.indexOf('.')>0)S[k.split('.')[0]][k.split('.')[1]]=v;else S[k]=v;}
+function mk(a){
+  var k=a[1],lbl=a[2];
+  if(!DEPS[k]){UNDECL.push(k);return '';}   /* §5: важіль без оголошеної умови НЕ рендериться */
+  if(a[0]==='seg'){
+    return '<div class="lev" data-k="'+k+'"><label>'+lbl+'</label><div class="seg">'
+      +a[3].map(function(o){return '<button data-k="'+k+'" data-v="'+o+'"'
+        +(String(get(k))===String(o)?' class="on"':'')+'>'+o+'</button>';}).join('')
+      +'</div><div class="why"></div></div>';
+  }
+  return '<div class="lev" data-k="'+k+'"><label>'+lbl+'</label>'
+    +'<input type="range" data-k="'+k+'" min="'+a[3]+'" max="'+a[4]+'" step="'+a[5]+'" value="'+get(k)+'">'
+    +'<output>'+get(k)+'</output><div class="why"></div></div>';
+}
+function buildMat(){
+  var dark=document.documentElement.getAttribute('data-theme')==='dark';
+  var arr=dark?MAT_D:MAT_L, pre=dark?'D':'L';
+  document.querySelector('#g-mat .grbody').innerHTML=arr.map(function(a){
+    return mk([a[0],pre+'.'+a[1],a[2],a[3],a[4],a[5]]);}).join('');
+  document.querySelector('#g-mat h3').childNodes[0].nodeValue=
+    '6 · матеріал — набір '+(dark?'DARK (заливка + ridge + бордюр)':'LIGHT (тінь + бордюр + тінт)')+' · A45 ';
+}
+var HUD=[['seg','devW','пристрій',[375,393]],['rng','zoom','loupe',.75,3,.25]];
+function refresh(){
+  UNDECL=[];
+  for(var g in SPEC) document.querySelector('#'+g+' .grbody').innerHTML=SPEC[g].map(mk).join('');
+  /* керування сценою стоїть НАД сценою, не в панелі знизу: пристрій і зум —
+     не предмет суду, а спосіб дивитись, і шукати їх треба там, де дивишся. */
+  document.getElementById('hudlev').innerHTML=HUD.map(mk).join('');
+  buildMat();
+  var extra=auditTokens();
+  var out=[];
+  if(UNDECL.length) out.push('НЕ ОГОЛОШЕНО в DEPS, не відрендерено: '+UNDECL.join(', '));
+  if(extra.length) out.push('авто-звірка токен↔DEPS: '+extra.join(' | '));
+  document.getElementById('undecl').textContent=out.join('  ·  ');
+  apply();
+}
+function onLev(e){
+  var i=e.target; if(i.tagName!=='INPUT')return;
+  var v=parseFloat(i.value); set(i.dataset.k,v);
+  i.nextElementSibling.textContent=v; apply();
+}
+function onClick(e){
+  var b=e.target.closest('button'); if(!b)return;
+  if(b.dataset.up){
+    var gr=b.closest('.gr'); gr.parentElement.insertBefore(gr,document.querySelector('.panel .gr'));
+    document.querySelector('.panel').scrollTop=0; return;
+  }
+  if(b.dataset.k){
+    var v=b.dataset.v; if(v!==''&&!isNaN(v))v=Number(v);
+    set(b.dataset.k,v);
+    [].forEach.call(b.parentElement.children,function(x){x.classList.toggle('on',x===b);});
+    if(b.dataset.k==='roFlag'||b.dataset.k==='devW'){apply();measureBase();return;} /* Д-5 */
+    apply(); return;
+  }
+  if(b.dataset.preset){var p=PRESETS[b.dataset.preset];for(var k in p)S[k]=p[k];refresh();return;}
+  if(b.id==='btnShut'){
+    var pn=document.getElementById('panel'), shut=pn.classList.toggle('shut');
+    b.textContent=shut?'важелі ▴':'важелі ▾'; return;
+  }
+  if(b.id==='btnTheme'){
+    var d=document.documentElement.getAttribute('data-theme')==='dark';
+    document.documentElement.setAttribute('data-theme',d?'light':'dark');
+    b.textContent='тема: '+(d?'light':'dark'); buildMat(); apply(); return;
+  }
+  if(b.id==='btnInfo'){var el=document.getElementById('info');
+    el.style.display=el.style.display==='block'?'none':'block'; return;}
+  if(b.id==='btnRun'){run3x3();return;}
+  if(b.id==='btnBase'){measureBase();return;}
+  if(b.id==='btnCopy'){dumpAll();return;}
+  if(b.id==='f1s'){FAV=JSON.stringify(S);b.textContent='F1 ✓';return;}
+  if(b.id==='f1l'&&FAV){S=JSON.parse(FAV);refresh();return;}
+}
+
+/* ═══ Copy-ALL — CSS у ДВОХ формах (Д-Б: auto-dark близнюк) ═══ */
+function dumpAll(){
+  var L=S.L,D=S.D;
+  var geo='.mny{--mPadX:'+S.mPadX+';--mPadY:'+S.mPadY+';--mRad:'+S.mRad+';--mFs:'+S.mFs
+    +';--mGapPx:'+S.mGapPx+';--mDivW:'+S.mDivW+';--mEmph:'+S.mEmph+'}';
+  var fa=':root{--faGap:'+S.faGap+';--faPairGap:'+S.faPairGap+';--bcntMin:'+S.bcntMin
+    +';--fbGap:'+S.fbGap+';--counterFill:'+S.counterFill+';--bcntBd:'+S.bcntBd
+    +';--markPx:'+S.markPx+';--markPad:'+S.markPad+';--netGap:'+S.netGap+'}';
+  var lit='.mny{--L-shY:'+L.shY+';--L-shBlur:'+L.shBlur+';--L-shA:'+L.shA+';--L-fillMix:'+L.fillMix
+    +';--L-bdFA:'+L.bdFA+';--L-bdFB:'+L.bdFB+';--L-valL:'+L.valL+';--L-mutL:'+L.mutL+'}';
+  var dvars='--D-fillMix:'+D.fillMix+';--D-posS:'+D.posS+';--D-posL:'+D.posL+';--D-negS:'+D.negS
+    +';--D-negL:'+D.negL+';--D-ridge:'+D.ridge+';--D-ridgeA:'+D.ridgeA+';--D-bdFA:'+D.bdFA
+    +';--D-bdFB:'+D.bdFB+';--D-valL:'+D.valL+';--D-mutL:'+D.mutL;
+  var css='/* ── О-49/О-51 · LIGHT + геометрія ── */\n'+geo+'\n'+fa+'\n'+lit+'\n\n'
+    +'/* ── DARK, форма 1: явна тема ── */\n[data-theme="dark"] .mny{'+dvars+'}\n\n'
+    +'/* ── DARK, форма 2: AUTO-DARK БЛИЗНЮК (A69 / Д-Б).\n'
+    +'   Закривна дужка @media — з нульової колонки окремим рядком: інакше H3\n'
+    +'   у Lens_validate.py проковтує решту файлу і дає ХИБНИЙ ✓ (знахідка s14). ── */\n'
+    +'@media(prefers-color-scheme:dark){\n  :root:not([data-theme="light"]) .mny{'+dvars+'}\n}\n';
+  var t=document.getElementById('dump');
+  t.value='/* STATE */\n'+JSON.stringify(S,null,1)+'\n\n'+css;
+  t.style.display='block'; t.select();
+  try{document.execCommand('copy');document.getElementById('btnCopy').textContent='Copy-ALL ✓';}catch(e){}
+}
+
+document.getElementById('info').innerHTML=
+ '<b>Об\'єкт суду.</b> Форма двох знакових величин (short/over) у трьох домах одного вертикального '
++'бюджету: шапка філу (fa) → хедер бренда (fb) → рядок SKU, разом із присутністю мережі в тій самій шапці (О-51).<br>'
++'<b>Гейт важелів</b> будується таблицею DEPS: важіль без оголошеної умови не рендериться, '
++'його ім\'я друкується в жовтий рядок панелі. Авто-звірка читає власний CSS і порівнює, '
++'де токен насправді живе, з тим, що стверджує таблиця. <b>Межа детектора названа свідомо:</b> '
++'перебиття правилом більшої специфічності перевіряється лише там, де воно оголошене полем '
++'<i>over</i> — повного автоматичного пошуку перебиттів немає, бо порівняння специфічності '
++'регексом однозначно не доводиться (wsd К2: хибний ✗ шкідливіший за відсутній детектор).<br>'
++'<b>Детектори.</b> «переміряти базу» знімає висоту з поточного білда (одна пілюля, +1 526, без мережі); '
++'база перемірюється сама при зміні пристрою й ro-рядка. «прогін 3×3» ганяє caseMode × iwCase — '
++'дев\'ять клітинок, бо після О-49 у шапці чотири числа, і розкид може народитись саме на парі. '
++'Еліпсис судиться дельтою: ✗ лише коли мережа додала обрізання, якого не було.<br>'
++'<b>Матеріал</b> — набір змінюється разом із темою, це не той самий набір з іншими числами (A45). '
++'У light глибину несе тінь, у dark — заливка + ridge; drop-важеля в dark немає навмисно.'
++'<span class="prov">база: StockCheck_port_b32_1_s12_addr.html · р.166-194 · 591-596 · 673-711 · 855-862 · '
++'882-918 · 1305-1315 · 2568 · 2769-2798 · 3281⟂3292 · 3317-3318 · 3339-3343 · '
++'дані: DATA білда (965 рядків) · кейс: ярус D, Стрепсілс</span>';
+
+/* Делегування на document — одне місце для ВСІХ поверхонь керування
+   (верхня смуга + панель). Прив'язка до конкретного контейнера вже одного разу
+   загубилась при переписуванні build()→refresh() і дала «стенд мертвий»:
+   важелі рендеряться, жоден не реагує. Делегування знімає клас помилки. */
+document.addEventListener('input',onLev);
+document.addEventListener('click',onClick);
+document.addEventListener('click',function(e){
+  var h=e.target.closest('.gr>h3'); if(h&&!e.target.closest('.up')) h.parentElement.classList.toggle('folded');
+});
+/* висота панелі міряється, а не вгадується: інакше низ сцени ховається під панеллю */
+function panelH(){
+  var pn=document.getElementById('panel');
+  document.body.style.setProperty('--panelH',Math.min(pn.offsetHeight,window.innerHeight*0.55)+'px');
+}
+window.addEventListener('resize',panelH);
+
+refresh();
+measureBase();
+panelH();
+</script>
+
+</body>
+</html>
