@@ -141,7 +141,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 | продукт | файли |
 |---|---|
 | **StockCheck** | `StockCheck_MASTER_LOCK.md` · `StockCheck_brand_valuesLOCK.md` · `StockCheck_materiality_valuesLOCK.md` · `StockCheck_glyph_valuesLOCK.md` · `StockCheck_tails_valuesLOCK.md` · `StockCheck_money_home_valuesLOCK.md` · `StockCheck_island_glass_FINDINGS.md` · `StockCheck_NETS_register.md` |
-| **QR Lens** | `QR_Lens_srpill_valuesLOCK.md` · `QR_Lens_srmotion_valuesLOCK.md` · `QR_Lens_probrow_PARAMS_LOCK.md` · `QR_Lens_statusgauge_BENCHLOCK.md` · `QR_Lens_CTA_mechanic_LOCK.md` · `QR_Lens_export_contract_v1_1.md` *(v1 витіснено B59)* |
+| **QR Lens** | `QR_Lens_srpill_valuesLOCK.md` · `QR_Lens_srmotion_valuesLOCK.md` · `QR_Lens_areachip_valuesLOCK.md` · `QR_Lens_probrow_PARAMS_LOCK.md` · `QR_Lens_statusgauge_BENCHLOCK.md` · `QR_Lens_CTA_mechanic_LOCK.md` · `QR_Lens_export_contract_v1_1.md` *(v1 витіснено B59)* |
 | **Фармастор** *(попередня назва StockCheck)* | `Фармастор_v2_MASTER_LOCK.md` · `Фармастор_history_badge_valuesLOCK.md` · `Фармастор_v2_PORT_REGISTER.md` |
 | **Drive Lens** | `Drive_Lens_concept_v1_3.md` · `Drive_Lens_logic_audit_findings.md` |
 | **PharmaLens** *(5-й продукт; ребренд робочої назви VTM Lens, 30.07.2026)* | `PharmaLens_Claude_Handover.md` — консолідований контекст напрацювань · `PharmaLens_Independent_Design_Research_Handover.md` — бриф на пошук варіативності (токени/мова/структура). **Ще не читані Claude** — читаються на старті арку PharmaLens, після governance-паса. Джерела-попередники (VTM) — §7 |
@@ -191,7 +191,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 | продукт | білд | стан |
 |---|---|---|
 | **StockCheck** | `StockCheck_port_b32_2_s16_money_net.html` — v2.26.0 · b32.2 | 🟢 **device✓ 13.08.2026** — порт локу s15c: О-49 спліт-капсула грошей (`.money` → `.mny`) · О-51 мітка мережі в шапці філу · чіп дельти симетричний. Смоук `StockCheck_b32_2_port_smoke.js` **82** твердження (76 статичних + 6 у `twins.forEach`, заміряно 13.08). **Норматив гейта: `✓7 · ⚠3 · ✗4`** — заміряно 13.08.2026 повним `--html` **після фіксу H3** (Г-3+Г-5). Старий `✓7·⚠3·✗3` недійсний: один ✗ був артефактом парсера, натомість відкрились два справжні борги. Реальний список без auto-dark близнюка: `.about-logo` · `.jr-grp` · `.jr-row::after` · `.kv` |
-| **QR Lens** | `QR_Lens_preview_batch59.html` + `QR_Lens_template_v3.html` | 🟢 device✓ B59 · черга Phase 3 відкрита |
+| **QR Lens** | `QR_Lens_preview_batch61_press_s4.html` + `QR_Lens_template_v2.html` | 🟢 device✓ B61 (прес Area-чіпа · surgical · свайп-гард) · експорт перевірено на регенерованому шаблоні |
 | **KPI Lens** | `KPI_Lens_v2_preview_batch15_2.html` | 🟡 VBA/PQ у черзі |
 | **Drive Lens** | — | 🟡 Tab-3 / Tab-4 відкриті |
 
@@ -234,7 +234,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 | продукт | живі самері |
 |---|---|
 | **StockCheck** | `StockCheck_session_summary_b32_2_s16_PORT_DONE_HYGIENE_NEXT.md` · `StockCheck_session_summary_G1_HYGIENE.md` |
-| **QR Lens** | `QR_Lens_session_summary_B59.md` · `QR_Lens_session_summary_B59_perf_MICROSCOPE_WEB.md` |
+| **QR Lens** | `QR_Lens_session_summary_B61_PRESS_PORT_DONE.md` · `QR_Lens_session_summary_b60_PRESSBENCH_v3_1.md` |
 | **KPI Lens** | `KPI_Lens_session_summary_Batch15_2.md` |
 | **Lens** *(governance)* | `Lens_session_summary_governance_D.md` · `Lens_session_summary_governance_C.md` |
 | **Фармастор** | `АРХІВ-УСІ` — продукт перейменовано на StockCheck; канон живе у `Фармастор_v2_MASTER_LOCK.md` і `Фармастор_v2_PORT_REGISTER.md`, самері не потрібні жодні |
