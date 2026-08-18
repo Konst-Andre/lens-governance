@@ -145,6 +145,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 | **Фармастор** *(попередня назва StockCheck)* | `Фармастор_v2_MASTER_LOCK.md` · `Фармастор_history_badge_valuesLOCK.md` · `Фармастор_v2_PORT_REGISTER.md` |
 | **Drive Lens** | `Drive_Lens_concept_v1_3.md` · `Drive_Lens_logic_audit_findings.md` |
 | **PharmaLens** *(5-й продукт; ребренд робочої назви VTM Lens, 30.07.2026)* | `PharmaLens_Claude_Handover.md` — консолідований контекст напрацювань · `PharmaLens_Independent_Design_Research_Handover.md` — бриф на пошук варіативності (токени/мова/структура). **Ще не читані Claude** — читаються на старті арку PharmaLens, після governance-паса. Джерела-попередники (VTM) — §7 |
+| **EquipLens** *(6-й продукт; польовий нотатник потреби в обладнанні, старт 18.08.2026)* | `EquipLens_MASTER_LOCK.md` — єдиний канон, замінює три джерела (два `Planner_Handoff`, GPT-аналіз). **Окремий продукт від QR Lens** — межа й підстава в §2 LOCK, злиття заборонене |
 
 > **⌛ Названі тут, але фізично поза Project** (у локальному архіві — підняти при дотику до компонента):
 > `QR_Lens_probrow_PARAMS_LOCK.md` · `QR_Lens_statusgauge_BENCHLOCK.md` · `QR_Lens_CTA_mechanic_LOCK.md`.
@@ -261,6 +262,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 | **E** | **канонізація StockCheck:** `Lens_module_1_maint_v1` · A79–A82 · контракт xlsx · hole #1 WONTFIX · рішення по SW · G8-розпил + фікс G5/G7 · мердж wsd→v2.28 | ✅ 01.08.2026 |
 | F | `Lens_matrix_INDEX.md` + `Lens_jsdom_boot.js` · мердж stagebench-буфера · розбір §7 | ⬜ |
 | G | **PharmaLens** — старт арку (новий чат, свіжий контекст) | ⬜ |
+| H | **EquipLens** — Ф0 канон ✅ 18.08.2026 · далі Ф1 дизайн-бенч + Ф2 стенд острівця | 🔄 |
 
 ---
 
