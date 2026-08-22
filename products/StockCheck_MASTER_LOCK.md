@@ -24,12 +24,12 @@
 | # | що залочено | дім | статус |
 |---|---|---|---|
 | 1 | **Бренд** — комета ✦, вордмарк, іконка/gap, геометрія комети, accent-hue 162, бейдж-тайл | `StockCheck_brand_valuesLOCK.md` | 🟡 BENCH-LOCKED · in-product verify **не робився окремо** |
-| 2 | **Острівець** — Frosted-Liquid (`op .82 / blur 12 / sat 170`) + 4 port-carry-over | `StockCheck_island_glass_FINDINGS.md` §4-preset / §4-port | ✅ IN-PRODUCT VERIFIED (b16) |
+| 2 | **Острівець** — Frosted-Liquid (`op .82 / blur 12 / sat 170`) + 4 port-carry-over | `Lens_glass_FINDINGS.md` §4-preset / §4-port | ✅ IN-PRODUCT VERIFIED (b16) |
 | 3 | **Материальність ярусу** — пресет **γ′** (таця + per-family матеріал), зазори, таця per-theme | `StockCheck_materiality_valuesLOCK.md` | ✅ LOCKED · IN-PRODUCT VERIFIED (b16) |
-| 4 | **Принципи скла/острівця** — шари, бейдж на склі, §3b–§3f, скрол-модель, радіуси | `StockCheck_island_glass_FINDINGS.md` | ✅ §1–§6 canon-ready |
+| 4 | **Принципи скла/острівця** — шари, бейдж на склі, §3b–§3f, скрол-модель, радіуси | `Lens_glass_FINDINGS.md` | ✅ §1–§6 canon-ready |
 | 5 | **Мережевий шар** — схема `net → {label,badge,color}`, 1 real + edge-стаби, fallback/contrast-floor | `StockCheck_NETS_register.md` | 🟡 схема залочена · **реальний список мереж від стейкхолдерів не надано** |
 | 6 | **Клас стенду** — device-simulator harness (blueprint) | `Lens_stagebench_manifest.md` | ✅ canonical (крос-Lens) |
-| 7 | **§5-B collapse-on-scroll** — механіка C (composite slide) + rAF-демпфер `K .28 / FMUL 1.35 / GAP 10`, 4 обов'язкові умови | `StockCheck_island_glass_FINDINGS.md` §5-B · механізм → Cookbook **A72** | ✅ DEVICE-LOCKED (b17_4) · SHIPPED + зачищено (b18) |
+| 7 | **§5-B collapse-on-scroll** — механіка C (composite slide) + rAF-демпфер `K .28 / FMUL 1.35 / GAP 10`, 4 обов'язкові умови | `Lens_glass_FINDINGS.md` §5-B · механізм → Cookbook **A72** | ✅ DEVICE-LOCKED (b17_4) · SHIPPED + зачищено (b18) |
 | 8 | **PWA-оболонка** — `manifest.json` окремим файлом, набір іконок із локнутого гліфа, генератор | `manifest.json` · `StockCheck_icon_gen.py` · Cookbook delta **A75 (cand.)** | ✅ DEVICE-VERIFIED (b25, 15 Pro / iOS 26) |
 | 9 | **Композиція журналу** — З-6…З-8 + З-4-уточнення; геометрія = пресет P3 | `StockCheck_materiality_valuesLOCK.md` §10 · цей файл §11 | ✅ DEVICE-LOCKED (О-1 закрито 02.08.2026 · порт b29.6 закритий заміром) |
 
@@ -90,7 +90,7 @@
 ## 5. Порядок читання для нового чату
 
 1. `StockCheck_MASTER_LOCK.md` (цей файл) — де що лежить
-2. `StockCheck_island_glass_FINDINGS.md` — принципи (читати перед будь-якою роботою з острівцем/склом)
+2. `Lens_glass_FINDINGS.md` — принципи (читати перед будь-якою роботою з острівцем/склом)
 3. профільний `*_valuesLOCK.md` — числа під конкретну задачу
 4. поточний білд `StockCheck_port_bNN.html`
 5. `Work_Standard.md` + `Lens_cookbook_INDEX.md` (→ томи) — процес і крос-Lens патерни

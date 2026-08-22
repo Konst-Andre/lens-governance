@@ -9,7 +9,7 @@
 # CANON DELTA — §5-B Collapse-on-scroll · модель C (composite slide)
 
 Статус: **BENCH-LOCKED (device b17_2/b17_3, обидві теми)** · дата 24.07.2026
-Куди мерджити: `StockCheck_island_glass_FINDINGS.md` §5 · `Lens_iOS_cookbook_5_motion.md` (A72) — ✅ ЗАКРИТО (новий пункт) · `StockCheck_MASTER_LOCK.md` §3
+Куди мерджити: `Lens_glass_FINDINGS.md` §5 · `Lens_iOS_cookbook_5_motion.md` (A72) — ✅ ЗАКРИТО (новий пункт) · `StockCheck_MASTER_LOCK.md` §3
 
 ---
 
