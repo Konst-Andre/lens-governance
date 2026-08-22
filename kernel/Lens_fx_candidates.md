@@ -50,7 +50,7 @@
 - **стек:** 🔴 чужий. Вимагає canvas + GL-контекст на кожну кнопку.
 - **вартість кадру:** GPU-контекст + постійний render-loop. На iPhone XS у PWA це батарея й пам'ять за нуль функціональної користі.
 - **вердикт:** 🔴 **не портуємо.** Але враження «металу/скла» у нас уже частково зроблене без GL: багатостоповий градієнт + `background-position` (материальність γ′, Frosted-Liquid острівця). Якщо колись захочеться підсилити — рухати цю вісь, не WebGL.
-- **зв'язок:** `StockCheck_materiality_valuesLOCK.md` (γ′) · `StockCheck_island_glass_FINDINGS.md`.
+- **зв'язок:** `StockCheck_materiality_valuesLOCK.md` (γ′) · `Lens_glass_FINDINGS.md`.
 
 ---
 

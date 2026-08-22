@@ -140,12 +140,13 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 ### Значення — по продуктах
 | продукт | файли |
 |---|---|
-| **StockCheck** | `StockCheck_MASTER_LOCK.md` · `StockCheck_brand_valuesLOCK.md` · `StockCheck_materiality_valuesLOCK.md` · `StockCheck_glyph_valuesLOCK.md` · `StockCheck_tails_valuesLOCK.md` · `StockCheck_money_home_valuesLOCK.md` · `StockCheck_island_glass_FINDINGS.md` · `StockCheck_NETS_register.md` |
+| **StockCheck** | `StockCheck_MASTER_LOCK.md` · `StockCheck_brand_valuesLOCK.md` · `StockCheck_materiality_valuesLOCK.md` · `StockCheck_glyph_valuesLOCK.md` · `StockCheck_tails_valuesLOCK.md` · `StockCheck_money_home_valuesLOCK.md` · `StockCheck_NETS_register.md` |
 | **QR Lens** | `QR_Lens_srpill_valuesLOCK.md` · `QR_Lens_srmotion_valuesLOCK.md` · `QR_Lens_areachip_valuesLOCK.md` · `QR_Lens_probrow_PARAMS_LOCK.md` · `QR_Lens_statusgauge_BENCHLOCK.md` · `QR_Lens_CTA_mechanic_LOCK.md` · `QR_Lens_export_contract_v1_1.md` *(v1 витіснено B59)* |
 | **Фармастор** *(попередня назва StockCheck)* | `Фармастор_v2_MASTER_LOCK.md` · `Фармастор_history_badge_valuesLOCK.md` · `Фармастор_v2_PORT_REGISTER.md` |
 | **Drive Lens** | `Drive_Lens_concept_v1_3.md` · `Drive_Lens_logic_audit_findings.md` |
 | **PharmaLens** *(5-й продукт; ребренд робочої назви VTM Lens, 30.07.2026)* | `PharmaLens_Claude_Handover.md` — консолідований контекст напрацювань · `PharmaLens_Independent_Design_Research_Handover.md` — бриф на пошук варіативності (токени/мова/структура). **Ще не читані Claude** — читаються на старті арку PharmaLens, після governance-паса. Джерела-попередники (VTM) — §7 |
 | **EquipLens** *(6-й продукт; польовий нотатник потреби в обладнанні, старт 18.08.2026)* | `EquipLens_MASTER_LOCK.md` — єдиний канон, замінює три джерела (два `Planner_Handoff`, GPT-аналіз). **Окремий продукт від QR Lens** — межа й підстава в §2 LOCK, злиття заборонене |
+| **крос-Lens** *(належать родині, не продукту)* | `Lens_glass_FINDINGS.md` — острівець + скло: закони backdrop-root, матеріальність ярусу, виріз у склі. *Колишнє ім'я* `StockCheck_island_glass_FINDINGS.md`, перейменовано 21.08.2026 (EquipLens S6): §1–§6 виросли на StockCheck, §9 — на EquipLens, закони спільні |
 
 > **⌛ Названі тут, але фізично поза Project** (у локальному архіві — підняти при дотику до компонента):
 > `QR_Lens_probrow_PARAMS_LOCK.md` · `QR_Lens_statusgauge_BENCHLOCK.md` · `QR_Lens_CTA_mechanic_LOCK.md`.
