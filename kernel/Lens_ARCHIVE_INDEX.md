@@ -115,7 +115,7 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
   тому старі посилання «Cookbook A45» дійсні для томів. Піднімати лише
   для археології (звірка, чи щось загубилось при розпилі).
 
-### `archive/summaries/` — 77 файлів
+### `archive/summaries/` — 89 файлів
 
 - `Lens_session_summary_governance_A.md`
 - `Lens_session_summary_governance_B.md`
@@ -195,6 +195,24 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 - `StockCheck_session_summary_b32_1_s13_STAGEBENCH_v1_FAIL_v2_SPEC.md` · 13.08.2026 · StockCheck · відбраковка стенда v1 → **народження Г-1**
 - `StockCheck_session_summary_b32_1_s14_STAGEBENCH_v2_DONE.md` · 13.08.2026 · StockCheck · стенд грошей v2 · **єдиний носій повного тексту Г-1…Г-3** до мерджу в буфер 13.08
 - `StockCheck_session_summary_b32_1_s15c_STAGEBENCH_LOCK.md` · 13.08.2026 · StockCheck · ЛОК чисел форми грошей (device-судимо) · **єдиний носій повного тексту Г-4** до мерджу в буфер 13.08
+
+
+**EquipLens — 12 самері, виселено 24.08.2026 (S14).** Живими лишились `S13` і `S14`
+(`Lens_INDEX §5`, стеля `G10`). Тексти рішень S11/S12 влиті в канон — самері тримались
+лише як переказ.
+
+- `EquipLens_session_summary_S1_FOUNDATION.md`
+- `EquipLens_session_summary_S2_TOKEN_HARNESS.md`
+- `EquipLens_session_summary_S3_HEADBENCH_THESIS.md`
+- `EquipLens_session_summary_S4_HEADBENCH_v5.md`
+- `EquipLens_session_summary_S5_UX_GLASS_v7.md`
+- `EquipLens_session_summary_S6_GOV_v8_TABS.md` — 3 таби (`Потреби · Обладнання · Огляд`), перейменування FINDINGS
+- `EquipLens_session_summary_S7_V9_BOTTOM_HEAD.md`
+- `EquipLens_session_summary_S8_LOCK_HEADGLASS.md`
+- `EquipLens_session_summary_S9_BAKE_SPLIT_VOLUME.md`
+- `EquipLens_session_summary_S10_VOLUME_SHADING_EDGE.md`
+- `EquipLens_session_summary_S11_SPLIT_GLASSKIT.md` — 33 світлі значення шейдингу запечені, `LOCK_MIGRATE`, 5 зовнішніх Liquid Glass репо; тексти влиті в Cookbook `A91`–`A102`
+- `EquipLens_session_summary_S12_GOVERNANCE_DRAIN.md` — черга 26 записів, вичерпана в S13
 
 ### `archive/stands/` — 28 файлів
 

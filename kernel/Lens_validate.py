@@ -46,6 +46,7 @@ import sys, os, re, glob, subprocess, tempfile
 
 KERNEL_FILES = [
     'Lens_INDEX.md', 'Lens_PROFILE.md', 'Work_Standard.md',
+    'Lens_governance_protocol.md',
     'Work_Standard_HISTORY.md', 'Lens_NEWPROJECT_bootstrap.md',
     'Lens_cookbook_INDEX.md',
     'Lens_iOS_cookbook_1_platform.md', 'Lens_iOS_cookbook_2_navigation.md',

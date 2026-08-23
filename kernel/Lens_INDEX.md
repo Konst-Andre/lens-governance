@@ -3,7 +3,7 @@
 
 # Lens · INDEX — маршрутизатор бази знань
 
-**Ядро: KERNEL v2 (31.07.2026).** Штамп несуть **13 файлів ядра** — 12 `.md`
+**Ядро: KERNEL v2 (31.07.2026).** Штамп несуть **14 файлів ядра** — 13 `.md`
 + `Lens_validate.py`. Вони лежать **не плоско**: `kernel/` має підтеки (§8, таблиця фізичних місць)
 + `Lens_validate.py`. Це **переносний** між Projects набір. Решта вічних файлів (маніфести
 методів, `*_valuesLOCK`, `*_MASTER_LOCK`) штампа НЕ несуть: вони прив'язані до продукту,
@@ -11,7 +11,7 @@
 
 > **Чому не «всі вічні»:** штамп означає «мене можна цілком перенести в новий Project».
 > `StockCheck_MASTER_LOCK` переносити нікуди — він помре разом із продуктом.
-> Гейт **G2** перевіряє рівно ці 12 і мовчить про решту — це задумано, не прогалина.
+> Гейт **G2** перевіряє рівно ці 13 і мовчить про решту — це задумано, не прогалина.
 
 > **Що це.** Єдина карта: *яке питання → який файл*. Коштує ~6 KB і скорочує решту читань,
 > бо називає адресата задачі одразу, замість «прочитати wsd наосліп і сподіватись».
@@ -29,7 +29,7 @@
 | тека репо | що там | у Project |
 |---|---|---|
 | **`kernel/`** *(корінь)* | маршрутизатори + `Lens_validate.py` + маніфести методів + буфер стендів | ✅ підключена |
-| **`kernel/wsd/`** | `Work_Standard.md` · `Work_Standard_HISTORY.md` · `wsd_delta_running.md` | ✅ підключена |
+| **`kernel/wsd/`** | `Work_Standard.md` · `Lens_governance_protocol.md` · `Work_Standard_HISTORY.md` · `wsd_delta_running.md` | ✅ підключена |
 | **`kernel/cookbook/`** | `Lens_cookbook_INDEX.md` · 5 томів · `Lens_cookbook_delta_running.md` | ✅ підключена |
 | **`kernel/modules/`** | донор-модулі коду `Lens_module_*.md` | ✅ підключена |
 | **`products/`** | `*_MASTER_LOCK` · `*_valuesLOCK` · FINDINGS · реєстри — прив'язані до продукту, **нікуди не переносяться** | ✅ підключена |
@@ -99,6 +99,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 | роль | питання | дім |
 |---|---|---|
 | **протокол** | *як ми працюємо* | `Work_Standard.md` |
+| **governance** | *як ми ведемо сам канон* | `Lens_governance_protocol.md` |
 | **патерн** | *як робиться ця річ* | `Lens_cookbook_INDEX.md` → том за темою |
 | **значення** | *які саме числа* | `*_valuesLOCK.md` · `*_MASTER_LOCK.md` |
 | **код** | *дай робочий фрагмент* | донор-модуль `Lens_module_*` |
@@ -113,7 +114,8 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 ### Протокол
 | файл | що в ньому |
 |---|---|
-| `Work_Standard.md` | правила роботи. Кластери 1–13 + форма запису К1/К2 |
+| `Work_Standard.md` | правила роботи. Кластери 1–13. **v2.31** — governance-частина виїхала (нижче) |
+| `Lens_governance_protocol.md` | **як ведеться сам канон**: К1/К2 · `1.14` · `12.6` `12.7` `12.8` `12.10` `12.11` `12.12` `12.15`–`12.19`. Розпил 24.08.2026 (EquipLens S14). У `wsd` на цих номерах — маршрутні рядки, старі посилання дійсні |
 | `Work_Standard_HISTORY.md` | changelog усіх версій + Кластер 14 «Прецеденти» (14.1–14.21) + Кластер 15 |
 
 ### Патерни
@@ -237,6 +239,8 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 |---|---|
 | **StockCheck** | `StockCheck_session_summary_b32_2_s16_PORT_DONE_HYGIENE_NEXT.md` · `StockCheck_session_summary_G1_HYGIENE.md` |
 | **QR Lens** | `QR_Lens_session_summary_B61_PRESS_PORT_DONE.md` · `QR_Lens_session_summary_b60_PRESSBENCH_v3_1.md` |
+| **EquipLens** | `EquipLens_session_summary_S14_RASPYL.md` · `EquipLens_session_summary_S13_CANON_DRAIN_DONE.md` |
+| **PharmaLens** | `PharmaLens_session_summary_S1_FOUNDATION.md` *(продукт заморожено — чекає `.pptx` від Олі; єдине самері, стеля не задіяна)* |
 | **KPI Lens** | `KPI_Lens_session_summary_Batch15_2.md` |
 | **Lens** *(governance)* | `Lens_session_summary_governance_D.md` · `Lens_session_summary_governance_C.md` |
 | **Фармастор** | `АРХІВ-УСІ` — продукт перейменовано на StockCheck; канон живе у `Фармастор_v2_MASTER_LOCK.md` і `Фармастор_v2_PORT_REGISTER.md`, самері не потрібні жодні |
@@ -309,7 +313,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 | місце | що там живе | хто і як править |
 |---|---|---|
 | **репо `kernel/`** *(корінь)* | маршрутизатори й інструмент: `Lens_INDEX` · `Lens_validate.py` · `Lens_ARCHIVE_INDEX` · `Lens_PROFILE` · `Lens_PROJECT_instruction` · `Lens_NEWPROJECT_bootstrap` · манифести стендів | **джерело правди.** Канон правиться тут |
-| **репо `kernel/wsd/`** | `Work_Standard.md` · `Work_Standard_HISTORY.md` · `wsd_delta_running.md` | те саме |
+| **репо `kernel/wsd/`** | `Work_Standard.md` · `Lens_governance_protocol.md` · `Work_Standard_HISTORY.md` · `wsd_delta_running.md` | те саме |
 | **репо `kernel/cookbook/`** | `Lens_cookbook_INDEX.md` · 5 томів · `Lens_cookbook_delta_running.md` | те саме |
 | **репо `kernel/modules/`** | донор-модулі коду: `Lens_module_*.md` | те саме |
 | **репо `archive/`** | `summaries/` · `stands/` · `superseded/` — канон-файли, що відслужили | `git mv`, **не** `rm` — нічого не гине |
