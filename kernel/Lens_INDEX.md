@@ -133,7 +133,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 |---|---|
 | `Lens_stagebench_manifest.md` | стенди: bench / harness / компер — рецепт і еталони |
 | `Lens_sandbox_manifest.md` | пісочниця: копія білда із синтетичними даними, 7 кроків |
-| `Lens_fx_candidates.md` | реєстр **зовнішніх** ефектів (FX-1 Border Beam · FX-2 Liquid metal · FX-3 Thinking orbs) |
+| `Lens_fx_candidates.md` | реєстр **зовнішніх** ефектів: FX-1 Border Beam · FX-2 Liquid metal · FX-3 Thinking orbs · FX-4 Gooey · **FX-5 GlassKit-Elements** (драбина inset · прожектор · волосинка · `color-mix` · фон-аврора) + **§Н** черга нерозібраних джерел |
 | `Lens_PROFILE.md` | робочий профіль оператора: стиль пояснень, віджети, зворотний зв'язок |
 | `Lens_NEWPROJECT_bootstrap.md` | рецепт заведення нового Project із тим самим ядром |
 | `Lens_PROJECT_instruction.md` | готовий текст інструкції Project + що змінилось проти старої |
