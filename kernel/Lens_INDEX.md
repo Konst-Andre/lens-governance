@@ -177,9 +177,9 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 
 | буфер | канон-ціль | стан |
 |---|---|---|
-| `Lens_cookbook_delta_running.md` | Cookbook | 🟢 1 запис (A76) · A77→**A80**, A78→**A81** змерджено 01.08 |
-| `Lens_stagebench_delta_running.md` | `Lens_stagebench_manifest.md` | 🟡 5 записів (додано Д-Г HARNESS-ШАБЛОН) |
-| `wsd_delta_running.md` | `Work_Standard.md` | 🟢 порожній · Г-1…Г-7 змерджено 13.08.2026 (**v2.29**): Г-2→**2.7**, Г-3/Г-5/Г-7→**1.15**, Г-4→**3.12**, Г-6→**2.6**, Г-1→`stagebench_manifest` §8.7 |
+| `Lens_cookbook_delta_running.md` | Cookbook | 🟡 **12 записів** (1 повний + 3 покажчики + 8 покажчиків cheat-sheet, S26 27.08.2026) |
+| `Lens_stagebench_delta_running.md` | `Lens_stagebench_manifest.md` | 🔴 **12 записів** (Д-А…Д-І; ⚠ стеля 2–3 сесії прострочена з 13.08.2026) |
+| `wsd_delta_running.md` *(фізично `kernel/wsd/`, **не** `kernel/`)* | `Work_Standard.md` | 🟡 **6 записів** (3 покажчики + Д-7 звірка з INDEX + Д-8 device дефектної збірки, S26 27.08.2026) |
 
 **Правило:** буфер — не архів. Лежить довше 2–3 сесій → мерджити як є.
 
@@ -221,6 +221,9 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 | `QRLens_areachip_halo_stagebench_v1.html` | стенд halo area-чіпа | числа не портовані в `preview_batch59` |
 | `QR_Lens_PeoplePicker_handoff_for_Opus_v1.md` | хендофф A58 SR-селектора | A58 не закрито |
 | `Lens_xlsx_strict.py` · `StockCheck_icon_gen.py` | гейт цілісності пакета · генератор іконок | назавжди |
+| `EquipLens_headbench_v17_13.html` | головний стенд EquipLens: 7 табів / 17 груп · 177 важелів + 33 пікери · паритет `S=210` | не витіснений новим білдом стенда |
+| `smoke_v17_13.js` | матриця головного стенда — **473** твердження (заміряно 27.08.2026); ганяти з `--inject` | стенд живий |
+| `EquipLens_S17_STARTPOINTS_and_QUEUE_v7.md` | супутник EquipLens (105 KB, ⚠ жодного разу не ревізований — аудит `Г-11`) | аудит `Г-11` не пройдено |
 
 > 🧹 **Знято 13.08.2026 (G-1) як мертве оголошення, не як архівація (Р-6):**
 > `StockCheck_journal_stagebench_v3.html` · `StockCheck_jr_stagebench_smoke_v3.js` ·
@@ -239,7 +242,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 |---|---|
 | **StockCheck** | `StockCheck_session_summary_b32_2_s16_PORT_DONE_HYGIENE_NEXT.md` · `StockCheck_session_summary_G1_HYGIENE.md` |
 | **QR Lens** | `QR_Lens_session_summary_B61_PRESS_PORT_DONE.md` · `QR_Lens_session_summary_b60_PRESSBENCH_v3_1.md` |
-| **EquipLens** | `EquipLens_session_summary_S14_RASPYL.md` · `EquipLens_session_summary_S13_CANON_DRAIN_DONE.md` |
+| **EquipLens** | `EquipLens_session_summary_S26_CARD_PIVOT.md` *(єдине; S13…S25 витіснені — S25 помер разом зі своєю умовою життя, див. шапку S26)* |
 | **PharmaLens** | `PharmaLens_session_summary_S1_FOUNDATION.md` *(продукт заморожено — чекає `.pptx` від Олі; єдине самері, стеля не задіяна)* |
 | **KPI Lens** | `KPI_Lens_session_summary_Batch15_2.md` |
 | **Lens** *(governance)* | `Lens_session_summary_governance_D.md` · `Lens_session_summary_governance_C.md` |
