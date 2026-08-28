@@ -221,8 +221,8 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 | `QRLens_areachip_halo_stagebench_v1.html` | стенд halo area-чіпа | числа не портовані в `preview_batch59` |
 | `QR_Lens_PeoplePicker_handoff_for_Opus_v1.md` | хендофф A58 SR-селектора | A58 не закрито |
 | `Lens_xlsx_strict.py` · `StockCheck_icon_gen.py` | гейт цілісності пакета · генератор іконок | назавжди |
-| `EquipLens_headbench_v17_13.html` | головний стенд EquipLens: 7 табів / 17 груп · 177 важелів + 33 пікери · паритет `S=210` | не витіснений новим білдом стенда |
-| `smoke_v17_13.js` | матриця головного стенда — **473** твердження (заміряно 27.08.2026); ганяти з `--inject` | стенд живий |
+| `EquipLens_headbench_v17_16.html` | головний стенд EquipLens: 7 табів / 20 груп · 197 важелів + 33 пікери · паритет `S=230`. Вироки **запечені в `S`** (Ф-ЛОК-2, `v17_16`) — стенд відкривається на ЛОКу незалежно від сховища | не витіснений новим білдом стенда |
+| `smoke_v17_16.js` | матриця головного стенда — **475** тверджень (заміряно 28.08.2026); ганяти з `--inject` | стенд живий |
 | `EquipLens_S17_STARTPOINTS_and_QUEUE_v7.md` | супутник EquipLens (105 KB, ⚠ жодного разу не ревізований — аудит `Г-11`) | аудит `Г-11` не пройдено |
 
 > 🧹 **Знято 13.08.2026 (G-1) як мертве оголошення, не як архівація (Р-6):**
@@ -236,13 +236,40 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 > Запускати матриці з read-only теки не можна: `require('jsdom')` шукає `node_modules`
 > відносно скрипта. Копія в `/home/claude` + `npm install jsdom` — див. wsd §3.11.
 
+### Черги продуктів — `<Продукт>_CHERGA.md` (дім оголошення для гейта **G14**)
+
+| продукт | черга |
+|---|---|
+| **EquipLens** | `EquipLens_CHERGA.md` ✅ заведено 28.08.2026 |
+| **StockCheck** | ⬜ завести при наступному дотику |
+| **QR Lens** | ⬜ завести при наступному дотику — спершу звірити з `QR_Lens_forward_plan.md`: можливо, це вже той самий носій під іншим ім'ям |
+| **Drive Lens · PharmaLens · KPI Lens** | ⬜ |
+
+**Що це.** Єдиний адресований носій **відкритого** по продукту: рядок = покажчик + вік,
+повний текст лишається там, де народився. Живе в `products/`, читається **цілком** на
+старті кожної сесії, **не має редакцій** — правиться на місці. Стеля 8 KB.
+
+**Чому окремим файлом, а не розділом супутника.** Носій черги був — супутник (`Г-8`).
+Він відмовив не тому, що правило погане, а тому, що виріс до 105 KB і набрав **чотири**
+розділи черги (`§4 → §14 → §18 → §21`), кожен «витіснений» наступним. Черга формально
+існувала й фактично не адресувалась: `К11` (ширина капсули) і `К12` (іконки) пролежали
+там шість сесій, поки оператор не назвав їх загубленими. **Стеля розміру — не гігієна,
+а умова роботи носія.**
+
+**Межа з `MASTER_LOCK`.** LOCK = вироки (залочено). CHERGA = відкрите (з віком).
+Пункт переїжджає з CHERGA у LOCK у момент device-вироку і **зникає з черги**.
+Рядок, що стоїть в обох, — дефект.
+
+⚠ **Вільний номер гейта — `G14`.** `G12` (файл-міст) і `G13` (нумерація секцій) зайняті
+в `Lens_validate.py`; буфер `Г-10` теж претендує на `G12` — колізію розвести в governance.
+
 ### Живі самері — стеля 2 на продукт (wsd 1.8, дім оголошення для гейта **G10**)
 
 | продукт | живі самері |
 |---|---|
 | **StockCheck** | `StockCheck_session_summary_b32_2_s16_PORT_DONE_HYGIENE_NEXT.md` · `StockCheck_session_summary_G1_HYGIENE.md` |
 | **QR Lens** | `QR_Lens_session_summary_B61_PRESS_PORT_DONE.md` · `QR_Lens_session_summary_b60_PRESSBENCH_v3_1.md` |
-| **EquipLens** | `EquipLens_session_summary_S26_CARD_PIVOT.md` *(єдине; S13…S25 витіснені — S25 помер разом зі своєю умовою життя, див. шапку S26)* |
+| **EquipLens** | `EquipLens_session_summary_S29_CHERGA_FLOK2.md` · `EquipLens_session_summary_S28_K22b_FLOK.md` *(S13…S27 витіснені)* |
 | **PharmaLens** | `PharmaLens_session_summary_S1_FOUNDATION.md` *(продукт заморожено — чекає `.pptx` від Олі; єдине самері, стеля не задіяна)* |
 | **KPI Lens** | `KPI_Lens_session_summary_Batch15_2.md` |
 | **Lens** *(governance)* | `Lens_session_summary_governance_D.md` · `Lens_session_summary_governance_C.md` |
