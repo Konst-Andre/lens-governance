@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>Фармастор · Харнес бейджа «Історія» v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box}
+:root{
+  --font:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --spring:cubic-bezier(.34,1.56,.64,1);
+  --hcRadius:20px; --hcPad:12px; --hcGap:9px;
+  --ringSize:62px; --ringStroke:5; --numSize:23px; --numWeight:800; --statusSize:11px;
+  --addrSize:15px; --addrWeight:650; --citySize:12.5px; --statusY:1px;
+  /* BADGE levers (JS-written) — GEOM shared */
+  --bH:30px; --bPadX:12px; --bRad:10px; --bGap:6px; --bIcon:14px; --bChev:13px; --bFont:12px;
+  /* LIGHT material (split) */
+  --Lfill:34; --Lbord:40; --Lshadow:10; --Lgrad:6; --LvalL:84;
+  /* DARK material (split) */
+  --Dfill:32; --Dridge:9; --Dbord:40; --DvalL:84;
+  /* ACCENT family */
+  --LaccAmt:0; --DaccAmt:0; --accS:40; --accL:42;
+  /* states */
+  --bDisOp:44; --bPress:.930;
+}
+.board[data-theme="light"]{
+  --bg:#eef3f1; --bg-soft:#e4ece9; --card:#ffffff; --surface-2:#f4f8f6; --surface-3:#eef4f1;
+  --text:#182c28; --text-2:#3c574f; --muted:#6b8c84; --border:#d4e5df; --border-subtle:#e1ebe7;
+  --accent:hsl(162 82% 27%); --accent-soft:hsl(162 64% 88%); --accent-ink:hsl(162 82% 16%);
+  --ringTrack:#dbe8e2; --cardShadow:0 1px 3px rgba(20,50,42,.08),0 4px 14px rgba(20,50,42,.05);
+  --fillFullH:150; --fillFullS:55; --fillFullL:46; --fillPartH:175; --fillPartS:60; --fillPartL:46;
+  --statusH:160; --statusS:58; --statusL:37;
+  --hcOtcH:160; --hcOtcS:55; --hcOtcL:40; --hcIwH:210; --hcIwS:48; --hcIwL:44;
+}
+.board[data-theme="dark"]{
+  --bg:#0d1512; --bg-soft:#151e1a; --card:#18221e; --surface-2:#1c2723; --surface-3:#212d28;
+  --text:#e8f0ec; --text-2:#a7c0b8; --muted:#7c968d; --border:#2a3833; --border-subtle:#222e29;
+  --accent:hsl(163 46% 46%); --accent-soft:hsl(163 37% 17%); --accent-ink:hsl(163 46% 68%);
+  --ringTrack:#2a3833; --cardShadow:none; --statusY:0px;
+  --fillFullH:155; --fillFullS:55; --fillFullL:50; --fillPartH:168; --fillPartS:55; --fillPartL:50;
+  --statusH:163; --statusS:55; --statusL:55;
+  --hcOtcH:162; --hcOtcS:46; --hcOtcL:55; --hcIwH:210; --hcIwS:48; --hcIwL:60;
+}
+
+html,body{margin:0;height:100%}
+body{font-family:var(--font);background:#c9d6d0;color:#182c28;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
+@media (prefers-color-scheme:dark){body{background:#05100c;color:#e8f0ec}}
+
+.stage-wrap{flex:1;overflow:auto;-webkit-overflow-scrolling:touch}
+.stage{padding:14px 0 24px}
+.board{background:var(--bg);padding:14px 0 18px;margin:0 0 2px}
+.board-lbl{font:700 11px/1 var(--font);letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin:0 16px 10px;opacity:.7}
+.list{display:flex;flex-direction:column;gap:var(--hcGap);margin:0 14px}
+
+/* ===== ported §5.2 card ===== */
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--hcRadius);
+  padding:var(--hcPad);box-shadow:var(--cardShadow);position:relative;overflow:hidden;cursor:default;
+  display:grid;grid-template-columns:1fr auto;grid-template-areas:"id rt" "foot foot";
+  column-gap:12px;row-gap:10px;align-items:start}
+.board[data-theme="dark"] .card{background:linear-gradient(180deg,#1a251f,#161f1b);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05),inset 0 -1px 0 rgba(0,0,0,.22)}
+.idcol{grid-area:id;min-width:0}
+.addr{font-size:var(--addrSize);font-weight:var(--addrWeight);color:var(--text);line-height:1.22;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.city{font-size:var(--citySize);color:var(--muted);margin-top:2px}
+.tier{margin-top:7px;display:flex;gap:8px;align-items:center;font-size:12px;font-weight:600}
+.tier .dot{color:var(--muted);font-weight:400}
+.tier .otc{color:hsl(var(--hcOtcH) calc(var(--hcOtcS)*1%) calc(var(--hcOtcL)*1%))}
+.tier .iw{color:hsl(var(--hcIwH) calc(var(--hcIwS)*1%) calc(var(--hcIwL)*1%))}
+.rt{grid-area:rt;display:flex;align-items:center}
+.rt.trcol{flex-direction:column;align-items:center;gap:2px}
+.ring{position:relative;width:var(--ringSize);height:var(--ringSize);flex:0 0 auto}
+.ring svg{display:block}
+.ring circle{fill:none}
+.amid{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;line-height:1}
+.ring.arcm .amid{justify-content:center;padding-bottom:calc(var(--ringSize)*.15)}
+.fig{font-size:var(--numSize);font-weight:var(--numWeight);color:var(--text);line-height:.95;font-variant-numeric:tabular-nums}
+.den{font-size:calc(var(--numSize)*.42);color:var(--muted);font-weight:600;line-height:1}
+.arcword{position:absolute;left:0;right:0;bottom:calc(var(--ringSize)*.02);text-align:center;
+  font-size:calc(var(--statusSize)*.92);font-weight:700;letter-spacing:.2px;white-space:nowrap;
+  color:hsl(var(--statusH) calc(var(--statusS)*1%) calc(var(--statusL)*1%));transform:translate(0,var(--statusY))}
+.newmark{font-size:calc(var(--numSize)*1.1);font-weight:300;color:var(--muted);line-height:1}
+.trmk{font-size:15px;font-weight:800;color:var(--muted)}
+.trl{font-size:11px;color:var(--muted);font-weight:600}
+.foot{grid-area:foot;display:flex;align-items:center;justify-content:space-between;gap:8px;
+  border-top:1px solid var(--border-subtle);padding-top:9px}
+.anchor,.date{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+
+/* ===== BADGE «Історія · N» — тихий soft-fill chip, L/D split ===== */
+.badge{display:inline-flex;align-items:center;gap:var(--bGap);height:var(--bH);padding:0 var(--bPadX);
+  border-radius:var(--bRad);font:800 var(--bFont)/1 var(--font);border:1px solid;background:transparent;
+  cursor:pointer;flex:0 0 auto;-webkit-appearance:none;white-space:nowrap;transition:transform 280ms var(--spring)}
+/* ☀ LIGHT — власний матеріал: нейтр-fill + lift(повний) + sheen + border + txt-L (+accent overlay) */
+.board[data-theme="light"] .badge{
+  --Lbase:color-mix(in srgb, var(--bg-soft) calc(var(--Lfill)*1%), var(--card));
+  background:
+    linear-gradient(180deg, rgba(255,255,255, calc(var(--Lgrad)*.01)), rgba(255,255,255,0)),
+    color-mix(in srgb, hsl(162 calc(var(--accS)*1%) calc(var(--accL)*1%)) calc(var(--LaccAmt)*1%), var(--Lbase));
+  border-color:color-mix(in srgb, hsl(162 calc(var(--accS)*1%) calc(var(--accL)*1%)) calc(var(--LaccAmt)*1%),
+     color-mix(in srgb, var(--muted) calc(var(--Lbord)*1%), var(--border)));
+  color:color-mix(in srgb, var(--accent-ink) calc(var(--LaccAmt)*1%),
+     color-mix(in srgb, var(--text) calc(var(--LvalL)*1%), var(--muted)));
+  box-shadow:0 calc(var(--Lshadow)*0.04px) calc(var(--Lshadow)*0.2px) rgba(20,50,42, calc(var(--Lshadow)*0.004));}
+/* ☾ DARK — власний матеріал: tone-lift + ridge + border + txt-L (+accent overlay) */
+.board[data-theme="dark"] .badge{
+  --Dbase:color-mix(in srgb, var(--surface-3) calc(var(--Dfill)*1%), var(--card));
+  background:color-mix(in srgb, hsl(163 calc(var(--accS)*1%) calc(var(--accL)*1%)) calc(var(--DaccAmt)*1%), var(--Dbase));
+  border-color:color-mix(in srgb, hsl(163 calc(var(--accS)*1%) calc(var(--accL)*1%)) calc(var(--DaccAmt)*1%),
+     color-mix(in srgb, var(--border) calc(var(--Dbord)*1%), var(--border-subtle)));
+  color:color-mix(in srgb, var(--accent-ink) calc(var(--DaccAmt)*1%),
+     color-mix(in srgb, var(--text) calc(var(--DvalL)*1%), var(--muted)));
+  box-shadow:inset 0 1px 0 rgba(255,255,255, calc(var(--Dridge)*.01));}
+.badge .b-ico{display:inline-flex;width:var(--bIcon);height:var(--bIcon);flex:0 0 auto}
+.badge .b-ico svg{width:100%;height:100%;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.badge .b-sep{margin:0 3px;opacity:.5;font-weight:600}
+.badge .b-n{font-weight:800;font-variant-numeric:tabular-nums}
+.badge .b-chev{display:inline-flex;width:var(--bChev);height:var(--bChev);opacity:.55;margin-left:1px;flex:0 0 auto}
+.badge .b-chev svg{width:100%;height:100%;stroke:currentColor;stroke-width:2.2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.badge.dis{opacity:calc(var(--bDisOp)*.01);pointer-events:none;cursor:default}
+.badge.pressing{transform:scale(var(--bPress));transition-duration:80ms}
+@media (prefers-reduced-motion:reduce){.badge{transition-duration:.01ms!important}}
+
+/* ===== PANEL ===== */
+.panel{background:#fafcfb;border-top:1px solid #cdd9d3;flex:0 0 auto;display:flex;flex-direction:column;max-height:50vh}
+@media (prefers-color-scheme:dark){.panel{background:#111a16;border-top-color:#243029}}
+.panelbar{display:flex;flex-wrap:wrap;align-items:center;gap:7px;padding:8px 10px;border-bottom:1px solid #dde7e2}
+@media (prefers-color-scheme:dark){.panelbar{border-bottom-color:#22302a}}
+.panelbody{overflow:auto;padding:8px 10px 14px;-webkit-overflow-scrolling:touch}
+.panel.collapsed .panelbody{display:none}
+.caret{border:1px solid #bcccc5;background:#eaf1ee;border-radius:8px;width:30px;height:28px;font-size:14px;cursor:pointer;color:#3c574f}
+@media (prefers-color-scheme:dark){.caret{background:#1a2621;border-color:#2c3a33;color:#a7c0b8}}
+.seg{display:inline-flex;border:1px solid #bcccc5;border-radius:9px;overflow:hidden}
+.seg button{border:0;background:transparent;padding:6px 9px;font:700 11.5px/1 var(--font);cursor:pointer;color:#3c574f}
+.seg button.on{background:#0d7c66;color:#fff}
+@media (prefers-color-scheme:dark){.seg{border-color:#2c3a33}.seg button{color:#a7c0b8}.seg button.on{background:#2f8a78}}
+.pbtn{border:1px solid #bcccc5;background:#eaf1ee;border-radius:8px;padding:6px 10px;font:700 11.5px/1 var(--font);cursor:pointer;color:#26433c}
+.pbtn.star{border-color:#0d7c66;color:#0d7c66}
+@media (prefers-color-scheme:dark){.pbtn{background:#1a2621;border-color:#2c3a33;color:#a7c0b8}.pbtn.star{border-color:#3aa78f;color:#5fc7b3}}
+.grp-lbl{font:700 10.5px/1 var(--font);letter-spacing:.5px;text-transform:uppercase;color:#7c968d;margin:12px 0 3px;padding-top:8px;border-top:1px dashed #d3ddd8}
+.grp-lbl:first-child{border-top:0;padding-top:0;margin-top:2px}
+@media (prefers-color-scheme:dark){.grp-lbl{border-top-color:#26332d}}
+.sliders{display:grid;grid-template-columns:1fr;gap:9px}
+.sl{display:grid;grid-template-columns:1fr auto;gap:2px 8px;align-items:center}
+.sl label{font:600 12px/1.2 var(--font);color:#3c574f}
+@media (prefers-color-scheme:dark){.sl label{color:#a7c0b8}}
+.sl .v{font:800 12px/1 var(--font);color:#0d7c66;font-variant-numeric:tabular-nums;min-width:40px;text-align:right}
+.sl input[type=range]{grid-column:1/-1;width:100%;accent-color:#0d7c66;margin:0}
+.toast{position:fixed;left:50%;bottom:calc(50vh + 14px);transform:translateX(-50%) translateY(10px);
+  background:#182c28;color:#fff;font:700 12px/1 var(--font);padding:9px 14px;border-radius:11px;
+  opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:80}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<div class="stage-wrap"><div class="stage" id="stage"></div></div>
+
+<div class="panel" id="panel">
+  <div class="panelbar">
+    <button class="caret" id="caret" title="Згорнути панель">▾</button>
+    <div class="seg" id="segTheme"></div>
+    <div class="seg" id="segIcon"></div>
+    <div class="seg" id="segFoot"></div>
+    <span style="flex:1"></span>
+    <button class="pbtn star" data-preset="0">★ Мішень</button>
+    <button class="pbtn" data-preset="1">A-акцент</button>
+    <button class="pbtn" data-preset="2">Плаский</button>
+    <button class="pbtn" data-preset="3">Матеріал+</button>
+    <button class="pbtn" data-preset="4">Компакт</button>
+    <button class="pbtn" id="copyBtn">📋 копі</button>
+  </div>
+  <div class="panelbody"><div class="sliders" id="sliders"></div></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+var TOTAL=83;
+function hPct(f){return Math.round(f/TOTAL*100);}
+function hFill(f){var q=(f>=TOTAL)?'Full':'Part';
+  return 'hsl(var(--fill'+q+'H) calc(var(--fill'+q+'S)*1%) calc(var(--fill'+q+'L)*1%))';}
+function ringSVG(f){
+  var d=62,w=5,r=(d-w)/2,cx=d/2,style='transform:rotate(135deg);transform-origin:center',
+      target=(75-0.75*hPct(f)).toFixed(2);
+  var track='<circle cx="'+cx+'" cy="'+cx+'" r="'+r+'" pathLength="100" stroke="var(--ringTrack)" stroke-width="'+w+'" stroke-linecap="round" stroke-dasharray="75 100" style="'+style+'"/>';
+  var fill=f>0?'<circle cx="'+cx+'" cy="'+cx+'" r="'+r+'" pathLength="100" stroke="'+hFill(f)+'" stroke-width="'+w+'" stroke-linecap="round" stroke-dasharray="75 100" stroke-dashoffset="'+target+'" style="'+style+'"/>':'';
+  return '<svg width="'+d+'" height="'+d+'">'+track+fill+'</svg>';
+}
+var ICONS={
+  clock:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 1.8"/></svg>',
+  stack:'<svg viewBox="0 0 24 24"><path d="M12 4l8 4-8 4-8-4 8-4z"/><path d="M4 12l8 4 8-4"/></svg>',
+  spark:'<svg viewBox="0 0 24 24"><polyline points="3 15 8 9 12 12 17 5 21 9"/></svg>',
+  none:''
+};
+var CHEV='<svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>';
+
+var CARDS=[
+  {m:2,   px:'1688723', addr:'вул. Січових Стрільців, 21', city:'Дніпро',      otc:'B', iw:'C', state:'ready',       filled:48, N:6, date:'02.07'},
+  {m:85,  px:'112233',  addr:'просп. Дмитра Яворницького, 45', city:'Дніпро',  otc:'A', iw:'B', state:'ready',       filled:61, N:2, date:'11.07'},
+  {m:168, px:'556677',  addr:'вул. Робоча, 152',           city:'Кам’янське',  otc:'C', iw:'D', state:'new',         filled:0,  N:1, date:''},
+  {m:251, px:'998877',  addr:'вул. Соборна, 87',           city:'Дніпро',      otc:'A', iw:'B', state:'transferred', filled:83, N:4, date:'18.07'}
+];
+
+var V={icon:'clock',footer:2,themeMode:'both',
+  h:30,padX:12,rad:10,gap:6,iconSz:14,chevSz:13,font:12,
+  Lfill:34,Lbord:40,Lshadow:10,Lgrad:6,LvalL:84,
+  Dfill:32,Dridge:9,Dbord:40,DvalL:84,
+  LaccAmt:0,DaccAmt:0,accS:40,accL:42,
+  disOp:44,press:93,cap:6};
+
+var PRESETS=[
+  {icon:'clock',footer:2,h:30,padX:12,rad:10,gap:6,iconSz:14,chevSz:13,font:12,
+   Lfill:34,Lbord:40,Lshadow:10,Lgrad:6,LvalL:84,Dfill:32,Dridge:9,Dbord:40,DvalL:84,
+   LaccAmt:0,DaccAmt:0,accS:40,accL:42,disOp:44,press:93,cap:6},                 /* ★ Мішень */
+  {LaccAmt:22,DaccAmt:18,accS:55,accL:44,Lfill:30,Dfill:28},                      /* A-акцент (тихий) */
+  {Lfill:24,Lshadow:0,Lgrad:0,Dfill:22,Dridge:4},                                /* Плаский (floor) */
+  {Lfill:50,Lshadow:30,Lgrad:14,Dfill:50,Dridge:18},                             /* Матеріал+ (стеля) */
+  {h:27,padX:9,rad:9,gap:5,iconSz:12,chevSz:12,font:11.5,icon:'clock'}           /* Компакт */
+];
+
+var SL=[
+  {g:'Геометрія (спільна)'},
+  {k:'h',l:'H (висота)',min:24,max:38,st:1},
+  {k:'padX',l:'padX',min:6,max:18,st:1},
+  {k:'rad',l:'rad',min:6,max:18,st:1},
+  {k:'gap',l:'gap',min:3,max:12,st:1},
+  {k:'iconSz',l:'iconSz',min:11,max:20,st:1},
+  {k:'chevSz',l:'chevSz',min:10,max:20,st:1},
+  {k:'font',l:'font',min:10,max:15,st:.5},
+  {g:'☀ Світла — матеріал'},
+  {k:'Lfill',l:'Lfill (нейтр-тінт у картку)',min:0,max:60,st:1},
+  {k:'Lbord',l:'Lbord (бордер сила)',min:0,max:100,st:1},
+  {k:'Lshadow',l:'Lshadow (lift/drop — ПОВНИЙ)',min:0,max:100,st:1},
+  {k:'Lgrad',l:'Lgrad (верхній sheen)',min:0,max:30,st:1},
+  {k:'LvalL',l:'LvalL (текст L)',min:55,max:100,st:1},
+  {g:'☾ Темна — матеріал'},
+  {k:'Dfill',l:'Dfill (tone-lift)',min:0,max:60,st:1},
+  {k:'Dridge',l:'Dridge (top-hl)',min:0,max:25,st:1},
+  {k:'Dbord',l:'Dbord (бордер сила)',min:0,max:100,st:1},
+  {k:'DvalL',l:'DvalL (текст L)',min:55,max:100,st:1},
+  {g:'Акцент (опц · нейтрал=0)'},
+  {k:'LaccAmt',l:'LaccAmt (акцент світла)',min:0,max:100,st:1},
+  {k:'DaccAmt',l:'DaccAmt (акцент темна)',min:0,max:100,st:1},
+  {k:'accS',l:'accS (насиченість — неон-важіль)',min:0,max:90,st:1},
+  {k:'accL',l:'accL (світлість акценту)',min:20,max:70,st:1},
+  {g:'Стани'},
+  {k:'disOp',l:'disOp (disabled %)',min:25,max:80,st:1},
+  {k:'press',l:'press (scale×100)',min:86,max:99,st:1},
+  {k:'cap',l:'cap (N→N+)',min:3,max:9,st:1}
+];
+
+function nDisp(n){return n>V.cap?(V.cap+'+'):(''+n);}
+function badgeHTML(c){
+  var dis=c.N<=1;
+  var ico=V.icon!=='none'?('<span class="b-ico">'+ICONS[V.icon]+'</span>'):'';
+  return '<button class="badge'+(dis?' dis':'')+'" data-px="'+c.px+'"'+(dis?' disabled':'')+'>'
+    +ico+'<span class="b-lbl">Історія</span><span class="b-sep">·</span><span class="b-n">'+nDisp(c.N)+'</span>'
+    +'<span class="b-chev">'+CHEV+'</span></button>';
+}
+function heroHTML(c){
+  if(c.state==='transferred')
+    return '<div class="rt trcol"><span class="trmk">✓✓</span><span class="trl">перенесено</span></div>';
+  if(c.state==='new')
+    return '<div class="rt"><div class="ring arcm">'+ringSVG(0)+'<div class="amid"><span class="newmark">—</span></div></div></div>';
+  return '<div class="rt"><div class="ring arcm">'+ringSVG(c.filled)
+    +'<div class="amid"><span class="fig">'+c.filled+'</span><span class="den">/'+TOTAL+'</span></div>'
+    +'<span class="arcword">'+hPct(c.filled)+'%</span></div></div>';
+}
+function footHTML(c){
+  var anchor='<span class="anchor">M'+c.m+' · Proxima '+c.px+'</span>';
+  var badge=badgeHTML(c);
+  if(V.footer===3){
+    var date=c.date?'<span class="date">'+c.date+'</span>':'<span class="date"></span>';
+    return '<div class="foot">'+anchor+date+badge+'</div>';
+  }
+  return '<div class="foot">'+anchor+badge+'</div>';
+}
+function cardHTML(c){
+  var tier='<div class="tier"><span class="otc">OTC '+c.otc+'</span><span class="dot">·</span><span class="iw">IW '+c.iw+'</span></div>';
+  var idcol='<div class="idcol"><div class="addr">'+c.addr+'</div><div class="city">'+c.city+'</div>'+tier+'</div>';
+  return '<div class="card">'+idcol+heroHTML(c)+footHTML(c)+'</div>';
+}
+function boardHTML(theme){
+  return '<div class="board" data-theme="'+theme+'"><div class="board-lbl">'
+    +(theme==='light'?'☀ Світла':'☾ Темна')+'</div><div class="list">'+CARDS.map(cardHTML).join('')+'</div></div>';
+}
+var stage=document.getElementById('stage');
+function renderStage(){
+  var m=V.themeMode,html='';
+  if(m==='light')html=boardHTML('light');
+  else if(m==='dark')html=boardHTML('dark');
+  else html=boardHTML('light')+boardHTML('dark');
+  stage.innerHTML=html;
+}
+
+function applyVars(){
+  var r=document.documentElement.style,px=['h','padX','rad','gap','iconSz','chevSz','font'],
+      map={h:'--bH',padX:'--bPadX',rad:'--bRad',gap:'--bGap',iconSz:'--bIcon',chevSz:'--bChev',font:'--bFont'};
+  px.forEach(function(k){r.setProperty(map[k],V[k]+'px');});
+  ['Lfill','Lbord','Lshadow','Lgrad','LvalL','Dfill','Dridge','Dbord','DvalL','LaccAmt','DaccAmt','accS','accL'].forEach(function(k){r.setProperty('--'+k,V[k]);});
+  r.setProperty('--bDisOp',V.disOp);
+  r.setProperty('--bPress',(V.press/100).toFixed(3));
+}
+
+var slidersEl=document.getElementById('sliders');
+function buildSliders(){
+  var html='';
+  SL.forEach(function(s){
+    if(s.g){html+='<div class="grp-lbl">'+s.g+'</div>';return;}
+    var val=V[s.k];
+    html+='<div class="sl"><label>'+s.l+'</label><span class="v" id="v_'+s.k+'">'+val+'</span>'
+      +'<input type="range" data-k="'+s.k+'" min="'+s.min+'" max="'+s.max+'" step="'+s.st+'" value="'+val+'"></div>';
+  });
+  slidersEl.innerHTML=html;
+  slidersEl.querySelectorAll('input[type=range]').forEach(function(inp){
+    inp.addEventListener('input',function(){
+      var k=inp.dataset.k,val=parseFloat(inp.value);
+      V[k]=val; document.getElementById('v_'+k).textContent=val;
+      applyVars(); if(k==='cap')renderStage();
+    });
+  });
+}
+
+function seg(elId,opts,cur,cb){
+  var el=document.getElementById(elId);
+  el.innerHTML=opts.map(function(o){return '<button data-val="'+o.v+'"'+(o.v==cur?' class="on"':'')+'>'+o.t+'</button>';}).join('');
+  el.querySelectorAll('button').forEach(function(b){
+    b.addEventListener('click',function(){
+      el.querySelectorAll('button').forEach(function(x){x.classList.remove('on');});
+      b.classList.add('on'); cb(b.dataset.val);
+    });
+  });
+}
+seg('segTheme',[{v:'light',t:'☀'},{v:'dark',t:'☾'},{v:'both',t:'▣ Обидві'}],V.themeMode,function(v){V.themeMode=v;renderStage();});
+seg('segIcon',[{v:'clock',t:'Годинник'},{v:'stack',t:'Стек'},{v:'spark',t:'Спарк'},{v:'none',t:'—'}],V.icon,function(v){V.icon=v;renderStage();});
+seg('segFoot',[{v:'2',t:'2-слот'},{v:'3',t:'3-слот'}],''+V.footer,function(v){V.footer=parseInt(v,10);renderStage();});
+
+document.querySelectorAll('.pbtn[data-preset]').forEach(function(b){
+  b.addEventListener('click',function(){
+    var p=PRESETS[parseInt(b.dataset.preset,10)];
+    for(var k in p){if(p.hasOwnProperty(k))V[k]=p[k];}
+    if(p.icon){document.querySelectorAll('#segIcon button').forEach(function(x){x.classList.toggle('on',x.dataset.val===p.icon);});}
+    if(p.footer){document.querySelectorAll('#segFoot button').forEach(function(x){x.classList.toggle('on',x.dataset.val===(''+p.footer));});}
+    buildSliders(); applyVars(); renderStage();
+  });
+});
+
+function readout(){
+  return ['icon='+V.icon,'footer='+V.footer+'slot',
+    '| L:','Lfill='+V.Lfill,'Lbord='+V.Lbord,'Lshadow='+V.Lshadow,'Lgrad='+V.Lgrad,'LvalL='+V.LvalL,
+    '| D:','Dfill='+V.Dfill,'Dridge='+V.Dridge,'Dbord='+V.Dbord,'DvalL='+V.DvalL,
+    '| acc:','LaccAmt='+V.LaccAmt,'DaccAmt='+V.DaccAmt,'accS='+V.accS,'accL='+V.accL,
+    '| geom:','H='+V.h,'padX='+V.padX,'rad='+V.rad,'gap='+V.gap,'iconSz='+V.iconSz,'chevSz='+V.chevSz,'font='+V.font,
+    '| st:','disOp='+V.disOp,'press='+(V.press/100).toFixed(2),'cap='+V.cap].join(' ');
+}
+var toast=document.getElementById('toast');
+function showToast(t){toast.textContent=t;toast.classList.add('on');setTimeout(function(){toast.classList.remove('on');},1400);}
+document.getElementById('copyBtn').addEventListener('click',function(){
+  var s=readout();
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(s).then(function(){showToast('Скопійовано ✓');},function(){fb(s);});}
+  else fb(s);
+  function fb(str){var ta=document.createElement('textarea');ta.value=str;document.body.appendChild(ta);ta.select();
+    try{document.execCommand('copy');showToast('Скопійовано ✓');}catch(e){showToast('Копі не вдалось');}document.body.removeChild(ta);}
+});
+
+document.getElementById('caret').addEventListener('click',function(){
+  var p=document.getElementById('panel'),c=p.classList.toggle('collapsed');
+  this.textContent=c?'▴':'▾';
+});
+
+(function(){
+  var cur=null,rel=function(){if(cur){cur.classList.remove('pressing');cur=null;}};
+  stage.addEventListener('pointerdown',function(e){var b=e.target.closest('.badge');if(!b||b.classList.contains('dis'))return;cur=b;b.classList.add('pressing');});
+  stage.addEventListener('pointerup',rel);
+  stage.addEventListener('pointercancel',rel);
+  stage.addEventListener('pointerleave',rel);
+})();
+
+buildSliders(); applyVars(); renderStage();
+</script>
+</body>
+</html>
