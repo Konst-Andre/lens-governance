@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="uk" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
+<title>FILL copy+form · compare v3</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --font:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --r-card:16px; --spring:cubic-bezier(.34,1.56,.64,1);
+  --bg:#eef3f1; --bg-soft:#e4ece9; --card:#ffffff; --surface-2:#f4f8f6; --surface-3:#eef4f1;
+  --text:#182c28; --text-2:#3c574f; --muted:#6b8c84; --border:#d4e5df; --border-subtle:#e1ebe7;
+  --ok:#1f9d57; --crit:#c0392b; --warn:#c8811b;
+  --accent:hsl(162 82% 27%); --accent-soft:hsl(162 64% 88%); --accent-ink:hsl(162 82% 16%);
+  --cardShadow:0 1px 3px rgba(20,50,42,.08),0 4px 14px rgba(20,50,42,.05);
+}
+[data-theme="dark"]{
+  --bg:#0d1512; --bg-soft:#151e1a; --card:#18221e; --surface-2:#1c2723; --surface-3:#212d28;
+  --text:#e8f0ec; --text-2:#a7c0b8; --muted:#7c968d; --border:#2a3833; --border-subtle:#222e29;
+  --ok:#33c06f; --crit:#e0685c; --warn:#e0a94a;
+  --accent:hsl(163 46% 46%); --accent-soft:hsl(163 37% 17%); --accent-ink:hsl(163 46% 68%);
+  --cardShadow:none;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0}
+body{font-family:var(--font);background:var(--bg);color:var(--text);
+  padding-bottom:calc(40px + env(safe-area-inset-bottom));-webkit-font-smoothing:antialiased}
+
+.panel{position:sticky;top:0;z-index:40;background:color-mix(in srgb,var(--bg) 92%,transparent);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--border);padding:calc(8px + env(safe-area-inset-top)) 10px 8px}
+.prow{display:flex;align-items:center;gap:6px;margin-top:6px}
+.prow:first-child{margin-top:0}
+.plabel{font:800 9.5px/1 var(--font);letter-spacing:.4px;text-transform:uppercase;color:var(--muted);flex:0 0 42px}
+.seg{display:flex;flex:1;gap:4px;background:var(--surface-3);border:1px solid var(--border-subtle);border-radius:9px;padding:3px}
+.seg button{flex:1;border:none;background:transparent;color:var(--text-2);cursor:pointer;font:700 11px/1 var(--font);padding:7px 4px;border-radius:6px;white-space:nowrap;transition:background .12s ease,color .12s ease}
+.seg button.on{background:var(--accent);color:#fff}
+
+.stage{margin:0 auto;transition:max-width .2s ease}
+.stage[data-w="xs"]{max-width:375px}
+.stage[data-w="pro"]{max-width:393px}
+.stage[data-w="full"]{max-width:100%}
+
+.sec{margin:14px 12px 0;border:1px solid var(--border);border-radius:var(--r-card);background:var(--card);box-shadow:var(--cardShadow);overflow:hidden}
+[data-theme="dark"] .sec{background:linear-gradient(180deg,#1a251f,#161f1b)}
+.sec-h{font:800 11px/1 var(--font);letter-spacing:1px;text-transform:uppercase;color:var(--accent-ink);padding:12px 14px 0}
+.rows{padding:8px 14px 2px}
+.frow{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border-subtle);opacity:.48}
+.frow:last-child{border-bottom:none}
+.frow .nm{font:600 12.5px/1.2 var(--font);color:var(--text-2)}
+.frow .ms{font:600 10.5px/1 var(--font);color:var(--muted);margin-top:2px}
+.frow .vv{font:700 13px/1 var(--font);color:var(--muted);font-variant-numeric:tabular-nums}
+.bar{padding:6px 14px calc(14px + env(safe-area-inset-bottom))}
+
+/* ===== button bases ===== */
+.btn-copy{border:none;border-radius:12px;padding:14px;background:var(--accent);color:#fff;font:800 14px/1 var(--font);cursor:pointer;transition:transform .2s var(--spring),filter .12s ease;display:flex;align-items:center;justify-content:center;gap:7px}
+.btn-form{border-radius:12px;padding:13px;cursor:pointer;text-decoration:none;font:800 13.5px/1 var(--font);transition:transform .2s var(--spring),filter .12s ease;display:flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap}
+.btn-form svg{flex:0 0 auto}
+.is-pressed{transform:scale(.955);transition-duration:.06s;filter:brightness(.97)}
+
+/* ===== form-style (light) ===== */
+.stage[data-fs="outneu"] .btn-form{border:1.5px solid var(--border);background:transparent;color:var(--text-2)}
+.stage[data-fs="outneu"] .btn-form svg{color:var(--muted)}
+.stage[data-fs="soft"]   .btn-form{border:none;background:var(--accent-soft);color:var(--accent-ink)}
+.stage[data-fs="link"]   .btn-form{border:none;background:transparent;color:var(--accent);padding:13px 8px}
+/* ===== dark tone-lift parity fix (A45) — form lifted ABOVE card ===== */
+[data-theme="dark"] .stage[data-fs="outneu"] .btn-form{background:var(--surface-3);border-color:var(--border);color:var(--text)}
+[data-theme="dark"] .stage[data-fs="soft"]   .btn-form{background:color-mix(in srgb,var(--accent) 22%,var(--surface-3));color:var(--accent-ink)}
+[data-theme="dark"] .stage[data-fs="link"]   .btn-form{background:transparent;color:var(--accent-ink)}
+
+/* ===== Mat lever (material / depth) — theme-aware ===== */
+/* light: shadow + micro-gradient led */
+.stage[data-mat="lift"] .btn-copy{background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 90%,#fff),var(--accent));box-shadow:0 3px 10px -2px color-mix(in srgb,var(--accent) 48%,transparent),0 1px 2px rgba(20,50,42,.14)}
+.stage[data-mat="rich"] .btn-copy{background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 84%,#fff),var(--accent));box-shadow:0 6px 18px -3px color-mix(in srgb,var(--accent) 55%,transparent),0 2px 4px rgba(20,50,42,.2),inset 0 1px 0 rgba(255,255,255,.28)}
+.stage[data-mat="lift"] .btn-form,.stage[data-mat="rich"] .btn-form{box-shadow:0 2px 7px -2px rgba(20,50,42,.16)}
+.stage[data-mat="rich"] .btn-form{box-shadow:0 4px 12px -3px rgba(20,50,42,.2)}
+/* dark: tone-lift + top ridge led (A45), shadow minimal */
+[data-theme="dark"] .stage[data-mat="lift"] .btn-copy{background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 84%,#fff),var(--accent));box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 2px 9px rgba(0,0,0,.38)}
+[data-theme="dark"] .stage[data-mat="rich"] .btn-copy{background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 76%,#fff),var(--accent));box-shadow:inset 0 1px 0 rgba(255,255,255,.18),inset 0 -2px 6px rgba(0,0,0,.28),0 3px 14px rgba(0,0,0,.5)}
+[data-theme="dark"] .stage[data-mat="lift"] .btn-form,[data-theme="dark"] .stage[data-mat="rich"] .btn-form{box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
+[data-theme="dark"] .stage[data-mat="rich"] .btn-form{box-shadow:inset 0 1px 0 rgba(255,255,255,.10),0 2px 8px rgba(0,0,0,.35)}
+
+/* ===== layouts ===== */
+.lay-row{display:flex;gap:9px}
+.lay-row .btn-copy{flex:2.5 1 0;min-width:0}
+.lay-row .btn-form{flex:1 1 0;min-width:0}
+.lay-stack{display:flex;flex-direction:column;gap:9px}
+.lay-stack .btn-copy,.lay-stack .btn-form{width:100%}
+.lay-rev .btn-copy{width:100%}
+.rev-slot{display:grid;grid-template-rows:0fr;transition:grid-template-rows .34s var(--spring)}
+.lay-rev.shown .rev-slot{grid-template-rows:1fr}
+.rev-inner{min-height:0;overflow:hidden}
+.rev-pad{padding-top:9px}
+.rev-slot .btn-form{width:100%;opacity:0;transition:opacity .24s ease}
+.lay-rev.shown .rev-slot .btn-form{opacity:1}
+
+.toast{position:fixed;left:50%;bottom:calc(22px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(12px);z-index:60;max-width:88%;background:var(--text);color:var(--bg);font:700 12.5px/1.35 var(--font);padding:11px 16px;border-radius:14px;opacity:0;pointer-events:none;transition:opacity .2s ease,transform .2s ease;box-shadow:0 6px 22px rgba(0,0,0,.28)}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+
+<div class="panel">
+  <div class="prow"><span class="plabel">Тема</span><div class="seg" id="segTheme">
+    <button class="on" onclick="setTheme('light',this)">☀ light</button>
+    <button onclick="setTheme('dark',this)">🌙 dark</button></div></div>
+  <div class="prow"><span class="plabel">Ширина</span><div class="seg" id="segW">
+    <button class="on" onclick="setW('xs',this)">XS·375</button>
+    <button onclick="setW('pro',this)">Pro·393</button>
+    <button onclick="setW('full',this)">Full</button></div></div>
+  <div class="prow"><span class="plabel">Форма</span><div class="seg" id="segFs">
+    <button class="on" onclick="setFs('soft',this)">soft</button>
+    <button onclick="setFs('outneu',this)">out·neu</button>
+    <button onclick="setFs('link',this)">link</button></div></div>
+  <div class="prow"><span class="plabel">Mat</span><div class="seg" id="segMat">
+    <button onclick="setMat('flat',this)">flat</button>
+    <button class="on" onclick="setMat('lift',this)">lift</button>
+    <button onclick="setMat('rich',this)">rich</button></div></div>
+  <div class="prow"><span class="plabel">Лейбл</span><div class="seg" id="segLbl">
+    <button class="on" onclick="setLbl('Excel',this)">Excel</button>
+    <button onclick="setLbl('Відкрити Excel',this)">Відкр.Excel</button>
+    <button onclick="setLbl('Форма',this)">Форма</button></div></div>
+</div>
+
+<div class="stage" id="stage" data-w="xs" data-fs="soft" data-mat="lift">
+
+  <div class="sec">
+    <div class="sec-h">① Поруч · копі домінує</div>
+    <div class="rows">
+      <div class="frow"><div><div class="nm">Нурофєн Форте 40 таб</div><div class="ms">MSL 6</div></div><div class="vv">8</div></div>
+      <div class="frow"><div><div class="nm">Стрепсілс мед-лимон 24</div><div class="ms">MSL 4</div></div><div class="vv">3</div></div>
+    </div>
+    <div class="bar"><div class="lay-row">
+      <button class="btn-copy pressable" onclick="doCopy()">Копіювати 83 значення</button>
+      <a class="btn-form pressable formA" data-form target="_blank" rel="noopener"><svg class="glyph" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h6"/></svg><span class="ftx">Excel</span></a>
+    </div></div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-h">② Стек · одна під одною</div>
+    <div class="rows">
+      <div class="frow"><div><div class="nm">Нурофєн Форте 40 таб</div><div class="ms">MSL 6</div></div><div class="vv">8</div></div>
+      <div class="frow"><div><div class="nm">Стрепсілс мед-лимон 24</div><div class="ms">MSL 4</div></div><div class="vv">3</div></div>
+    </div>
+    <div class="bar"><div class="lay-stack">
+      <button class="btn-copy pressable" onclick="doCopy()">Копіювати 83 значення</button>
+      <a class="btn-form pressable formA" data-form target="_blank" rel="noopener"><svg class="glyph" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h6"/></svg><span class="ftx">Excel</span></a>
+    </div></div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-h">③ Reveal · Excel після копі</div>
+    <div class="rows">
+      <div class="frow"><div><div class="nm">Нурофєн Форте 40 таб</div><div class="ms">MSL 6</div></div><div class="vv">8</div></div>
+      <div class="frow"><div><div class="nm">Стрепсілс мед-лимон 24</div><div class="ms">MSL 4</div></div><div class="vv">3</div></div>
+    </div>
+    <div class="bar">
+      <div class="lay-rev" id="revLay">
+        <button class="btn-copy pressable" onclick="doCopy();document.getElementById('revLay').classList.add('shown')">Копіювати 83 значення</button>
+        <div class="rev-slot"><div class="rev-inner"><div class="rev-pad">
+          <a class="btn-form pressable formA" data-form target="_blank" rel="noopener"><svg class="glyph" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h6"/></svg><span class="ftx">Excel</span></a>
+        </div></div></div>
+      </div>
+      <div style="text-align:center;margin-top:8px"><button onclick="document.getElementById('revLay').classList.remove('shown')" style="border:1px solid var(--border);background:var(--card);color:var(--muted);font:700 11px/1 var(--font);padding:7px 12px;border-radius:8px;cursor:pointer">↺ reset reveal</button></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var FORM_URL='https://rbcom-my.sharepoint.com/:x:/r/personal/yuliia_syniuhina_reckitt_com/_layouts/15/Doc.aspx?sourcedoc=%7B361AB6BF-2AE9-410C-A81F-2AA3502C4EAD%7D&file=%25u0424%25u0430%25u0440%25u043c%25u0430%25u0441%25u0442%25u043e%25u0440%20%25u0437%25u0430%25u043c%25u043e%25u0432%25u043b%25u0435%25u043d%25u043d%25u044f%20%25u0442%25u0442.xlsx&wdLOR=c06833412-A6C7-4B15-AE95-76BCF4AB9FD6&openShare=true&fromShare=true&action=default&mobileredirect=true';
+document.querySelectorAll('[data-form]').forEach(function(a){a.href=FORM_URL;});
+document.addEventListener('pointerdown',function(e){var b=e.target.closest('.pressable');if(b)b.classList.add('is-pressed');});
+['pointerup','pointercancel','pointerleave'].forEach(function(ev){document.addEventListener(ev,function(){document.querySelectorAll('.is-pressed').forEach(function(b){b.classList.remove('is-pressed');});});});
+var stage=document.getElementById('stage'),toastEl=document.getElementById('toast');
+function segOn(id,btn){document.getElementById(id).querySelectorAll('button').forEach(function(b){b.classList.remove('on');});btn.classList.add('on');}
+function setTheme(v,b){document.documentElement.setAttribute('data-theme',v);segOn('segTheme',b);}
+function setW(v,b){stage.setAttribute('data-w',v);segOn('segW',b);}
+function setFs(v,b){stage.setAttribute('data-fs',v);segOn('segFs',b);}
+function setMat(v,b){stage.setAttribute('data-mat',v);segOn('segMat',b);}
+function setLbl(t,b){document.querySelectorAll('.ftx').forEach(function(s){s.textContent=t;});segOn('segLbl',b);}
+function toast(m){toastEl.textContent=m;toastEl.classList.add('on');clearTimeout(toastEl._h);toastEl._h=setTimeout(function(){toastEl.classList.remove('on');},1900);}
+function doCopy(){var d=Array.from({length:83},function(_,i){return i;}).join('\t');if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(d).catch(function(){});}toast('✓ Скопійовано 83 · встав у Excel');}
+</script>
+</body>
+</html>

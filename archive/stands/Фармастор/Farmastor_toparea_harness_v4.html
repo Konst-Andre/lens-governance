@@ -1,0 +1,297 @@
+<!doctype html><html lang="uk"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
+<title>Фармастор · TopArea harness v1 (Node 5 пікер)</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--font:'Manrope',-apple-system,system-ui,sans-serif;
+  --hbg:#0e1512;--hpanel:#141d19;--hbd:#243029;--hln:#8aa39b}
+html,body{height:100%}
+body{font-family:var(--font);background:var(--hbg);color:#dfeae5;overflow:hidden}
+.wrap{display:flex;flex-direction:column;height:100%}
+
+/* ---- top bar ---- */
+.bar{flex:0 0 auto;display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid var(--hbd);background:var(--hpanel)}
+.seg{display:inline-flex;background:#0c1310;border:1px solid var(--hbd);border-radius:9px;overflow:hidden}
+.seg button{border:0;background:transparent;color:#9db3ab;font:700 11px/1 var(--font);padding:7px 9px;cursor:pointer}
+.seg button.on{background:#1f5f4d;color:#eafff6}
+.vcost{margin-left:auto;font:800 12px/1 var(--font);color:#7fe3bf;background:#0c1310;border:1px solid var(--hbd);border-radius:8px;padding:7px 10px;white-space:nowrap}
+.hint{width:100%;font:600 10.5px/1.4 var(--font);color:var(--hln)}
+
+/* ---- stage ---- */
+.stage{flex:1 1 auto;overflow:auto;display:flex;justify-content:center;padding:16px 10px 26px;background:
+  repeating-linear-gradient(45deg,#0c1310 0 10px,#0e1512 10px 20px)}
+.app{width:375px;flex:0 0 auto;background:var(--bg);border-radius:26px;overflow:hidden;
+  box-shadow:0 10px 40px rgba(0,0,0,.5);border:1px solid #000;align-self:flex-start;
+  --chipH:32px;--chipGap:7px;--chipPadX:13px;--chipRad:10px;--searchH:40px;--taGap:8px}
+
+/* ===== theme tokens (§6.1/§6.2) ===== */
+.app[data-th="light"]{--bg:#eef3f1;--bg-soft:#e4ece9;--card:#fff;--surface-2:#f4f8f6;--surface-3:#eef4f1;
+  --text:#182c28;--text-2:#3c574f;--muted:#6b8c84;--border:#d4e5df;--border-subtle:#e1ebe7;
+  --accent:hsl(162 82% 27%);--accent-soft:hsl(162 64% 88%);--accent-ink:hsl(162 82% 16%);
+  --ringTrack:#dbe8e2;--cardShadow:0 1px 3px rgba(20,50,42,.08),0 4px 14px rgba(20,50,42,.05);
+  --otcH:160;--otcS:55;--otcL:40;--iwH:210;--iwS:48;--iwL:44}
+.app[data-th="dark"]{--bg:#0d1512;--bg-soft:#151e1a;--card:#18221e;--surface-2:#1c2723;--surface-3:#212d28;
+  --text:#e8f0ec;--text-2:#a7c0b8;--muted:#7c968d;--border:#2a3833;--border-subtle:#222e29;
+  --accent:hsl(163 46% 46%);--accent-soft:hsl(163 37% 17%);--accent-ink:hsl(163 46% 68%);
+  --ringTrack:#2a3833;--cardShadow:none;--otcH:162;--otcS:46;--otcL:55;--iwH:210;--iwS:48;--iwL:60}
+
+/* ---- app header (like product) ---- */
+.hdr{position:sticky;top:0;z-index:20;background:var(--bg);padding:12px 14px 10px;border-bottom:1px solid var(--border-subtle)}
+.hdr .t{font-size:19px;font-weight:800;letter-spacing:-.3px;color:var(--text)}
+.hdr .s{font-size:12px;font-weight:600;margin-top:1px;color:var(--muted)}
+
+/* ---- TOP AREA (subject) ---- */
+.toparea{position:sticky;top:52px;z-index:15;background:var(--bg);padding:9px 0 8px;
+  display:flex;flex-direction:column;gap:var(--taGap);border-bottom:1px solid var(--border-subtle)}
+.bcrow{padding:0 14px}
+.bc{display:inline-flex;align-items:center;gap:6px;background:var(--surface-2);border:1px solid var(--border);
+  border-radius:var(--chipRad);padding:7px 12px;font:800 13px/1 var(--font);color:var(--text);cursor:pointer;
+  white-space:nowrap;max-width:calc(100% - 4px)}
+[data-th="dark"] .bc{background:var(--surface-3)}
+.bc .bc-c{color:var(--accent);font-weight:800;display:inline-block;transition:transform .22s ease}
+.bc.open .bc-c{transform:rotate(180deg)}
+.bc-save{font:700 10px/1 var(--font);color:var(--muted);margin-left:8px}
+.chiprow{display:flex;gap:var(--chipGap);overflow-x:auto;scroll-behavior:smooth;padding:0 14px 2px;
+  -webkit-overflow-scrolling:touch;scrollbar-width:none}
+.chiprow::-webkit-scrollbar{display:none}
+/* edge-fade affordance (hints horizontal scroll) — dynamic per overflow side */
+.chiprow.ov-r{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 32px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 32px),transparent)}
+.chiprow.ov-l{-webkit-mask-image:linear-gradient(90deg,transparent,#000 28px);mask-image:linear-gradient(90deg,transparent,#000 28px)}
+.chiprow.ov-l.ov-r{-webkit-mask-image:linear-gradient(90deg,transparent,#000 28px,#000 calc(100% - 32px),transparent);mask-image:linear-gradient(90deg,transparent,#000 28px,#000 calc(100% - 32px),transparent)}
+/* band-swap crossfade (місто ⇄ область у тій самій стрічці — без vert-push) */
+@keyframes bandin{from{opacity:0}to{opacity:1}}
+.chiprow.swap{animation:bandin .18s ease}
+/* sticky-collapse on scroll */
+.toparea.collapsed{gap:6px;padding-top:6px;padding-bottom:6px}
+.toparea.collapsed #cityrow,.toparea.collapsed .areapop,.toparea.collapsed .bc-save{display:none}
+.bc-scope{color:var(--muted);font-weight:700}
+.segrow{display:flex;gap:6px;padding:0 14px}
+.segrow .chip{flex:1;text-align:center;justify-content:center}
+.chip{flex:0 0 auto;height:var(--chipH);display:inline-flex;align-items:center;justify-content:center;
+  padding:0 var(--chipPadX);border-radius:var(--chipRad);border:1px solid var(--border);
+  background:linear-gradient(180deg,#ffffff,#eef4f1);color:var(--text-2);--pcs:var(--pcsCity,.95);--pdur:var(--pdurCity,90ms);
+  font:700 12.5px/1 var(--font);white-space:nowrap;cursor:pointer;box-shadow:0 1px 2px rgba(20,50,42,.07);
+  transition:transform var(--pdur) cubic-bezier(.4,0,.6,1),background .12s,color .12s,border-color .12s,box-shadow .12s}
+.chip.is-pressed{transform:scale(var(--pcs))}
+.chip.area{--pcs:var(--pcsArea,.93);--pdur:var(--pdurArea,120ms)}
+[data-th="dark"] .chip{background:linear-gradient(180deg,#26332d,#1e2924);box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
+.chip.on{background:linear-gradient(180deg,hsl(162 82% 31%),hsl(162 82% 26%));border-color:var(--accent);color:#fff;box-shadow:0 1px 3px rgba(13,110,90,.32)}
+[data-th="dark"] .chip.on{background:linear-gradient(180deg,hsl(163 46% 50%),hsl(163 46% 44%));color:#08120e;box-shadow:inset 0 1px 0 rgba(255,255,255,.16)}
+.srch{margin:0 14px;height:var(--searchH);display:flex;align-items:center;gap:9px;border-radius:12px;padding:0 12px;
+  background:color-mix(in srgb,var(--bg-soft) 82%,var(--card));border:1px solid var(--border);
+  box-shadow:inset 0 1px 2px rgba(20,50,42,.15),inset 0 0 0 1px rgba(20,50,42,.02)}
+[data-th="dark"] .srch{background:color-mix(in srgb,var(--card),#000 24%);
+  border:1px solid color-mix(in srgb,var(--border),#000 20%);
+  box-shadow:inset 0 2px 5px rgba(0,0,0,.55),inset 0 -1px 0 rgba(255,255,255,.12)}
+.srch .si{width:16px;height:16px;flex:0 0 auto;color:var(--muted);display:flex}
+.srch .si svg{width:100%;height:100%;display:block}
+.srch input{flex:1;border:0;background:transparent;color:var(--text);font:600 14px/1 var(--font);outline:none}
+.srch input::placeholder{color:var(--muted)}
+
+/* ---- card list (Node 7 context) ---- */
+.list{display:flex;flex-direction:column;gap:9px;padding:12px 14px 20px}
+.empty{padding:30px 14px;text-align:center;color:var(--muted);font:600 13px/1.5 var(--font)}
+.card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:12px;box-shadow:var(--cardShadow);
+  position:relative;overflow:hidden;display:grid;grid-template-columns:1fr auto;column-gap:12px;align-items:center}
+[data-th="dark"] .card{background:linear-gradient(180deg,#1a251f,#161f1b);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05),inset 0 -1px 0 rgba(0,0,0,.22)}
+.idcol{min-width:0}
+.addr{font-size:15px;font-weight:650;color:var(--text);line-height:1.22;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.city{font-size:12.5px;color:var(--muted);margin-top:2px}
+.tier{margin-top:7px;display:flex;gap:8px;align-items:center;font-size:12px;font-weight:600}
+.tier .dot{color:var(--muted);font-weight:400}
+.tier .otc{color:hsl(var(--otcH) calc(var(--otcS)*1%) calc(var(--otcL)*1%))}
+.tier .iw{color:hsl(var(--iwH) calc(var(--iwS)*1%) calc(var(--iwL)*1%))}
+.ring{position:relative;width:62px;height:62px;flex:0 0 auto}
+.ring svg{display:block}.ring circle{fill:none}
+.amid{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.newmark{font-size:25px;font-weight:300;color:var(--muted);line-height:1}
+
+/* ---- lever panel ---- */
+.panel{flex:0 0 auto;max-height:40dvh;overflow:auto;border-top:1px solid var(--hbd);background:var(--hpanel)}
+.panel.closed{max-height:34px;overflow:hidden}
+.ptog{width:100%;text-align:left;border:0;background:transparent;color:#b7c9c3;font:700 11px/1 var(--font);
+  padding:10px 12px;cursor:pointer;display:flex;align-items:center;gap:7px}
+.ptog::before{content:"▾";color:var(--hln)}
+.panel.closed .ptog::before{content:"▸"}
+.legr{font:600 10px/1.5 var(--font);color:var(--hln);margin:2px 12px 8px;padding:8px 10px;background:#0c1310;border:1px solid var(--hbd);border-radius:8px}
+.legr b{color:#bcd}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;padding:0 12px 12px}
+.lv{display:flex;flex-direction:column;gap:3px}
+.lv label{font:700 10px/1 var(--font);color:#9db3ab;display:flex;justify-content:space-between}
+.lv label b{color:#7fe3bf;font-weight:800}
+.lv input[type=range]{width:100%;accent-color:#2f9c7a}
+.copy{margin:0 12px 14px;width:calc(100% - 24px);border:0;background:#1f5f4d;color:#eafff6;font:800 12px/1 var(--font);padding:11px;border-radius:9px;cursor:pointer}
+</style></head>
+<body>
+<div class="wrap">
+  <div class="bar">
+    <div class="seg" id="segTh"><button data-th="light" class="on">☀ світла</button><button data-th="dark">☾ темна</button></div>
+    <div class="seg" id="segDev"><button data-dev="375" class="on">XS 375</button><button data-dev="393">15Pro 393</button></div>
+    <div class="seg" id="segLay"><button data-lay="A" class="on">L-A breadcrumb</button><button data-lay="B">L-B 2-свайп</button><button data-lay="C">L-C сегмент</button></div>
+    <div class="seg" id="segCol"><button data-col="1" class="on">collapse⬆ вкл</button><button data-col="0">викл</button></div>
+    <div class="vcost" id="vcost">▲ —px</div>
+    <div class="hint" id="hint"></div>
+  </div>
+
+  <div class="stage">
+    <div class="app" id="app" data-th="light">
+      <div class="hdr"><div class="t">Фармастор</div><div class="s">Мої аптеки</div></div>
+      <div class="toparea" id="toparea"></div>
+      <div class="list" id="list"></div>
+    </div>
+  </div>
+
+  <div class="panel" id="panel">
+    <button class="ptog" id="ptog">важелі / легенда</button>
+    <div class="legr" id="legr"></div>
+    <div class="grid" id="levs"></div>
+    <button class="copy" id="copy">📋 копі-конфіг</button>
+  </div>
+</div>
+
+<script>
+const PH=/*__PH__*/[{"px": "102520", "ar": "Дніпропетровська", "ci": "Новомосковськ", "ad": "вул.Гетьманська, 40А", "o": "B", "i": "C"}, {"px": "119016", "ar": "Дніпропетровська", "ci": "Новомосковськ", "ad": "вул.Гетьманська, 20. прим. 4", "o": "C", "i": "C"}, {"px": "121825", "ar": "Дніпропетровська", "ci": "Дніпро", "ad": "вул.Бандери Степана, 2", "o": "C", "i": "D"}, {"px": "125077", "ar": "Дніпропетровська", "ci": "Дніпро", "ad": "пл.Новокодацька, 2. прим. 4", "o": "C", "i": "D"}, {"px": "125396", "ar": "Дніпропетровська", "ci": "Дніпро", "ad": "вул.Робоча, 79А", "o": "B", "i": "D"}, {"px": "131595", "ar": "Дніпропетровська", "ci": "Дніпро", "ad": "вул.Сонячна Набережна, 2. ТЦ ВАВІЛОН", "o": "A", "i": "A"}, {"px": "140875", "ar": "Дніпропетровська", "ci": "Дніпро", "ad": "просп.Науки, 98. прим. 1", "o": "C", "i": "C"}, {"px": "142672", "ar": "Дніпропетровська", "ci": "Дніпро", "ad": "вул.Вернадського, 17", "o": "C", "i": "C"}, {"px": "155921", "ar": "Дніпропетровська", "ci": "Дніпро", "ad": "просп.Мазепи Івана, 34", "o": "A", "i": "B"}, {"px": "156405", "ar": "Полтавська", "ci": "Полтава", "ad": "вул.Сінна, 32", "o": "C", "i": "D"}, {"px": "156779", "ar": "Дніпропетровська", "ci": "Дніпро", "ad": "вул.Нижньодніпровська, 17. ТЦ Караван, тер. Слобожанського с/р, комплекс буд. та спор., 17", "o": "B", "i": "A"}, {"px": "292623", "ar": "Дніпропетровська", "ci": "Слобожанське", "ad": "вул.Нижньодніпровська, 17. ТЦ КАРАВАН, поряд з фонтаном, тер. Слобожанського с/р", "o": "A", "i": "C"}, {"px": "313224", "ar": "Дніпропетровська", "ci": "Дніпро", "ad": "пл.Вокзальна, 3", "o": "C", "i": "C"}, {"px": "370334", "ar": "Дніпропетровська", "ci": "Новомосковськ", "ad": "вул.Білої Зіни, 2", "o": "C", "i": "C"}, {"px": "391088", "ar": "Дніпропетровська", "ci": "Дніпро", "ad": "вул.Калинова, 82Б. прим. 5. Зупинка тролейбусу Образцова", "o": "C", "i": "D"}, {"px": "399503", "ar": "Дніпропетровська", "ci": "Дніпро", "ad": "просп.Лесі Українки, 19", "o": "C", "i": "C"}, {"px": "413981", "ar": "Дніпропетровська", "ci": "Підгородне", "ad": "Дніпропетровський р-н., м.Підгородне, вул.Шосейна, 74", "o": "B", "i": "C"}, {"px": "415907", "ar": "Дніпропетровська", "ci": "Дніпро", "ad": "просп.Хмельницького Богдана, 119. прим. 46", "o": "B", "i": "C"}, {"px": "576189", "ar": "Дніпропетровська", "ci": "Дніпро", "ad": "вул.Роторна, 21", "o": "B", "i": "D"}, {"px": "774506", "ar": "Дніпропетровська", "ci": "Дніпро", "ad": "вул.Набережна Перемоги, 86Д", "o": "A", "i": "B"}, {"px": "1017518", "ar": "Дніпропетровська", "ci": "Підгородне", "ad": "Дніпропетровський р-н., м.Підгородне, вул.Центральна, 48А", "o": "B", "i": "D"}, {"px": "1334586", "ar": "Дніпропетровська", "ci": "Дніпро", "ad": "просп.Поля Олександра, 104А. ТЦ Славутич", "o": "B", "i": "B"}, {"px": "1417730", "ar": "Дніпропетровська", "ci": "Дніпро", "ad": "просп.Слобожанський, 1Ж. на розі просп.Воронцова", "o": "C", "i": "C"}, {"px": "1576544", "ar": "Дніпропетровська", "ci": "Дніпро", "ad": "ж/м.Тополь-1, 15, корп.4. прим. 3", "o": "B", "i": "C"}, {"px": "1576606", "ar": "Дніпропетровська", "ci": "Дніпро", "ad": "вул.Коробова, 2. прим. 111", "o": "B", "i": "C"}, {"px": "1671849", "ar": "Дніпропетровська", "ci": "Павлоград", "ad": "вул.Преображенська, 5/63", "o": "C", "i": "D"}, {"px": "1684823", "ar": "Кіровоградська", "ci": "Знам'янка", "ad": "вул.Теліги Олени, 10Д", "o": "D", "i": "D"}, {"px": "1688723", "ar": "Дніпропетровська", "ci": "Дніпро", "ad": "вул.Арсенича Миколи, 10", "o": "C", "i": "D"}, {"px": "1984670", "ar": "Дніпропетровська", "ci": "Дніпро", "ad": "просп.Мазепи Івана, 53А", "o": "C", "i": "D"}, {"px": "1987660", "ar": "Дніпропетровська", "ci": "Дніпро", "ad": "просп.Героїв, 3", "o": "C", "i": "D"}, {"px": "1990317", "ar": "Полтавська", "ci": "Кременчук", "ad": "вул.Небесної Сотні, 54", "o": "C", "i": "C"}, {"px": "2035654", "ar": "Дніпропетровська", "ci": "Дніпро", "ad": "вул.Сонячна Набережна, 6. прим. 129", "o": "C", "i": "C"}, {"px": "2050798", "ar": "Полтавська", "ci": "Кременчук", "ad": "просп.Лесі Українки, 57", "o": "C", "i": "D"}, {"px": "2067015", "ar": "Дніпропетровська", "ci": "Новомосковськ", "ad": "вул.Гідності, 36", "o": "C", "i": "C"}, {"px": "2108722", "ar": "Дніпропетровська", "ci": "Дніпро", "ad": "вул.Семафорна, 26. прим. 14", "o": "C", "i": "D"}, {"px": "2204464", "ar": "Дніпропетровська", "ci": "Дніпро", "ad": "пров.Парусний, 14А", "o": "D", "i": "D"}, {"px": "2380728", "ar": "Кіровоградська", "ci": "Світловодськ", "ad": "вул.Грушевського Михайла, 12", "o": "C", "i": "C"}, {"px": "2443481", "ar": "Дніпропетровська", "ci": "Дніпро", "ad": "пров.Вільний, 3", "o": "C", "i": "C"}, {"px": "2496601", "ar": "Дніпропетровська", "ci": "Дніпро", "ad": "просп.Слобожанський, 73", "o": "C", "i": "C"}, {"px": "2536363", "ar": "Полтавська", "ci": "Полтава", "ad": "вул.Зіньківська, 6/1А. ТЦ Київ, 1-й поверх", "o": "B", "i": "B"}, {"px": "2686743", "ar": "Кіровоградська", "ci": "Світловодськ", "ad": "вул.Бойка Вадима, 4", "o": "C", "i": "D"}, {"px": "2846288", "ar": "Полтавська", "ci": "Кременчук", "ad": "вул.Соборна, 21", "o": "B", "i": "C"}, {"px": "2986396", "ar": "Дніпропетровська", "ci": "Новоолександрівка", "ad": "Дніпропетровський р-н., с.Новоолександрівка, вул.Гагаріна, 2Е", "o": "A", "i": "C"}, {"px": "3142839", "ar": "Кіровоградська", "ci": "Олександрія", "ad": "просп.Соборний, 11", "o": "C", "i": "C"}, {"px": "3224123", "ar": "Дніпропетровська", "ci": "Дніпро", "ad": "вул.Галицького Данила, 51. прим. 3", "o": "B", "i": "C"}, {"px": "3289104", "ar": "Дніпропетровська", "ci": "Дніпро", "ad": "просп.Хмельницького Богдана, 8. прим. 127Б", "o": "B", "i": "B"}, {"px": "3304030", "ar": "Полтавська", "ci": "Полтава", "ad": "вул.Шевченка Тараса, 31", "o": "C", "i": "D"}, {"px": "3379113", "ar": "Полтавська", "ci": "Кобеляки", "ad": "Кобеляцький р-н., м.Кобеляки, перех.Касьяна / 1-го Травня, 41/13", "o": "C", "i": "D"}, {"px": "3389815", "ar": "Дніпропетровська", "ci": "Царичанка", "ad": "Царичанський р-н., смт.Царичанка, вул.Першотравнева, 2. прим. 1", "o": "C", "i": "D"}, {"px": "3389956", "ar": "Дніпропетровська", "ci": "Дніпро", "ad": "вул.Незалежності, 11", "o": "C", "i": "D"}, {"px": "3389958", "ar": "Полтавська", "ci": "Зіньків", "ad": "Зіньківський р-н., м.Зіньків, вул.Воздвиженська, 49Д. Літ. А-2 поряд Кулиничі", "o": "C", "i": "D"}, {"px": "3403813", "ar": "Дніпропетровська", "ci": "Павлоград", "ad": "вул.Незалежності, 166. ТЦ Олімпія", "o": "C", "i": "D"}, {"px": "3499321", "ar": "Кіровоградська", "ci": "Олександрія", "ad": "вул.6-го Грудня, 137", "o": "C", "i": "D"}, {"px": "3593469", "ar": "Полтавська", "ci": "Кременчук", "ad": "вул.Соборна, 18/14", "o": "C", "i": "D"}, {"px": "3900392", "ar": "Дніпропетровська", "ci": "Новомосковськ", "ad": "вул.Гетьманська, 32Б", "o": "A", "i": "A"}, {"px": "3902664", "ar": "Дніпропетровська", "ci": "Дніпро", "ad": "просп.Поля Олександра, 59", "o": "B", "i": "C"}, {"px": "3902951", "ar": "Дніпропетровська", "ci": "Підгородне", "ad": "Дніпропетровський р-н., м.Підгородне, вул.Центральна, 2", "o": "A", "i": "C"}, {"px": "3902954", "ar": "Дніпропетровська", "ci": "Слобожанське", "ad": "Дніпропетровський р-н., смт.Слобожанське, вул.Сухомлинського Василя, 44", "o": "A", "i": "B"}, {"px": "3919580", "ar": "Дніпропетровська", "ci": "Дніпро", "ad": "шосе.Донецьке, 12Б", "o": "B", "i": "C"}, {"px": "3919583", "ar": "Дніпропетровська", "ci": "Дніпро", "ad": "просп.Науки, 171. прим. 23", "o": "C", "i": "D"}, {"px": "3988188", "ar": "Полтавська", "ci": "Полтава", "ad": "вул.Героїв ОУН, 26", "o": "B", "i": "B"}, {"px": "4387433", "ar": "Дніпропетровська", "ci": "Дніпро", "ad": "вул.Панікахи, 15", "o": "A", "i": "B"}, {"px": "20052701", "ar": "Кіровоградська", "ci": "Кропивницький", "ad": "вул.Коваленка Юрія, 2А", "o": "A", "i": "B"}];
+const AREAS=[]; PH.forEach(function(p){if(AREAS.indexOf(p.ar)<0)AREAS.push(p.ar);});
+const AREA_ABBR={'Дніпропетровська':'Дніпроп.','Полтавська':'Полтав.','Кіровоградська':'Кіровогр.'};
+function citiesOf(a){var s=[];PH.forEach(function(p){if(p.ar===a&&s.indexOf(p.ci)<0)s.push(p.ci);});
+  return s.sort(function(x,y){return x.localeCompare(y,'uk');});}
+function esc(s){return(''+s).replace(/&/g,'&amp;').replace(/</g,'&lt;');}
+
+var TH='light',DEV='375',LAY='A';
+var S={area:AREAS[0],city:'',q:'',picking:'city'};
+var CFG={chipH:30,chipGap:6,chipPadX:14,chipRad:10,searchH:40,taGap:8,pressCity:90,pressArea:88,pressDur:80};
+const PK='farmstore_area_demo';
+function loadArea(){try{var r=JSON.parse(localStorage.getItem(PK));if(r&&AREAS.indexOf(r.a)>=0)S.area=r.a;}catch(e){}}
+function saveArea(){try{localStorage.setItem(PK,JSON.stringify({a:S.area}));}catch(e){}}
+
+function ringEmpty(){var d=62,w=5,r=(d-w)/2,cx=d/2,st='transform:rotate(135deg);transform-origin:center';
+  return '<svg width="'+d+'" height="'+d+'"><circle cx="'+cx+'" cy="'+cx+'" r="'+r+'" pathLength="100" stroke="var(--ringTrack)" stroke-width="'+w+'" stroke-linecap="round" stroke-dasharray="75 100" style="'+st+'"/></svg>';}
+
+function filtered(){var q=S.q.trim().toLowerCase();
+  return PH.filter(function(p){
+    if(p.ar!==S.area)return false;
+    if(S.city&&p.ci!==S.city)return false;
+    if(q){var h=(p.ad+' '+p.ci+' '+p.px).toLowerCase();if(h.indexOf(q)<0)return false;}
+    return true;
+  });}
+
+function areaChips(){return AREAS.map(function(a){
+  return '<button class="chip area'+(a===S.area?' on':'')+'" data-area="'+esc(a)+'">'+(LAY==='C'?AREA_ABBR[a]:a)+'</button>';}).join('');}
+function cityChips(){var cs=citiesOf(S.area);
+  var all='<button class="chip'+(!S.city?' on':'')+'" data-city="">Всі</button>';
+  return all+cs.map(function(c){return '<button class="chip'+(c===S.city?' on':'')+'" data-city="'+esc(c)+'">'+esc(c)+'</button>';}).join('');}
+var SVG_SEARCH='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><circle cx="11" cy="11" r="7.2"/><path d="M20.5 20.5 16.2 16.2"/></svg>';
+function searchField(){return '<div class="srch"><span class="si">'+SVG_SEARCH+'</span><input id="q" placeholder="Пошук вулиці / Proxima…" value="'+esc(S.q)+'"></div>';}
+function bandChips(){return S.picking==='area'?areaChips():cityChips();}
+function breadcrumb(){
+  return '<div class="bcrow"><button class="bc" id="bc">'+esc(S.area)+' <span class="bc-c">▾</span></button></div>';}
+
+function renderTop(){
+  var t;
+  if(LAY==='A')t=breadcrumb()+'<div class="chiprow" id="cityrow">'+bandChips()+'</div>'+searchField();
+  else if(LAY==='B')t='<div class="chiprow" id="arearow">'+areaChips()+'</div><div class="chiprow" id="cityrow">'+cityChips()+'</div>'+searchField();
+  else t='<div class="segrow" id="arearow">'+areaChips()+'</div><div class="chiprow" id="cityrow">'+cityChips()+'</div>'+searchField();
+  document.getElementById('toparea').innerHTML=t;
+  bindTop();
+  edgeFade();
+  measure();
+}
+function cardHTML(p){
+  return '<div class="card"><div class="idcol"><div class="addr">'+esc(p.ad)+'</div>'+
+    (S.city?'':'<div class="city">'+esc(p.ci)+'</div>')+
+    '<div class="tier"><span class="otc">OTC '+esc(p.o)+'</span><span class="dot">·</span><span class="iw">IW '+esc(p.i)+'</span></div></div>'+
+    '<div class="rt"><div class="ring arcm">'+ringEmpty()+'<div class="amid"><span class="newmark">—</span></div></div></div></div>';
+}
+function renderList(){var f=filtered();
+  document.getElementById('list').innerHTML=f.length?f.map(cardHTML).join(''):'<div class="empty">Нічого не знайдено у «'+esc(S.area)+(S.city?' · '+esc(S.city):'')+'»</div>';}
+
+function bindTop(){
+  var cr=document.getElementById('cityrow');
+  if(cr)cr.addEventListener('click',function(e){var b=e.target.closest('.chip');if(!b)return;
+    if(b.hasAttribute('data-area')){ /* область-mode → вибір області */
+      S.area=b.getAttribute('data-area');S.city='';S.picking='city';saveArea();renderTop();renderList();
+    }else{ /* місто → in-place .on (scroll зберігається) */
+      [].forEach.call(cr.querySelectorAll('.chip'),function(c){c.classList.remove('on');});
+      b.classList.add('on');S.city=b.getAttribute('data-city');renderList();edgeRecalc();
+    }});
+  var ar=document.getElementById('arearow');
+  if(ar)ar.addEventListener('click',function(e){var b=e.target.closest('.chip');if(!b)return;
+    S.area=b.getAttribute('data-area');S.city='';saveArea();renderTop();renderList();});
+  var bc=document.getElementById('bc');
+  if(bc)bc.addEventListener('click',function(){
+    S.picking=S.picking==='area'?'city':'area';bc.classList.toggle('open',S.picking==='area');renderBand();});
+  var q=document.getElementById('q');
+  if(q)q.addEventListener('input',function(){S.q=q.value;renderList();});
+}
+function renderBand(){var row=document.getElementById('cityrow');if(!row)return;
+  row.innerHTML=bandChips();row.scrollLeft=0;
+  row.classList.remove('swap');void row.offsetWidth;row.classList.add('swap');
+  edgeRecalc();}
+var _edge=[];
+function edgeFade(){_edge=[];
+  [].forEach.call(document.querySelectorAll('.chiprow'),function(row){
+    function upd(){var l=row.scrollLeft>2,r=row.scrollLeft<row.scrollWidth-row.clientWidth-2;
+      row.classList.toggle('ov-l',l);row.classList.toggle('ov-r',r);}
+    row.addEventListener('scroll',upd,{passive:true});upd();_edge.push(upd);});}
+function edgeRecalc(){_edge.forEach(function(f){f();});}
+function measure(){var h=document.getElementById('toparea').offsetHeight;
+  document.getElementById('vcost').textContent='▲ '+h+'px chrome';}
+
+function applyCFG(){var a=document.getElementById('app');
+  a.style.setProperty('--chipH',CFG.chipH+'px');a.style.setProperty('--chipGap',CFG.chipGap+'px');
+  a.style.setProperty('--chipPadX',CFG.chipPadX+'px');a.style.setProperty('--chipRad',CFG.chipRad+'px');
+  a.style.setProperty('--searchH',CFG.searchH+'px');a.style.setProperty('--taGap',CFG.taGap+'px');
+  a.style.setProperty('--pcsCity',CFG.pressCity/100);a.style.setProperty('--pcsArea',CFG.pressArea/100);
+  a.style.setProperty('--pdurCity',CFG.pressDur+'ms');a.style.setProperty('--pdurArea',(CFG.pressDur+30)+'ms');}
+
+var LEVERS=[['chipH','chipH',24,44,1],['chipGap','chipGap',3,14,1],['chipPadX','chipPadX',8,20,1],
+  ['chipRad','chipRad',6,20,1],['searchH','searchH',32,52,1],['taGap','row-gap',4,16,1],
+  ['pressCity','city .0×',88,99,1],['pressArea','area .0×',88,99,1],['pressDur','durCity ms',60,160,5]];
+function buildLevs(){document.getElementById('levs').innerHTML=LEVERS.map(function(l){
+  return '<div class="lv"><label>'+l[1]+' <b id="o-'+l[0]+'">'+CFG[l[0]]+'</b></label>'+
+    '<input type="range" min="'+l[2]+'" max="'+l[3]+'" step="'+l[4]+'" value="'+CFG[l[0]]+'" data-k="'+l[0]+'"></div>';}).join('');
+  document.getElementById('levs').addEventListener('input',function(e){var k=e.target.getAttribute('data-k');if(!k)return;
+    CFG[k]=+e.target.value;document.getElementById('o-'+k).textContent=CFG[k];applyCFG();measure();edgeRecalc();});}
+
+function legend(){document.getElementById('legr').innerHTML=
+  '<b>v4 · L-A.</b> Тап <b>breadcrumb ▾</b> → стрічка перемикається місто⇄<b>область</b> у тому ж рядку (crossfade вбік, БЕЗ штовхання вниз). Вибір області → назад на міста. '+
+  'Вибір <b>міста</b> — <b>scroll зберігається</b> (обране лишається в полі зору). Область <b>свайпається</b> + edge-fade. '+
+  'Прес: місто/область (повзунки, device-lock .90/.88/80ms). Пошук=well. collapse⬆ — на примітку (зі scope знято).';}
+
+function render(){applyCFG();renderTop();renderList();}
+document.getElementById('segTh').addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;
+  [].forEach.call(this.children,function(c){c.classList.remove('on')});b.classList.add('on');
+  TH=b.getAttribute('data-th');document.getElementById('app').setAttribute('data-th',TH);});
+document.getElementById('segDev').addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;
+  [].forEach.call(this.children,function(c){c.classList.remove('on')});b.classList.add('on');
+  DEV=b.getAttribute('data-dev');document.getElementById('app').style.width=DEV+'px';measure();});
+document.getElementById('segLay').addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;
+  [].forEach.call(this.children,function(c){c.classList.remove('on')});b.classList.add('on');
+  LAY=b.getAttribute('data-lay');renderTop();renderList();});
+var COL=true,_col=false;
+document.getElementById('segCol').addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;
+  [].forEach.call(this.children,function(c){c.classList.remove('on')});b.classList.add('on');
+  COL=b.getAttribute('data-col')==='1';
+  if(!COL){document.getElementById('toparea').classList.remove('collapsed');_col=false;measure();}});
+document.querySelector('.stage').addEventListener('scroll',function(){
+  if(!COL)return;var want=this.scrollTop>44;
+  if(want!==_col){_col=want;document.getElementById('toparea').classList.toggle('collapsed',want);measure();}},{passive:true});
+document.getElementById('ptog').addEventListener('click',function(){document.getElementById('panel').classList.toggle('closed');});
+document.getElementById('copy').addEventListener('click',function(){
+  var t='TopArea CFG '+JSON.stringify(CFG)+' · layout=L-'+LAY+' · vcost='+document.getElementById('toparea').offsetHeight+'px';
+  if(navigator.clipboard)navigator.clipboard.writeText(t).catch(function(){});
+  var b=document.getElementById('copy');b.textContent='✓ '+t.slice(0,26)+'…';setTimeout(function(){b.textContent='📋 копі-конфіг';},1400);});
+
+/* pointer-driven press (iOS :active ненадійний у PWA) */
+document.addEventListener('pointerdown',function(e){var c=e.target.closest('.chip');if(c)c.classList.add('is-pressed');},{passive:true});
+function clrPress(){[].forEach.call(document.querySelectorAll('.chip.is-pressed'),function(c){c.classList.remove('is-pressed');});}
+document.addEventListener('pointerup',clrPress,{passive:true});
+document.addEventListener('pointercancel',clrPress,{passive:true});
+
+loadArea();buildLevs();legend();render();
+</script>
+</body></html>
