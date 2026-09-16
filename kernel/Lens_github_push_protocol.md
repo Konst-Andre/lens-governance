@@ -60,6 +60,11 @@ python3 Lens_claude_github_push.py --repo Konst-Andre/<репо> --branch <гі�
 # → мікроскоп пушу з виводу + віджет «Пушимо? PLAN-ID xxxxxx» → чекати «так»
 python3 Lens_claude_github_push.py ...той самий виклик... --confirm xxxxxx
 ```
+**Кінець ходу пушу (wsd `1.14`).** `--gov` — до dry-run, на локальному стані, що йде
+в коміт; підсумок ✓/⚠/✗ і дельта — у `--message`. Після `--confirm`, у тому ж ході:
+read-back кожного файла з репо, md5 = локальний; розбіжність → стоп і звіт.
+Без read-back пуш не завершений.
+
 Мердж гілки в `main` — кнопкою Konst на GitHub або окремим «так, у main» (тоді новий dry-run з `--main`).
 
 ## §6 Переїзд на інший акаунт Claude
