@@ -22,7 +22,7 @@
 
 ---
 
-**ЛОТОК: 13 записів.** *(2 готові A-записи + 3 покажчики + 8 покажчиків cheat-sheet S26)*
+**ЛОТОК: 14 записів.** *(2 готові A-записи + 3 покажчики + 8 покажчиків cheat-sheet S26 · + A105 HSO ✅ device-lock 16.09.2026, готовий до мерджу в том 5)*
 
 Останнє спорожнення — **KERNEL v2, 31.07.2026** (governance-сесія B, розпил Cookbook):
 
@@ -324,3 +324,82 @@ invalid at computed-value time → `initial` = 0. Лікується `max(0px, c
 тримається тут до device-вироку по вордмарку EquipLens; тоді переїжджає в том 1.
 
 *(Народилось: EquipLens S32, 31.08.2026. Повний контекст — `EquipLens_session_summary_S32_FONT.md` §3.)*
+
+---
+
+## A105 (cand.) · HSO — Haptic Switch Overlay: системний тик iOS у PWA через «свіч під пальцем» ✅
+**Цільовий том:** `Lens_iOS_cookbook_5_motion.md` (поруч із `A67` press · `A73` хіт-експандер)
+
+> ⏳ **ПАСПОРТ СВІЖОСТІ — читати ПЕРШИМ.** Патерн тримається на поведінці WebKit, а не на стандарті.
+> Apple вже раз закрила сусідній шлях (iOS 26.5). **Звірено: 16.09.2026.**
+> **Гейт перед портом:** якщо від дати звірки минуло >60 днів АБО вийшла нова мінорна iOS —
+> спершу web-перевірка (§Звірка), дату оновити тут. Протухлий запис не портується.
+
+**Тригер.** Хочу, щоб дискретний вибір у PWA на iPhone відчувався «нативно» — короткий
+тактильний тик при зміні таба, режиму, пункту меню. `navigator.vibrate()` на iOS не існує.
+
+**Механіка.** WebKit (iOS 18+) грає системний haptic, коли **палець користувача** перемикає
+справжній `<input type="checkbox" switch>`. HSO кладе такий switch невидимо на всю площу
+кнопки-хоста: дотик потрапляє в switch → iOS тикає → `click` спливає до наявних обробників хоста.
+
+**Що НЕ працює (анти).**
+| Шлях | Статус | Чому |
+|---|---|---|
+| програмний `label.click()` / `input.click()` (ios-haptics, use-haptic до 26.5) | 🔴 мертвий з iOS 26.5 | Apple прив'язала тик до реального дотику |
+| багатотактові патерни (confirm/error) | 🔴 з 26.5 грає лише перший тик | те саме |
+| `navigator.vibrate()` | 🔴 на iOS не реалізовано ніколи | — |
+| HSO над скролом, який палець тягне по горизонталі (стрічка чіпів) | 🔴 device-доведено QR B62 | switch перехоплює пан: чіп перевибирається замість скролу, «через раз»; `touch-action:pan-x` не лікує |
+| `appearance:none` на overlay | ⚠ не робити | тик належить нативному контролу |
+
+**Рішення (канон B62 rev2, ~25 рядків, без залежностей).**
+```css
+.hx{position:absolute;inset:0;width:100%;height:100%;margin:0;padding:0;opacity:0;z-index:2;
+    border-radius:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:pan-x pan-y}
+/* активний/обраний хост: зміни стану нема → тику нема, click проходить у кнопку */
+.nav-i.act>.hx,.seg.act>.hx,.menu-item.active>.hx{pointer-events:none}
+/* хостам без position — relative */
+```
+```js
+(function(){
+  var HX_HOSTS='…';                                   // ЄДИНИЙ перемикач обсягу
+  if(!('switch' in HTMLInputElement.prototype))return; // WebKit із switch
+  if(!matchMedia('(pointer:coarse)').matches)return;   // десктоп: DOM 0 змін
+  function arm(){document.querySelectorAll(HX_HOSTS).forEach(function(h){
+    if(h.lastElementChild&&h.lastElementChild.classList.contains('hx'))return;
+    var x=document.createElement('input');x.type='checkbox';x.setAttribute('switch','');
+    x.className='hx';x.tabIndex=-1;x.setAttribute('aria-hidden','true');h.appendChild(x);});}
+  arm();var busy=false;
+  new MutationObserver(function(){if(busy)return;busy=true;arm();busy=false;})
+    .observe(document.body,{childList:true,subtree:true}); // доставка в innerHTML-перебудови
+})();
+```
+
+**Де доречно (принцип).** Тик = підтвердження **дискретної свідомої зміни стану** або рідкої
+дії з видимим пресом. **Не** на drill у скролі, не на серійні тапи (стрілки каруселі), не над
+горизонтальним скролом. Гард активного обов'язковий — повтор без зміни мовчить.
+Нагадка: нативний UITabBar сам тику не дає — HSO на табах є свідомим доповненням, не «як у системі».
+
+**Інтеграція без конфліктів.** Хост лишається власником логіки (делегація через `closest`,
+inline `onclick` — обидва працюють, бо input — дитина). Анімації іконок вішати на svg-дитину,
+не на хост; overlay без transform → не б'ється з WAAPI/keyframes.
+
+**Edge cases.** Потрібен iPhone 7+ і Налаштування → Звуки → «System Haptics» увімкнено ·
+iPad тику не має · iOS 17.4–17.x: switch є, тику нема (мовчки, нешкідливо) · input усередині
+`<button>` формально невалідна вкладеність — на WebKit device-підтверджено робочим (XS iOS18);
+фолбек, якщо колись зламається: overlay-сиблінги в контейнері хоста.
+
+**Звірка (що перевіряти при гейті свіжості).**
+1. Чи працює прямий дотик до `input switch` на поточній iOS (живе демо `webkit.org/demos/html-switch/`).
+2. GitHub `m1ckc3s/project-fathom` і `tijnjh/ios-haptics` README — нові застереження про патчі.
+3. WebKit release notes Safari — згадки `switch` / haptic.
+4. Device: одна кнопка з HSO у встановленому PWA на найновішій iOS тестової бази.
+
+**Статус device — LOCK 16.09.2026 (Konst).** ✅ iPhone XS iOS 18 · ✅ iPhone 15 Pro iOS 26.6+
+(мінорна точно не зафіксована, **пізніша за патч 26.5**) — у Safari, у встановленому PWA і в
+прев'ю-пісочниці Claude. Хости rev2: таби · пункти теми · сегмент · рядки SR · SR-pill ·
+Фільтри · «Перейти до аптек» — усі ✅. Скрол і прес Area-чіпів після зняття HSO — як до B62 ✅.
+❌ стрічка чіпів (rev1) — доказ анти-рядка вище.
+Поріг `12.11` пройдено → мерджити в том 5 найближчим проходом.
+
+**Провенанс.** QR Lens B62 rev1/rev2, 16.09.2026 (research WebKit/GitHub + device Konst).
+Файли: `QR_Lens_preview_batch62_haptic_v2.html`, `b62_haptic_apply_v2.py`.
