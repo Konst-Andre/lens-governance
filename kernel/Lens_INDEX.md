@@ -91,6 +91,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 | 5 | `<Product>_MASTER_LOCK.md` + релевантні `*_valuesLOCK.md` | якщо торкаємось локнутого компонента |
 | 6 | `Work_Standard_HISTORY.md` | **лише** якщо правило посилається на `14.x` і треба контекст |
 | `Lens_excel_protocol.md` | Excel-протокол: Power Query (5.x) + HTML/VBA sync (6.x). **Scope: KPI Lens / QR Lens.** Виселено з wsd 13.08.2026 (v2.29), нумерація не мінялась |
+| `Lens_github_push_protocol.md` | Запис у GitHub із чату Claude (П-GH1): токен, запобіжник у 4 шари, переїзд між акаунтами. **Читати точково** — коли задача пише в репо. Заведено 16.09.2026 |
 
 ---
 
@@ -161,6 +162,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 | `StockCheck_b27_jsdom_matrix.js` | jsdom-матриця b27 (CTA sweep + тост), 34 твердження |
 | `StockCheck_icon_gen.py` | генератор іконок PWA з локнутого гліфа |
 | `Lens_validate.py` | гейт-скрипт: `--gov` (G1–G6 governance) · `--html <file>` (H1–H4 білд) |
+| `Lens_claude_github_push.py` | пуш з чату одним атомарним комітом; двоходовий запобіжник `--dry-run` → `--confirm PLAN-ID`; без видалень і force-push (протокол `Lens_github_push_protocol.md`) |
 
 ---
 
