@@ -179,9 +179,9 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 
 | буфер | канон-ціль | стан |
 |---|---|---|
-| `Lens_cookbook_delta_running.md` | Cookbook | 🟡 **12 записів** (1 повний + 3 покажчики + 8 покажчиків cheat-sheet, S26 27.08.2026) |
-| `Lens_stagebench_delta_running.md` | `Lens_stagebench_manifest.md` | 🔴 **12 записів** (Д-А…Д-І; ⚠ стеля 2–3 сесії прострочена з 13.08.2026) |
-| `wsd_delta_running.md` *(фізично `kernel/wsd/`, **не** `kernel/`)* | `Work_Standard.md` | 🔴 **фактично 10** (заміряно 03.09.2026 після мерджу `1.15`; попереднє «6» тут протухло — рахувало не всі). ⚠ Шапка самого буфера тримає «ЛОТОК: 6» **свідомо** — це доказ для `IDX-6`, тому `G11` червоний навмисно. Стеля 2–3 сесії прострочена |
+| `Lens_cookbook_delta_running.md` | Cookbook | 🔴 **17 записів** (заміряно 17.09.2026, G-A; `G11` ✓) · злиття — G-D |
+| `Lens_stagebench_delta_running.md` | `Lens_stagebench_manifest.md` | 🔴 **15 записів** (Д-А…Д-М; заміряно 17.09.2026, G-A; `G11` ✓; ⚠ стеля 2–3 сесії прострочена з 13.08.2026) · злиття — G-B |
+| `wsd_delta_running.md` *(фізично `kernel/wsd/`, **не** `kernel/`)* | `Work_Standard.md` | 🔴 **10 записів** (заміряно 17.09.2026, G-A; шапку зведено з фактом — `IDX-6` закрито, `G11` ✓). Стеля 2–3 сесії прострочена · злиття — G-C |
 
 **Правило:** буфер — не архів. Лежить довше 2–3 сесій → мерджити як є.
 
