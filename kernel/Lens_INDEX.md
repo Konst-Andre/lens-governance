@@ -288,7 +288,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 | **EquipLens** | `EquipLens_session_summary_S31_HEAD_LEVERS.md` · `EquipLens_session_summary_S30_SCALE_VERDICT.md` *(S13…S29 витіснені)* |
 | **PharmaLens** | `PharmaLens_session_summary_S1_FOUNDATION.md` *(продукт заморожено — чекає `.pptx` від Олі; єдине самері, стеля не задіяна)* |
 | **KPI Lens** | `KPI_Lens_session_summary_Batch15_2.md` |
-| **Lens** *(governance)* | `Lens_governance_session_summary_GB3_ZLYTTIA_V.md` · `Lens_governance_session_summary_GA_BUFERY.md` *(G_MASKA · F_CHERGA_PLAN · GB_TRIAZH · GB2_ZLYTTIA_B витіснені 17.09.2026)* |
+| **Lens** *(governance)* | `Lens_governance_session_summary_GC3_PUSH_ARCHIV.md` *(GA · GB_TRIAZH · GB2 · GB3 · GC1 · GC2a · GC2b · GH1 витіснені 17.09.2026 → `archive/summaries/Lens_gov/`)* |
 | **Фармастор** | `АРХІВ-УСІ` — продукт перейменовано на StockCheck; канон живе у `Фармастор_v2_MASTER_LOCK.md` і `Фармастор_v2_PORT_REGISTER.md`, самері не потрібні жодні |
 
 > ⚠ **Звірено скриптом 30.08.2026 — таблиця протухла по ТРЬОХ продуктах одночасно,
@@ -486,7 +486,7 @@ Project під час розмови в GitHub не ходить: він три�
 запиту до системи, яка може не відповісти**.
 
 **Тригер переїзду** — рядок «живе доки» (wsd 1.8) вичерпався:
-буфер змерджено → ПК · самері випало з §5 → ПК · канон-файл розпиляно → репо `archive/`.
+буфер змерджено → ПК · самері випало з §5 → репо `archive/summaries/` (`gov 1.14`) · канон-файл розпиляно → репо `archive/`.
 
 **Детектор (К2).** Не тримати цей маршрут у голові: гейти рахують його самі —
 **G10** називає самері на виселення, **G7** ловить буфер, що пережив ціль,

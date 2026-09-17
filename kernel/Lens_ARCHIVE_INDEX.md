@@ -214,6 +214,49 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 - `EquipLens_session_summary_S11_SPLIT_GLASSKIT.md` — 33 світлі значення шейдингу запечені, `LOCK_MIGRATE`, 5 зовнішніх Liquid Glass репо; тексти влиті в Cookbook `A91`–`A102`
 - `EquipLens_session_summary_S12_GOVERNANCE_DRAIN.md` — черга 26 записів, вичерпана в S13
 
+### `archive/summaries/Lens_gov/` — 39 файлів *(заведено G-C3 17.09.2026; шлях з підтекою — raw без `Lens_gov/` дає 404; лічильник «Разом» нижче і §2 «плоско» не перераховані — `IDX-13`)*
+
+- `Lens_session_summary_governance_A.md` · governance A (31.07)
+- `Lens_session_summary_governance_B.md` · governance B
+- `Lens_session_summary_governance_C.md` · governance C
+- `Lens_session_summary_governance_D.md` · governance D
+- `Lens_session_summary_governance_E.md` · governance E — лежав без рядка (§3 «втрачений»), закрито G-C3
+
+- `Lens_governance_session_summary_GA_BUFERY.md` · 17.09.2026 · Lens governance · G-A: шапки буферів = факт, IDX-6 · §0 підхоплено G-B
+- `Lens_governance_session_summary_GB_TRIAZH.md` · 17.09.2026 · Lens governance · G-B: тріаж stagebench-буфера · §0 підхоплено G-B2
+- `Lens_governance_session_summary_GB2_ZLYTTIA_B.md` · 17.09.2026 · Lens governance · G-B2: злиття груп Б1/Б2 у manifest · §0 закрито G-B3
+- `Lens_governance_session_summary_GB3_ZLYTTIA_V.md` · 17.09.2026 · Lens governance · G-B3: група В, stagebench-буфер 0 · §0 закрито G-C
+- `Lens_governance_session_summary_GC1_ZLYTTIA_WSD.md` · 17.09.2026 · Lens governance · G-C1: злиття wsd-буфера, групи А/Б/В · G-C запушено 6b9943f
+- `Lens_governance_session_summary_GC2a_HRUPA_G.md` · 17.09.2026 · Lens governance · G-C2a: група Г; §2 — повні тексти G16-1 · Г-13 (на нього посилається CHERGA, доступ — рівень 3 драбини §8) · G-C запушено 6b9943f
+- `Lens_governance_session_summary_GC2b_FINAL_AUDYT.md` · 17.09.2026 · Lens governance · G-C2b: фінал злиття + аудит зв'язності; §2 — повний текст К3-1 · G-C запушено 6b9943f, §0 закрито G-C3
+- `Lens_session_summary_GH1_PUSH_Z_CHATU.md` · 17.09.2026 · Lens governance · GH1: протокол П-GH1, пуш з чату · гілку змерджено, B63 стартував
+- `GA_step2_texts_v1.md` · 17.09.2026 · Lens governance · G-A: тексти вставок В1–В9 · влиті скриптом
+- `GB_triage_v1.md` · 17.09.2026 · Lens governance · G-B: таблиця тріажу · злиття виконано
+- `GB2_groupB1_texts_v1.md` · 17.09.2026 · Lens governance · G-B2: тексти Б1 · влиті й пушені
+- `GB2_groupB2_texts_v1.md` · 17.09.2026 · Lens governance · G-B2: тексти Б2 · влиті й пушені
+- `GB3_DA_texts_v1.md` · 17.09.2026 · Lens governance · G-B3: тексти Д-А · влиті й пушені
+- `GB3_DB_texts_v1.md` · 17.09.2026 · Lens governance · G-B3: тексти Д-Б · влиті й пушені
+- `GB3_DK_texts_v1.md` · 17.09.2026 · Lens governance · G-B3: тексти Д-К · влиті й пушені
+- `ga_step1_g11_v1.py` · 17.09.2026 · Lens governance · пакет G-A: G11 · залито в репо
+- `ga_step2_insert_v1.py` · 17.09.2026 · Lens governance · пакет G-A: вставки за якорями · залито в репо
+- `ga_step4_index_cherga_v1.py` · 17.09.2026 · Lens governance · пакет G-A: INDEX/CHERGA · залито в репо
+- `g11hist.py` · 17.09.2026 · Lens governance · G-A: історія G11 (закриття IDX-6) · IDX-6 закрито
+- `gb_step1b_triage_v1.py` · 17.09.2026 · Lens governance · пакет G-B: тріаж · злиття виконано
+- `gb_step2A_merge_v1.py` · 17.09.2026 · Lens governance · пакет G-B2: група А · пушено
+- `gb2_step1B1_merge_v1.py` · 17.09.2026 · Lens governance · пакет G-B2: Б1 · пушено
+- `gb2_step1B2_merge_v1.py` · 17.09.2026 · Lens governance · пакет G-B2: Б2 · пушено
+- `gb3_step1A_merge_v1.py` · 17.09.2026 · Lens governance · пакет G-B3: А · пушено f4decb7
+- `gb3_step1B_merge_v1.py` · 17.09.2026 · Lens governance · пакет G-B3: Б · пушено f4decb7
+- `gb3_step1C_merge_v1.py` · 17.09.2026 · Lens governance · пакет G-B3: В · пушено f4decb7
+- `gb3_step1D_addr_v1.py` · 17.09.2026 · Lens governance · пакет G-B3: літерні адреси · пушено f4decb7
+- `gb3_step2_index_v1.py` · 17.09.2026 · Lens governance · пакет G-B3: INDEX · пушено f4decb7
+- `gc_step1A_wsd_v1.py` · 17.09.2026 · Lens governance · пакет G-C: група А · пушено 6b9943f
+- `gc_step1B_wsd_v1.py` · 17.09.2026 · Lens governance · пакет G-C: група Б · пушено 6b9943f
+- `gc_step1B2_s32ref_v1.py` · 17.09.2026 · Lens governance · пакет G-C: s32-посилання · пушено 6b9943f
+- `gc_step1V_wsd_v1.py` · 17.09.2026 · Lens governance · пакет G-C: група В · пушено 6b9943f
+- `gc_step1G_wsd_v1.py` · 17.09.2026 · Lens governance · пакет G-C: група Г · пушено 6b9943f
+- `gc_step2_final_v1.py` · 17.09.2026 · Lens governance · пакет G-C: фінал (wsd 2.35, Z_REGISTR, CHERGA, INDEX) · пушено 6b9943f
+
 ### `archive/stands/` — 28 файлів
 
 - `Dinamika_colhead_bench_v2.html`
