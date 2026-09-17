@@ -214,7 +214,7 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 - `EquipLens_session_summary_S11_SPLIT_GLASSKIT.md` — 33 світлі значення шейдингу запечені, `LOCK_MIGRATE`, 5 зовнішніх Liquid Glass репо; тексти влиті в Cookbook `A91`–`A102`
 - `EquipLens_session_summary_S12_GOVERNANCE_DRAIN.md` — черга 26 записів, вичерпана в S13
 
-### `archive/summaries/Lens_gov/` — 44 файлів *(заведено G-C3 17.09.2026; шлях з підтекою — raw без `Lens_gov/` дає 404; лічильник «Разом» нижче і §2 «плоско» не перераховані — `IDX-13`)*
+### `archive/summaries/Lens_gov/` — 56 файлів *(заведено G-C3 17.09.2026; шлях з підтекою — raw без `Lens_gov/` дає 404; лічильник «Разом» нижче і §2 «плоско» не перераховані — `IDX-13`)*
 
 - `Lens_session_summary_governance_A.md` · governance A (31.07)
 - `Lens_session_summary_governance_B.md` · governance B
@@ -261,6 +261,18 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 - `gc3_step1_archive_v1.py` · 17.09.2026 · Lens governance · пакет G-C3: архів 34 файлів + INDEX/CHERGA/ARCHIVE_INDEX · пушено 73ff3e4
 - `gd_step1_merge_v2.py` · 17.09.2026 · Lens governance · пакет G-D: 5 записів буфера → томи 3/4/5 + Cookbook INDEX §2/§3 · пушено 6b08c83
 - `gd_step2_prune_v2.py` · 17.09.2026 · Lens governance · пакет G-D: прополка cookbook-буфера + INDEX §4 + CHERGA `IDX-12` · пушено 6b08c83
+- `Lens_governance_session_summary_GE_K2_PILOT.md` · 17.09.2026 · Lens governance · G-E: пілот К2-1 на gov-протоколі (0/12 ✅), шаблон вироку GE2 §1; §2 — Ф-8 (пастка підрядка G10) · Ф-9 · пушено 3a8a36a/b5e3f5c/e53824f, §0 закрито G-F, в архів G-G
+- `GE2_k2_gov_texts_v1.md` · 17.09.2026 · Lens governance · G-E: тексти вироків gov-протоколу + §1 шаблон, §4 G16-1 · влиті b5e3f5c
+- `ge_step1_archive_v1.py` · 17.09.2026 · Lens governance · пакет G-E: архів GC3 + gc3_step1 · пушено 3a8a36a
+- `ge_step3_k2gov_v1.py` · 17.09.2026 · Lens governance · пакет G-E: К2-1 gov-протокол 5/12 → 0/12 · пушено b5e3f5c
+- `ge_step4_cherga_v1.py` · 17.09.2026 · Lens governance · пакет G-E: CHERGA К2-1 + G16-1 · пушено e53824f
+- `GF2_k2_wsd_texts_v1.md` · 17.09.2026 · Lens governance · G-F: тексти вироків wsd група 1 · влиті 6bc28f5
+- `GF5_k2_wsd_texts_v1.md` · 17.09.2026 · Lens governance · G-F: тексти вироків wsd група 2 · влиті 3ef4dd0
+- `gf_step1_archive_v1.py` · 17.09.2026 · Lens governance · пакет G-F: архів GD + gd_step1/2 · пушено f35a2e7
+- `gf_step3_k2wsd_v1.py` · 17.09.2026 · Lens governance · пакет G-F: К2-1 wsd група 1 (36/68) · пушено 6bc28f5
+- `gf_step4_cherga_v1.py` · 17.09.2026 · Lens governance · пакет G-F: CHERGA К2-1 36→27 · пушено 139e173
+- `gf_step5_k2wsd_v1.py` · 17.09.2026 · Lens governance · пакет G-F: К2-1 wsd група 2 (27/68) · пушено 3ef4dd0
+- `gf_step6_cherga_v1.py` · 17.09.2026 · Lens governance · пакет G-F: CHERGA К2-1 27→18 · пушено 3a9715a
 
 ### `archive/stands/` — 28 файлів
 
