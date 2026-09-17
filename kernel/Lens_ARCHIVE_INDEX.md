@@ -214,7 +214,7 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 - `EquipLens_session_summary_S11_SPLIT_GLASSKIT.md` — 33 світлі значення шейдингу запечені, `LOCK_MIGRATE`, 5 зовнішніх Liquid Glass репо; тексти влиті в Cookbook `A91`–`A102`
 - `EquipLens_session_summary_S12_GOVERNANCE_DRAIN.md` — черга 26 записів, вичерпана в S13
 
-### `archive/summaries/Lens_gov/` — 56 файлів *(заведено G-C3 17.09.2026; шлях з підтекою — raw без `Lens_gov/` дає 404; лічильник «Разом» нижче і §2 «плоско» не перераховані — `IDX-13`)*
+### `archive/summaries/Lens_gov/` — 63 файли *(заведено G-C3 17.09.2026; шлях з підтекою — raw без `Lens_gov/` дає 404; лічильник «Разом» нижче і §2 «плоско» не перераховані — `IDX-13`)*
 
 - `Lens_session_summary_governance_A.md` · governance A (31.07)
 - `Lens_session_summary_governance_B.md` · governance B
@@ -273,6 +273,13 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 - `gf_step4_cherga_v1.py` · 17.09.2026 · Lens governance · пакет G-F: CHERGA К2-1 36→27 · пушено 139e173
 - `gf_step5_k2wsd_v1.py` · 17.09.2026 · Lens governance · пакет G-F: К2-1 wsd група 2 (27/68) · пушено 3ef4dd0
 - `gf_step6_cherga_v1.py` · 17.09.2026 · Lens governance · пакет G-F: CHERGA К2-1 27→18 · пушено 3a9715a
+- `Lens_governance_session_summary_GF_K2_WSD12.md` · 18.09.2026 · Lens governance · G-F: К2-1 wsd 18/68 (дві групи вироків); §2 — Ф-6 сегмент правила · Ф-7 · пушено 6bc28f5/3ef4dd0/3a9715a, §0 закрито G-G, в архів G-H
+- `GG2_k2_wsd_texts_v1.md` · 18.09.2026 · Lens governance · G-G: тексти вироків wsd група 1 · влиті 818bf18
+- `GG5_k2_wsd_texts_v1.md` · 18.09.2026 · Lens governance · G-G: тексти вироків wsd група 2 · влиті 818bf18
+- `gg_step1_archive_v1.py` · 18.09.2026 · Lens governance · пакет G-G: архів GE + пакети G-E/G-F · пушено 818bf18
+- `gg_step3_k2wsd_v1.py` · 18.09.2026 · Lens governance · пакет G-G: К2-1 wsd група 1 · пушено 818bf18
+- `gg_step5_k2wsd_v1.py` · 18.09.2026 · Lens governance · пакет G-G: К2-1 wsd група 2, `G16` по wsd → ✓ · пушено 818bf18
+- `gg_step6_cherga_v1.py` · 18.09.2026 · Lens governance · пакет G-G: CHERGA К2-1 закрито, +К4-1/К5-1/G3-1 · пушено 818bf18
 
 ### `archive/stands/` — 28 файлів
 

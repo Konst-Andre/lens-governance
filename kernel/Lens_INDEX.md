@@ -252,7 +252,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 **Що це.** Єдиний адресований носій **відкритого** по продукту: рядок = покажчик + вік,
 повний текст лишається там, де народився. Живе в `products/<Продукт>/`, читається
 **цілком** на старті кожної сесії, **не має редакцій** — правиться на місці.
-**Стеля 8 KB** — число канонічне тут, решта файлів посилається (`IDX-10`).
+**Стеля 8 192 B (8 KiB)** — число канонічне **тут**, решта файлів посилається і не переказує (`12.20`). Детектор — `kernel/check_cherga.py`, константа `CEIL`; звірено 18.09.2026 (G-H, вирок Konst). Проза «8 KB» читалась і як 8 000, і як 8 192 — саме це закривало `IDX-10`.
 
 **Чому окремим файлом, а не розділом супутника.** Носій черги був — супутник (`Г-8`).
 Він відмовив не тому, що правило погане, а тому, що виріс до 105 KB і набрав **чотири**
@@ -288,7 +288,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 | **EquipLens** | `EquipLens_session_summary_S31_HEAD_LEVERS.md` · `EquipLens_session_summary_S30_SCALE_VERDICT.md` *(S13…S29 витіснені)* |
 | **PharmaLens** | `PharmaLens_session_summary_S1_FOUNDATION.md` *(продукт заморожено — чекає `.pptx` від Олі; єдине самері, стеля не задіяна)* |
 | **KPI Lens** | `KPI_Lens_session_summary_Batch15_2.md` |
-| **Lens** *(governance)* | `Lens_governance_session_summary_GF_K2_WSD12.md` *(GA · GB_TRIAZH · GB2 · GB3 · GC1 · GC2a · GC2b · GH1 · GC3 · GD · GE витіснені 17.09.2026 → `archive/summaries/Lens_gov/`)* |
+| **Lens** *(governance)* | `Lens_governance_session_summary_GG_K2_ZAKRYTO.md` *(GF витіснено 18.09.2026 сесією G-H; GA…GE — 17.09.2026 → `archive/summaries/Lens_gov/`)* |
 | **Фармастор** | `АРХІВ-УСІ` — продукт перейменовано на StockCheck; канон живе у `Фармастор_v2_MASTER_LOCK.md` і `Фармастор_v2_PORT_REGISTER.md`, самері не потрібні жодні |
 
 > ⚠ **Звірено скриптом 30.08.2026 — таблиця протухла по ТРЬОХ продуктах одночасно,
