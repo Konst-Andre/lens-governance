@@ -115,7 +115,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 ### Протокол
 | файл | що в ньому |
 |---|---|
-| `Work_Standard.md` | правила роботи. Кластери 1–13. **v2.31** — governance-частина виїхала (нижче) |
+| `Work_Standard.md` | правила роботи. Кластери 1–13. Версія — у шапці файла (`12.20`); governance-частина виїхала в розпилі S14 (нижче) |
 | `Lens_governance_protocol.md` | **як ведеться сам канон**: К1/К2 · `1.14` · `12.6` `12.7` `12.8` `12.10` `12.11` `12.12` `12.15`–`12.19`. Розпил 24.08.2026 (EquipLens S14). У `wsd` на цих номерах — маршрутні рядки, старі посилання дійсні |
 | `Work_Standard_HISTORY.md` | changelog усіх версій + Кластер 14 «Прецеденти» (14.1–14.21) + Кластер 15 |
 
@@ -161,7 +161,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 | `StockCheck_maint_jsdom_matrix.js` | jsdom-матриця блоку «Обслуговування», 61 твердження |
 | `StockCheck_b27_jsdom_matrix.js` | jsdom-матриця b27 (CTA sweep + тост), 34 твердження |
 | `StockCheck_icon_gen.py` | генератор іконок PWA з локнутого гліфа |
-| `Lens_validate.py` | гейт-скрипт: `--gov` (G1–G6 governance) · `--html <file>` (H1–H4 білд) |
+| `Lens_validate.py` | гейт-скрипт: `--gov` (G1–G13 · G16 governance; номери — §5 «Стан номерів гейтів») · `--html <file>` (H1–H4 білд) |
 | `Lens_claude_github_push.py` | пуш з чату одним атомарним комітом; двоходовий запобіжник `--dry-run` → `--confirm PLAN-ID`; без видалень і force-push (протокол `Lens_github_push_protocol.md`) |
 
 ---
@@ -181,7 +181,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 |---|---|---|
 | `Lens_cookbook_delta_running.md` | Cookbook | 🔴 **17 записів** (заміряно 17.09.2026, G-A; `G11` ✓) · злиття — G-D |
 | `Lens_stagebench_delta_running.md` | `Lens_stagebench_manifest.md` | 🟢 **порожній** (G-B3 17.09.2026, `G11` ✓) · злиття G-B завершено: група А → §8.7-д · §8.12 · §8.14–§8.17 · Б → §8.10 · §8.11 · §8.13 · §8.18 · §6-а · §6-б · В → §6 · §8.9 · §2-п.7 |
-| `wsd_delta_running.md` *(фізично `kernel/wsd/`, **не** `kernel/`)* | `Work_Standard.md` | 🔴 **10 записів** (заміряно 17.09.2026, G-A; шапку зведено з фактом — `IDX-6` закрито, `G11` ✓). Стеля 2–3 сесії прострочена · злиття — G-C |
+| `wsd_delta_running.md` *(фізично `kernel/wsd/`, **не** `kernel/`)* | `Work_Standard.md` | 🟢 **порожній** (G-C2b 17.09.2026, `G11` ✓) · злиття G-C завершено: А погашено `Г-8` `Г-12` · Б → `1.19-б` · `2.13` · `2.14` · В → `1.20` · `2.15` · `4.5` · Г → `12.1-б` · `1.17-б` · gov `12.19-б` |
 
 **Правило:** буфер — не архів. Лежить довше 2–3 сесій → мерджити як є.
 
@@ -265,11 +265,11 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 Пункт переїжджає з CHERGA у LOCK у момент device-вироку і **зникає з черги**.
 Рядок, що стоїть в обох, — дефект.
 
-⚠ **Стан номерів гейтів** (звірено грепом `Lens_validate.py` 31.08.2026).
+⚠ **Стан номерів гейтів** (звірено грепом `Lens_validate.py` 17.09.2026, G-C2b).
 Написані: `G1`–`G13`, `G16`. **Зарезервовані без коду: `G14` (черги продуктів) ·
 `G15` (протухання §5)** — індекс обіцяє машинну перевірку, якої не існує; борг `IDX-9`.
-Перший вільний номер — **`G17`**. Буфер `Г-10` претендує на `G12`, а `G12` зайнятий
-(файли-мости) — колізію розвести (`Г-12'`).
+Заявки без коду: `G17` — детектор черг (`IDX-11`) · `G18` — кандидат детектора `1.19-б`.
+Перший вільний номер — **`G19`**. Колізію `Г-10`/`G12` розведено G-C (`Г-12'` закрито).
 
 ### Черга ядра — `kernel/Lens_governance_CHERGA.md`
 
