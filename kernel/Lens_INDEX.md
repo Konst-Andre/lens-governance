@@ -179,7 +179,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 
 | буфер | канон-ціль | стан |
 |---|---|---|
-| `Lens_cookbook_delta_running.md` | Cookbook | 🔴 **17 записів** (заміряно 17.09.2026, G-A; `G11` ✓) · злиття — G-D |
+| `Lens_cookbook_delta_running.md` | Cookbook | 🟡 **12 записів** (G-D 17.09.2026: 5 змерджено в томи 3/4/5; `G11` ✓) · решта заблоковані: `A103` · `A**nn**` · `К-1`…`К-8` device✗ · `З-37`/`З-40` → `Г-11` |
 | `Lens_stagebench_delta_running.md` | `Lens_stagebench_manifest.md` | 🟢 **порожній** (G-B3 17.09.2026, `G11` ✓) · злиття G-B завершено: група А → §8.7-д · §8.12 · §8.14–§8.17 · Б → §8.10 · §8.11 · §8.13 · §8.18 · §6-а · §6-б · В → §6 · §8.9 · §2-п.7 |
 | `wsd_delta_running.md` *(фізично `kernel/wsd/`, **не** `kernel/`)* | `Work_Standard.md` | 🟢 **порожній** (G-C2b 17.09.2026, `G11` ✓) · злиття G-C завершено: А погашено `Г-8` `Г-12` · Б → `1.19-б` · `2.13` · `2.14` · В → `1.20` · `2.15` · `4.5` · Г → `12.1-б` · `1.17-б` · gov `12.19-б` |
 
