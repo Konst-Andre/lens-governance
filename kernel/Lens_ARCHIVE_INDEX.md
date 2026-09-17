@@ -214,7 +214,7 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 - `EquipLens_session_summary_S11_SPLIT_GLASSKIT.md` — 33 світлі значення шейдингу запечені, `LOCK_MIGRATE`, 5 зовнішніх Liquid Glass репо; тексти влиті в Cookbook `A91`–`A102`
 - `EquipLens_session_summary_S12_GOVERNANCE_DRAIN.md` — черга 26 записів, вичерпана в S13
 
-### `archive/summaries/Lens_gov/` — 41 файлів *(заведено G-C3 17.09.2026; шлях з підтекою — raw без `Lens_gov/` дає 404; лічильник «Разом» нижче і §2 «плоско» не перераховані — `IDX-13`)*
+### `archive/summaries/Lens_gov/` — 44 файлів *(заведено G-C3 17.09.2026; шлях з підтекою — raw без `Lens_gov/` дає 404; лічильник «Разом» нижче і §2 «плоско» не перераховані — `IDX-13`)*
 
 - `Lens_session_summary_governance_A.md` · governance A (31.07)
 - `Lens_session_summary_governance_B.md` · governance B
@@ -230,6 +230,7 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 - `Lens_governance_session_summary_GC2a_HRUPA_G.md` · 17.09.2026 · Lens governance · G-C2a: група Г; §2 — повні тексти G16-1 · Г-13 (на нього посилається CHERGA, доступ — рівень 3 драбини §8) · G-C запушено 6b9943f
 - `Lens_governance_session_summary_GC2b_FINAL_AUDYT.md` · 17.09.2026 · Lens governance · G-C2b: фінал злиття + аудит зв'язності; §2 — повний текст К3-1 · G-C запушено 6b9943f, §0 закрито G-C3
 - `Lens_governance_session_summary_GC3_PUSH_ARCHIV.md` · 17.09.2026 · Lens governance · G-C3: архів governance-хвоста Project, `IDX-13` (повний текст §2) · пушено 73ff3e4, §0 закрито G-D, в архів G-E
+- `Lens_governance_session_summary_GD_COOKBOOK.md` · 17.09.2026 · Lens governance · G-D: cookbook-буфер 17→12 (5 → томи 3/4/5); §2 — Ф-2 · Ф-3 · Ф-4 повним текстом · пушено 6b08c83, §0 закрито G-E/G-F, в архів G-F
 - `Lens_session_summary_GH1_PUSH_Z_CHATU.md` · 17.09.2026 · Lens governance · GH1: протокол П-GH1, пуш з чату · гілку змерджено, B63 стартував
 - `GA_step2_texts_v1.md` · 17.09.2026 · Lens governance · G-A: тексти вставок В1–В9 · влиті скриптом
 - `GB_triage_v1.md` · 17.09.2026 · Lens governance · G-B: таблиця тріажу · злиття виконано
@@ -258,6 +259,8 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 - `gc_step1G_wsd_v1.py` · 17.09.2026 · Lens governance · пакет G-C: група Г · пушено 6b9943f
 - `gc_step2_final_v1.py` · 17.09.2026 · Lens governance · пакет G-C: фінал (wsd 2.35, Z_REGISTR, CHERGA, INDEX) · пушено 6b9943f
 - `gc3_step1_archive_v1.py` · 17.09.2026 · Lens governance · пакет G-C3: архів 34 файлів + INDEX/CHERGA/ARCHIVE_INDEX · пушено 73ff3e4
+- `gd_step1_merge_v2.py` · 17.09.2026 · Lens governance · пакет G-D: 5 записів буфера → томи 3/4/5 + Cookbook INDEX §2/§3 · пушено 6b08c83
+- `gd_step2_prune_v2.py` · 17.09.2026 · Lens governance · пакет G-D: прополка cookbook-буфера + INDEX §4 + CHERGA `IDX-12` · пушено 6b08c83
 
 ### `archive/stands/` — 28 файлів
 

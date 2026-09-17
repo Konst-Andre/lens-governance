@@ -288,7 +288,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 | **EquipLens** | `EquipLens_session_summary_S31_HEAD_LEVERS.md` · `EquipLens_session_summary_S30_SCALE_VERDICT.md` *(S13…S29 витіснені)* |
 | **PharmaLens** | `PharmaLens_session_summary_S1_FOUNDATION.md` *(продукт заморожено — чекає `.pptx` від Олі; єдине самері, стеля не задіяна)* |
 | **KPI Lens** | `KPI_Lens_session_summary_Batch15_2.md` |
-| **Lens** *(governance)* | `Lens_governance_session_summary_GD_COOKBOOK.md` *(GA · GB_TRIAZH · GB2 · GB3 · GC1 · GC2a · GC2b · GH1 · GC3 витіснені 17.09.2026 → `archive/summaries/Lens_gov/`)* |
+| **Lens** *(governance)* | `Lens_governance_session_summary_GE_K2_PILOT.md` *(GA · GB_TRIAZH · GB2 · GB3 · GC1 · GC2a · GC2b · GH1 · GC3 · GD витіснені 17.09.2026 → `archive/summaries/Lens_gov/`)* |
 | **Фармастор** | `АРХІВ-УСІ` — продукт перейменовано на StockCheck; канон живе у `Фармастор_v2_MASTER_LOCK.md` і `Фармастор_v2_PORT_REGISTER.md`, самері не потрібні жодні |
 
 > ⚠ **Звірено скриптом 30.08.2026 — таблиця протухла по ТРЬОХ продуктах одночасно,
