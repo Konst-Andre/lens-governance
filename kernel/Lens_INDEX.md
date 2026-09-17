@@ -180,7 +180,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 | буфер | канон-ціль | стан |
 |---|---|---|
 | `Lens_cookbook_delta_running.md` | Cookbook | 🔴 **17 записів** (заміряно 17.09.2026, G-A; `G11` ✓) · злиття — G-D |
-| `Lens_stagebench_delta_running.md` | `Lens_stagebench_manifest.md` | 🔴 **15 записів** (Д-А…Д-М; заміряно 17.09.2026, G-A; `G11` ✓; ⚠ стеля 2–3 сесії прострочена з 13.08.2026) · злиття — G-B |
+| `Lens_stagebench_delta_running.md` | `Lens_stagebench_manifest.md` | 🟢 **порожній** (G-B3 17.09.2026, `G11` ✓) · злиття G-B завершено: група А → §8.7-д · §8.12 · §8.14–§8.17 · Б → §8.10 · §8.11 · §8.13 · §8.18 · §6-а · §6-б · В → §6 · §8.9 · §2-п.7 |
 | `wsd_delta_running.md` *(фізично `kernel/wsd/`, **не** `kernel/`)* | `Work_Standard.md` | 🔴 **10 записів** (заміряно 17.09.2026, G-A; шапку зведено з фактом — `IDX-6` закрито, `G11` ✓). Стеля 2–3 сесії прострочена · злиття — G-C |
 
 **Правило:** буфер — не архів. Лежить довше 2–3 сесій → мерджити як є.
@@ -288,7 +288,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 | **EquipLens** | `EquipLens_session_summary_S31_HEAD_LEVERS.md` · `EquipLens_session_summary_S30_SCALE_VERDICT.md` *(S13…S29 витіснені)* |
 | **PharmaLens** | `PharmaLens_session_summary_S1_FOUNDATION.md` *(продукт заморожено — чекає `.pptx` від Олі; єдине самері, стеля не задіяна)* |
 | **KPI Lens** | `KPI_Lens_session_summary_Batch15_2.md` |
-| **Lens** *(governance)* | `Lens_session_summary_governance_G_MASKA.md` · `Lens_session_summary_governance_F_CHERGA_PLAN.md` *(E, D, C витіснені 31.08.2026 — рядок оголошував D·C, тоді як E і F уже жили в Project: та сама хвороба §5, що й у стендів)* |
+| **Lens** *(governance)* | `Lens_governance_session_summary_GB3_ZLYTTIA_V.md` · `Lens_governance_session_summary_GA_BUFERY.md` *(G_MASKA · F_CHERGA_PLAN · GB_TRIAZH · GB2_ZLYTTIA_B витіснені 17.09.2026)* |
 | **Фармастор** | `АРХІВ-УСІ` — продукт перейменовано на StockCheck; канон живе у `Фармастор_v2_MASTER_LOCK.md` і `Фармастор_v2_PORT_REGISTER.md`, самері не потрібні жодні |
 
 > ⚠ **Звірено скриптом 30.08.2026 — таблиця протухла по ТРЬОХ продуктах одночасно,
