@@ -214,7 +214,7 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 - `EquipLens_session_summary_S11_SPLIT_GLASSKIT.md` — 33 світлі значення шейдингу запечені, `LOCK_MIGRATE`, 5 зовнішніх Liquid Glass репо; тексти влиті в Cookbook `A91`–`A102`
 - `EquipLens_session_summary_S12_GOVERNANCE_DRAIN.md` — черга 26 записів, вичерпана в S13
 
-### `archive/summaries/Lens_gov/` — 67 файлів *(заведено G-C3 17.09.2026; шлях з підтекою — raw без `Lens_gov/` дає 404; лічильник «Разом» нижче і §2 «плоско» не перераховані — `IDX-13`)*
+### `archive/summaries/Lens_gov/` — 73 файли *(заведено G-C3 17.09.2026; шлях з підтекою — raw без `Lens_gov/` дає 404; лічильник «Разом» нижче і §2 «плоско» не перераховані — `IDX-13`)*
 
 - `Lens_session_summary_governance_A.md` · governance A (31.07)
 - `Lens_session_summary_governance_B.md` · governance B
@@ -284,6 +284,12 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 - `gh_step1_cherga_v1.py` · 18.09.2026 · Lens governance · пакет G-H: прополка gov-черги 7 996→7 762 B, стеля 8 192 (IDX-10) · пушено 26c08b3
 - `gh_step2_archive_v1.py` · 18.09.2026 · Lens governance · пакет G-H: архів GF + пакет G-G (56→63), §5 → GG · пушено 26c08b3
 - `rules_hits_v1.py` · 18.09.2026 · Lens governance · пакет G-H: лічильник спрацювань правил К4-1 (12/90 нулів) · джерело — коміт 26c08b3, стан до надгробка (у Project файла вже не було, G-I §0 п.7); влито як `G19` у f52f59e
+- `Lens_governance_session_summary_GH_CHERGA_LICHYLNYK.md` · 18.09.2026 · Lens governance · G-H: прополка gov-черги 7 996→7 762 B, лічильник спрацювань К4-1 (12/90 нулів) · пушено 26c08b3, §0 закрито G-I/G-J, в архів G-K
+- `gi_step1_intake_v1.py` · 18.09.2026 · Lens governance · пакет G-I: INTAKE дописком у рядок К3-1 черги (+208 B, без нового id, Ф-10) · пушено f52f59e · в архів G-K (G-J пропустила, G-I §0 п.7)
+- `gi_step2_g19_v1.py` · 18.09.2026 · Lens governance · пакет G-I: К4-1 — rules_hits.py влито в Lens_validate.py як G19 · пушено f52f59e · в архів G-K
+- `gi_step3_declare_v1.py` · 18.09.2026 · Lens governance · пакет G-I: оголошено G19, К4-1 знято з черги, §5 G20 резерв · пушено f52f59e · в архів G-K
+- `gj_step1_archive_v1.py` · 18.09.2026 · Lens governance · пакет G-J: архів GG + пакет G-H (63→67), §5 → GI · GH · пушено ea9dd5b
+- `gj_step2_rulefiles_v1.py` · 18.09.2026 · Lens governance · пакет G-J: С1 розпилу wsd — RULE_FILES, G4 по всіх файлах правил, +G21 · пушено c0b6daa
 
 ### `archive/stands/` — 28 файлів
 
