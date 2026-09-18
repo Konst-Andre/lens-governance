@@ -676,12 +676,14 @@ def g23(root):
 #   G3-1: червоне, на яке немає дії, вчить ігнорувати червоне.
 
 _CTX = r'(?:`|wsd\s+|gov\s+|§|\bп\.\s?|\(|правил\w*\s+)'
+_GATE_QUOTE = r'(?!\((?:wsd|gov|prof|verd|chk)\))'
 
 
 def _rule_pat(rid):
     """Строгий якір номера правила з вимогою контексту посилання."""
     tail = r'(?![\d.])' if '-' in rid else r'(?![\d.\-])'
-    return re.compile(_CTX + re.escape(rid) + tail)
+    # Ф-27 (G-S): `N.N(kind)` — форма рядка виводу G19; цитата звіту гейта не є слідом спрацювання
+    return re.compile(_CTX + re.escape(rid) + tail + _GATE_QUOTE)
 
 
 def _rule_ids(path, kind):
