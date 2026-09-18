@@ -214,7 +214,7 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 - `EquipLens_session_summary_S11_SPLIT_GLASSKIT.md` — 33 світлі значення шейдингу запечені, `LOCK_MIGRATE`, 5 зовнішніх Liquid Glass репо; тексти влиті в Cookbook `A91`–`A102`
 - `EquipLens_session_summary_S12_GOVERNANCE_DRAIN.md` — черга 26 записів, вичерпана в S13
 
-### `archive/summaries/Lens_gov/` — 63 файли *(заведено G-C3 17.09.2026; шлях з підтекою — raw без `Lens_gov/` дає 404; лічильник «Разом» нижче і §2 «плоско» не перераховані — `IDX-13`)*
+### `archive/summaries/Lens_gov/` — 67 файлів *(заведено G-C3 17.09.2026; шлях з підтекою — raw без `Lens_gov/` дає 404; лічильник «Разом» нижче і §2 «плоско» не перераховані — `IDX-13`)*
 
 - `Lens_session_summary_governance_A.md` · governance A (31.07)
 - `Lens_session_summary_governance_B.md` · governance B
@@ -280,6 +280,10 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 - `gg_step3_k2wsd_v1.py` · 18.09.2026 · Lens governance · пакет G-G: К2-1 wsd група 1 · пушено 818bf18
 - `gg_step5_k2wsd_v1.py` · 18.09.2026 · Lens governance · пакет G-G: К2-1 wsd група 2, `G16` по wsd → ✓ · пушено 818bf18
 - `gg_step6_cherga_v1.py` · 18.09.2026 · Lens governance · пакет G-G: CHERGA К2-1 закрито, +К4-1/К5-1/G3-1 · пушено 818bf18
+- `Lens_governance_session_summary_GG_K2_ZAKRYTO.md` · 18.09.2026 · Lens governance · G-G: К2-1 закрито (gov 0/12 · wsd 0/68), канон у фазу прополки; §0 — черга 7 996 B при стелі, wsd 198 896 B · пушено 641b9bc, §0 закрито G-H/G-I, в архів G-J
+- `gh_step1_cherga_v1.py` · 18.09.2026 · Lens governance · пакет G-H: прополка gov-черги 7 996→7 762 B, стеля 8 192 (IDX-10) · пушено 26c08b3
+- `gh_step2_archive_v1.py` · 18.09.2026 · Lens governance · пакет G-H: архів GF + пакет G-G (56→63), §5 → GG · пушено 26c08b3
+- `rules_hits_v1.py` · 18.09.2026 · Lens governance · пакет G-H: лічильник спрацювань правил К4-1 (12/90 нулів) · джерело — коміт 26c08b3, стан до надгробка (у Project файла вже не було, G-I §0 п.7); влито як `G19` у f52f59e
 
 ### `archive/stands/` — 28 файлів
 
