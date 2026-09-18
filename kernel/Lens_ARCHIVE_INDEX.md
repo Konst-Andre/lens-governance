@@ -214,7 +214,7 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 - `EquipLens_session_summary_S11_SPLIT_GLASSKIT.md` — 33 світлі значення шейдингу запечені, `LOCK_MIGRATE`, 5 зовнішніх Liquid Glass репо; тексти влиті в Cookbook `A91`–`A102`
 - `EquipLens_session_summary_S12_GOVERNANCE_DRAIN.md` — черга 26 записів, вичерпана в S13
 
-### `archive/summaries/Lens_gov/` — 78 файлів *(заведено G-C3 17.09.2026; шлях з підтекою — raw без `Lens_gov/` дає 404; лічильник «Разом» нижче і §2 «плоско» не перераховані — `IDX-13`)*
+### `archive/summaries/Lens_gov/` — 82 файли *(заведено G-C3 17.09.2026; шлях з підтекою — raw без `Lens_gov/` дає 404; лічильник «Разом» нижче і §2 «плоско» не перераховані — `IDX-13`)*
 
 - `Lens_session_summary_governance_A.md` · governance A (31.07)
 - `Lens_session_summary_governance_B.md` · governance B
@@ -295,6 +295,10 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 - `gk_step2_hist_v1.py` · 18.09.2026 · Lens governance · пакет G-K: С2 розпилу wsd — шапка-changelog 2.25–2.39 → HISTORY (8 414 B, md5) · пушено 655521b
 - `gk_step3_delete_v1.py` · 18.09.2026 · Lens governance · пакет G-K: П-GH1 v2 --delete, видалено надгробок kernel/rules_hits.py · пушено e417d15
 - `gk_step4_f14_v1.py` · 18.09.2026 · Lens governance · пакет G-K: Ф-14 → 12.16 gov-протоколу (перенос байт-у-байт з md5) · пушено 7e2a6d0
+- `Lens_governance_session_summary_GJ_ROZPYL_S1.md` · 18.09.2026 · Lens governance · G-J: архів GG + пакет G-H, С1 розпилу wsd (RULE_FILES · G4 · G21) · пушено ea9dd5b · c0b6daa · §0 виконано G-K (С2, Ф-14, архів, надгробок) або перенесено в §0 G-L (план С5/С6, 1.1 п.3, G3-1), в архів G-M
+- `gl_step1_archive_v1.py` · 18.09.2026 · Lens governance · пакет G-L: архів GI + пакет G-K (73→78), §5 → GK · GJ, Ф-15 у коді · пушено 709f587
+- `gl_step2_c3_v1.py` · 18.09.2026 · Lens governance · пакет G-L: С3 розпилу wsd — кластер 13 → Lens_PROFILE.md §7 (12 391 B, md5) · пушено 20957b9 (маршрут-заглушки виправлено таблицею в bf606d1)
+- `gl_step3_c4_v1.py` · 18.09.2026 · Lens governance · пакет G-L: С4 розпилу wsd — метод вироку → Lens_verdict_protocol.md (5 фрагментів, 50 660 B, md5) + таблиця маршрутів · пушено bf606d1
 
 ### `archive/stands/` — 28 файлів
 
