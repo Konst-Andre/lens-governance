@@ -215,7 +215,7 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 - `EquipLens_session_summary_S11_SPLIT_GLASSKIT.md` — 33 світлі значення шейдингу запечені, `LOCK_MIGRATE`, 5 зовнішніх Liquid Glass репо; тексти влиті в Cookbook `A91`–`A102`
 - `EquipLens_session_summary_S12_GOVERNANCE_DRAIN.md` — черга 26 записів, вичерпана в S13
 
-### `archive/summaries/Lens_gov/` — 104 файли *(заведено G-C3 17.09.2026; шлях з підтекою — raw без `Lens_gov/` дає 404; лічильник «Разом» нижче і §2 «плоско» не перераховані — `IDX-13`)*
+### `archive/summaries/Lens_gov/` — 109 файлів *(заведено G-C3 17.09.2026; шлях з підтекою — raw без `Lens_gov/` дає 404; лічильник «Разом» нижче і §2 «плоско» не перераховані — `IDX-13`)*
 
 - `Lens_session_summary_governance_A.md` · governance A (31.07)
 - `Lens_session_summary_governance_B.md` · governance B
@@ -322,6 +322,11 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 - `gp_step2_114_v1.py` · 18.09.2026 · Lens governance · пакет G-P: 1.14 += Ф-21 · Ф-23 · Ф-15 (gov 53 024 → 56 287 B) · пушено 6105574
 - `gp_step3_1216_v1.py` · 18.09.2026 · Lens governance · пакет G-P: 12.16 += Ф-20 · Ф-17 (gov 56 287 → 59 383 B) · пушено 9c0aa86
 - `gp_step4_102p4_v1.py` · 18.09.2026 · Lens governance · пакет G-P: 10.2 п.4 → загальний інваріант + приклад QR Lens (chk 59 656 → 59 861 B) · пушено c51356f
+- `Lens_governance_session_summary_GO_KANON_TOCHKOVO.md` · 18.09.2026 · Lens governance · G-O: архів GL + пакет G-N, точкові правки канону (1.15 · 10.2 · черга · PROFILE 13.2 · Ф-22) · пушено 5333f77 · 98cf939 · b79c400 · f642fcd · 9d41ef3 · 01f9626 · §0 виконано G-P/G-Q, в архів G-R (§2 Ф-24 — текст для К3-1, G-R)
+- `gq_step1_archive_v1.py` · 18.09.2026 · Lens governance · пакет G-Q: архів GN + пакет G-P (99→104), §5 → GP · GO, Ф-15 у коді · пушено 39681fd
+- `gq_step2_f25_v1.py` · 18.09.2026 · Lens governance · пакет G-Q: Ф-25 — структурна ознака заглушки в G16/G21 (Lens_validate 51 376 → 53 206 B) · пушено 5ad5f71
+- `gq_step3_g22_v1.py` · 18.09.2026 · Lens governance · пакет G-Q: гейт G22 — стартове повідомлення в code block, варіант Б (53 206 → 55 874 B) · пушено 987d7ee
+- `gq_step4_g6_v1.py` · 18.09.2026 · Lens governance · пакет G-Q: G6 — маркер «читається ТОЧКОВО» знімає сигнал 120 KB (55 874 → 56 413 B) · пушено 4323edf
 
 ### `archive/stands/` — 28 файлів
 
