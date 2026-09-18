@@ -215,7 +215,7 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 - `EquipLens_session_summary_S11_SPLIT_GLASSKIT.md` — 33 світлі значення шейдингу запечені, `LOCK_MIGRATE`, 5 зовнішніх Liquid Glass репо; тексти влиті в Cookbook `A91`–`A102`
 - `EquipLens_session_summary_S12_GOVERNANCE_DRAIN.md` — черга 26 записів, вичерпана в S13
 
-### `archive/summaries/Lens_gov/` — 109 файлів *(заведено G-C3 17.09.2026; шлях з підтекою — raw без `Lens_gov/` дає 404; лічильник «Разом» нижче і §2 «плоско» не перераховані — `IDX-13`)*
+### `archive/summaries/Lens_gov/` — 114 файлів *(заведено G-C3 17.09.2026; шлях з підтекою — raw без `Lens_gov/` дає 404; лічильник «Разом» нижче і §2 «плоско» не перераховані — `IDX-13`)*
 
 - `Lens_session_summary_governance_A.md` · governance A (31.07)
 - `Lens_session_summary_governance_B.md` · governance B
@@ -327,6 +327,11 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 - `gq_step2_f25_v1.py` · 18.09.2026 · Lens governance · пакет G-Q: Ф-25 — структурна ознака заглушки в G16/G21 (Lens_validate 51 376 → 53 206 B) · пушено 5ad5f71
 - `gq_step3_g22_v1.py` · 18.09.2026 · Lens governance · пакет G-Q: гейт G22 — стартове повідомлення в code block, варіант Б (53 206 → 55 874 B) · пушено 987d7ee
 - `gq_step4_g6_v1.py` · 18.09.2026 · Lens governance · пакет G-Q: G6 — маркер «читається ТОЧКОВО» знімає сигнал 120 KB (55 874 → 56 413 B) · пушено 4323edf
+- `Lens_governance_session_summary_GP_VLYVANNIA_F.md` · 19.09.2026 · Lens governance · G-P: архів GM + пакет G-O, вливання Ф у gov (1.14 · 12.16), 10.2 п.4 · пушено c58b49d · 6105574 · 9c0aa86 · c51356f · §0 виконано G-Q/G-R, в архів G-S
+- `gr_step1_archive_v1.py` · 19.09.2026 · Lens governance · пакет G-R: архів GO + пакет G-Q (104→109), §5 → GQ · GP, Ф-15 у коді · пушено 2f4d056
+- `gr_step2_f24_v1.py` · 19.09.2026 · Lens governance · пакет G-R: Ф-24 → Lens_INDEX §5 біля стелі черги (51 141 → 51 428 B) · пушено 788f62f
+- `gr_step3_g16_v1.py` · 19.09.2026 · Lens governance · пакет G-R: G16 — мітка детектора будь-де в тілі правила (Lens_validate 56 413 → 57 258 B) · пушено 1e95cb9
+- `gr_step4_g16close_v1.py` · 19.09.2026 · Lens governance · пакет G-R: закриття G16-1 — gov 12.12 += мітка детектора · 12.17 += K2:n/a (gov 59 383 → 59 768 B) · пушено fcfc3ec
 
 ### `archive/stands/` — 28 файлів
 
