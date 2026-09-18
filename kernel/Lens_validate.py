@@ -14,7 +14,8 @@ KERNEL v2 · 31.07.2026
       G3 покриття індексом: кожен .md названий у Lens_INDEX.md
       G4 посилання 14.x з wsd резолвляться у Work_Standard_HISTORY.md
       G5 вік буферів: непорожній *_delta_running.md → нагадування про стелю 2-3 сесії
-      G6 стеля обсягу: >120KB сигнал, >200KB червона межа
+      G6 стеля обсягу: >120KB сигнал, >200KB червона межа · сигнал не діє на файл, що в шапці
+         оголошує «читається ТОЧКОВО» (HISTORY, томи cookbook); червона межа — для всіх (G-Q)
       G7 мертвий буфер: «Куди канонити/мерджити» вказує на неіснуючий файл
          АБО цільовий A-запис уже стоїть у томі Cookbook
       G8 сирота-посилання: `Ім'я.md` у канон-файлі, а файлу в теці немає
@@ -230,6 +231,10 @@ def gov(root):
         if kb > RED_KB:
             fail(f'{f} — {kb:.0f} KB > {RED_KB} KB червона межа: різати на томи'); big = True
         elif kb > SIGNAL_KB:
+            head = open(R(root, f), encoding='utf-8').read().splitlines()[:12]
+            if any('читається ТОЧКОВО' in l for l in head):
+                print(f'  ⓘ {f} — {kb:.0f} KB > {SIGNAL_KB} KB, але читається ТОЧКОВО (шапка) — сигнал не діє')
+                continue
             warn(f'{f} — {kb:.0f} KB > {SIGNAL_KB} KB сигнал: планувати розпил'); big = True
     if not big:
         ok(f'усі файли ≤ {SIGNAL_KB} KB')
