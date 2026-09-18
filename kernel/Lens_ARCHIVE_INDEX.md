@@ -214,7 +214,7 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 - `EquipLens_session_summary_S11_SPLIT_GLASSKIT.md` — 33 світлі значення шейдингу запечені, `LOCK_MIGRATE`, 5 зовнішніх Liquid Glass репо; тексти влиті в Cookbook `A91`–`A102`
 - `EquipLens_session_summary_S12_GOVERNANCE_DRAIN.md` — черга 26 записів, вичерпана в S13
 
-### `archive/summaries/Lens_gov/` — 82 файли *(заведено G-C3 17.09.2026; шлях з підтекою — raw без `Lens_gov/` дає 404; лічильник «Разом» нижче і §2 «плоско» не перераховані — `IDX-13`)*
+### `archive/summaries/Lens_gov/` — 86 файлів *(заведено G-C3 17.09.2026; шлях з підтекою — raw без `Lens_gov/` дає 404; лічильник «Разом» нижче і §2 «плоско» не перераховані — `IDX-13`)*
 
 - `Lens_session_summary_governance_A.md` · governance A (31.07)
 - `Lens_session_summary_governance_B.md` · governance B
@@ -299,6 +299,10 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 - `gl_step1_archive_v1.py` · 18.09.2026 · Lens governance · пакет G-L: архів GI + пакет G-K (73→78), §5 → GK · GJ, Ф-15 у коді · пушено 709f587
 - `gl_step2_c3_v1.py` · 18.09.2026 · Lens governance · пакет G-L: С3 розпилу wsd — кластер 13 → Lens_PROFILE.md §7 (12 391 B, md5) · пушено 20957b9 (маршрут-заглушки виправлено таблицею в bf606d1)
 - `gl_step3_c4_v1.py` · 18.09.2026 · Lens governance · пакет G-L: С4 розпилу wsd — метод вироку → Lens_verdict_protocol.md (5 фрагментів, 50 660 B, md5) + таблиця маршрутів · пушено bf606d1
+- `Lens_governance_session_summary_GK_ROZPYL_S2.md` · 18.09.2026 · Lens governance · G-K: архів GH + пакет G-I/G-J, С2 розпилу wsd (шапка-changelog → HISTORY), П-GH1 v2 (--delete), Ф-14 у 12.16 · пушено 3d946e7 · 655521b · e417d15 · 7e2a6d0 · §0 виконано G-L/G-M або перенесено в §0 G-M, в архів G-N
+- `gm_step1_archive_v1.py` · 18.09.2026 · Lens governance · пакет G-M: архів GJ + пакет G-L (78→82), §5 → GL · GK, Ф-15 у коді · пушено 46c7bc4
+- `gm_step2_c5_v1.py` · 18.09.2026 · Lens governance · пакет G-M: С5 розпилу wsd — перевірка → Lens_patch_check_protocol.md (6 фрагментів, 58 125 B, md5) + сирота «Четверта пастка» + 1.1 + PROFILE §6 + RULE_FILES chk · пушено 0261817
+- `gm_step3_idx7_v1.py` · 18.09.2026 · Lens governance · пакет G-M: IDX-7 закрито за власною умовою (wsd 71 289 B < 120 KiB), висяча адреса в К6-1 → К3-1 · пушено 2f426e6
 
 ### `archive/stands/` — 28 файлів
 
