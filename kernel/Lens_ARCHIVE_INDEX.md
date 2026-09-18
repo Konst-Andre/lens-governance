@@ -215,7 +215,7 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 - `EquipLens_session_summary_S11_SPLIT_GLASSKIT.md` — 33 світлі значення шейдингу запечені, `LOCK_MIGRATE`, 5 зовнішніх Liquid Glass репо; тексти влиті в Cookbook `A91`–`A102`
 - `EquipLens_session_summary_S12_GOVERNANCE_DRAIN.md` — черга 26 записів, вичерпана в S13
 
-### `archive/summaries/Lens_gov/` — 92 файли *(заведено G-C3 17.09.2026; шлях з підтекою — raw без `Lens_gov/` дає 404; лічильник «Разом» нижче і §2 «плоско» не перераховані — `IDX-13`)*
+### `archive/summaries/Lens_gov/` — 99 файлів *(заведено G-C3 17.09.2026; шлях з підтекою — raw без `Lens_gov/` дає 404; лічильник «Разом» нижче і §2 «плоско» не перераховані — `IDX-13`)*
 
 - `Lens_session_summary_governance_A.md` · governance A (31.07)
 - `Lens_session_summary_governance_B.md` · governance B
@@ -310,6 +310,13 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 - `gn_step3_k61_v1.py` · 18.09.2026 · Lens governance · пакет G-N: С6 — рядок «читається коли / не читається» у шапки 10 канон-файлів (G23 ✗10 → 0) · пушено d33a4b8
 - `gn_step4_prof_v1.py` · 18.09.2026 · Lens governance · пакет G-N: С6 (12.18) — дублі-конспекти Lens_PROFILE §3/§4 → вказівники на §7 13.3/13.1 (21 440 → 19 902 B) · пушено 23ccfda
 - `gn_step5_k61close_v1.py` · 18.09.2026 · Lens governance · пакет G-N: К6-1 закрито за власною умовою (G23 ✓ 26/26), рядок знято з черги (7 460 → 7 093 B) · пушено 6e2633c
+- `Lens_governance_session_summary_GM_ROZPYL_S5.md` · 18.09.2026 · Lens governance · G-M: архів GJ + пакет G-L, С5 розпилу wsd (6 фрагментів → Lens_patch_check_protocol.md), IDX-7 закрито · пушено 46c7bc4 · 0261817 · 2f426e6 · §0 виконано G-N/G-O або перенесено в §0 G-P, в архів G-P
+- `go_step1_archive_v1.py` · 18.09.2026 · Lens governance · пакет G-O: архів GL + пакет G-N (86→92), §5 → GN · GM, Ф-15 у коді · пушено 5333f77
+- `go_step2_115_v1.py` · 18.09.2026 · Lens governance · пакет G-O: 1.15 «п'ять пасток» → «шість», сирота «Четверта пастка» → пункт 6 (60 146 → 59 529 B) · пушено 98cf939
+- `go_step3_102_v1.py` · 18.09.2026 · Lens governance · пакет G-O: 10.2 злиття відхилено, правка лише K2-коментаря (59 529 → 59 656 B) · пушено b79c400
+- `go_step4_cherga_v1.py` · 18.09.2026 · Lens governance · пакет G-O: черга ядра — дописки G3-1 і К3-1 (Ф-18 · Ф-19), нових id немає (7 093 → 7 274 B) · пушено f642fcd
+- `go_step5_prof132_v1.py` · 18.09.2026 · Lens governance · пакет G-O: Lens_PROFILE §4 «Проактивні пропозиції» → вказівник на §7 13.2 (19 902 → 19 486 B) · пушено 9d41ef3
+- `go_step6_f22_v1.py` · 18.09.2026 · Lens governance · пакет G-O: Ф-22 → Lens_github_push_protocol.md (7 886 → 8 742 B) · пушено 01f9626
 
 ### `archive/stands/` — 28 файлів
 
