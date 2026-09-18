@@ -215,7 +215,7 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 - `EquipLens_session_summary_S11_SPLIT_GLASSKIT.md` — 33 світлі значення шейдингу запечені, `LOCK_MIGRATE`, 5 зовнішніх Liquid Glass репо; тексти влиті в Cookbook `A91`–`A102`
 - `EquipLens_session_summary_S12_GOVERNANCE_DRAIN.md` — черга 26 записів, вичерпана в S13
 
-### `archive/summaries/Lens_gov/` — 86 файлів *(заведено G-C3 17.09.2026; шлях з підтекою — raw без `Lens_gov/` дає 404; лічильник «Разом» нижче і §2 «плоско» не перераховані — `IDX-13`)*
+### `archive/summaries/Lens_gov/` — 92 файли *(заведено G-C3 17.09.2026; шлях з підтекою — raw без `Lens_gov/` дає 404; лічильник «Разом» нижче і §2 «плоско» не перераховані — `IDX-13`)*
 
 - `Lens_session_summary_governance_A.md` · governance A (31.07)
 - `Lens_session_summary_governance_B.md` · governance B
@@ -304,6 +304,12 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 - `gm_step1_archive_v1.py` · 18.09.2026 · Lens governance · пакет G-M: архів GJ + пакет G-L (78→82), §5 → GL · GK, Ф-15 у коді · пушено 46c7bc4
 - `gm_step2_c5_v1.py` · 18.09.2026 · Lens governance · пакет G-M: С5 розпилу wsd — перевірка → Lens_patch_check_protocol.md (6 фрагментів, 58 125 B, md5) + сирота «Четверта пастка» + 1.1 + PROFILE §6 + RULE_FILES chk · пушено 0261817
 - `gm_step3_idx7_v1.py` · 18.09.2026 · Lens governance · пакет G-M: IDX-7 закрито за власною умовою (wsd 71 289 B < 120 KiB), висяча адреса в К6-1 → К3-1 · пушено 2f426e6
+- `Lens_governance_session_summary_GL_ROZPYL_S3.md` · 18.09.2026 · Lens governance · G-L: архів GI + пакет G-K, С3 (кластер 13 → Lens_PROFILE §7) і С4 (метод вироку → Lens_verdict_protocol.md) розпилу wsd, маршрут-таблиця · пушено 709f587 · 20957b9 · bf606d1 · §0 виконано G-M/G-N або перенесено в §0 G-O, в архів G-O
+- `gn_step1_archive_v1.py` · 18.09.2026 · Lens governance · пакет G-N: архів GK + пакет G-M (82→86), §5 → GM · GL, Ф-15 у коді · пушено 5f0979a
+- `gn_step2_g23_v1.py` · 18.09.2026 · Lens governance · пакет G-N: С6 розпилу wsd — G23 «канон-файл без тригера читання» у Lens_validate --gov (49 645 → 51 376 B) · пушено cc9266a
+- `gn_step3_k61_v1.py` · 18.09.2026 · Lens governance · пакет G-N: С6 — рядок «читається коли / не читається» у шапки 10 канон-файлів (G23 ✗10 → 0) · пушено d33a4b8
+- `gn_step4_prof_v1.py` · 18.09.2026 · Lens governance · пакет G-N: С6 (12.18) — дублі-конспекти Lens_PROFILE §3/§4 → вказівники на §7 13.3/13.1 (21 440 → 19 902 B) · пушено 23ccfda
+- `gn_step5_k61close_v1.py` · 18.09.2026 · Lens governance · пакет G-N: К6-1 закрито за власною умовою (G23 ✓ 26/26), рядок знято з черги (7 460 → 7 093 B) · пушено 6e2633c
 
 ### `archive/stands/` — 28 файлів
 

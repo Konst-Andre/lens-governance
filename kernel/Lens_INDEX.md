@@ -296,7 +296,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 | **EquipLens** | `EquipLens_session_summary_S31_HEAD_LEVERS.md` · `EquipLens_session_summary_S30_SCALE_VERDICT.md` *(S13…S29 витіснені)* |
 | **PharmaLens** | `PharmaLens_session_summary_S1_FOUNDATION.md` *(продукт заморожено — чекає `.pptx` від Олі; єдине самері, стеля не задіяна)* |
 | **KPI Lens** | `KPI_Lens_session_summary_Batch15_2.md` |
-| **Lens** *(governance)* | `Lens_governance_session_summary_GM_ROZPYL_S5.md` · `Lens_governance_session_summary_GL_ROZPYL_S3.md` *(GK витіснено 18.09.2026 сесією G-N; GJ — G-M; GI — G-L; GH — G-K; GG — G-J; GF — G-H; GA…GE — 17.09.2026 → `archive/summaries/Lens_gov/`)* |
+| **Lens** *(governance)* | `Lens_governance_session_summary_GN_ROZPYL_S6.md` · `Lens_governance_session_summary_GM_ROZPYL_S5.md` *(GL витіснено 18.09.2026 сесією G-O; GK — G-N; GJ — G-M; GI — G-L; GH — G-K; GG — G-J; GF — G-H; GA…GE — 17.09.2026 → `archive/summaries/Lens_gov/`)* |
 | **Фармастор** | `АРХІВ-УСІ` — продукт перейменовано на StockCheck; канон живе у `Фармастор_v2_MASTER_LOCK.md` і `Фармастор_v2_PORT_REGISTER.md`, самері не потрібні жодні |
 
 > ⚠ **Звірено скриптом 30.08.2026 — таблиця протухла по ТРЬОХ продуктах одночасно,
