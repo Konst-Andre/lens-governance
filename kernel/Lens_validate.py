@@ -32,6 +32,8 @@ KERNEL v2 · 31.07.2026
          Project, не в репо — тому тека з ними додається: --gov . --live <тека>
       G21 номер правила з тілом визначений рівно в одному файлі RULE_FILES → інакше ✗
          (розпил wsd, IDX-7: перенос без вирізання дає дубль, якого не бачить ніхто)
+         Маршрутна заглушка (G16 · G21) — за структурою, не за словом (Ф-25): тіло до h1 —
+         лише цитати, одна з них `> **ROUTING →`. Заглушка ≥ 400 B → ⚠ «виключено як маршрут»
       G23 канон-файл kernel/**/*.md без тригера читання в шапці (перші 12 рядків:
          «читається…» або «AUTO-READ») → ✗ на файл (К6-1: файл вмикається механізмом, не пам'яттю)
 
@@ -66,6 +68,20 @@ LIVE_DIRS = []          # теки живих самері (Project) для G19 
 # Файли правил — ОГОЛОШЕННЯ, не здогад (wsd 1.10). Новий дім правил = рядок тут
 # + рядок у Lens_INDEX. Читають G4 · G16 · G19 · G21. Мітка — у виводі G19/G21.
 RULE_FILES = {'Work_Standard.md': 'wsd', 'Lens_governance_protocol.md': 'gov', 'Lens_PROFILE.md': 'prof', 'Lens_verdict_protocol.md': 'verd', 'Lens_patch_check_protocol.md': 'chk'}
+
+
+def route_body(part):
+    """Фрагмент номера без хвоста файлу: зріз на першому h1 (`# …`) — інакше останнє правило
+    файлу тягне за собою розділ «# Історія…» і заглушка виглядає тілом (wsd 12.19, G-Q)."""
+    return re.split(r'\n(?=# )', part)[0]
+
+
+def is_route(part):
+    """Ф-25: маршрутна заглушка — структурно. Після заголовка кожен непорожній рядок
+    (крім `-----`) — цитата, і хоч одна — `> **ROUTING →`. Слово ROUTING у тілі правила
+    (заголовок gov 12.11, приклад у тексті) заглушкою його НЕ робить."""
+    ls = [l for l in route_body(part).splitlines()[1:] if l.strip() and not re.fullmatch(r'-{3,}', l.strip())]
+    return bool(ls) and all(l.startswith('>') for l in ls) and any(re.match(r'>\s*\*\*ROUTING\s*→', l) for l in ls)
 
 ok_n = warn_n = fail_n = 0
 
@@ -537,7 +553,7 @@ def gov(root):
         for r_ in rules:
             num = re.match(r'#{2}\s*(\S+)', r_).group(1)
             # маршрутна заглушка — тіло в іншому файлі
-            if 'ROUTING' in r_ or len(r_.encode('utf-8')) < 400:
+            if is_route(r_) or len(r_.encode('utf-8')) < 400:
                 continue
             if re.search(r'K2:n/a\s*—\s*\S', r_):
                 na += 1
@@ -547,7 +563,7 @@ def gov(root):
             naked.append(num)
         with_det = sum(
             1 for r_ in rules
-            if not ('ROUTING' in r_ or len(r_.encode('utf-8')) < 400)
+            if not (is_route(r_) or len(r_.encode('utf-8')) < 400)
             and not re.search(r'K2:n/a\s*—\s*\S', r_)
             and ('етектор' in r_ or 'К2' in r_))
         total = len(naked) + na + with_det
@@ -570,9 +586,10 @@ def gov(root):
 # ─────────────────────────── G21 · ОДИН ДІМ НОМЕРА ──────────────────────────
 def g21(root):
     """Номер правила з тілом — рівно в одному файлі RULE_FILES (IDX-7, G-J).
-    Маршрут (ROUTING або <400 B) — не тіло: на старому місці він законний."""
+    Маршрут (заглушка за is_route, Ф-25, або <400 B) — не тіло: на старому місці він законний.
+    К2 Ф-25: заглушка ≥ 400 B → ⚠ — тихе виключення стає видимим."""
     print('\n[G21] номер правила — один дім (розпил wsd, IDX-7)')
-    homes, nfiles = {}, 0
+    homes, nfiles, big = {}, 0, []
     for f, kind in RULE_FILES.items():
         try:
             body = open(R(root, f), encoding='utf-8').read()
@@ -581,12 +598,21 @@ def g21(root):
         nfiles += 1
         for part in re.split(r'\n(?=##+\s+`?\d+\.\d+)', body):
             m = re.match(r'##+\s+`?(\d+\.\d+(?:-[а-яґєіїь])?)`?[\s|]', part)
-            if not m or 'ROUTING' in part or len(part.encode('utf-8')) < 400:
+            if not m:
+                continue
+            if is_route(part):
+                nb = len(route_body(part).encode('utf-8'))
+                if nb >= 400:
+                    big.append(f'{kind} {m.group(1)} ({nb} B)')
+                continue
+            if len(part.encode('utf-8')) < 400:
                 continue
             homes.setdefault(m.group(1), []).append(kind)
     if not nfiles:
         warn('жодного файлу правил не знайдено — G21 не виконався, це НЕ зелений результат')
         return
+    if big:
+        warn('виключено як маршрут, але ≥ 400 B (Ф-25) — перевір, чи не тіло: ' + ' · '.join(big))
     dups = sorted((k, v) for k, v in homes.items() if len(v) > 1)
     if dups:
         fail('номер з тілом у кількох файлах: ' +
