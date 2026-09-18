@@ -29,7 +29,7 @@
 | тека репо | що там | у Project |
 |---|---|---|
 | **`kernel/`** *(корінь)* | маршрутизатори + `Lens_validate.py` + маніфести методів + буфер стендів | ✅ підключена |
-| **`kernel/wsd/`** | `Work_Standard.md` · `Lens_governance_protocol.md` · `Work_Standard_HISTORY.md` · `wsd_delta_running.md` | ✅ підключена |
+| **`kernel/wsd/`** | `Work_Standard.md` · `Lens_governance_protocol.md` · `Lens_verdict_protocol.md` · `Work_Standard_HISTORY.md` · `wsd_delta_running.md` | ✅ підключена |
 | **`kernel/cookbook/`** | `Lens_cookbook_INDEX.md` · 5 томів · `Lens_cookbook_delta_running.md` | ✅ підключена |
 | **`kernel/modules/`** | донор-модулі коду `Lens_module_*.md` | ✅ підключена |
 | **`products/`** | `*_MASTER_LOCK` · `*_valuesLOCK` · FINDINGS · реєстри — прив'язані до продукту, **нікуди не переносяться** | ✅ підключена |
@@ -117,6 +117,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 |---|---|
 | `Work_Standard.md` | правила роботи. Кластери 1–13. Версія — у шапці файла (`12.20`); governance-частина виїхала в розпилі S14 (нижче) |
 | `Lens_governance_protocol.md` | **як ведеться сам канон**: К1/К2 · `1.14` · `12.6` `12.7` `12.8` `12.10` `12.11` `12.12` `12.15`–`12.19`. Розпил 24.08.2026 (EquipLens S14). У `wsd` на цих номерах — маршрутні рядки, старі посилання дійсні |
+| `Lens_verdict_protocol.md` *(`kernel/wsd/`)* | **як судити рендер**: метод вироку `1.11` `1.12` `1.18` `1.20` · `2.4`–`2.15` · `4.4` `4.5`. Розпил wsd С4 (G-L 18.09.2026). **Читається:** точково за номером — маршрут з таблиці на початку `wsd` |
 | `Work_Standard_HISTORY.md` | changelog усіх версій + Кластер 14 «Прецеденти» (14.1–14.21) + Кластер 15 |
 
 ### Патерни
@@ -410,7 +411,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 | місце | що там живе | хто і як править |
 |---|---|---|
 | **репо `kernel/`** *(корінь)* | маршрутизатори й інструмент: `Lens_INDEX` · `Lens_validate.py` · `Lens_ARCHIVE_INDEX` · `Lens_PROFILE` · `Lens_PROJECT_instruction` · `Lens_NEWPROJECT_bootstrap` · манифести стендів | **джерело правди.** Канон правиться тут |
-| **репо `kernel/wsd/`** | `Work_Standard.md` · `Lens_governance_protocol.md` · `Work_Standard_HISTORY.md` · `wsd_delta_running.md` | те саме |
+| **репо `kernel/wsd/`** | `Work_Standard.md` · `Lens_governance_protocol.md` · `Lens_verdict_protocol.md` · `Work_Standard_HISTORY.md` · `wsd_delta_running.md` | те саме |
 | **репо `kernel/cookbook/`** | `Lens_cookbook_INDEX.md` · 5 томів · `Lens_cookbook_delta_running.md` | те саме |
 | **репо `kernel/modules/`** | донор-модулі коду: `Lens_module_*.md` | те саме |
 | **репо `archive/`** | `summaries/` · `stands/` · `superseded/` — канон-файли, що відслужили | `git mv`, **не** `rm` — нічого не гине |

@@ -52,7 +52,7 @@ import sys, os, re, glob, subprocess, tempfile
 
 KERNEL_FILES = [
     'Lens_INDEX.md', 'Lens_PROFILE.md', 'Work_Standard.md',
-    'Lens_governance_protocol.md',
+    'Lens_governance_protocol.md', 'Lens_verdict_protocol.md',
     'Work_Standard_HISTORY.md', 'Lens_NEWPROJECT_bootstrap.md',
     'Lens_cookbook_INDEX.md',
     'Lens_iOS_cookbook_1_platform.md', 'Lens_iOS_cookbook_2_navigation.md',
@@ -63,7 +63,7 @@ SIGNAL_KB, RED_KB = 120, 200
 LIVE_DIRS = []          # теки живих самері (Project) для G19 — --live
 # Файли правил — ОГОЛОШЕННЯ, не здогад (wsd 1.10). Новий дім правил = рядок тут
 # + рядок у Lens_INDEX. Читають G4 · G16 · G19 · G21. Мітка — у виводі G19/G21.
-RULE_FILES = {'Work_Standard.md': 'wsd', 'Lens_governance_protocol.md': 'gov', 'Lens_PROFILE.md': 'prof'}
+RULE_FILES = {'Work_Standard.md': 'wsd', 'Lens_governance_protocol.md': 'gov', 'Lens_PROFILE.md': 'prof', 'Lens_verdict_protocol.md': 'verd'}
 
 ok_n = warn_n = fail_n = 0
 
