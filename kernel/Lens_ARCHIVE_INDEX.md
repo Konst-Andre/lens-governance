@@ -214,7 +214,7 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 - `EquipLens_session_summary_S11_SPLIT_GLASSKIT.md` — 33 світлі значення шейдингу запечені, `LOCK_MIGRATE`, 5 зовнішніх Liquid Glass репо; тексти влиті в Cookbook `A91`–`A102`
 - `EquipLens_session_summary_S12_GOVERNANCE_DRAIN.md` — черга 26 записів, вичерпана в S13
 
-### `archive/summaries/Lens_gov/` — 73 файли *(заведено G-C3 17.09.2026; шлях з підтекою — raw без `Lens_gov/` дає 404; лічильник «Разом» нижче і §2 «плоско» не перераховані — `IDX-13`)*
+### `archive/summaries/Lens_gov/` — 78 файлів *(заведено G-C3 17.09.2026; шлях з підтекою — raw без `Lens_gov/` дає 404; лічильник «Разом» нижче і §2 «плоско» не перераховані — `IDX-13`)*
 
 - `Lens_session_summary_governance_A.md` · governance A (31.07)
 - `Lens_session_summary_governance_B.md` · governance B
@@ -290,6 +290,11 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 - `gi_step3_declare_v1.py` · 18.09.2026 · Lens governance · пакет G-I: оголошено G19, К4-1 знято з черги, §5 G20 резерв · пушено f52f59e · в архів G-K
 - `gj_step1_archive_v1.py` · 18.09.2026 · Lens governance · пакет G-J: архів GG + пакет G-H (63→67), §5 → GI · GH · пушено ea9dd5b
 - `gj_step2_rulefiles_v1.py` · 18.09.2026 · Lens governance · пакет G-J: С1 розпилу wsd — RULE_FILES, G4 по всіх файлах правил, +G21 · пушено c0b6daa
+- `Lens_governance_session_summary_GI_INTAKE_G19.md` · 18.09.2026 · Lens governance · G-I: INTAKE дописком у К3-1 (+208 B), К4-1 → G19 у Lens_validate.py · пушено f52f59e · §0 закрито G-J/G-K (INTAKE-текст §2 — адреса «G-I §2» у К3-1 черги), в архів G-L
+- `gk_step1_archive_v1.py` · 18.09.2026 · Lens governance · пакет G-K: архів GH + пакет G-I + пакет G-J (67→73), §5 → GJ · GI · пушено 3d946e7
+- `gk_step2_hist_v1.py` · 18.09.2026 · Lens governance · пакет G-K: С2 розпилу wsd — шапка-changelog 2.25–2.39 → HISTORY (8 414 B, md5) · пушено 655521b
+- `gk_step3_delete_v1.py` · 18.09.2026 · Lens governance · пакет G-K: П-GH1 v2 --delete, видалено надгробок kernel/rules_hits.py · пушено e417d15
+- `gk_step4_f14_v1.py` · 18.09.2026 · Lens governance · пакет G-K: Ф-14 → 12.16 gov-протоколу (перенос байт-у-байт з md5) · пушено 7e2a6d0
 
 ### `archive/stands/` — 28 файлів
 
