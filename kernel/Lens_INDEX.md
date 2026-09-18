@@ -162,7 +162,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 | `StockCheck_b27_jsdom_matrix.js` | jsdom-матриця b27 (CTA sweep + тост), 34 твердження |
 | `StockCheck_icon_gen.py` | генератор іконок PWA з локнутого гліфа |
 | `Lens_validate.py` | гейт-скрипт: `--gov [тека] [--live <тека живих самері>]` (G1–G13 · G16 · G19 governance; номери — §5 «Стан номерів гейтів») · `--html <file>` (H1–H4 білд) |
-| `Lens_claude_github_push.py` | пуш з чату одним атомарним комітом; двоходовий запобіжник `--dry-run` → `--confirm PLAN-ID`; без видалень і force-push (протокол `Lens_github_push_protocol.md`) |
+| `Lens_claude_github_push.py` | пуш з чату одним атомарним комітом; двоходовий запобіжник `--dry-run` → `--confirm PLAN-ID`; v2 — видалення файлу `--delete` під тим самим PLAN-ID; без видалення гілок і force-push (протокол `Lens_github_push_protocol.md`) |
 
 ---
 
@@ -269,8 +269,8 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 Написані: `G1`–`G13`, `G16`, `G19` (спрацювання правил, К4-1), `G21` (номер правила —
 один дім, `IDX-7`, G-J). Файли правил — константа `RULE_FILES` у `Lens_validate.py`;
 новий дім правил = рядок там + рядок тут (`G4` `G16` `G19` `G21` читають її). Код влитий із
-`rules_hits.py`; сам файл лишається в репо як надгробок до видалення руками —
-П-GH1 забороняє видалення з чату (§0 самері G-I). **Зарезервовані без коду: `G14`
+`rules_hits.py`; надгробок видалено з чату 18.09.2026 (G-K, `--delete`, П-GH1 v2),
+стан до надгробка — `archive/summaries/Lens_gov/rules_hits_v1.py`. **Зарезервовані без коду: `G14`
 (черги продуктів) · `G15` (протухання §5)** — індекс обіцяє машинну перевірку,
 якої не існує; борг `IDX-9`.
 Заявки без коду: `G17` — детектор черг (`IDX-11`) · `G18` — кандидат детектора `1.19-б` ·

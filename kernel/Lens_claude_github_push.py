@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # живе доки: у claude.ai немає офіційного GitHub-конектора із записом (тоді — в archive/superseded)
-# Lens_claude_github_push.py · v1 · 16.09.2026 · П-GH1 · протокол: Lens_github_push_protocol.md
+# Lens_claude_github_push.py · v2 · 18.09.2026 (G-K: +--delete) · П-GH1 · протокол: Lens_github_push_protocol.md
 """Пуш з чату Claude у GitHub одним атомарним комітом (Git Data API).
 
 ЗАПОБІЖНИК (двоходовий):
@@ -10,7 +10,8 @@ PLAN-ID = хеш(репо + ціль + SHA бази + шляхи + вміст). 
 або репо пішло вперед → інший PLAN-ID → запис відмовлено.
 
 Токен — лише зі змінної середовища GH_TOKEN (ніколи з аргументів чи файлів).
-Видалення файлів, гілок, force-push — у v1 НЕ ПІДТРИМУЄТЬСЯ свідомо.
+Видалення ФАЙЛУ — лише --delete repo/path (v2): шлях має існувати в базі, входить у PLAN-ID,
+у dry-run окремим рядком ВИДАЛЕННЯ. Видалення гілок і force-push — НЕ ПІДТРИМУЄТЬСЯ свідомо.
 
 Приклад:
   export GH_TOKEN=...   # з інструкції Project
@@ -55,7 +56,9 @@ def main():
     m = ap.add_mutually_exclusive_group(required=True)
     m.add_argument("--dry-run", action="store_true")
     m.add_argument("--confirm", metavar="PLAN-ID")
-    ap.add_argument("files", nargs="+", help="repo/path=local/path")
+    ap.add_argument("--delete", action="append", default=[], metavar="repo/path",
+                    help="видалити файл (v2); шлях має існувати в базі")
+    ap.add_argument("files", nargs="*", help="repo/path=local/path")
     a = ap.parse_args()
 
     token = os.environ.get("GH_TOKEN") or die("немає GH_TOKEN у середовищі")
@@ -76,6 +79,11 @@ def main():
             die(f"у файлі схожий на токен рядок — запис заблоковано: {lp}")
         pairs.append((rp, data))
     pairs.sort()
+    dels = sorted({d.lstrip("/") for d in a.delete})
+    if not pairs and not dels:
+        die("нічого писати: немає ні файлів, ні --delete")
+    if set(dels) & {rp for rp, _ in pairs}:
+        die("той самий шлях і пишеться, і видаляється")
 
     st, ref = gh("GET", f"/repos/{a.repo}/git/ref/heads/{target}", token)
     branch_exists = st == 200
@@ -105,6 +113,12 @@ def main():
         else:
             tag = f"НОВИЙ ({len(data)} б)"
         print(f"  · {rp}: {tag}")
+    for rp in dels:
+        h.update(b"DEL\0" + rp.encode())
+        st, cur = gh("GET", f"/repos/{a.repo}/contents/{rp}?ref={base}", token)
+        if st != 200 or not isinstance(cur, dict) or cur.get("type") != "file":
+            die(f"видалення: {rp} — у базі {base[:7]} такого файлу немає ({st})")
+        print(f"  · {rp}: ВИДАЛЕННЯ ({cur.get('size')} б)")
     plan = h.hexdigest()[:6]
     print(f"PLAN-ID: {plan}")
 
@@ -122,6 +136,8 @@ def main():
         if st != 201:
             die(f"blob {rp}: {st} {blob.get('message')}")
         items.append({"path": rp, "mode": "100644", "type": "blob", "sha": blob["sha"]})
+    for rp in dels:     # sha: None у дереві = видалення файлу (Git Data API)
+        items.append({"path": rp, "mode": "100644", "type": "blob", "sha": None})
     st, tree = gh("POST", f"/repos/{a.repo}/git/trees", token, {"base_tree": bc["tree"]["sha"], "tree": items})
     if st != 201:
         die(f"tree: {st} {tree.get('message')}")
