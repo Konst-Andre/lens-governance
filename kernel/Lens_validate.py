@@ -63,7 +63,7 @@ SIGNAL_KB, RED_KB = 120, 200
 LIVE_DIRS = []          # теки живих самері (Project) для G19 — --live
 # Файли правил — ОГОЛОШЕННЯ, не здогад (wsd 1.10). Новий дім правил = рядок тут
 # + рядок у Lens_INDEX. Читають G4 · G16 · G19 · G21. Мітка — у виводі G19/G21.
-RULE_FILES = {'Work_Standard.md': 'wsd', 'Lens_governance_protocol.md': 'gov'}
+RULE_FILES = {'Work_Standard.md': 'wsd', 'Lens_governance_protocol.md': 'gov', 'Lens_PROFILE.md': 'prof'}
 
 ok_n = warn_n = fail_n = 0
 
