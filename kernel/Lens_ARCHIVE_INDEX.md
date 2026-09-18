@@ -215,7 +215,7 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 - `EquipLens_session_summary_S11_SPLIT_GLASSKIT.md` — 33 світлі значення шейдингу запечені, `LOCK_MIGRATE`, 5 зовнішніх Liquid Glass репо; тексти влиті в Cookbook `A91`–`A102`
 - `EquipLens_session_summary_S12_GOVERNANCE_DRAIN.md` — черга 26 записів, вичерпана в S13
 
-### `archive/summaries/Lens_gov/` — 99 файлів *(заведено G-C3 17.09.2026; шлях з підтекою — raw без `Lens_gov/` дає 404; лічильник «Разом» нижче і §2 «плоско» не перераховані — `IDX-13`)*
+### `archive/summaries/Lens_gov/` — 104 файли *(заведено G-C3 17.09.2026; шлях з підтекою — raw без `Lens_gov/` дає 404; лічильник «Разом» нижче і §2 «плоско» не перераховані — `IDX-13`)*
 
 - `Lens_session_summary_governance_A.md` · governance A (31.07)
 - `Lens_session_summary_governance_B.md` · governance B
@@ -317,6 +317,11 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 - `go_step4_cherga_v1.py` · 18.09.2026 · Lens governance · пакет G-O: черга ядра — дописки G3-1 і К3-1 (Ф-18 · Ф-19), нових id немає (7 093 → 7 274 B) · пушено f642fcd
 - `go_step5_prof132_v1.py` · 18.09.2026 · Lens governance · пакет G-O: Lens_PROFILE §4 «Проактивні пропозиції» → вказівник на §7 13.2 (19 902 → 19 486 B) · пушено 9d41ef3
 - `go_step6_f22_v1.py` · 18.09.2026 · Lens governance · пакет G-O: Ф-22 → Lens_github_push_protocol.md (7 886 → 8 742 B) · пушено 01f9626
+- `Lens_governance_session_summary_GN_ROZPYL_S6.md` · 18.09.2026 · Lens governance · G-N: архів GK + пакет G-M, С6 розпилу wsd (G23 · 10 тригерів читання · PROFILE §3/§4), К6-1 закрито · пушено 5f0979a · cc9266a · d33a4b8 · 23ccfda · 6e2633c · §0 виконано G-O/G-P, в архів G-Q
+- `gp_step1_archive_v1.py` · 18.09.2026 · Lens governance · пакет G-P: архів GM + пакет G-O (92→99), §5 → GO · GN, Ф-15 у коді · пушено c58b49d
+- `gp_step2_114_v1.py` · 18.09.2026 · Lens governance · пакет G-P: 1.14 += Ф-21 · Ф-23 · Ф-15 (gov 53 024 → 56 287 B) · пушено 6105574
+- `gp_step3_1216_v1.py` · 18.09.2026 · Lens governance · пакет G-P: 12.16 += Ф-20 · Ф-17 (gov 56 287 → 59 383 B) · пушено 9c0aa86
+- `gp_step4_102p4_v1.py` · 18.09.2026 · Lens governance · пакет G-P: 10.2 п.4 → загальний інваріант + приклад QR Lens (chk 59 656 → 59 861 B) · пушено c51356f
 
 ### `archive/stands/` — 28 файлів
 
