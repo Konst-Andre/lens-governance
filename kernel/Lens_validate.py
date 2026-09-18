@@ -30,6 +30,8 @@ KERNEL v2 · 31.07.2026
       G19 спрацювання правил: правило з нулем згадок у самері й без сліду
          народження — кандидат на виселення (К4-1). Живі самері лежать у
          Project, не в репо — тому тека з ними додається: --gov . --live <тека>
+      G21 номер правила з тілом визначений рівно в одному файлі RULE_FILES → інакше ✗
+         (розпил wsd, IDX-7: перенос без вирізання дає дубль, якого не бачить ніхто)
 
   python3 Lens_validate.py --html <file.html>
       Перед-видачні гейти білда (wsd Кластер 3 / 10).
@@ -59,6 +61,9 @@ KERNEL_FILES = [
 ]
 SIGNAL_KB, RED_KB = 120, 200
 LIVE_DIRS = []          # теки живих самері (Project) для G19 — --live
+# Файли правил — ОГОЛОШЕННЯ, не здогад (wsd 1.10). Новий дім правил = рядок тут
+# + рядок у Lens_INDEX. Читають G4 · G16 · G19 · G21. Мітка — у виводі G19/G21.
+RULE_FILES = {'Work_Standard.md': 'wsd', 'Lens_governance_protocol.md': 'gov'}
 
 ok_n = warn_n = fail_n = 0
 
@@ -167,11 +172,13 @@ def gov(root):
             warn(f'самері поза індексом: {len(summaries)} шт. — очікувано, '
                  f'якщо їх ≤2 на продукт (wsd 1.8); зараз перевір вручну')
 
-    # G4 — 14.x резолвляться
-    print('\n[G4] посилання 14.x з wsd → HISTORY')
-    w, h = R(root, 'Work_Standard.md'), R(root, 'Work_Standard_HISTORY.md')
-    if os.path.exists(w) and os.path.exists(h):
-        refs = sorted(set(re.findall(r'\b14\.\d+\b', open(w, encoding='utf-8').read())))
+    # G4 — 14.x резолвляться (з G-J — з УСІХ файлів правил, не лише wsd)
+    print('\n[G4] посилання 14.x з файлів правил → HISTORY')
+    h = R(root, 'Work_Standard_HISTORY.md')
+    srcs = [R(root, f) for f in RULE_FILES if os.path.exists(R(root, f))]
+    if srcs and os.path.exists(h):
+        refs = sorted(set(r for p in srcs for r in
+                          re.findall(r'\b14\.\d+\b', open(p, encoding='utf-8').read())))
         ht = open(h, encoding='utf-8').read()
         dead = [r for r in refs if f'## {r} ' not in ht]
         if dead:
@@ -179,7 +186,7 @@ def gov(root):
         else:
             ok(f'усі {len(refs)} посилань резолвляться')
     else:
-        warn('wsd або HISTORY відсутні — гейт пропущено')
+        warn('файли правил або HISTORY відсутні — гейт пропущено')
 
     # G5 — буфери
     print('\n[G5] буфери')
@@ -511,10 +518,9 @@ def gov(root):
     # МЕЖА: маршрутні заглушки (тіло виїхало в інший файл) не рахуються —
     # детектор живе разом з тілом, а не з покажчиком.
     print('\n[G16] правила без детектора (К2)')
-    RULE_FILES = ('Work_Standard.md', 'Lens_governance_protocol.md')
     seen_rule_file = False
     for f in sorted(live):
-        if not f.endswith(RULE_FILES):
+        if not f.endswith(tuple(RULE_FILES)):
             continue
         try:
             body = open(R(root, f), encoding='utf-8').read()
@@ -555,7 +561,36 @@ def gov(root):
         warn('жодного файлу правил не знайдено — гейт не виконався '
              '(дзеркало неповне?), це НЕ зелений результат')
 
+    g21(root)
     g19(root)
+
+# ─────────────────────────── G21 · ОДИН ДІМ НОМЕРА ──────────────────────────
+def g21(root):
+    """Номер правила з тілом — рівно в одному файлі RULE_FILES (IDX-7, G-J).
+    Маршрут (ROUTING або <400 B) — не тіло: на старому місці він законний."""
+    print('\n[G21] номер правила — один дім (розпил wsd, IDX-7)')
+    homes, nfiles = {}, 0
+    for f, kind in RULE_FILES.items():
+        try:
+            body = open(R(root, f), encoding='utf-8').read()
+        except OSError:
+            continue
+        nfiles += 1
+        for part in re.split(r'\n(?=##+\s+`?\d+\.\d+)', body):
+            m = re.match(r'##+\s+`?(\d+\.\d+(?:-[а-яґєіїь])?)`?[\s|]', part)
+            if not m or 'ROUTING' in part or len(part.encode('utf-8')) < 400:
+                continue
+            homes.setdefault(m.group(1), []).append(kind)
+    if not nfiles:
+        warn('жодного файлу правил не знайдено — G21 не виконався, це НЕ зелений результат')
+        return
+    dups = sorted((k, v) for k, v in homes.items() if len(v) > 1)
+    if dups:
+        fail('номер з тілом у кількох файлах: ' +
+             ' '.join(f'{k}({"+".join(v)})' for k, v in dups))
+    else:
+        ok(f'{len(homes)} номерів з тілом у {nfiles} файлах — кожен рівно в одному')
+
 
 # ─────────────────────────── G19 · СПРАЦЮВАННЯ ПРАВИЛ ───────────────────────
 # К4-1. Три рішення, на яких тримається чесність числа (перенесено з
@@ -607,8 +642,7 @@ def _declared_order(root):
 
 def g19(root):
     print('\n[G19] спрацювання правил — нуль згадок без сліду народження (К4-1)')
-    R_ = _rule_ids(R(root, 'Work_Standard.md'), 'wsd') + \
-         _rule_ids(R(root, 'Lens_governance_protocol.md'), 'gov')
+    R_ = [x for f, kind in RULE_FILES.items() for x in _rule_ids(R(root, f), kind)]
     seen, RU = set(), []
     for r_, k in R_:
         if r_ not in seen:
