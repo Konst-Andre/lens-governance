@@ -26,6 +26,10 @@ KERNEL v2 · 31.07.2026
       G13 нумерація секцій усередині файлу: (a) дубль §N → ✗
          (b) діра в послідовності → ⚠ (c) секції не по зростанню → ⚠
          Для дубля додатково називає, ХТО на нього посилається ззовні
+      G16 правило без детектора (К2) і без маркера K2:n/a
+      G19 спрацювання правил: правило з нулем згадок у самері й без сліду
+         народження — кандидат на виселення (К4-1). Живі самері лежать у
+         Project, не в репо — тому тека з ними додається: --gov . --live <тека>
 
   python3 Lens_validate.py --html <file.html>
       Перед-видачні гейти білда (wsd Кластер 3 / 10).
@@ -54,6 +58,7 @@ KERNEL_FILES = [
     'Lens_iOS_cookbook_5_motion.md', 'Lens_ARCHIVE_INDEX.md',
 ]
 SIGNAL_KB, RED_KB = 120, 200
+LIVE_DIRS = []          # теки живих самері (Project) для G19 — --live
 
 ok_n = warn_n = fail_n = 0
 
@@ -550,6 +555,115 @@ def gov(root):
         warn('жодного файлу правил не знайдено — гейт не виконався '
              '(дзеркало неповне?), це НЕ зелений результат')
 
+    g19(root)
+
+# ─────────────────────────── G19 · СПРАЦЮВАННЯ ПРАВИЛ ───────────────────────
+# К4-1. Три рішення, на яких тримається чесність числа (перенесено з
+# rules_hits.py разом з кодом — без них число бреше):
+#   1. ПОРЯДОК СЕСІЙ береться з ОГОЛОШЕННЯ (Lens_ARCHIVE_INDEX.md), а не з дати
+#      файлу чи алфавіту: дати губляться при Sync у Project, алфавіт ставить
+#      b27 перед b9 (Lens_INDEX §5).
+#   2. ЗБІГ СТРОГИЙ + ВИМОГА КОНТЕКСТУ: `12.16`, wsd 1.9, §2.4 — так; голе
+#      число в прозі («2.4 KB», «v2.34») — ні. Без вимоги контексту замір дав
+#      2 нулі замість 12, тобто 10 хибних ✓ (1.15 пастка 1).
+#   3. НАРОДЖЕННЯ ≠ СПРАЦЮВАННЯ: правило, влите вчора, має нуль за визначенням.
+#      Слід народження — **N.N** у таблиці злиття самері.
+#
+# ЧОМУ ⚠, А НЕ ✗ (відхилення від дослівної К2 в rules_hits.py, назване вголос):
+#   вирок «виселити» виносить людина, і закрити ці нулі одним ходом неможливо —
+#   це робота К3-1. Вісім незакриваних ✗ дали б рівно те, від чого застерігає
+#   G3-1: червоне, на яке немає дії, вчить ігнорувати червоне.
+
+_CTX = r'(?:`|wsd\s+|gov\s+|§|\bп\.\s?|\(|правил\w*\s+)'
+
+
+def _rule_pat(rid):
+    """Строгий якір номера правила з вимогою контексту посилання."""
+    tail = r'(?![\d.])' if '-' in rid else r'(?![\d.\-])'
+    return re.compile(_CTX + re.escape(rid) + tail)
+
+
+def _rule_ids(path, kind):
+    try:
+        t = open(path, encoding='utf-8').read()
+    except OSError:
+        return []
+    return [(m.group(1), kind) for m in
+            re.finditer(r'^##+\s+`?(\d+\.\d+(?:-[а-яґєіїь])?)`?[\s|]', t, re.M)]
+
+
+def _declared_order(root):
+    """Порядок сесій = порядок рядків реєстру в ARCHIVE_INDEX (оголошення, не здогад)."""
+    try:
+        t = open(R(root, 'Lens_ARCHIVE_INDEX.md'), encoding='utf-8').read()
+    except OSError:
+        return []
+    names = []
+    for m in re.finditer(r'^- `([^`]+\.md)`', t, re.M):
+        if m.group(1) not in names:
+            names.append(m.group(1))
+    return names
+
+
+def g19(root):
+    print('\n[G19] спрацювання правил — нуль згадок без сліду народження (К4-1)')
+    R_ = _rule_ids(R(root, 'Work_Standard.md'), 'wsd') + \
+         _rule_ids(R(root, 'Lens_governance_protocol.md'), 'gov')
+    seen, RU = set(), []
+    for r_, k in R_:
+        if r_ not in seen:
+            seen.add(r_); RU.append((r_, k))
+    if not RU:
+        warn('файлів правил не знайдено — G19 не виконався, це НЕ зелений результат')
+        return
+
+    found = {}
+    base = os.path.join(root, 'archive', 'summaries')
+    for dp, _, fns in os.walk(base):
+        for n in fns:
+            if n.endswith('.md'):
+                found[n] = os.path.join(dp, n)
+    order = _declared_order(root)
+    docs = [(n, open(found[n], encoding='utf-8').read()) for n in order if n in found]
+    undeclared = sorted(set(found) - set(order))
+    for d in LIVE_DIRS:
+        if not os.path.isdir(d):
+            warn(f'--live: теки немає — {d}')
+            continue
+        for n in sorted(os.listdir(d)):
+            if n.endswith('.md'):
+                docs.append((n + ' [live]', open(os.path.join(d, n), encoding='utf-8').read()))
+    if not docs:
+        warn('корпусу самері не знайдено (archive/summaries порожня, --live не дано) — '
+             'G19 не виконався, це НЕ зелений результат')
+        return
+
+    zeros, born_zeros = [], []
+    for rid, kind in RU:
+        p = _rule_pat(rid)
+        if any(p.search(t) for _, t in docs):
+            continue
+        bp = re.compile(r'\*\*' + re.escape(rid) + r'\*\*')
+        (born_zeros if any(bp.search(t) for _, t in docs) else zeros).append(f'{rid}({kind})')
+
+    print(f'  правил {len(RU)} · самері в підрахунку {len(docs)}'
+          + (f' (+{len(LIVE_DIRS)} тек живих)' if LIVE_DIRS else ''))
+    if undeclared:
+        warn(f'{len(undeclared)} самері в archive/ не названі в ARCHIVE_INDEX — '
+             f'у підрахунок НЕ ввійшли (IDX-13)')
+    if born_zeros:
+        print(f'  народжені, спрацювати ще не встигли ({len(born_zeros)}): '
+              f'{" ".join(born_zeros)}')
+    if zeros:
+        warn(f'{len(zeros)} з {len(RU)} правил без жодного сліду — кандидати на '
+             f'виселення (К3-1): {" ".join(zeros)}')
+    else:
+        ok(f'усі {len(RU)} правил мають слід у корпусі самері')
+    if not LIVE_DIRS:
+        print('  ⓘ живі самері (Project) не додані: правило, що спрацювало лише в '
+              'останніх сесіях, читається тут як 0. Додати: --live <тека>')
+
+
 # ────────────────────────────────── HTML ──────────────────────────────────
 
 def html(path):
@@ -638,7 +752,13 @@ def main():
     if len(sys.argv) < 2:
         print(__doc__); sys.exit(2)
     if sys.argv[1] == '--gov':
-        gov(sys.argv[2] if len(sys.argv) > 2 else '.')
+        args = sys.argv[2:]
+        while '--live' in args:
+            i = args.index('--live')
+            if i + 1 >= len(args):
+                print('--live потребує теки'); sys.exit(2)
+            LIVE_DIRS.append(args[i + 1]); del args[i:i + 2]
+        gov(args[0] if args else '.')
     elif sys.argv[1] == '--html':
         if len(sys.argv) < 3:
             print('потрібен шлях до .html'); sys.exit(2)
