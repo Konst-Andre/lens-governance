@@ -34,6 +34,8 @@ KERNEL v2 · 31.07.2026
          (розпил wsd, IDX-7: перенос без вирізання дає дубль, якого не бачить ніхто)
          Маршрутна заглушка (G16 · G21) — за структурою, не за словом (Ф-25): тіло до h1 —
          лише цитати, одна з них `> **ROUTING →`. Заглушка ≥ 400 B → ⚠ «виключено як маршрут»
+      G22 (з --live) живе самері (у теці --live, не в archive/summaries/) без code block у розділі
+         «стартове повідомлення» → ✗ (wsd 1.3 К2; G-J віддало §6 blockquote-ом — не копіюється)
       G23 канон-файл kernel/**/*.md без тригера читання в шапці (перші 12 рядків:
          «читається…» або «AUTO-READ») → ✗ на файл (К6-1: файл вмикається механізмом, не пам'яттю)
 
@@ -582,6 +584,7 @@ def gov(root):
     g21(root)
     g23(root)
     g19(root)
+    g22(root)
 
 # ─────────────────────────── G21 · ОДИН ДІМ НОМЕРА ──────────────────────────
 def g21(root):
@@ -746,6 +749,48 @@ def g19(root):
     if not LIVE_DIRS:
         print('  ⓘ живі самері (Project) не додані: правило, що спрацювало лише в '
               'останніх сесіях, читається тут як 0. Додати: --live <тека>')
+
+
+# ─────────────────────────── G22 · СТАРТОВЕ ПОВІДОМЛЕННЯ У CODE BLOCK ──────────
+def g22(root):
+    """wsd 1.3 К2 (G-K §2): §6 самері — готовий до копіювання текст, тобто fenced code block.
+    Перевіряє живі самері: *_session_summary_*.md у теках --live, яких немає в archive/summaries/**
+    (варіант Б, G-Q: ловить і свіже самері в outputs до видачі, ще не оголошене в §5)."""
+    print('\n[G22] стартове повідомлення самері — у code block (wsd 1.3)')
+    if not LIVE_DIRS:
+        print('  ⓘ --live не дано — G22 не виконувався (живі самері лежать у Project, не в репо)')
+        return
+    arc = set()
+    for _, _, fns in os.walk(os.path.join(root, 'archive', 'summaries')):
+        arc |= set(fns)
+    seen, bad = 0, []
+    for d in LIVE_DIRS:
+        if not os.path.isdir(d):
+            continue
+        for n in sorted(os.listdir(d)):
+            if not (n.endswith('.md') and '_session_summary_' in n) or n in arc:
+                continue
+            seen += 1
+            lines = open(os.path.join(d, n), encoding='utf-8').read().splitlines()
+            hs = [i for i, l in enumerate(lines)
+                  if re.match(r'#{2,}\s', l) and 'стартове повідомлення' in l.casefold()]
+            if not hs:
+                bad.append(f'{n} (немає заголовка «стартове повідомлення»)')
+                continue
+            sec = []
+            for l in lines[hs[-1] + 1:]:
+                if re.match(r'#{1,2}\s', l):
+                    break
+                sec.append(l)
+            if not any(re.match(r'\s*(```|~~~)', l) for l in sec):
+                bad.append(f'{n} (немає code block — blockquote/текст не копіюється)')
+    if not seen:
+        warn('живих самері в --live не знайдено — G22 не виконався, це НЕ зелений результат')
+    elif bad:
+        for b in bad:
+            fail(f'G22 {b}')
+    else:
+        ok(f'усі {seen} живих самері мають стартове повідомлення в code block')
 
 
 # ────────────────────────────────── HTML ──────────────────────────────────
