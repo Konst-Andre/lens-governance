@@ -500,7 +500,8 @@ device-арбітраж (1.5) — він лише розширює набір к
 - [ ] `node --check file.html` (через JS extraction або окремий .js файл) — синтаксис OK.
 - [ ] Усі функції що мають викликатись з event handlers — присутні в global scope або правильно binded.
 - [ ] Усі константи (`EQ_BRAND_ORDER`, `STATUSES`, тощо) — declared один раз, не дублюються.
-- [ ] `o.i` sorted at the right place (`selectOutlet()` time), не локально в render-функціях.
+- [ ] Сортування даних — у точці вибору, не локально в render-функціях (приклад — QR Lens:
+  `o.i` сортується в `selectOutlet()`; позначка G-P 18.09.2026 — специфіка продукту як приклад, не як правило).
 - [ ] Listener guards проти подвійного reg (`if (window.__listener_added) return;`).
 - [ ] Кожен `<button>` у документі має non-empty `onclick`/addEventListener, або `disabled` з visible reason (Кластер 3.9).
 
