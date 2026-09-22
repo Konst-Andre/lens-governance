@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # живе доки: у claude.ai немає офіційного GitHub-конектора із записом (тоді — в archive/superseded)
-# Lens_claude_github_push.py · v2 · 18.09.2026 (G-K: +--delete) · П-GH1 · протокол: Lens_github_push_protocol.md
+# Lens_claude_github_push.py · v3 · 22.09.2026 (AE S82: FORBIDDEN_PATH порожній, В-139) · v2 18.09.2026 (G-K: +--delete) · П-GH1 · протокол: Lens_github_push_protocol.md
 """Пуш з чату Claude у GitHub одним атомарним комітом (Git Data API).
 
 ЗАПОБІЖНИК (двоходовий):
@@ -23,7 +23,8 @@ PLAN-ID = хеш(репо + ціль + SHA бази + шляхи + вміст). 
 import argparse, base64, difflib, hashlib, json, os, re, sys, urllib.request, urllib.error
 
 API = "https://api.github.com"
-FORBIDDEN_PATH = [re.compile(r"AE_WORK_index_X.*\.html$")]          # В-31/В-94
+FORBIDDEN_PATH = []   # порожньо: В-31/В-94 скасовано В-139 (AE S82 · 22.09.2026) — репо = єдиний дім продукту;
+                      # механізм лишено для майбутніх заборон шляху
 SECRET = re.compile(rb"github_pat_[A-Za-z0-9_]{20,}|ghp_[A-Za-z0-9]{30,}")
 
 
@@ -73,7 +74,7 @@ def main():
         rp, lp = spec.split("=", 1)
         rp = rp.lstrip("/")
         if any(p.search(rp) for p in FORBIDDEN_PATH):
-            die(f"заборонений шлях (робочий index не пушимо): {rp}")
+            die(f"заборонений шлях: {rp}")
         data = open(lp, "rb").read()
         if SECRET.search(data):
             die(f"у файлі схожий на токен рядок — запис заблоковано: {lp}")
