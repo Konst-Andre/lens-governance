@@ -219,7 +219,7 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 - `EquipLens_session_summary_S32_FONT.md` · 24.09.2026 · витіснено S34/S35 (G-T)
 - `EquipLens_session_summary_S33_CHILLAX.md` · 24.09.2026 · витіснено S34/S35 (G-T)
 
-### `archive/summaries/Lens_gov/` — 114 файлів *(заведено G-C3 17.09.2026; шлях з підтекою — raw без `Lens_gov/` дає 404; лічильник «Разом» нижче і §2 «плоско» не перераховані — `IDX-13`)*
+### `archive/summaries/Lens_gov/` — 116 файлів *(заведено G-C3 17.09.2026; шлях з підтекою — raw без `Lens_gov/` дає 404; лічильник «Разом» нижче і §2 «плоско» не перераховані — `IDX-13`)*
 
 - `Lens_session_summary_governance_A.md` · governance A (31.07)
 - `Lens_session_summary_governance_B.md` · governance B
@@ -336,6 +336,8 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 - `gr_step2_f24_v1.py` · 19.09.2026 · Lens governance · пакет G-R: Ф-24 → Lens_INDEX §5 біля стелі черги (51 141 → 51 428 B) · пушено 788f62f
 - `gr_step3_g16_v1.py` · 19.09.2026 · Lens governance · пакет G-R: G16 — мітка детектора будь-де в тілі правила (Lens_validate 56 413 → 57 258 B) · пушено 1e95cb9
 - `gr_step4_g16close_v1.py` · 19.09.2026 · Lens governance · пакет G-R: закриття G16-1 — gov 12.12 += мітка детектора · 12.17 += K2:n/a (gov 59 383 → 59 768 B) · пушено fcfc3ec
+- `Lens_session_summary_governance_F_CHERGA_PLAN.md` · 24.09.2026 · Lens governance · governance F (план черги): витіснене G-C3 17.09.2026, у Project лежало сиротою до G-U (Ф-15, старий префікс — звірено вручну)
+- `Lens_session_summary_governance_G_MASKA.md` · 24.09.2026 · Lens governance · governance G (маска, `12.20`): витіснене G-C3 17.09.2026, у Project лежало сиротою до G-U (Ф-15, старий префікс — звірено вручну)
 
 ### `archive/stands/` — 28 файлів
 
