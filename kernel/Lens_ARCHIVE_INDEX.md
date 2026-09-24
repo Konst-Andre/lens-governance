@@ -219,7 +219,7 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 - `EquipLens_session_summary_S32_FONT.md` · 24.09.2026 · витіснено S34/S35 (G-T)
 - `EquipLens_session_summary_S33_CHILLAX.md` · 24.09.2026 · витіснено S34/S35 (G-T)
 
-### `archive/summaries/Lens_gov/` — 116 файлів *(заведено G-C3 17.09.2026; шлях з підтекою — raw без `Lens_gov/` дає 404; лічильник «Разом» нижче і §2 «плоско» не перераховані — `IDX-13`)*
+### `archive/summaries/Lens_gov/` — 120 файлів *(заведено G-C3 17.09.2026; шлях з підтекою — raw без `Lens_gov/` дає 404; лічильник «Разом» нижче і §2 «плоско» не перераховані — `IDX-13`)*
 
 - `Lens_session_summary_governance_A.md` · governance A (31.07)
 - `Lens_session_summary_governance_B.md` · governance B
@@ -338,6 +338,8 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 - `gr_step4_g16close_v1.py` · 19.09.2026 · Lens governance · пакет G-R: закриття G16-1 — gov 12.12 += мітка детектора · 12.17 += K2:n/a (gov 59 383 → 59 768 B) · пушено fcfc3ec
 - `Lens_session_summary_governance_F_CHERGA_PLAN.md` · 24.09.2026 · Lens governance · governance F (план черги): витіснене G-C3 17.09.2026, у Project лежало сиротою до G-U (Ф-15, старий префікс — звірено вручну)
 - `Lens_session_summary_governance_G_MASKA.md` · 24.09.2026 · Lens governance · governance G (маска, `12.20`): витіснене G-C3 17.09.2026, у Project лежало сиротою до G-U (Ф-15, старий префікс — звірено вручну)
+- `gu_step1_archive_v1.py` · `gu_step2_f1_v1.py` · `gu_step3_f2_v1.py` · 24.09.2026 · Lens governance · пакет G-U (хід 1 — §5 → GT + сироти F·G; хід 2 — Ф1, дім формули; хід 3 — Ф2 для governance). Коміти `e53b104` · `2d1cc26` · хід 3
+- `Lens_session_summary_governance_E_PROJECT.md` · 24.09.2026 · Lens governance · друга редакція самері governance E (11 285 B, md5 `f79e66ca`), що лежала в Project під іменем архівної (`dac233a8`, 22 929 B); перейменовано, щоб не було дубля імені
 
 ### `archive/stands/` — 28 файлів
 
