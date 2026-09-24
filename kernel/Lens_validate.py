@@ -19,6 +19,8 @@ KERNEL v2 · 31.07.2026
       G7 мертвий буфер: «Куди канонити/мерджити» вказує на неіснуючий файл
          АБО цільовий A-запис уже стоїть у томі Cookbook
       G8 сирота-посилання: `Ім'я.md` у канон-файлі, а файлу в теці немає
+         + шлях від кореня `тека/Ім'я.md` не існує → ✗ · `Репо:шлях` — лише з --repo
+         ІМ'Я=тека (локальний корінь, мережі немає); кореня не дано → ⓘ (REPO_LAYOUT §1 · §3)
       G9 дубль A-номера між томами Cookbook
       G10 перепис самері: >2 на продукт → друкує список найстаріших на архів
       G11 цілісність буфера: (a) оголошене «ЛОТОК: N» ≠ фактичне число записів
@@ -40,6 +42,9 @@ KERNEL v2 · 31.07.2026
          «стартове повідомлення» → ✗ (wsd 1.3 К2; G-J віддало §6 blockquote-ом — не копіюється)
       G23 канон-файл kernel/**/*.md без тригера читання в шапці (перші 12 рядків:
          «читається…» або «AUTO-READ») → ✗ на файл (К6-1: файл вмикається механізмом, не пам'яттю)
+      G24 дубль базового імені в живому дереві (поза archive/) → ✗; дублі в archive/ — ⓘ,
+         історія не правиться (REPO_LAYOUT §1, детектор Ф1)
+      --repo ІМ'Я=тека (повторюваний) — сусідній локальний корінь для `Репо:шлях` у G8
 
   python3 Lens_validate.py --html <file.html>
       Перед-видачні гейти білда (wsd Кластер 3 / 10).
@@ -69,6 +74,8 @@ KERNEL_FILES = [
 ]
 SIGNAL_KB, RED_KB = 120, 200
 LIVE_DIRS = []          # теки живих самері (Project) для G19 — --live
+REPO_ROOTS = {}         # ІМ'Я → локальна тека чужого репо для G8 (`Репо:шлях`) — --repo; мережі немає (REPO_LAYOUT §3)
+SELF_REPO = 'lens-governance'
 # Файли правил — ОГОЛОШЕННЯ, не здогад (wsd 1.10). Новий дім правил = рядок тут
 # + рядок у Lens_INDEX. Читають G4 · G16 · G19 · G21. Мітка — у виводі G19/G21.
 RULE_FILES = {'Work_Standard.md': 'wsd', 'Lens_governance_protocol.md': 'gov', 'Lens_PROFILE.md': 'prof', 'Lens_verdict_protocol.md': 'verd', 'Lens_patch_check_protocol.md': 'chk'}
@@ -134,9 +141,21 @@ def gov(root):
         dns[:] = [d for d in dns if d not in ('.git', 'node_modules', '__pycache__')]
         for fn in fns:
             _FMAP.setdefault(fn, os.path.join(dp, fn))
+    # ── G24 — дубль імені (детектор Ф1, REPO_LAYOUT §1) ──
+    # Був безномерним рядком до G1 і валив ✗ на archive/, якого не правлять (gov 12.12, межа):
+    # ✗, який не закрити, привчає ігнорувати червоне. Живе дерево → ✗; archive/ → ⓘ.
+    print('\n[G24] дубль імені в живому дереві (поза archive/)')
+    live_d, arch_d = {}, {}
     for n, ps in _dup_scan(root).items():
+        lp = [x for x in ps if not x.replace('\\', '/').split('/')[0] == 'archive']
+        (live_d if len(lp) > 1 else arch_d)[n] = ps
+    for n, ps in sorted(live_d.items()):
         fail(f'`{n}` лежить у {len(ps)} теках ({", ".join(ps)}) — '
              f'посилання за іменем стає неоднозначним')
+    if arch_d:
+        print(f'  ⓘ дублі лише в archive/ ({len(arch_d)}): {" ".join(sorted(arch_d))} — історія, не правиться')
+    if not live_d:
+        ok('дублів імен у живому дереві немає')
     mds = sorted(n for n in _FMAP if n.endswith('.md'))
     if not mds:
         fail('жодного .md не знайдено — не та тека?'); return
@@ -267,6 +286,8 @@ def gov(root):
         closed = 'ЗАКРИТО' in head or 'ПЕРЕНАВЕДЕНО' in head
         blob = '\n'.join(lines)
         for tgt in set(re.findall(r'`([^`]+\.md)`', blob)):
+            if '/' in tgt and os.path.exists(os.path.join(root, tgt)):
+                continue   # шлях від кореня, що існує (Ф1) — не ✗
             if tgt not in mds and not closed:
                 fail(f'{f} → ціль `{tgt}` не існує в теці (розпиляна/перейменована)'); g7 = True
         for num in sorted(set(re.findall(r'\bA(\d+)\b', blob))):
@@ -289,6 +310,29 @@ def gov(root):
         for ref in set(re.findall(r'`([A-Za-zА-Яа-яЇїІіЄєҐґ0-9_\-\.]+\.(?:md|py|js))`', body)):
             if not os.path.exists(R(root, ref)):
                 orphans.setdefault(ref, []).append(f)
+    # Ф1 (REPO_LAYOUT §1): шлях від кореня свого репо та `Репо:шлях` чужого.
+    # Регекс імені вище `/` не бачить — без цього блоку сирота-шлях для G8 не існує.
+    path_bad, x_skip, x_n = [], set(), 0
+    for f in canon:
+        body = open(R(root, f), encoding='utf-8').read()
+        for ref in set(re.findall(r'`((?:[\w.\-]+/)+[\w.\-]+\.(?:md|py|js))`', body)):
+            if not os.path.exists(os.path.join(root, ref)):
+                path_bad.append((ref, f))
+        for rp, ref in set(re.findall(r'`([A-Za-z][\w\-]*):((?:[\w.\-]+/)*[\w.\-]+\.[A-Za-z]+)`', body)):
+            x_n += 1
+            base = root if rp == SELF_REPO else REPO_ROOTS.get(rp)
+            if base is None:
+                x_skip.add(rp); continue
+            if not os.path.exists(os.path.join(base, ref)):
+                path_bad.append((f'{rp}:{ref}', f))
+    for ref, f in sorted(path_bad):
+        fail(f'`{ref}` — шлях не існує (згадка: {f}); Ф1: шлях несе координату, сирота-шлях = втрата')
+    if x_skip:
+        print(f'  ⓘ `Репо:шлях` без локального кореня — не перевірено: {" ".join(sorted(x_skip))} '
+              f'(додати --repo ІМ\'Я=тека; мережі гейт не має, REPO_LAYOUT §3)')
+    if not path_bad:
+        ok(f'шляхи й `Репо:шлях` резолвляться (згадок `Репо:шлях` {x_n}, з них без кореня — реп {len(x_skip)})')
+
     # G8 розпил (сесія E). Раніше гейт давав ⚠ на ВСЕ, чого немає в теці, —
     # і оголошено-живий, і легально-заархівований файл виглядали однаково.
     # Наслідок: `StockCheck_session_summary_b27.md`, оголошений живим у §5,
@@ -902,6 +946,11 @@ def main():
             if i + 1 >= len(args):
                 print('--live потребує теки'); sys.exit(2)
             LIVE_DIRS.append(args[i + 1]); del args[i:i + 2]
+        while '--repo' in args:
+            i = args.index('--repo')
+            if i + 1 >= len(args) or '=' not in args[i + 1]:
+                print('--repo потребує ІМ\'Я=тека'); sys.exit(2)
+            k, v = args[i + 1].split('=', 1); REPO_ROOTS[k] = v; del args[i:i + 2]
         gov(args[0] if args else '.')
     elif sys.argv[1] == '--html':
         if len(sys.argv) < 3:
