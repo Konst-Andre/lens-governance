@@ -166,6 +166,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 | `StockCheck_icon_gen.py` | генератор іконок PWA з локнутого гліфа |
 | `Lens_validate.py` | гейт-скрипт: `--gov [тека] [--live <тека живих самері>]` (G1–G13 · G16 · G19 governance; номери — §5 «Стан номерів гейтів») · `--html <file>` (H1–H4 білд) |
 | `Lens_claude_github_push.py` | пуш з чату одним атомарним комітом; двоходовий запобіжник `--dry-run` → `--confirm PLAN-ID`; v2 — видалення файлу `--delete` під тим самим PLAN-ID; без видалення гілок і force-push (протокол `Lens_github_push_protocol.md`) |
+| `Lens_start.py` | **старт сесії однією командою** (І-1, G-X 24.09.2026): клон ядра + `--product` · числа бази проти §5 живого самері (самері — з рядка §5, не вгадується) · стеля черг · лістинг репо (П-GV1) · `--gov-session` «Зміст» gov-протоколу · `--instr` diff поля Instructions ⟂ `Lens_PROJECT_instruction.md` (токен маскується). Нічого не пише; exit 1 = розбіжність |
 
 ---
 
