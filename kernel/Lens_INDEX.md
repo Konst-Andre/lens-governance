@@ -293,7 +293,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 |---|---|
 | **StockCheck** | `StockCheck_session_summary_b32_7_s20s21_STORAGE_TRUTH.md` · `StockCheck_session_summary_b32_5_s18s19_STORAGE_DONE.md` |
 | **QR Lens** | `QR_Lens_session_summary_b60_PRESSBENCH_v3_1.md` · `QR_Lens_session_summary_b60_AREACHIP_PORT.md` |
-| **EquipLens** | `EquipLens_session_summary_S31_HEAD_LEVERS.md` · `EquipLens_session_summary_S30_SCALE_VERDICT.md` *(S13…S29 витіснені)* |
+| **EquipLens** | `EquipLens_session_summary_S35_OSTRIVETS.md` · `EquipLens_session_summary_S34_AURORA_HYBRID.md` *(S13…S33 витіснені; S30–S33 → `archive/summaries/EquipLens/` 24.09.2026, G-T)* |
 | **PharmaLens** | `PharmaLens_session_summary_S1_FOUNDATION.md` *(продукт заморожено — чекає `.pptx` від Олі; єдине самері, стеля не задіяна)* |
 | **KPI Lens** | `KPI_Lens_session_summary_Batch15_2.md` |
 | **Lens** *(governance)* | `Lens_governance_session_summary_GR_G16_STRUKTURA.md` · `Lens_governance_session_summary_GQ_HEITY_TRY.md` *(GP витіснено 19.09.2026 сесією G-S; GO — G-R; GN — G-Q; GM — G-P; GL — G-O; GK — G-N; GJ — G-M; GI — G-L; GH — G-K; GG — G-J; GF — G-H; GA…GE — 17.09.2026 → `archive/summaries/Lens_gov/`)* |

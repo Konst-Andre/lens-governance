@@ -214,6 +214,10 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 - `EquipLens_session_summary_S10_VOLUME_SHADING_EDGE.md`
 - `EquipLens_session_summary_S11_SPLIT_GLASSKIT.md` — 33 світлі значення шейдингу запечені, `LOCK_MIGRATE`, 5 зовнішніх Liquid Glass репо; тексти влиті в Cookbook `A91`–`A102`
 - `EquipLens_session_summary_S12_GOVERNANCE_DRAIN.md` — черга 26 записів, вичерпана в S13
+- `EquipLens_session_summary_S30_SCALE_VERDICT.md` · 24.09.2026 · витіснено S34/S35 (G-T)
+- `EquipLens_session_summary_S31_HEAD_LEVERS.md` · 24.09.2026 · витіснено S34/S35 (G-T)
+- `EquipLens_session_summary_S32_FONT.md` · 24.09.2026 · витіснено S34/S35 (G-T)
+- `EquipLens_session_summary_S33_CHILLAX.md` · 24.09.2026 · витіснено S34/S35 (G-T)
 
 ### `archive/summaries/Lens_gov/` — 114 файлів *(заведено G-C3 17.09.2026; шлях з підтекою — raw без `Lens_gov/` дає 404; лічильник «Разом» нижче і §2 «плоско» не перераховані — `IDX-13`)*
 
