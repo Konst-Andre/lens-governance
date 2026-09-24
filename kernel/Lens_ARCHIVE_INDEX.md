@@ -341,6 +341,7 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 - `gu_step1_archive_v1.py` · `gu_step2_f1_v1.py` · `gu_step3_f2_v1.py` · 24.09.2026 · Lens governance · пакет G-U (хід 1 — §5 → GT + сироти F·G; хід 2 — Ф1, дім формули; хід 3 — Ф2 для governance). Коміти `e53b104` · `2d1cc26` · хід 3
 - `Lens_session_summary_governance_E_PROJECT.md` · 24.09.2026 · Lens governance · друга редакція самері governance E (11 285 B, md5 `f79e66ca`), що лежала в Project під іменем архівної (`dac233a8`, 22 929 B); перейменовано, щоб не було дубля імені
 - `Lens_governance_session_summary_GT_S35_INVENTAR.md` · 24.09.2026 · Lens governance · G-T (інвентар перед переїздом, Ф1–Ф8 питаннями): витіснене G-V (стеля 2) з `sessions/Lens_gov/`; супутник `Lens_inventory_GT_v1.md` лишається живим до кінця формули
+- `Lens_governance_session_summary_GU_F1_ADRESA.md` · 24.09.2026 · Lens governance · G-U (Ф1 адресація `Репо:шлях`, Ф2 governance-самері в репо): витіснене G-W (стеля 2) з `sessions/Lens_gov/`
 
 ### `archive/stands/` — 28 файлів
 
