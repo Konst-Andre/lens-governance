@@ -343,6 +343,7 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 - `Lens_governance_session_summary_GT_S35_INVENTAR.md` · 24.09.2026 · Lens governance · G-T (інвентар перед переїздом, Ф1–Ф8 питаннями): витіснене G-V (стеля 2) з `sessions/Lens_gov/`; супутник `Lens_inventory_GT_v1.md` лишається живим до кінця формули
 - `Lens_governance_session_summary_GU_F1_ADRESA.md` · 24.09.2026 · Lens governance · G-U (Ф1 адресація `Репо:шлях`, Ф2 governance-самері в репо): витіснене G-W (стеля 2) з `sessions/Lens_gov/`
 - `Lens_governance_session_summary_GV_F4_KORPUS.md` · 24.09.2026 · Lens governance · G-V (Ф4 корпус у ядрі, детектор Ф1 — `G24`, Ф1 чинне): витіснене G-Y (стеля 2) з `sessions/Lens_gov/`
+- `Lens_governance_session_summary_GW_F3_YADRO.md` · 24.09.2026 · Lens governance · G-W (Ф3 «ядро ⟂ продукти», журнал переїзду, Р-1…Р-7): витіснене G-Y (стеля 2) з `sessions/Lens_gov/`
 
 ### `archive/stands/` — 28 файлів
 
