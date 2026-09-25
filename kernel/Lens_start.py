@@ -37,7 +37,10 @@ def sh(cmd, cwd=None):
 def clone(repo, root, token):
     dst = os.path.join(root, repo)
     if os.path.isdir(os.path.join(dst, '.git')):
-        code, out = sh(['git', 'pull', '-q', '--ff-only'], dst)
+        # fetch + ff-only від origin/main, не `pull`: клон Claude Code стоїть на гілці без upstream (G-Y)
+        code, out = sh(['git', 'fetch', '-q', 'origin', 'main'], dst)
+        if not code:
+            code, out = sh(['git', 'merge', '-q', '--ff-only', 'origin/main'], dst)
     else:
         auth = f'x-access-token:{token}@' if token else ''
         code, out = sh(['git', 'clone', '-q', f'https://{auth}github.com/{OWNER}/{repo}.git', dst])
