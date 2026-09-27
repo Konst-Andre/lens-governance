@@ -77,8 +77,8 @@ Drive → `Drive-Lens`, Equip → `EquipLens`, StockCheck → `stock-check`.
 | продуктове | G12 | 1 | `archive/matrices/` (EquipLens · StockCheck · Фармастор) не названа в `ARCHIVE_INDEX §4` | 2-б Б + хід 3 |
 | **ядрове · архів** | G3 | 14 | `archive/summaries/Lens_gov/` тексти кроків GA…GG5 ×12 · `archive/Lens_iOS_cookbook.md` · `archive/superseded/lens-gh_SPEC_v1.2.md` | клас черги `G3-1`, не 7-а |
 | ядрове · архів | G6 | 1 | `archive/Lens_iOS_cookbook.md` 227 KB > 200 KB — міряється архів, якого не читають | той самий клас |
-| **ядрове · живе** | G3 | 1 | `tools/lens-gh/README.md` — G3 вимагає назвати кожен README, а Р-7 кладе README у кожну теку | спірне → Konst |
-| ядрове · живе | G8 | 1 | `Lens_xlsx_strict.py` — родинний інструмент (StockCheck · KPI · QR), лежить лише в Project | спірне → Konst |
+| **ядрове · живе** | G3 | 1 | `tools/lens-gh/README.md` — G3 вимагає назвати кожен README, а Р-7 кладе README у кожну теку | ✅ G-Z 7-а: G3 не вимагає `README.md` |
+| ядрове · живе | G8 | 1 | `Lens_xlsx_strict.py` — родинний інструмент (StockCheck · KPI · QR), лежить лише в Project | ✅ G-Z → `tools/Lens_xlsx_strict.py` (делегування Konst: ядрове) |
 
 Разом: продуктове **80** · ядрове **17** (архів 15 · живе 2). Після 7-а і ходів 3–6 гейт ядра = 17 ✗, з них 15 закриває `G3-1`.
 **Дельта G-Y ✗95 → ✗97** (прогін `--gov` на кожному коміті `5f26c45…d0e1880`): +1 `README.md` (LGH-1 `e2d845d`) · +1 `SPEC_v1.2.md` (LGH-2 `c2b9af9`, з `69d7821` — `lens-gh_SPEC_v1.2.md`); `CHAT_TOOLS.md` був ✗ з `6cd9da4` до `d0e1880`. Обидва — ядрові, не регрес коду.
