@@ -68,11 +68,11 @@ GitHub живе в секреті воркера, тож у тексті чат�
    `wrangler versions upload worker.js --name lens-gh --compatibility-date 2026-09-01 --no-bundle --keep-vars --preview-alias next --tag v<версія>`
    `--no-bundle` — у Cloudflare іде рівно цей файл (md5 ≡ репо); `--keep-vars` — інакше wrangler видалить змінні з дашборду (`OWNER`). Секрети версія бере поточні.
 3. `GET https://next-lens-gh.konstandre.workers.dev/` → нова версія; `GET https://lens-gh.konstandre.workers.dev/` → стара.
-4. Konst вмикає конектор «Lens GitHub next» (перепідключає, якщо змінився список інструментів) → чат видає квитки через нього → `bash smoke.sh live` + пункти, які скрипт перелічує наприкінці.
+4. **Агент сам нагадує Konst** (блок «Від тебе», коли версія на `next` жива): увімкнути конектор «Lens GitHub next» (перепідключає, якщо змінився список інструментів) → чат видає квитки через нього → `bash smoke.sh live` + пункти, які скрипт перелічує наприкінці.
 5. Зелено → коміт `worker.js` (+ смоук) у репо → у прод **ту саму** версію через API (не `wrangler versions deploy`: він підставляє свою конфігурацію й може вимкнути Workers Logs):
    `POST /accounts/<acc>/workers/scripts/lens-gh/deployments` · `{"strategy":"percentage","versions":[{"version_id":"<id>","percentage":100}]}`.
 6. Звірка: `GET /` прод → нова версія · md5 коду з `GET …/scripts/lens-gh/content/v2` ≡ md5 `worker.js` у репо · Workers Logs увімкнено (`…/settings` → `observability.logs.enabled`).
-7. Konst перепідключає основний «Lens GitHub» (нові інструменти видно лише після цього); «next» — вимкнути до наступної версії.
+7. **Агент сам нагадує Konst** (блок «Від тебе» у звіті про прод): перепідключити основний «Lens GitHub» (нові інструменти видно лише після цього) і вимкнути «next» до наступної версії. Після підтвердження — ✅ з датою в самері.
 8. ⚠ Файл `wrangler.jsonc` для цього воркера не заводимо: його `vars` перезаписують змінні з дашборду.
 
 ⚠ **Будь-яка зміна секрету чи змінної в дашборді (Deploy) створює нову версію з ОСТАННЬОЇ ЗАВАНТАЖЕНОЇ і ставить її в прод** — навіть якщо остання завантажена лише на `next` і ще не перевірена (LGH-2: так 1.2.0 потрапила в прод до живого смоуку). Тому: секрети міняти **до** кроку 2 або після кроку 5; якщо довелось між ними — одразу крок 6 і, якщо смоук ще не зелений, відкат.
@@ -90,4 +90,4 @@ GitHub живе в секреті воркера, тож у тексті чат�
 
 - 1.0.0 · 25.09.2026 (LGH-0) — read · list · log · commit; `PROTECT=main`.
 - 1.1.0 · 25.09.2026 (LGH-1) — `expected_head` обовʼязковий · `gh_branch` · `gh_actions`; `PROTECT` знято.
-- 1.2.0 · 27.09.2026 (LGH-2) — «квиток»: `gh_ticket` (tar · get · put) + маршрут `/t/` · `gh_commit {blob}` · точний розмір `content_base64` у `dry_run` · секрет `TICKET_KEY` · `smoke.sh`/`smoke_local.mjs` · деплой через доріжку `next`. ТЗ: `SPEC_v1.2.md`. Смоук §7: локально 38/38, живий 6/6. Прод = версія `cbe01d9e`.
+- 1.2.0 · 27.09.2026 (LGH-2) — «квиток»: `gh_ticket` (tar · get · put) + маршрут `/t/` · `gh_commit {blob}` · точний розмір `content_base64` у `dry_run` · секрет `TICKET_KEY` · `smoke.sh`/`smoke_local.mjs` · деплой через доріжку `next`. ТЗ: `archive/superseded/lens-gh_SPEC_v1.2.md`. Смоук §7: локально 38/38, живий 6/6. Прод = версія `cbe01d9e`.

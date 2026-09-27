@@ -377,7 +377,7 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 - `StockCheck_netpick_matrix.js` + `StockCheck_netpick_v3_smoke_b6.js` + `StockCheck_netpick_v3_live_b6.js` — 🗄 13.08.2026. Матриці сітки NetPick v3, числа b6. Портовано в b32.1 (s6–s11)
 - `StockCheck_h2_msl_data.py` — 🗄 13.08.2026. Дані H2; витіснено `StockCheck_msl_gen.py` (b31)
 
-### `archive/superseded/` — 7 файлів
+### `archive/superseded/` — 7 рядків · у теці 6 файлів (звірено 27.09.2026, LGH-2: `farmastor_v2_data.js` фізично в `archive/matrices/Фармастор/`; `StockCheck_B32_STAGEBENCH_HANDOFF.md` у теці нема; `StockCheck_collapse_C_CANON_delta.md` у теці **є**, хоч записаний у «Втрачене» — розібрати, `Lens_governance_CHERGA.md`)
 
 - `Drive_Lens_concept_v1.md`
 - `Drive_Lens_concept_v1_2.md`
@@ -386,6 +386,7 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 - `canon_delta_A45_material_lever_manifest.md` — 🗄 01.08.2026. Буфер **пережив ціль**: A45 канонізовано в `Lens_iOS_cookbook_3_material.md`. Йти сюди тільки за **сирими важелями компера** матеріальності, яких канон не зберіг
 
 - `StockCheck_B32_STAGEBENCH_HANDOFF.md` — 🗄 13.08.2026. Хендофф на побудову стенда грошей. Ціль досягнута: стенд v2 побудовано й залочено (s15c)
+- `lens-gh_SPEC_v1.2.md` · 27.09.2026 · Lens (інструменти чату) · ТЗ конектора lens-gh v1.2 «квиток» (контейнер ↔ воркер ↔ GitHub повз контекст), ред. 3 · задеплоєно й прийнято Konst (LGH-2), зміст влито в `tools/lens-gh/README.md` і `tools/CHAT_TOOLS.md` §2-б; до архіву лежав у теці tools/lens-gh/ під іменем SPEC_v1.2.md
 
 ### ❌ Втрачене при переїзді — НЕ шукати
 
@@ -397,4 +398,4 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
   фактично **404**. Втрачено транспорт, не зміст: ціль буфера канонізована як **A72**
   у `Lens_iOS_cookbook_5_motion.md`. Закрито 13.08.2026 як Р-5, відновлення не потрібне.
 
-**Разом: 113 файлів.** *(лічильники перераховані за фактом рядків 13.08.2026, сесія G-1 — стара цифра 81 розходилась із переліком)*
+**Разом: 114 файлів.** *(+1 `lens-gh_SPEC_v1.2.md`, LGH-2 27.09.2026)* *(лічильники перераховані за фактом рядків 13.08.2026, сесія G-1 — стара цифра 81 розходилась із переліком)*

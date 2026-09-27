@@ -4,7 +4,7 @@
 > дім: `lens-governance/tools/lens-gh/SPEC_v1.2.md` · автор: чат Routes, 27.09.2026 · будується в окремому чаті Project «Lens PWA».
 > ред. 2 · 27.09.2026: поле `note` + лог використань (слово Konst) · кейс «між репо» · `put` пачкою.
 > ред. 3 · 27.09.2026: §9 рецепти — це смоук §7 дослівно.
-> стан · 27.09.2026 (LGH-2): **задеплоєно** — lens-gh 1.2.0 у проді (`a8ddd44` код · `1772c3e` README 1.2.0 + CHAT_TOOLS v2). Зміст влито в README і CHAT_TOOLS §2-б. У `archive/` — після прийняття Konst (рядок у `Lens_ARCHIVE_INDEX.md` — тим самим ходом).
+> стан · 27.09.2026 (LGH-2): **задеплоєно і прийнято Konst** — lens-gh 1.2.0 у проді (`a8ddd44` код · `1772c3e` README 1.2.0 + CHAT_TOOLS v2). Зміст влито в `tools/lens-gh/README.md` і `tools/CHAT_TOOLS.md` §2-б. Перенесено в `archive/superseded/lens-gh_SPEC_v1.2.md` (було `tools/lens-gh/SPEC_v1.2.md`).
 
 ## §0 Навіщо
 
