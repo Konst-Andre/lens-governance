@@ -347,6 +347,8 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 - `Lens_governance_session_summary_GX_START_APP.md` · 24.09.2026 · Lens governance · G-X (Lens_start.py, GitHub App, прев'ю-стенд О-5): витіснене LGH-3 (стеля 2) з `sessions/Lens_gov/`
 - `Lens_governance_session_summary_LGH1_CONNECTOR_V11.md` · 26.09.2026 · Lens governance · LGH-1 (конектор «Lens GitHub» v1.1, П-LGH1…7, докази блокера LGH-0): витіснене LGH-3, §0 перенесено в LGH-3 §0
 - `Lens_governance_session_summary_LGH2_TICKET_V12.md` · 27.09.2026 · Lens governance · LGH-2 (квиток v1.2, wsd 1.9-б, П-LGH8…11): витіснене LGH-3, §0 перенесено в LGH-3 §0
+- `Lens_governance_session_summary_GY_GIT_APP_2B.md` · 27.09.2026 · Lens governance · G-Y (Р-4′ · Р-8 · Р-9, коміт А EquipLens, план G-Z): витіснене G-Z, §0 перенесено в G-Z §0
+- `Lens_governance_session_summary_LGH3_ADAPT_PREVIEW.md` · 27.09.2026 · Lens governance · LGH-3 (адаптер · прев'ю-стенд · інструкція v4, П-LGH12…15): витіснене G-Z, §0 перенесено в G-Z §0
 
 ### `archive/stands/` — 28 файлів
 
