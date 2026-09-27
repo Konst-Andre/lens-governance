@@ -137,6 +137,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 | `Lens_stagebench_manifest.md` | стенди: bench / harness / компер — рецепт і еталони |
 | `Lens_sandbox_manifest.md` | пісочниця: копія білда із синтетичними даними, 7 кроків |
 | `tools/PREVIEW.md` | **прев'ю-стенд** `Konst-Andre/sandbox`: прев'ю → деплой Pages зелений → посилання в чат → вирок → промоція тим самим blob. Спільне для всіх Projects (LGH-3) |
+| `tools/ADAPT.md` | **адаптер**: канон → короткий промпт → агент Project сам адаптує інструкцію й видає в чат · паспорт адаптації · реєстр канонів «кому» (LGH-3) |
 | `tools/CHAT_TOOLS.md` | інструменти чату: конектор «Lens GitHub» · квиток · правила запису · документи Project. Спільне для всіх Projects |
 | `Lens_fx_candidates.md` | реєстр **зовнішніх** ефектів: FX-1 Border Beam · FX-2 Liquid metal · FX-3 Thinking orbs · FX-4 Gooey · **FX-5 GlassKit-Elements** (драбина inset · прожектор · волосинка · `color-mix` · фон-аврора) + **§Н** черга нерозібраних джерел |
 | `Lens_PROFILE.md` | робочий профіль оператора: стиль пояснень, віджети, зворотний зв'язок · **§7 — правила UX `13.1` `13.2` `13.2-б` `13.3`** (з wsd, G-L) · **читається:** точково за номером `13.x` (маршрут з wsd); цілком — при заведенні Project (bootstrap п.2) |
