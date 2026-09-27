@@ -251,7 +251,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 
 | продукт | черга |
 |---|---|
-| **EquipLens** | `products/EquipLens/EquipLens_CHERGA.md` ✅ заведено 28.08.2026 · з 31.08 несе **план у 9 кроків**, не список |
+| **EquipLens** | `EquipLens:lens/EquipLens_CHERGA.md` — у репо продукту з G-Z (оголошення — `EquipLens:lens/EquipLens_INDEX.md`) · заведено 28.08.2026 · з 31.08 несе **план у 9 кроків**, не список |
 | **StockCheck** | ⬜ завести при наступному дотику |
 | **QR Lens** | ⬜ завести при наступному дотику. Звірено 31.08.2026: `QR_Lens_forward_plan.md` — носій **плану**, не черги; `MASTER_LOCK` у QR Lens немає **за задумом** — канон значень розкладений по семи `*_LOCK` (§3), єдиного зведеного файлу ніколи не оголошували. Це не борг |
 | **Drive Lens · PharmaLens · KPI Lens** | ⬜ |
@@ -316,7 +316,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 |---|---|
 | **StockCheck** | `StockCheck_session_summary_b32_7_s20s21_STORAGE_TRUTH.md` · `StockCheck_session_summary_b32_5_s18s19_STORAGE_DONE.md` |
 | **QR Lens** | `QR_Lens_session_summary_b60_PRESSBENCH_v3_1.md` · `QR_Lens_session_summary_b60_AREACHIP_PORT.md` |
-| **EquipLens** | `EquipLens_session_summary_S35_OSTRIVETS.md` · `EquipLens_session_summary_S34_AURORA_HYBRID.md` *(S13…S33 витіснені; S30–S33 → `archive/summaries/EquipLens/` 24.09.2026, G-T)* |
+| **EquipLens** | `EquipLens_session_summary_S35_OSTRIVETS.md` · `EquipLens_session_summary_S34_AURORA_HYBRID.md` *(у репо `EquipLens`: живі — `sessions/`, витіснені S1…S33 — `archive/summaries/`; оголошення — `EquipLens:lens/EquipLens_INDEX.md`, G-Z)* |
 | **PharmaLens** | `PharmaLens_session_summary_S1_FOUNDATION.md` *(продукт заморожено — чекає `.pptx` від Олі; єдине самері, стеля не задіяна)* |
 | **KPI Lens** | `KPI_Lens_session_summary_Batch15_2.md` |
 | **Lens** *(governance)* | `Lens_governance_session_summary_LGH3_ADAPT_PREVIEW.md` (числа бази · відкрите ліній LGH) · `Lens_governance_session_summary_GY_GIT_APP_2B.md` (§0 — план G-Z) · супутник `Lens_inventory_GT_v1.md` · тимчасовий журнал переїзду `Lens_MIGRATION_GW_ledger.md` (живе доки перенос Ф3 не завершено, потім видаляється) — **лежать у репо, тека `sessions/Lens_gov/`, не в Project** (Ф2 для governance, `Lens_REPO_LAYOUT.md` §2, G-U 24.09.2026; читати з clone/raw) *(GX · LGH1 · LGH2 — LGH-3; GW — G-Y; GV — G-Y; GU — G-W; GT — G-V; GR · GQ витіснено G-U, файли не збережено — зміст у комітах `39681fd`…`fcfc3ec`; F · G — сироти G-C3; GP — G-S; GO — G-R; GN — G-Q; GM — G-P; GL — G-O; GK — G-N; GJ — G-M; GI — G-L; GH — G-K; GG — G-J; GF — G-H; GA…GE — 17.09.2026 → `archive/summaries/Lens_gov/`)* |
