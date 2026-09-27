@@ -44,6 +44,12 @@ KERNEL v2 · 31.07.2026
          «читається…» або «AUTO-READ») → ✗ на файл (К6-1: файл вмикається механізмом, не пам'яттю)
       G24 дубль базового імені в живому дереві (поза archive/) → ✗; дублі в archive/ — ⓘ,
          історія не правиться (REPO_LAYOUT §1, детектор Ф1)
+      G25 продуктове в ядрі (Р-4′, G-Z): реєстр продуктів — Lens_INDEX §5 «Реєстр продуктів»
+         (продукт → репо → теки → префікси). Файл у теці продукту або з його префіксом — не ядро:
+         гейти ядра його не судять (G1 G3 G5 G6 G7 G10 G11 G13), згадка в ядрі → ⓘ (G8),
+         тека archive/ лише з продуктовим → ⓘ (G12); сам факт «ще лежить у ядрі» → ⚠ на продукт
+         (мета — 0; переїзд — журнал переїзду). Гейт продукту — у його репо.
+         G3 · G6 не судять archive/ (G3-1: архів не читається, §8) · G3 не вимагає README.md (Р-7)
       --repo ІМ'Я=тека (повторюваний) — сусідній локальний корінь для `Репо:шлях` у G8
 
   python3 Lens_validate.py --html <file.html>
@@ -119,6 +125,42 @@ def R(root, name):
     return _FMAP.get(name, os.path.join(root, name))
 
 
+def _products(idx_text):
+    """Реєстр продуктів з Lens_INDEX §5 (Р-4′): {продукт: (репо, {теки}, (префікси,))}.
+    Оголошення, не здогад (wsd 1.10): продукт без рядка — для гейта ядра ядровий."""
+    reg = {}
+    m = re.search(r'^###\s*Реєстр продуктів.*?$(.*?)(?=^#|\Z)', idx_text, re.M | re.S)
+    if not m:
+        return reg
+    for l in m.group(1).splitlines():
+        if not l.lstrip().startswith('|'):
+            continue
+        c = [x.strip() for x in l.strip().strip('|').split('|')]
+        if len(c) < 4 or set(c[0]) <= set('-: ') or c[0] == 'продукт':
+            continue
+        name = re.sub(r'\*\([^)]*\)\*|[*`]', '', c[0]).strip()
+        repo = (re.findall(r'`([^`]+)`', c[1]) or [''])[0]
+        reg[name] = (repo, set(re.findall(r'`([^`]+)`', c[2])),
+                     tuple(re.findall(r'`([^`]+)`', c[3])))
+    return reg
+
+
+def _prod_of(rel, reg):
+    """Продукт файлу за шляхом (products/<тека>/ · archive/*/<тека>/) або префіксом імені."""
+    parts = rel.replace('\\', '/').split('/')
+    base = parts[-1]
+    for name, (_, dirs, pref) in reg.items():
+        if parts[0] in ('products', 'archive') and any(x in dirs for x in parts[1:-1]):
+            return name
+        if pref and base.startswith(pref):
+            return name
+    return None
+
+
+def _in_archive(root, name):
+    return R(root, name).replace('\\', '/').startswith(os.path.join(root, 'archive').replace('\\', '/') + '/')
+
+
 def _dup_scan(root):
     seen = {}
     for dp, dns, fns in os.walk(root):
@@ -159,6 +201,29 @@ def gov(root):
     mds = sorted(n for n in _FMAP if n.endswith('.md'))
     if not mds:
         fail('жодного .md не знайдено — не та тека?'); return
+
+    # ── G25 — продуктове в ядрі (Р-4′, G-Z) ──
+    # Гейт перевіряє лише свій репо. Продукт упізнається реєстром (Lens_INDEX §5), не здогадом:
+    # без рядка реєстру файл лишається ядровим — і гейт ядра далі судить його як ядро.
+    print('\n[G25] продуктове в ядрі — реєстр Lens_INDEX §5 (Р-4′)')
+    _ip = R(root, 'Lens_INDEX.md')
+    PREG = _products(open(_ip, encoding='utf-8').read()) if os.path.exists(_ip) else {}
+    if not PREG:
+        warn('реєстру продуктів у Lens_INDEX §5 немає — продуктове судиться як ядро')
+    here = {}
+    for dp, dns, fns in os.walk(root):
+        dns[:] = [d for d in dns if d not in ('.git', 'node_modules', '__pycache__')]
+        for fn in fns:
+            pr = _prod_of(os.path.relpath(os.path.join(dp, fn), root), PREG)
+            if pr:
+                here.setdefault(pr, []).append(fn)
+    for pr in sorted(here):
+        warn(f'{pr} — {len(here[pr])} файл(ів) ще в ядрі; дім — репо `{PREG[pr][0]}` '
+             f'(мета — 0, журнал переїзду); гейти ядра їх не судять')
+    if PREG and not here:
+        ok(f'продуктових файлів у ядрі немає ({len(PREG)} продуктів у реєстрі)')
+    PROD = {n for fs in here.values() for n in fs}
+    mds = [f for f in mds if f not in PROD]
 
     # G1 — «живе доки» у перших 5 рядках
     print('\n[G1] рядок «живе доки» у шапці')
@@ -201,7 +266,10 @@ def gov(root):
         fail('Lens_INDEX.md відсутній — маршрутизатора немає (wsd 1.1)')
     else:
         idx = open(idxp, encoding='utf-8').read()
-        miss = [f for f in mds if f not in idx and f != 'Lens_INDEX.md']
+        # G3-1: archive/ не судиться (архів не читається, §8; реєстр — ARCHIVE_INDEX) ·
+        # README.md — роль теки за Р-7, у кожній теці, не канон-файл
+        miss = [f for f in mds if f not in idx and f != 'Lens_INDEX.md'
+                and f != 'README.md' and not _in_archive(root, f)]
         summaries = [f for f in miss if 'session_summary' in f]
         rest = [f for f in miss if 'session_summary' not in f]
         if rest:
@@ -247,6 +315,8 @@ def gov(root):
     print('\n[G6] обсяг файлів')
     big = False
     for f in mds:
+        if _in_archive(root, f):
+            continue   # G3-1: архів не читається — обсяг не важить (§8)
         kb = os.path.getsize(R(root, f)) / 1024
         if kb > RED_KB:
             fail(f'{f} — {kb:.0f} KB > {RED_KB} KB червона межа: різати на томи'); big = True
@@ -325,6 +395,11 @@ def gov(root):
                 x_skip.add(rp); continue
             if not os.path.exists(os.path.join(base, ref)):
                 path_bad.append((f'{rp}:{ref}', f))
+    p_info = [(r, f) for r, f in path_bad if _prod_of(r.split(':', 1)[-1], PREG)]
+    path_bad = [x for x in path_bad if x not in p_info]
+    if p_info:
+        print(f'  ⓘ продуктові шляхи в ядрі ({len(p_info)}) — перевіряє гейт продукту (Р-4′, Р-5): '
+              + ' '.join(sorted({r for r, _ in p_info})))
     for ref, f in sorted(path_bad):
         fail(f'`{ref}` — шлях не існує (згадка: {f}); Ф1: шлях несе координату, сирота-шлях = втрата')
     if x_skip:
@@ -354,8 +429,14 @@ def gov(root):
         rows = [l for l in (m5.group(1) if m5 else '').splitlines() if l.lstrip().startswith('|')]
         live_decl = re.sub(r'\*\([^)]*\)\*', '', '\n'.join(rows))
         lost = named = unknown = 0
+        p_orph = sorted(r for r in orphans if _prod_of(r, PREG))
+        if p_orph:
+            print(f'  ⓘ продуктові файли, названі в ядрі й відсутні тут ({len(p_orph)}) — '
+                  f'живуть у репо продукту або в Project; перевіряє гейт продукту (Р-4′)')
         for ref, src in sorted(orphans.items()):
             where = ", ".join(src)
+            if ref in p_orph:
+                continue
             if ref in live_decl:
                 fail(f'`{ref}` — ОГОЛОШЕНИЙ ЖИВИМ у Lens_INDEX §5, файлу в теці немає. '
                      f'Це втрата, не архівація (wsd 1.10)'); lost += 1
@@ -499,11 +580,20 @@ def gov(root):
                  '(норма: archive не підключений до Project)')
         else:
             tree = {d for d in os.listdir(real) if os.path.isdir(os.path.join(real, d))}
-            if reg and tree - reg:
-                fail(f'archive/ містить теки, не названі в §4: {", ".join(sorted(tree - reg))}')
+            extra = set()
+            for d in sorted(tree - reg):
+                fs = [os.path.relpath(os.path.join(dp, fn), root)
+                      for dp, _, fns in os.walk(os.path.join(real, d)) for fn in fns]
+                if fs and all(_prod_of(x, PREG) for x in fs):
+                    print(f'  ⓘ archive/{d}/ — лише продуктове ({len(fs)} файлів), поза §4 законно: '
+                          f'їде з продуктами (Р-4′)')
+                else:
+                    extra.add(d)
+            if reg and extra:
+                fail(f'archive/ містить теки, не названі в §4: {", ".join(sorted(extra))}')
             if reg and reg - tree:
                 fail(f'§4 називає теки, яких у archive/ немає: {", ".join(sorted(reg - tree))}')
-            if reg and tree == reg:
+            if reg and not extra and not (reg - tree):
                 ok(f'Lens_ARCHIVE_INDEX ⟂ фактичне дерево archive/ ({len(tree)} теки)')
 
     # ── G13 — нумерація секцій усередині файлу ────────────────────────────
