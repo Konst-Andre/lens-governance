@@ -1,7 +1,7 @@
 # lens-gh — конектор «Lens GitHub»
 
 > живе доки: конектор lens-gh працює АБО його замінено іншим шляхом запису з чату (тоді — в archive/).
-> дім: `lens-governance/tools/lens-gh/` · протокол використання: `kernel/Lens_github_push_protocol.md`
+> дім: `lens-governance/tools/lens-gh/` · протокол використання: `tools/CHAT_TOOLS.md`
 > версія: 1.2.0 · 27.09.2026 · сесія LGH-2
 
 ## Що це

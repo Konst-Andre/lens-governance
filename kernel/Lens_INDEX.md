@@ -91,7 +91,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 | 5 | `<Product>_MASTER_LOCK.md` + релевантні `*_valuesLOCK.md` | якщо торкаємось локнутого компонента |
 | 6 | `Work_Standard_HISTORY.md` | **лише** якщо правило посилається на `14.x` і треба контекст |
 | `Lens_excel_protocol.md` | Excel-протокол: Power Query (5.x) + HTML/VBA sync (6.x). **Scope: KPI Lens / QR Lens.** Виселено з wsd 13.08.2026 (v2.29), нумерація не мінялась |
-| `Lens_github_push_protocol.md` | Запис у GitHub із чату Claude (П-GH1): токен, запобіжник у 4 шари, переїзд між акаунтами. **Читати точково** — коли задача пише в репо. Заведено 16.09.2026 |
+| `Lens_github_push_protocol.md` | Запис у GitHub із чату Claude (П-GH1): токен, запобіжник у 4 шари, переїзд між акаунтами. **Читати точково** — коли задача пише в репо. Заведено 16.09.2026 · **§8 прев'ю переїхав у `tools/PREVIEW.md`** (LGH-3); сам протокол — старий шлях через токен, заміна — `tools/CHAT_TOOLS.md` |
 
 ---
 
@@ -136,6 +136,8 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 |---|---|
 | `Lens_stagebench_manifest.md` | стенди: bench / harness / компер — рецепт і еталони |
 | `Lens_sandbox_manifest.md` | пісочниця: копія білда із синтетичними даними, 7 кроків |
+| `tools/PREVIEW.md` | **прев'ю-стенд** `Konst-Andre/sandbox`: прев'ю → деплой Pages зелений → посилання в чат → вирок → промоція тим самим blob. Спільне для всіх Projects (LGH-3) |
+| `tools/CHAT_TOOLS.md` | інструменти чату: конектор «Lens GitHub» · квиток · правила запису · документи Project. Спільне для всіх Projects |
 | `Lens_fx_candidates.md` | реєстр **зовнішніх** ефектів: FX-1 Border Beam · FX-2 Liquid metal · FX-3 Thinking orbs · FX-4 Gooey · **FX-5 GlassKit-Elements** (драбина inset · прожектор · волосинка · `color-mix` · фон-аврора) + **§Н** черга нерозібраних джерел |
 | `Lens_PROFILE.md` | робочий профіль оператора: стиль пояснень, віджети, зворотний зв'язок · **§7 — правила UX `13.1` `13.2` `13.2-б` `13.3`** (з wsd, G-L) · **читається:** точково за номером `13.x` (маршрут з wsd); цілком — при заведенні Project (bootstrap п.2) |
 | `Lens_NEWPROJECT_bootstrap.md` | рецепт заведення нового Project із тим самим ядром |
