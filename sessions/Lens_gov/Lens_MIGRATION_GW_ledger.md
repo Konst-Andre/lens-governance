@@ -51,7 +51,7 @@ Drive → `Drive-Lens`, Equip → `EquipLens`, StockCheck → `stock-check`.
 | 5 | **Drive Lens** → `Drive-Lens` (порожній, 404 — не втрата) | ⬜ |
 | 6 | **PharmaLens** → `PharmaLens` (handover-и вже там, ≡ blob-sha) | ⬜ |
 | 6-б | **KPI Lens** → `KPI-Lens` (репо є, G-Z) — `archive/superseded/KPI_Lens_*` · самері Batch15_2 (О-2) | ⬜ |
-| 7 | **За Р-4′, ПЕРЕД 2-б Б:** 7-а гейт ядра — тільки ядро (спершу класифікація ✗95: ядрове ⟂ продуктове) · 7-б `--product <корінь>` (G1 · G3 · G10 · G14 · G24) · 7-в `EquipLens:lens/EquipLens_INDEX.md`; детектор «продуктового в ядрі = 0» | 🔄 (0) ✅ G-Z — класифікація ✗97 нижче · **7-а ✅ G-Z** — реєстр продуктів `Lens_INDEX §5` + `G25`; G3·G6 не судять `archive/`, G3 — `README.md`; `--gov` ✗97 → ✗1 (`Lens_xlsx_strict.py`), симуляція Б ✗1; `--inject` ✓ · 7-б ⬜ · 7-в ⬜ |
+| 7 | **За Р-4′, ПЕРЕД 2-б Б:** 7-а гейт ядра — тільки ядро (спершу класифікація ✗95: ядрове ⟂ продуктове) · 7-б `--product <корінь>` (G1 · G3 · G10 · G14 · G24) · 7-в `EquipLens:lens/EquipLens_INDEX.md`; детектор «продуктового в ядрі = 0» | 🔄 (0) ✅ G-Z — класифікація ✗97 нижче · **7-а ✅ G-Z** — реєстр продуктів `Lens_INDEX §5` + `G25`; G3·G6 не судять `archive/`, G3 — `README.md`; `--gov` ✗97 → ✗1 (`Lens_xlsx_strict.py`), симуляція Б ✗1; `--inject` ✓ · 7-б ✅ G-Z — `Lens_validate.py --product <корінь>` (G24 · G1 · G3 в обидва боки · G10 · G14), `--inject` 7/7 ✗ · 7-в ⬜ |
 | 8 | `Lens_INDEX` §0 · §3 · §5 · §8 — під нову модель; Project → лише інструкція (Ф7) | ⬜ |
 
 ## Пропозиції G-W (родина П · 13.2)

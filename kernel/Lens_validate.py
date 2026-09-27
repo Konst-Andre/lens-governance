@@ -52,6 +52,14 @@ KERNEL v2 · 31.07.2026
          G3 · G6 не судять archive/ (G3-1: архів не читається, §8) · G3 не вимагає README.md (Р-7)
       --repo ІМ'Я=тека (повторюваний) — сусідній локальний корінь для `Репо:шлях` у G8
 
+  python3 Lens_validate.py --product <корінь репо продукту> [--live <тека>]
+      Гейт продукту (Р-9, G-Z 7-б): той самий скрипт ядра на корені репо продукту. Оголошення —
+      lens/<Продукт>_INDEX.md (шляхи від кореня репо; маска `v*` — живий = найбільший номер).
+      G24 дубль імені поза archive/ · G1 «живе доки» у .md поза archive/ · G3 lens/ sessions/ tools/
+      ⟂ індекс в обидва боки (неоголошений файл ✗ · оголошений без файлу ✗, у --live — ⚠ транспорт ·
+      маска без файлу ✗) · G10 sessions/: стеля 2, кожне самері оголошене · G14 черга: одна,
+      існує, ≤ 8 192 B (⚠ понад 90%)
+
   python3 Lens_validate.py --html <file.html>
       Перед-видачні гейти білда (wsd Кластер 3 / 10).
       H1 node --check по кожному inline <script> без src
@@ -942,6 +950,125 @@ def g22(root):
         ok(f'усі {seen} живих самері мають стартове повідомлення в code block')
 
 
+# ───────────────────────────── PRODUCT (Р-9 · 7-б) ─────────────────────────────
+# Гейт продукту: той самий скрипт ядра, запущений на КОРЕНІ репо продукту. Оголошення —
+# з власного індексу продукту `lens/<Продукт>_INDEX.md` (Р-9), не з Lens_INDEX ядра:
+# гейт перевіряє лише свій репо (Р-4′). Шляхи в індексі — від кореня репо продукту.
+Q_CEIL = 8192             # стеля черги — канон у Lens_INDEX §5 ядра · детектор kernel/check_cherga.py CEIL
+Q_THR = Q_CEIL * 9 // 10  # поріг прополки Ф-10 (90%)
+P_LIVE = ('lens', 'sessions', 'tools')   # теки, що оголошуються; archive/ — історія, сайт — не канон
+
+
+def _walk_rel(root):
+    for dp, dns, fns in os.walk(root):
+        dns[:] = [d for d in dns if d not in ('.git', 'node_modules', '__pycache__')]
+        for fn in fns:
+            yield os.path.relpath(os.path.join(dp, fn), root).replace('\\', '/')
+
+
+def product(root):
+    import fnmatch
+    root = os.path.abspath(root)
+    idxs = sorted(glob.glob(os.path.join(root, 'lens', '*_INDEX.md')))
+    print(f'\n=== ГЕЙТ ПРОДУКТУ · {root} ===')
+    if len(idxs) != 1:
+        fail(f'lens/<Продукт>_INDEX.md: знайдено {len(idxs)}, треба рівно 1 (Р-9)'); return
+    ip = idxs[0]
+    prod = os.path.basename(ip)[:-len('_INDEX.md')]
+    txt = open(ip, encoding='utf-8').read()
+    print(f'  ⓘ продукт {prod} · індекс {os.path.relpath(ip, root)}')
+    files = sorted(_walk_rel(root))
+    live_names = {}
+    for d in LIVE_DIRS:
+        for r in _walk_rel(d):
+            live_names.setdefault(os.path.basename(r), os.path.join(d, r))
+
+    def sect(word):
+        m = re.search(rf'^##\s*[^\n]*{word}[^\n]*$(.*?)(?=^##\s|\Z)', txt, re.M | re.S)
+        return m.group(1) if m else ''
+    pat = r'`((?:[\w.\-]+/)+[\w.\-*]+\.[A-Za-z0-9]+)`'
+    decl = sorted(set(re.findall(pat, txt)))
+    masks = [d for d in decl if '*' in d]
+    exact = [d for d in decl if '*' not in d]
+
+    # G24 — дубль імені поза archive/
+    print('\n[G24] дубль імені в живому дереві (поза archive/)')
+    seen = {}
+    for r in files:
+        if r.split('/')[0] != 'archive' and r.endswith(('.md', '.py', '.js', '.html')):
+            seen.setdefault(os.path.basename(r), []).append(r)
+    dups = {n: ps for n, ps in seen.items() if len(ps) > 1 and n != 'README.md'}
+    for n, ps in sorted(dups.items()):
+        fail(f'`{n}` — {len(ps)} копії: {", ".join(ps)}')
+    if not dups:
+        ok('дублів імен немає')
+
+    # G1 — «живе доки» у шапці кожного .md поза archive/
+    print('\n[G1] рядок «живе доки» у шапці')
+    mdl = [r for r in files if r.endswith('.md') and r.split('/')[0] != 'archive']
+    badl = [r for r in mdl if not any('живе доки' in l for l in
+            open(os.path.join(root, r), encoding='utf-8').read().split('\n')[:5])]
+    for r in badl:
+        fail(f'{r} — немає «живе доки» у перших 5 рядках (wsd 1.8)')
+    if not badl:
+        ok(f'усі {len(mdl)} .md поза archive/ мають «живе доки»')
+
+    # G3 — покриття індексом в обидва боки
+    print(f'\n[G3] покриття {os.path.basename(ip)} — файл ⟂ оголошення')
+    body = [r for r in files if r.split('/')[0] in P_LIVE
+            and os.path.basename(r) != 'README.md' and r != os.path.relpath(ip, root)]
+    und = [r for r in body if r not in exact and not any(fnmatch.fnmatch(r, m) for m in masks)]
+    for r in und:
+        fail(f'{r} — не оголошений в індексі продукту (wsd 1.1)')
+    g3 = bool(und)
+    for d in exact:
+        if d not in files:
+            where = live_names.get(os.path.basename(d))
+            if where:
+                warn(f'{d} — оголошений, у репо нема; лежить у --live ({where}) — транспорт у репо')
+            else:
+                fail(f'{d} — ОГОЛОШЕНИЙ, файлу немає. Втрата, не архівація (wsd 1.10)')
+            g3 = True
+    for m in masks:
+        hit = sorted(r for r in files if fnmatch.fnmatch(r, m))
+        if not hit:
+            fail(f'маска {m} — жодного файлу (живий = найбільший номер, gov 12.20)'); g3 = True
+        else:
+            print(f'  ⓘ маска {m} → живий {hit[-1]} (кандидатів {len(hit)})')
+    if not g3:
+        ok(f'{len(body)} файлів ⟂ {len(exact)} оголошень + {len(masks)} масок — збігаються')
+
+    # G10 — живі самері: стеля 2, кожне оголошене
+    print('\n[G10] живі самері — стеля 2 (wsd 1.8)')
+    sdecl = re.findall(pat, sect('самері'))
+    sfiles = [r for r in files if r.startswith('sessions/') and 'session_summary' in r]
+    if len(sdecl) > 2:
+        fail(f'оголошено живими {len(sdecl)} самері, стеля 2')
+    extra = [r for r in sfiles if r not in sdecl]
+    for r in extra:
+        fail(f'{r} — у sessions/, але не оголошене живим: на архів (archive/summaries/)')
+    if len(sdecl) <= 2 and not extra:
+        ok(f'оголошено {len(sdecl)} · у sessions/ {len(sfiles)}')
+
+    # G14 — черга продукту: оголошена, існує, у стелі
+    print('\n[G14] черга продукту — стеля Lens_INDEX §5 ядра')
+    qd = re.findall(pat, sect('Черга'))
+    if len(qd) != 1:
+        fail(f'розділ «Черга» оголошує {len(qd)} файл(ів), треба рівно 1')
+    else:
+        qp = os.path.join(root, qd[0])
+        if not os.path.exists(qp):
+            fail(f'{qd[0]} — черги немає')
+        else:
+            n = os.path.getsize(qp)
+            if n > Q_CEIL:
+                fail(f'{qd[0]} = {n} B > стеля {Q_CEIL}: прополка')
+            elif n > Q_THR:
+                warn(f'{qd[0]} = {n} B > поріг {Q_THR} (90%): прополка при наступному дописі')
+            else:
+                ok(f'{qd[0]} = {n} B (поріг {Q_THR} · стеля {Q_CEIL})')
+
+
 # ────────────────────────────────── HTML ──────────────────────────────────
 
 def html(path):
@@ -1042,6 +1169,14 @@ def main():
                 print('--repo потребує ІМ\'Я=тека'); sys.exit(2)
             k, v = args[i + 1].split('=', 1); REPO_ROOTS[k] = v; del args[i:i + 2]
         gov(args[0] if args else '.')
+    elif sys.argv[1] == '--product':
+        args = sys.argv[2:]
+        while '--live' in args:
+            i = args.index('--live')
+            if i + 1 >= len(args):
+                print('--live потребує теки'); sys.exit(2)
+            LIVE_DIRS.append(args[i + 1]); del args[i:i + 2]
+        product(args[0] if args else '.')
     elif sys.argv[1] == '--html':
         if len(sys.argv) < 3:
             print('потрібен шлях до .html'); sys.exit(2)
