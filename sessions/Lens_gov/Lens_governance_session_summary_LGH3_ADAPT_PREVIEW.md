@@ -91,6 +91,9 @@ Project: копію LGH-2 звірено з репо (16 132 B, ключові �
 (2) Хід 7-б: Lens_validate.py --product <корінь> (G1 · G3 · G10 · G14 · G24 з lens/<Продукт>_INDEX.md).
 (3) Хід 7-в: EquipLens:lens/EquipLens_INDEX.md.
 (4) Хід 2-б Б: прибрати EquipLens з ядра (gh_commit delete); числа бази — ядро і EquipLens окремо.
+    ПЕРЕД (4) — проба delete (не перевірено наживо, LGH-3 §0 п.3): коміт А — викидний файл
+    sandbox/probe/delete_test.txt (не temp/ — там файли Konst) · коміт Б — delete його → gh_list: файлу нема.
+    ✗ → зупинитись, сказати Konst; (4) не починати.
 (5) Project-частина (Р-8): S34 · S35 · v17_30 (стенд + смоук) · wordmark · K0 · K21 ×2 · S17 УЖЕ в Project →
     project_read → квиток put → gh_commit {blob} в EquipLens → read-back sha → видалити з Project.
 О-4 закрито в LGH-3 (інструкція v4). PCP-Lens — запаркований. GH-1 (архів запису через токен) — разом із ходом 8, якщо дійде.
