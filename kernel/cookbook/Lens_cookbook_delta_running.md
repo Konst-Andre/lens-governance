@@ -23,7 +23,7 @@
 
 ---
 
-**ЛОТОК: 12 записів.** *(G-D 17.09.2026: змерджено `A76` `A104` `A105` `A106` `A107` · лишились `A103` 🔒 device-раунд · `З-37` `З-40` → `Г-11` (джерела в репо немає) · `К-1`…`К-8` device✗ · `A**nn**` вебшрифт 🔒 вордмарк)*
+**ЛОТОК: 13 записів.** *(AirLens 01.10.2026: + `A**nn**` «i» tip-popover — device ✓, готовий до мерджу в том 5 · G-D 17.09.2026: змерджено `A76` `A104` `A105` `A106` `A107` · лишились `A103` 🔒 device-раунд · `З-37` `З-40` → `Г-11` (джерела в репо немає) · `К-1`…`К-8` device✗ · `A**nn**` вебшрифт 🔒 вордмарк)*
 
 Останнє спорожнення — **KERNEL v2, 31.07.2026** (governance-сесія B, розпил Cookbook):
 
@@ -240,3 +240,45 @@ invalid at computed-value time → `initial` = 0. Лікується `max(0px, c
 тримається тут до device-вироку по вордмарку EquipLens; тоді переїжджає в том 1.
 
 *(Народилось: EquipLens S32, 31.08.2026. Повний контекст — `EquipLens_session_summary_S32_FONT.md` §3.)*
+
+---
+
+## `A**nn**` (cand.) · «i»-пояснення як підказка поверх вмісту (TipKit-popover), а не розгортання
+
+**Том при мерджі:** **5** (`Lens_iOS_cookbook_5_motion.md`) — тригер тому: анімація, ривки, «штовхає блок»; покажчик — у **4** (компоненти).
+
+**Проблема.** Кнопка «i» біля заголовка секції розгортає пояснення під собою. Анімація `height` (WAAPI чи `grid-template-rows 0fr→1fr`) на iPhone
+дає ривки: сторінка перераховує розкладку на кожному кадрі, текст усередині обрізається, поки блок росте, — «дьоргається, наче фріз» (Konst, AirLens, 01.10.2026).
+
+**Замір (Chromium, CPU ×6, 375 px, DPR 3, 6 прогонів, AirLens Р-66):**
+
+| варіант | показ | найдовший кадр анімації | перерахунків сторінки |
+|---|---|---|---|
+| розгортання (`height` 0 → h) | 33 мс | 33 мс | 16 |
+| підказка поверх вмісту (`opacity` + `transform`, свій шар) | 26 мс | **≤ 17 мс** (60 к/с) | 5 |
+
+**Рішення — патерн «tip-popover»** (Apple TipKit, iOS 17 / WWDC 2023 «Make features discoverable with TipKit»):
+- бульбашка `position:absolute` під заголовком, **поверх** вмісту — нічого не зсуває; стрілка (`::before`, повернутий квадрат) — на «i» через `--ax`;
+- поява 220 мс `cubic-bezier(.2,.9,.25,1)`: `opacity 0→1`, `translateY(-6px) scale(.96) → none`, `transform-origin` — від стрілки; зникнення 140 мс `ease-in`;
+- `will-change: transform, opacity; contain: layout paint`; тінь — помірна (велике розмиття на DPR 3 дороге);
+- одна відкрита; дотик будь-де (`pointerdown`, capture) — закрити; повторний дотик «i» — закрити;
+- `prefers-reduced-motion: reduce` — без анімації (показ / сховати).
+
+```js
+function toggleInfo(btn) {               // el — бульбашка #info-<id>, sh — заголовок секції з кнопкою «i»
+  const el = $(`#info-${btn.dataset.info}`), was = tip && tip.el === el; closeTip(!was); if (was) return;
+  const sh = btn.closest(".shead"); el.hidden = false;
+  el.style.top = `${sh.offsetTop + sh.offsetHeight + 4}px`; el.style.left = `${sh.offsetLeft - 4}px`; el.style.width = `${sh.offsetWidth + 8}px`;
+  el.style.setProperty("--ax", `${btn.offsetLeft + btn.offsetWidth / 2 - sh.offsetLeft + 4}px`);
+  tip = { el, btn }; btn.setAttribute("aria-expanded", "true");
+  if (!CALM.matches) el.animate([{ opacity: 0, transform: "translateY(-6px) scale(.96)" }, { opacity: 1, transform: "none" }], { duration: 220, easing: "cubic-bezier(.2,.9,.25,1)" });
+}
+```
+
+**Не беремо:** кнопку «✕» і лічильники показів TipKit — пояснення відкривають за бажанням; спливне вікно по центру екрана — відриває пояснення від того, що пояснює.
+
+**Правило, що з цього випливає:** анімувати лише `opacity` і `transform`; скаргу «дьоргається» — міряти в браузері з уповільненим CPU, а не гадати.
+
+**Поріг входу (`12.11`).** Наше й device-locked: Konst перевірив на iPhone XS 01.10.2026 — «тепер це набагато краще».
+
+*(Народилось: AirLens, сесія 9, 01.10.2026 — `Konst-Andre/AirLens` `docs/DECISIONS.md` Р-66, код — `miniapp/app/index.html` `toggleInfo`.)*
