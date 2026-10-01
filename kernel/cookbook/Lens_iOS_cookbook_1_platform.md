@@ -139,8 +139,10 @@ Sheet `max-height:85dvh` + контент 600px на vh 900 → висота=600
 
 ## A23. Orientation lock — CSS overlay
 
+**Тригер.** Застосунок лише вертикальний і просить повернути телефон оверлеєм.
+
 ```css
-@media (orientation:landscape) and (max-width:900px){
+@media (orientation:landscape) and (min-width:520px) and (max-width:900px){
   #app{ display:none !important; }
   body::after{ content:"Поверніть телефон вертикально"; position:fixed; inset:0; z-index:10000;
     display:flex; align-items:center; justify-content:center; … }
@@ -148,6 +150,16 @@ Sheet `max-height:85dvh` + контент 600px на vh 900 → висота=600
 ```
 
 iOS НЕ підтримує `screen.orientation.lock()` (native-only); `manifest orientation` ігнорує. `max-width:900px` виключає планшети.
+
+**`min-width:520px` — обов'язкова нижня межа (поправка 01.10.2026).** `orientation` міряє пропорцію **в'юпорта**, не поворот пристрою: клавіатура вертикального телефона стискає висоту, і в'юпорт стає «landscape». Без нижньої межі оверлей накриває поле вводу → фокус губиться → клавіатура закривається → оверлей зникає: **жодне поле не приймає введення**, на екрані мигає «Поверніть телефон». Межа ріже по ширині: вертикальний телефон із клавіатурою ≤ 440 px, повернутий iPhone ≥ 568 px.
+- *Спостереження (12.10), 01.10.2026:* Telegram Mini App на iPhone XS — в'юпорт із клавіатурою ~375×330, пошук не працював з 30.09 (відкрито Konst на пристрої; device ✓ після фікса 01.10). Механізм — MDN `@media/orientation`, Note: «does not correspond to device orientation. Opening the soft keyboard … will cause the viewport to become wider than it is tall» (https://developer.mozilla.org/en-US/docs/Web/CSS/@media/orientation, прочитано 01.10.2026). Чи стискає клавіатура в'юпорт, залежить від оболонки (вебв'ю Telegram — так); рецепт не покладається на це — межа діє завжди.
+
+❌ `@media (orientation:landscape) and (max-width:900px)` без нижньої межі — оверлей від клавіатури.
+✅ Оверлей лише при ширині ≥ 520 px.
+
+**Детектор (К2).** Смоук продукту: в'юпорт 375×330 і 320×260 → оверлей `display:none`; 844×390 → видно (`AirLens:tools/miniapp/smoke.js`, «A23: клавіатура на вертикальному …»; на коді без межі — ✗). Греп: медіа-запит оверлею з `orientation:landscape` без `min-width` → ✗.
+
+*(Код-точка: `AirLens:miniapp/app/index.html` — `.turn`, `@media (orientation:landscape) and (max-height:500px) and (min-width:520px)`; рішення Р-71.)*
 
 ## A24. iOS системні CSS правила (що кожне блокує)
 
