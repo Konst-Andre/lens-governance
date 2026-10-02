@@ -12,6 +12,8 @@
 | файл | що | коли читати |
 |---|---|---|
 | `tools/claude-code/REPO_FRAME.md` | **каркас**: принципи · як агент пам'ятає · розкладка тек · документи і ролі · куди записувати · цикл сесії · перевірки · прод · анти-приклади · адаптація · джерела | заводиш або переводиш репо — цілком; далі точково |
+| `tools/claude-code/ADOPT.md` | **адаптація наявного репо**: фраза запуску для Konst · шляхи А звірка / Б переїзд / В міст · етапи 0–7 · **приймання** (як довести, що нічого не зламано і пам'ять працює) · відповідність ролей для продуктів Lens (Р-7) | переводиш наявне репо — цілком |
+| `tools/claude-code/ADOPTIONS.md` | журнал адаптацій: який репо, яким шляхом, тест «нова сесія без чату», що в каркасі неясно → що виправлено; черга репо | закриваєш адаптацію; правиш каркас |
 | `tools/claude-code/PROFILE.md` | **профіль Konst** — канонічна копія (у налаштуваннях акаунта — копія для вставки) | правиш профіль |
 | `tools/claude-code/templates/` | шаблони: `CLAUDE_template.md` · `REPO_LAYOUT_template.md` · `CHERGA_template.md` · `DECISIONS_template.md` · `ARCHITECTURE_template.md` · `SUMMARY_template.md` · `AUDIT_template.md` · `env_check_template.sh` · `session_start_template.sh` | створюєш файл, якого бракує |
 | `tools/claude-code/audit_prompts.sh` | подвійний `/doctor prompt-audit` (sonnet + opus high; `AUDIT_THIRD=fable`; «`.`» — увесь репо) | копіювати в `tools/` репо як є |
@@ -23,12 +25,10 @@
 **Нове репо.** Прочитати `tools/claude-code/REPO_FRAME.md` → створити з шаблонів `CLAUDE.md`, `docs/REPO_LAYOUT.md`, `docs/CHERGA.md`, `docs/DECISIONS.md`,
 `docs/ARCHITECTURE.md`, `docs/AUDIT.md`, `tools/env_check.sh`, `tools/audit_prompts.sh`, хук старту → перший подвійний аудит `CLAUDE.md` → коміт.
 
-**Наявне репо (Claude Code).** Звірити з чеклістом нижче; чого бракує — сказати Konst, запропонувати окремим ходом, створити після «так».
-Наявне не переписувати заради шаблону: шаблон — форма, зміст — від репо.
-
-**Репо з claude.ai Project.** Розвідка (хто що читає, за яким шляхом; греп перед «не потрібно») → питання Konst → діагноз і план
-малими кроками (кожен — коміт із перевіркою, що прод живий) → переїзд на гілці → перегляд → злиття. Зразок — самері `AE-Simulator` S88.
-Поле Instructions у Project → покажчик на `CLAUDE.md` або видалити.
+**Наявне репо** (з Claude Code чи з claude.ai Project) — процедура `tools/claude-code/ADOPT.md`. Konst вставляє в сесію репо одне речення:
+```text
+Адаптуй цей репо під каркас Claude Code за процедурою Konst-Andre/lens-governance, tools/claude-code/ADOPT.md (прочитай цілком). Етапи по черзі; до етапу 4 нічого не змінюй.
+```
 
 ## Чекліст репо
 
