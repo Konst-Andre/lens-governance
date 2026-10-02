@@ -36,7 +36,7 @@
 | 2 | `Lens_PROFILE.md` | профіль оператора — заміна непереносимій пам'яті |
 | 3 | `Work_Standard.md` | протокол |
 | 4 | `Work_Standard_HISTORY.md` | історія протоколу (точкове читання) |
-| 5 | `Lens_cookbook_INDEX.md` + 5 томів `Lens_iOS_cookbook_N_*.md` | патерни |
+| 5 | `Lens_cookbook_INDEX.md` + 5 томів `Lens_iOS_cookbook_N_*.md` + том 6 `Lens_bot_cookbook_6_telegram_workers.md` (бот) | патерни |
 | 6 | `Lens_stagebench_manifest.md` · `Lens_sandbox_manifest.md` · `Lens_fx_candidates.md` | методи роботи |
 | 7 | три буфери `*_delta_running.md` | вхідні лотки |
 

@@ -30,7 +30,7 @@
 |---|---|---|
 | **`kernel/`** *(корінь)* | маршрутизатори + `Lens_validate.py` + маніфести методів + буфер стендів | ✅ підключена |
 | **`kernel/wsd/`** | `Work_Standard.md` · `Lens_governance_protocol.md` · `Lens_verdict_protocol.md` · `Lens_patch_check_protocol.md` · `Work_Standard_HISTORY.md` · `wsd_delta_running.md` | ✅ підключена |
-| **`kernel/cookbook/`** | `Lens_cookbook_INDEX.md` · 5 томів · `Lens_cookbook_delta_running.md` | ✅ підключена |
+| **`kernel/cookbook/`** | `Lens_cookbook_INDEX.md` · 6 томів · `Lens_cookbook_delta_running.md` | ✅ підключена |
 | **`kernel/modules/`** | донор-модулі коду `Lens_module_*.md` | ✅ підключена |
 | **`products/`** | `*_MASTER_LOCK` · `*_valuesLOCK` · FINDINGS · реєстри — прив'язані до продукту, **нікуди не переносяться** | ✅ підключена |
 | **`archive/`** | `summaries/` · `stands/` · `superseded/` — те, що відслужило «живе доки» | ❌ **свідомо НЕ підключена** (§8) |
@@ -70,7 +70,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
          Lens_cookbook_INDEX.md Lens_NEWPROJECT_bootstrap.md Lens_ARCHIVE_INDEX.md \
          Lens_iOS_cookbook_1_platform.md Lens_iOS_cookbook_2_navigation.md \
          Lens_iOS_cookbook_3_material.md Lens_iOS_cookbook_4_components.md \
-         Lens_iOS_cookbook_5_motion.md; do
+         Lens_iOS_cookbook_5_motion.md Lens_bot_cookbook_6_telegram_workers.md; do
   c=$(curl -s -o /tmp/f -w "%{http_code}" "$B/$f")
   echo "$c $(head -3 /tmp/f | grep -o 'KERNEL v[0-9]*' | head -1) $f"; done
 ```
@@ -87,7 +87,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 | 1 | **`Lens_INDEX.md`** | завжди |
 | 2 | **останнє самері продукту** | завжди (відкриті питання — зверху) |
 | 3 | **`Work_Standard.md`** | завжди — точково: «Зміст» і таблиця маршрутів, далі потрібні номери |
-| 4 | `Lens_cookbook_INDEX.md` → потрібний том | точково за індексом, якщо задача торкається iOS/PWA/UI. **Том цілком не читати** |
+| 4 | `Lens_cookbook_INDEX.md` → потрібний том | точково за індексом, якщо задача торкається iOS/PWA/UI або бота на Workers (том 6). **Том цілком не читати** |
 | 5 | `<Product>_MASTER_LOCK.md` + релевантні `*_valuesLOCK.md` | якщо торкаємось локнутого компонента |
 | 6 | `Work_Standard_HISTORY.md` | **лише** якщо правило посилається на `14.x` і треба контекст |
 | `Lens_excel_protocol.md` | Excel-протокол: Power Query (5.x) + HTML/VBA sync (6.x). **Scope: KPI Lens / QR Lens.** Виселено з wsd 13.08.2026 (v2.29), нумерація не мінялась |
@@ -130,6 +130,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 | `Lens_iOS_cookbook_3_material.md` | матеріал, elevation, recess, поверхні, колірна семантика |
 | `Lens_iOS_cookbook_4_components.md` | контроли: селект, тогл, чіп, плитка, тост, нативні поля + Частина B продукт-специфічне |
 | `Lens_iOS_cookbook_5_motion.md` | motion-мова, press, жест/axis-lock, stagger, scroll-linked |
+| `Lens_bot_cookbook_6_telegram_workers.md` | Telegram-бот на Cloudflare Workers + D1 + Mini App: CPU, обрив, замок, викладка, Bot API (серія `T`) |
 
 ### Методи роботи (не код продукту)
 | файл | що в ньому |
@@ -436,7 +437,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 |---|---|---|
 | **репо `kernel/`** *(корінь)* | маршрутизатори й інструмент: `Lens_INDEX` · `Lens_validate.py` · `Lens_ARCHIVE_INDEX` · `Lens_PROFILE` · `Lens_PROJECT_instruction` · `Lens_NEWPROJECT_bootstrap` · манифести стендів | **джерело правди.** Канон правиться тут |
 | **репо `kernel/wsd/`** | `Work_Standard.md` · `Lens_governance_protocol.md` · `Lens_verdict_protocol.md` · `Lens_patch_check_protocol.md` · `Work_Standard_HISTORY.md` · `wsd_delta_running.md` | те саме |
-| **репо `kernel/cookbook/`** | `Lens_cookbook_INDEX.md` · 5 томів · `Lens_cookbook_delta_running.md` | те саме |
+| **репо `kernel/cookbook/`** | `Lens_cookbook_INDEX.md` · 6 томів · `Lens_cookbook_delta_running.md` | те саме |
 | **репо `kernel/modules/`** | донор-модулі коду: `Lens_module_*.md` | те саме |
 | **репо `archive/`** | `summaries/` · `stands/` · `superseded/` — канон-файли, що відслужили | `git mv`, **не** `rm` — нічого не гине |
 | **Project knowledge** | копія ядра · `*_valuesLOCK` / `*_MASTER_LOCK` продуктів · непорожні буфери · **живі самері (§5)** · живі білди й стенди | завантаження копій; читальня |

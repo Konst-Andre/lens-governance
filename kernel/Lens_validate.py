@@ -84,7 +84,7 @@ KERNEL_FILES = [
     'Lens_cookbook_INDEX.md',
     'Lens_iOS_cookbook_1_platform.md', 'Lens_iOS_cookbook_2_navigation.md',
     'Lens_iOS_cookbook_3_material.md', 'Lens_iOS_cookbook_4_components.md',
-    'Lens_iOS_cookbook_5_motion.md', 'Lens_ARCHIVE_INDEX.md',
+    'Lens_iOS_cookbook_5_motion.md', 'Lens_bot_cookbook_6_telegram_workers.md', 'Lens_ARCHIVE_INDEX.md',
 ]
 SIGNAL_KB, RED_KB = 120, 200
 LIVE_DIRS = []          # теки живих самері (Project) для G19 — --live
