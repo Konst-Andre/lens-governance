@@ -26,5 +26,11 @@ echo "env: github=${g:-000} cloudflare=${c:-000} · ${vars% } · гейт: $gate
 # прод (лише читання): <живий код ≡ репо; тека публікації; службове не видно — судити за ВМІСТОМ, не за HTTP-кодом>
 echo "прод: — (додати: живий код ≡ репо; тека публікації; службове не видно — за ВМІСТОМ)"
 
+# Cloudflare — СПІЛЬНИЙ акаунт усіх проєктів: бюджет (запити · збірки · прогноз) і свіжість правил. Рядки «⚠» — читати й діяти
+# за lens-governance:tools/cloudflare/CLOUDFLARE.md. Скрипт лише читає й завжди exit 0. Репо без Cloudflare — рядок прибрати.
+# ⚠ не «curl | bash || echo»: bash на порожньому вході (404) виходить з 0, і збій мовчить
+if cfb=$(curl -sSf -m 20 https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/tools/cloudflare/cf_budget.sh 2>/dev/null); then
+  printf '%s\n' "$cfb" | bash; else echo "cloudflare: — (cf_budget не завантажено)"; fi
+
 [ "${g:-000}" = "000" ] && exit 1
 exit 0

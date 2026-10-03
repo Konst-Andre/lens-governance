@@ -18,6 +18,9 @@
 | `tools/claude-code/templates/` | шаблони: `CLAUDE_template.md` · `REPO_LAYOUT_template.md` · `CHERGA_template.md` · `DECISIONS_template.md` · `ARCHITECTURE_template.md` · `SUMMARY_template.md` · `AUDIT_template.md` · `env_check_template.sh` · `session_start_template.sh` | створюєш файл, якого бракує |
 | `tools/claude-code/audit_prompts.sh` | подвійний `/doctor prompt-audit` (sonnet + opus high; `AUDIT_THIRD=fable`; «`.`» — увесь репо) | копіювати в `tools/` репо як є |
 
+Поруч — `tools/cloudflare/` (`CLOUDFLARE.md` правила й бюджет спільного акаунта · `cf_budget.sh` замір для `env_check`): потрібен
+кожному репо, що живе на Cloudflare.
+
 Живі зразки: `AirLens` (воркер + Mini App, документація в `docs/`), `AE-Simulator` (сайт на Cloudflare Pages у `site/`, редактор через воркер).
 
 ## Як користуватись
