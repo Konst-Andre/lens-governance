@@ -16,7 +16,7 @@
 | `tools/claude-code/ADOPTIONS.md` | журнал адаптацій: який репо, яким шляхом, тест «нова сесія без чату», що в каркасі неясно → що виправлено; черга репо | закриваєш адаптацію; правиш каркас |
 | `tools/claude-code/PROFILE.md` | **профіль Konst** — канонічна копія (у налаштуваннях акаунта — копія для вставки) | правиш профіль |
 | `tools/claude-code/templates/` | шаблони: `CLAUDE_template.md` · `REPO_LAYOUT_template.md` · `CHERGA_template.md` · `DECISIONS_template.md` · `ARCHITECTURE_template.md` · `SUMMARY_template.md` · `AUDIT_template.md` · `env_check_template.sh` · `session_start_template.sh` | створюєш файл, якого бракує |
-| `tools/claude-code/audit_prompts.sh` | подвійний `/doctor prompt-audit` (sonnet + opus high; `AUDIT_THIRD=fable`; «`.`» — увесь репо) | копіювати в `tools/` репо як є |
+| `tools/claude-code/audit_prompts.sh` | подвійний `/doctor prompt-audit` (sonnet + opus high; `AUDIT_THIRD=fable` — лише за словом Konst; «`.`» — увесь репо) | копіювати в `tools/` репо як є |
 
 Поруч — `tools/cloudflare/` (`CLOUDFLARE.md` правила й бюджет спільного акаунта · `cf_budget.sh` замір для `env_check`): потрібен
 кожному репо, що живе на Cloudflare.
