@@ -39,7 +39,9 @@ fresh_days=30
    Документи, самері, інструменти, тести збірку не будять. Виключення перевіряються першими; `*` ловить і вкладені теки.
    Пропущена фільтром збірка лишає в API запис із `is_skipped: true` і стадіями `idle` (заміряно 03.10.2026) — це не збірка;
    `cf_budget.sh` її не рахує. Чи рахує її ліміт Cloudflare — у документації не сказано (не перевірено).
-   Те саме є у Workers Builds (*Build watch paths*) — для воркера include = `worker/*` (+ тека статики, якщо `[assets]`).
+   Те саме є у Workers Builds (*Build watch paths*), але для воркера — **навпаки: include `*`, exclude документів** (`docs/*`, `tools/*`,
+   `.claude/*`, `CLAUDE.md`, `README.md`): збірка воркера читає й сусідні теки (`[assets]`, `../data`), і перелік, що забув одну, мовчки
+   не викладе зміну, а виключення, що забуло одну, дасть лише зайву збірку. Як і чим перевірити — кукбук том 6 · T13.
 2. **Прев'ю лише для робочих гілок агента.** Pages → Settings → Builds → *Branch control*: preview = *Custom*, include `claude/*`.
    Інші гілки прев'ю не дають. Не потрібні прев'ю — *None*.
 3. **Тека виводу — лише те, що публікується** (`site/`, `public/`; у продуктах Lens сайт — `docs/`, Р-7), не корінь репо — інакше
@@ -59,7 +61,7 @@ fresh_days=30
 |---|---|---|---|---|---|
 | `ae-simulator` | Pages (`site/`) | AE-Simulator | `site/*` | `claude/*` | налаштовано S89 |
 | `ae-edit` · `ae-proxy` | воркери | AE-Simulator (`ae-proxy` — лише дашборд) | CI GitHub (`deploy-edit.yml`) | — | — |
-| `airlens` | воркер + `[assets]` (бот і Mini App: `airlens.konstandre.workers.dev`) | AirLens | Workers Builds — кожен push (03.10: 8 з 34 комітів жовтня — лише документи) | — | 03.10 (AirLens S11): watch paths нема → `worker/*` `miniapp/*` `data/*` ставить Konst у дашборді (API Builds — лише токен користувача); детектор «прод ≡ репо» в `env_check` ✓; тривога власнику про запити **акаунта** з півночі UTC — Р-79 (до того тривоги про запити не було взагалі, лише D1) |
+| `airlens` | воркер + `[assets]` (бот і Mini App: `airlens.konstandre.workers.dev`) | AirLens | Workers Builds: include `*`, exclude `docs/*` `tools/*` `.claude/*` `CLAUDE.md` `README.md` (жовтень: 13 з 25 комітів — без збірки) | — | налаштовано 03.10 (AirLens S12, Р-80) через Builds API; перевірено — коміт лише з `docs/` збірки не дав; детектор «прод ≡ репо» в `env_check` ✓; тривога власнику про запити **акаунта** з півночі UTC — Р-79 |
 | ~~`airlens`~~ | ~~Pages (`airlens-8bd.pages.dev`)~~ | AirLens | — | — | **видалено 03.10** (AirLens S11, Р-78): перевірено — доменів нема, 404, посилань у репо нема; 131 деплой + проєкт через API; бот і Mini App живі (воркер) |
 | `qr-lens` · `drive-lens-preview` | Pages | QR-Lens · Drive-Lens-preview | `*` | усі гілки | ⚠ заводські — правило 1–2 у їхній сесії |
 | `lens-gh` | воркер | lens-governance | — | — | — |
@@ -94,6 +96,7 @@ Workers, Account Analytics) і `CLOUDFLARE_ACCOUNT_ID`. Скрипт лише ч
 
 | дата | хто (репо, сесія) | що звірено | що змінилось |
 |---|---|---|---|
+| 2026-10-03 | AirLens S12 | developers.cloudflare.com/workers/ci-cd/builds/build-watch-paths (29.05.2026) · …/builds/api-reference (22.09.2026); Builds API: тригер і список збірок воркера airlens | §2 п.1: для воркера — виключення, а не перелік тек (перелік мовчки пропускає `../data`, `[assets]`); watch paths airlens поставлено через API (`PATCH builds/triggers`), коміт лише з `docs/` — без збірки (до фільтра — збірка за ~3 с); шляхи фільтра — від кореня репо при корені збірки `/worker` |
 | 2026-10-03 | AirLens S11 | API акаунта: запити по днях 26.09–03.10 за скриптами; проєкт Pages airlens (домени, деплої); developers.cloudflare.com/workers/ci-cd/builds/api-reference (22.09.2026) · …/configuration (API token) | заміряно: ≤ 2 027 запитів/добу, бот 97 %; Pages airlens видалено (131 деплой + проєкт, `DELETE …?force=true` без збоїв); Builds API — лише токен користувача (права: Workers Builds Configuration Edit + Workers Scripts Read); build token Workers Builds — окремий, автостворений, не чіпати |
 | 2026-10-03 | AE-Simulator S89 | developers.cloudflare.com/pages/platform/known-issues (06.05.2026) | проєкт Pages із >100 деплоями дашборд не видаляє: спершу деплої (`wrangler pages deployment delete <id> --project-name <p> --force` у циклі, скрипт на тій сторінці; або API `DELETE …/pages/projects/<p>/deployments/<id>?force=true`), активний продакшн-деплой лишається — потім видалити проєкт |
 | 2026-10-03 | AE-Simulator S89 | усі джерела §1; API акаунта: проєкти, збірки за 30 днів, запити за 7 днів | файл створено; заміряно: запити ≤ 2 000/добу (~2 %), збірки Pages ~305 за 30 днів (AE ~173, AirLens-Pages 132) |
