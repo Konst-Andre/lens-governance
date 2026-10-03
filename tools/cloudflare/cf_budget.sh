@@ -51,7 +51,8 @@ try:
         n = 0
         for page in range(1, 41):
             res = get(f"{API}/pages/projects/{p['name']}/deployments?per_page=25&page={page}").get('result') or []
-            n += sum(1 for d in res if d['created_on'] >= month0)
+            # is_skipped — запис є, збірки не було (watch paths відсіяли); не рахуємо (заміряно S89: так виглядає пропуск)
+            n += sum(1 for d in res if d['created_on'] >= month0 and not d.get('is_skipped'))
             if len(res) < 25 or (res and res[-1]['created_on'] < month0): break
         per[p['name']] = n; total += n
         c = (p.get('source') or {}).get('config') or {}
