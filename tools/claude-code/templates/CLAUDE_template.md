@@ -1,14 +1,14 @@
 # <Продукт> — як працюємо
 
 > живе доки: існує репо. Коротко; подробиці — у `docs/`. Змінилось правило роботи — правиться тут, тим самим комітом (перед комітом — `bash tools/audit_prompts.sh CLAUDE.md`).
-> Зразок — `lens-governance:tools/claude-code/templates/CLAUDE_template.md`; каркас — `tools/claude-code/REPO_FRAME.md` там само. Тримати ≤ ~200 рядків: кожен рядок — «прибрав — агент помилиться?»
+> Зразок — `lens-governance:tools/claude-code/templates/CLAUDE_template.md`; каркас — `tools/claude-code/REPO_FRAME.md` там само. Тримати ≤ ~200 рядків: кожен рядок — «прибрав — агент помилиться?» Шляхи — у бектиках: `@шлях` без них вантажить файл цілком щосесії (`REPO_FRAME.md` §2).
 
 **Що це.** <одне-два речення: продукт, для кого, хто власник змісту>.
 
 - **Мова** — українська; код і ідентифікатори — англійською.
 - **Старт сесії:** `bash tools/env_check.sh` → `docs/REPO_LAYOUT.md` → найновіше самері в `docs/summary/` (§0) → `docs/CHERGA.md` цілком → точково `docs/DECISIONS.md` · `docs/ARCHITECTURE.md`.
 - **Гілка:** `main` <або інше>. Велика перебудова — на гілці `claude/…` з переглядом Konst. Після push — read-back: `git ls-remote origin refs/heads/<гілка>` ≡ локальний HEAD. <Хто ще пише в main (напр. редактор/бот) → `git pull` перед ходом, ніколи force.>
-- **Цикл:** план → мікроскоп → другий погляд (на тригері профілю — перелік тригерів лише там, `PROFILE.md` ЦИКЛ п.3) → «так» Konst → код. Один хід — один коміт. Рішення — `docs/DECISIONS.md`.
+- **Цикл:** план → мікроскоп → другий погляд (на тригері профілю — перелік тригерів лише там, `lens-governance:tools/claude-code/PROFILE.md` ЦИКЛ п.3) → «так» Konst → код. Один хід — один коміт. Рішення — `docs/DECISIONS.md`.
 - **Effort:** medium; «раджу high — чому» в мікроскопі лише на справжній вилці чи незворотному / прод-кроці; перемикає Konst.
 - **Device-арбітр:** <ПК 1920 px / iPhone 375 pt …>.
 - **Код старший за документи:** розбіжність — назвати.
@@ -30,8 +30,7 @@ bash tools/env_check.sh     # база · env · прод; exit 1 — розіб
 ```
 Інструменти ставить хук `.claude/hooks/session-start.sh`; змінив гейт — правиш хук і `env_check` тим самим комітом. <Відомий червоний — що саме і чому; сигнал «той самий червоний, що до ходу».>
 
-**Cloudflare** — один акаунт на всі проєкти Konst, ліміти спільні. Правила (збірка лише з теки сайту, прев'ю лише `claude/*`,
-детектор «живий файл ≡ `main`») і бюджет — `lens-governance:tools/cloudflare/CLOUDFLARE.md`; рядки `cloudflare:` / `⚠` в `env_check` —
+**Cloudflare** — один акаунт на всі проєкти Konst, ліміти спільні. Правила й бюджет — `lens-governance:tools/cloudflare/CLOUDFLARE.md`; рядки `cloudflare:` / `⚠` в `env_check` —
 читати; тривога — першою в звіті; зміна налаштувань Cloudflare — прод-крок, лише після «так» Konst. Репо без Cloudflare — абзац прибрати.
 
 ## Секрети
