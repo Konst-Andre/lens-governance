@@ -1,0 +1,3 @@
+# живе доки: є Python-скрипти, що імпортують kernel/Lens_validate.py (CQ-1, 04.10.2026)
+__pycache__/
+*.pyc
