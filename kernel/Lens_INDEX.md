@@ -148,6 +148,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 | `Lens_NEWPROJECT_bootstrap.md` | рецепт заведення нового Project із тим самим ядром |
 | `Lens_PROJECT_instruction.md` | готовий текст інструкції Project + що змінилось проти старої |
 | `Lens_ARCHIVE_INDEX.md` | що лежить в `archive/` репо + 5 тригерів, коли туди йти |
+| `Lens_AUDIT.md` | журнал аудиту інструкцій ядра (`/doctor prompt-audit`, sonnet + opus high): рядок на кожну правку інструкцій, нові зверху. Заведено 04.10.2026 — до того рядки ядра жили в `AE-Simulator:docs/AUDIT.md` |
 | `Lens_REPO_LAYOUT.md` | **формула архітектури**: тека · ім'я · адресація · носії — по Ф (Ф1 ухвалено G-U 24.09.2026). Аналог `Routes:REPO_LAYOUT.md` |
 
 ### Значення — по продуктах
