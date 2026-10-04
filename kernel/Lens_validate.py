@@ -954,8 +954,32 @@ def g22(root):
 # Гейт продукту: той самий скрипт ядра, запущений на КОРЕНІ репо продукту. Оголошення —
 # з власного індексу продукту `lens/<Продукт>_INDEX.md` (Р-9), не з Lens_INDEX ядра:
 # гейт перевіряє лише свій репо (Р-4′). Шляхи в індексі — від кореня репо продукту.
-Q_CEIL = 8192             # стеля черги — канон у Lens_INDEX §5 ядра · детектор kernel/check_cherga.py CEIL
-Q_THR = Q_CEIL * 9 // 10  # поріг прополки Ф-10 (90%)
+Q_MAX, Q_AGE = 12, 30     # стеля черги — відкритих пунктів і вік у днях; канон — Lens_INDEX §5 ядра (CQ-1, 04.10.2026) · ті самі числа: check_cherga.py · Lens_start.py · tools/env_check.sh
+Q_CEIL = 8192             # колишня стеля в байтах — лише ⓘ (CQ-1) · CEIL
+Q_THR = Q_CEIL * 9 // 10  # колишній поріг Ф-10 — лише ⓘ
+
+def queue_open(txt):
+    """Відкриті пункти черги (CQ-1): рядок таблиці, де `id` у 1-й або 2-й комірці (як check_cherga.ids), без «| закрито |»
+    → [(id, вік у днях або None)]. Дата — остання комірка-дата рядка: dd.mm.yyyy або dd.mm (рік — поточний, у майбутньому — минулий).
+    Черга з розділом «## Відкрите» — лише він; без нього — увесь файл."""
+    import datetime
+    sec = txt.split('## Відкрите', 1)[1].split('\n-----', 1)[0] if '## Відкрите' in txt else txt
+    out, today = [], datetime.date.today()
+    for l in sec.splitlines():
+        if not l.startswith('|') or '| закрито |' in l: continue
+        cells = [c.strip() for c in l.strip().strip('|').split('|')]
+        m = next((re.fullmatch(r'\*{0,2}`([^`]+)`\*{0,2}', c) for c in cells[:2] if re.fullmatch(r'\*{0,2}`([^`]+)`\*{0,2}', c)), None)
+        if not m: continue
+        age = None
+        for c in reversed(cells):
+            d = re.fullmatch(r'(\d{2})\.(\d{2})(?:\.(\d{4}))?', c)
+            if d:
+                y = int(d[3]) if d[3] else today.year
+                dt = datetime.date(y, int(d[2]), int(d[1]))
+                if not d[3] and dt > today: dt = datetime.date(y - 1, int(d[2]), int(d[1]))
+                age = (today - dt).days; break
+        out.append((m.group(1), age))
+    return out
 P_LIVE = ('lens', 'sessions', 'tools')   # теки, що оголошуються; archive/ — історія, сайт — не канон
 
 
@@ -1051,7 +1075,7 @@ def product(root):
         ok(f'оголошено {len(sdecl)} · у sessions/ {len(sfiles)}')
 
     # G14 — черга продукту: оголошена, існує, у стелі
-    print('\n[G14] черга продукту — стеля Lens_INDEX §5 ядра')
+    print('\n[G14] черга продукту — стеля Lens_INDEX §5 ядра: пункти й вік (CQ-1)')
     qd = re.findall(pat, sect('Черга'))
     if len(qd) != 1:
         fail(f'розділ «Черга» оголошує {len(qd)} файл(ів), треба рівно 1')
@@ -1061,12 +1085,14 @@ def product(root):
             fail(f'{qd[0]} — черги немає')
         else:
             n = os.path.getsize(qp)
-            if n > Q_CEIL:
-                fail(f'{qd[0]} = {n} B > стеля {Q_CEIL}: прополка')
-            elif n > Q_THR:
-                warn(f'{qd[0]} = {n} B > поріг {Q_THR} (90%): прополка при наступному дописі')
+            q = queue_open(open(qp, encoding='utf-8').read())
+            old = [i for i, a in q if a is not None and a > Q_AGE]
+            if not q:
+                print(f'  ⓘ {qd[0]}: таблиці з `id` нема — лічильник пунктів не застосовний ({n} B, байти — лише ⓘ)')
+            elif len(q) > Q_MAX or old:
+                warn(f'{qd[0]}: відкритих {len(q)} (стеля {Q_MAX}) · старших за {Q_AGE} дн.: {len(old)} {old[:5]} — спершу виконати, розрізати або відкласти з датою (CQ-1)')
             else:
-                ok(f'{qd[0]} = {n} B (поріг {Q_THR} · стеля {Q_CEIL})')
+                ok(f'{qd[0]}: відкритих {len(q)} ≤ {Q_MAX} · старших за {Q_AGE} дн. нема ({n} B — ⓘ)')
 
 
 # ────────────────────────────────── HTML ──────────────────────────────────

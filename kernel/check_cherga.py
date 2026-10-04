@@ -2,7 +2,8 @@
 """Детектор прополки черг. Живе доки: черги EquipLens/governance живі.
    К2: ловить загублений id, перетин черг, порожній крок, вихід за стелю."""
 import re, os, sys
-CEIL = 8192
+CEIL = 8192   # колишня стеля в байтах — лише ⓘ (CQ-1, 04.10.2026)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from Lens_validate import queue_open, Q_MAX, Q_AGE  # CQ-1: одна мірка черги
 def ids(txt):
     out=[]
     for line in txt.splitlines():
@@ -30,8 +31,8 @@ bad += [f'загублений id: {i}' for i in lost]
 steps=set(re.findall(r'\|\s*\*\*(\d)\*\*\s*\|',new))
 bad += [f'крок без id: {s}' for s in '123456789' if s not in steps]
 for f in sys.argv[2:4]:
-    n=os.path.getsize(f)
-    if n>CEIL: bad += [f'стеля: {f} = {n} B > {CEIL}']
+    q=queue_open(open(f,encoding='utf-8').read()); old=[i for i,a in q if a is not None and a>Q_AGE]
+    if len(q)>Q_MAX or old: print(f'  ⚠ {f}: відкритих {len(q)} (стеля {Q_MAX}) · старших за {Q_AGE} дн.: {len(old)} — спершу виконати (CQ-1)')
 print('[CHERGA]', '✗ '+str(len(bad)) if bad else f'✓ вхід {len(O)} · вихід {len(N)} · gov {len(G)} · знято {len(Zn)}')
 for b in bad: print('  ✗', b)
 sys.exit(1 if bad else 0)

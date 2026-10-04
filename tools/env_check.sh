@@ -31,16 +31,11 @@ spc=$(git ls-files | grep ' ' | grep -v '^archive/' | tr '\n' ';')
 
 # черга ядра — відкриті рядки й вік (CQ-1: стеля — кількість і вік, не байти)
 python3 - <<'PY'
-import re, datetime
-t = open('kernel/Lens_governance_CHERGA.md', encoding='utf-8').read()
-sec = t.split('## Відкрите', 1)[1].split('\n-----', 1)[0]
-rows = [l for l in sec.splitlines() if l.startswith('| `') and '| закрито |' not in l]
-today = datetime.date.today(); ages = []
-for l in rows:
-    m = re.search(r'\| (\d{2})\.(\d{2})\.(\d{4}) \|', l)
-    if m: ages.append(((today - datetime.date(int(m[3]), int(m[2]), int(m[1]))).days, l.split('`')[1]))
-old = sorted([a for a in ages if a[0] > 30], reverse=True)
-print(f"черга ядра: відкритих {len(rows)}" + (f" · старші за 30 дн.: {len(old)} (найстаріший {old[0][1]} — {old[0][0]} дн.)" if old else " · старших за 30 дн. нема"))
+import sys; sys.path.insert(0, 'kernel'); from Lens_validate import queue_open, Q_MAX, Q_AGE
+q = queue_open(open('kernel/Lens_governance_CHERGA.md', encoding='utf-8').read())
+old = sorted(((a, i) for i, a in q if a is not None and a > Q_AGE), reverse=True)
+s = f"черга ядра: відкритих {len(q)} (стеля {Q_MAX})" + (f" · старші за {Q_AGE} дн.: {len(old)} (найстаріший {old[0][1]} — {old[0][0]} дн.)" if old else f" · старших за {Q_AGE} дн. нема")
+print(("⚠ " + s + " — спершу виконати, розрізати або відкласти з датою (CQ-1)") if len(q) > Q_MAX or old else s)
 PY
 
 # каркас Claude Code — кожне репо сесії (сусідні теки з .git), включно з ядром

@@ -6,7 +6,7 @@
   1. clone/pull ядра lens-governance (+ продуктових репо з --product) у --root;
   2. числа бази: HEAD (sha + тема) · md5 Lens_validate.py · підсумок --gov;
   3. звірка з §5 живого самері: ✓/⚠/✗ і md5 беруться з тексту §5 — розбіжність друкується;
-  4. стеля черг: розмір кожного *_CHERGA.md проти 8 192 B і порогу 7 372 B (Lens_INDEX §5);
+  4. стеля черг: відкриті пункти й вік кожного *_CHERGA.md (Lens_INDEX §5, CQ-1); байти — лише ⓘ;
   5. лістинг УСІХ репо власника (П-GV1): з GH_TOKEN — разом із приватними, без — лише публічні;
   6. --gov-session: друкує «Зміст» gov-протоколу (шар 1 з «ТРИ ШАРИ»);
   7. --instr ФАЙЛ: diff тексту поля Instructions проти блоку в kernel/Lens_PROJECT_instruction.md.
@@ -24,7 +24,7 @@ import argparse, difflib, hashlib, json, os, re, subprocess, sys, urllib.request
 
 OWNER = 'Konst-Andre'
 CORE = 'lens-governance'
-CEIL, WARN = 8192, 7372
+CEIL, WARN = 8192, 7372   # колишня стеля в байтах — лише ⓘ (CQ-1, 04.10.2026)
 TOK = re.compile(r'github_pat_[A-Za-z0-9_]+')
 mism = []
 
@@ -122,9 +122,15 @@ def cherga(roots):
                 continue
             for f in files:
                 if f.endswith('_CHERGA.md'):
-                    n = os.path.getsize(os.path.join(base, f))
-                    flag = '✗ стеля' if n > CEIL else '⚠ поріг прополки' if n > WARN else '✓'
-                    print(f'  {flag:16} {n:5} B  {os.path.relpath(os.path.join(base, f), os.path.dirname(root))}')
+                    p = os.path.join(base, f); n = os.path.getsize(p)
+                    if os.path.isdir(os.path.join(root, 'kernel')): sys.path.insert(0, os.path.join(root, 'kernel'))
+                    try:
+                        from Lens_validate import queue_open, Q_MAX, Q_AGE  # CQ-1: одна мірка черги
+                        q = queue_open(open(p, encoding='utf-8').read()); old = [i for i, a in q if a is not None and a > Q_AGE]
+                        flag = '⚠ пункти/вік' if len(q) > Q_MAX or old else '✓'
+                        print(f'  {flag:14} відкритих {len(q):3} · старших {Q_AGE} дн.: {len(old):3} · {n:6} B (ⓘ)  {os.path.relpath(p, os.path.dirname(root))}')
+                    except ImportError:
+                        print(f'  ⓘ {n:6} B  {os.path.relpath(p, os.path.dirname(root))} (Lens_validate не знайдено — пункти не пораховано)')
 
 
 def gov_contents(core):
@@ -172,7 +178,7 @@ def main():
     roots = [core] + [p for p in (clone(r, a.root, token) for r in a.product) if p]
     print('── ЧИСЛА БАЗИ')
     base_numbers(core, live_summary(core, a.summary_of))
-    print('── ЧЕРГИ (стеля 8 192 B · поріг 7 372 B)')
+    print('── ЧЕРГИ (стеля: пункти й вік — Lens_INDEX §5, CQ-1)')
     cherga(roots)
     if not a.no_list:
         print('── РЕПО (П-GV1)')
