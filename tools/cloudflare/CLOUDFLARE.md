@@ -77,7 +77,7 @@ if cfb=$(curl -sSf -m 20 https://raw.githubusercontent.com/Konst-Andre/lens-gove
 ```
 ⚠ Не `curl … | bash || echo …`: на 404 `bash` отримує порожній вхід і виходить з 0 — збій мовчить.
 і абзац у `CLAUDE.md` репо (зразок — `tools/claude-code/templates/CLAUDE_template.md`): рядки `cloudflare:` і `⚠` в `env_check` —
-читати, тривога — першою в звіті; зміна налаштувань Cloudflare — прод-крок, лише після «так» Konst. Потрібні змінні середовища `CLOUDFLARE_API_TOKEN` (права на читання: Pages,
+читати, тривога — у звіті одразу після «що ти побачиш»; зміна налаштувань Cloudflare — прод-крок, лише після «так» Konst. Потрібні змінні середовища `CLOUDFLARE_API_TOKEN` (права на читання: Pages,
 Workers, Account Analytics) і `CLOUDFLARE_ACCOUNT_ID`. Скрипт лише читає, токен не друкує; береться з `main` ядра свідомо — щоб
 актуалізація (§5) доїжджала до всіх репо без правок у них. Ціна: довіра до `main` ядра (той самий власник).
 
