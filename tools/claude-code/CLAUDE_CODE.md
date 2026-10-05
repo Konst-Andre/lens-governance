@@ -1,6 +1,6 @@
 # Claude Code — каркас для всіх репо Konst (вхід)
 
-> живе доки: Konst працює з Claude Code. Змінилась практика — правиться тут або в `REPO_FRAME.md` (подвійний аудит перед комітом); репо підтягують при наступному тригері аудиту.
+> живе доки: Konst працює з Claude Code. Змінилась практика — правиться тут або в `REPO_FRAME.md` (аудит за класом, пакетом — `tools/claude-code/templates/AUDIT_template.md` «Коли і скільки»); репо підтягують при наступному тригері аудиту.
 > дім: `lens-governance:tools/claude-code/` · народився: AE-Simulator S88, 02.10.2026 (AE — приватне, інші сесії його не бачать, тому зразок тут, у публічному ядрі)
 
 **Навіщо.** Профіль Konst приходить у кожну сесію, а файли — ні. Практика, народжена в одному репо, іншим невідома. Тут — один
@@ -27,7 +27,7 @@
 ## Як користуватись
 
 **Нове репо.** Прочитати `tools/claude-code/REPO_FRAME.md` → створити з шаблонів `CLAUDE.md`, `docs/REPO_LAYOUT.md`, `docs/CHERGA.md`, `docs/DECISIONS.md`,
-`docs/ARCHITECTURE.md`, `docs/AUDIT.md`, `tools/env_check.sh`, `tools/audit_prompts.sh`, хук старту → перший подвійний аудит `CLAUDE.md` → коміт.
+`docs/ARCHITECTURE.md`, `docs/AUDIT.md`, `tools/env_check.sh`, `tools/audit_prompts.sh`, хук старту → перший аудит `CLAUDE.md` (клас 2: opus high + sonnet) → коміт.
 
 **Наявне репо** (з Claude Code чи з claude.ai Project) — процедура `tools/claude-code/ADOPT.md`. Konst вставляє в сесію репо одне речення:
 ```text

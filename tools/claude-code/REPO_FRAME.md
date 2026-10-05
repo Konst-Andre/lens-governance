@@ -1,6 +1,6 @@
 # Каркас репо під Claude Code — як влаштувати, щоб агент працював і пам'ятав
 
-> живе доки: Konst працює з Claude Code. Змінилась практика — правиться ЦЕЙ файл (подвійний аудит перед комітом); репо підтягують при наступному тригері.
+> живе доки: Konst працює з Claude Code. Змінилась практика — правиться ЦЕЙ файл (аудит за класом, пакетом — `tools/claude-code/templates/AUDIT_template.md` «Коли і скільки»); репо підтягують при наступному тригері.
 > дім: `lens-governance:tools/claude-code/REPO_FRAME.md` · вхід — `tools/claude-code/CLAUDE_CODE.md` · шаблони — `tools/claude-code/templates/`
 > народився: AE-Simulator S88, 02.10.2026 (переїзд репо з claude.ai Project у Claude Code); зразки в живих репо — `AirLens`, `AE-Simulator`
 

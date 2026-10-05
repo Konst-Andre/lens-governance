@@ -86,7 +86,7 @@ Workers, Account Analytics) і `CLOUDFLARE_ACCOUNT_ID`. Скрипт лише ч
 **Коли.** (а) `cf_budget.sh` друкує «перевірено N дн. тому» при N > 30; (б) реальність суперечить числу тут (помилка 1027, збірка не
 пішла, ліміт у дашборді інший); (в) Cloudflare змінив план чи назву налаштування.
 **Звірку агент робить сам, без запиту Konst, окремим ходом у будь-якому репо, де помітив; ПРАВКУ — пропонує й застосовує після
-«так» Konst** (це файл правил ядра: зміна тексту §2 — ще й подвійний аудит, `CLAUDE.md` ядра «Аудит правил» · `tools/claude-code/audit_prompts.sh`; зміна лише чисел, дат, реєстру чи
+«так» Konst** (це файл правил ядра: зміна тексту §2 — ще й аудит класу 1, `CLAUDE.md` ядра «Аудит правил» · `tools/claude-code/audit_prompts.sh`; зміна лише чисел, дат, реєстру чи
 журналу — дані, без аудиту):
 1. Відкрити джерела з колонки «джерело» (developers.cloudflare.com: `workers/platform/limits` · `workers/platform/pricing` ·
    `pages/platform/limits` · `pages/configuration/build-watch-paths` · `pages/configuration/branch-build-controls` ·
