@@ -144,7 +144,7 @@ Lens_patch_check_protocol, Lens_governance_protocol, Lens_fx_candidates. Наз�
 | `archive/Lens_iOS_cookbook.md` · `archive/superseded/canon_delta_A45_material_lever_manifest.md` · `archive/superseded/lens-gh_SPEC_v1.2.md` | 3 | 🗄 лишається | Родинне (Р-2) і витіснена спека конектора ядра. |
 | `archive/summaries/StockCheck/` · `Фармастор/` + `archive/superseded/StockCheck_collapse_C_CANON_delta.md` | 55 · 30 · 1 | 📦 → `stock-check` | Р-1/Р-3, хід 3 журналу GW. |
 | `archive/summaries/QR_Lens/` | 11 | 📦 → `QR-Lens` | Хід 4. |
-| `archive/superseded/Drive_Lens_concept_v1.md` · `_v1_2.md` | 2 | 📦 → `Drive-Lens` | Хід 5. |
+| `archive/superseded/Drive_Lens_concept_v1.md` · `_v1_2.md` | 2 | ✅ 05.10 → `Drive-Lens` | Хід 5 — пілот (`Drive-Lens` `0309ab3`). |
 | `archive/superseded/KPI_Lens_categories_Excel_impl_Batch15.md` | 1 | 📦 → `KPI-Lens` | Хід 6-б. |
 
 **Архів 154:** 🗄 лишається 54 · 📦 переїзд 100.

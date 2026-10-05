@@ -384,8 +384,7 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 
 ### `archive/superseded/` — 7 рядків · у теці 6 файлів (звірено 27.09.2026, LGH-2: `farmastor_v2_data.js` фізично в `archive/matrices/Фармастор/`; `StockCheck_B32_STAGEBENCH_HANDOFF.md` у теці нема; `StockCheck_collapse_C_CANON_delta.md` у теці **є**, хоч записаний у «Втрачене» — розібрати, `Lens_governance_CHERGA.md`)
 
-- `Drive_Lens_concept_v1.md`
-- `Drive_Lens_concept_v1_2.md`
+- ~~`Drive_Lens_concept_v1.md`~~ · ~~`Drive_Lens_concept_v1_2.md`~~ → переїхали в `Drive-Lens:archive/superseded/` 05.10.2026 (пілот переїзду, Р-3)
 - `KPI_Lens_categories_Excel_impl_Batch15.md`
 - `farmastor_v2_data.js`
 - `canon_delta_A45_material_lever_manifest.md` — 🗄 01.08.2026. Буфер **пережив ціль**: A45 канонізовано в `Lens_iOS_cookbook_3_material.md`. Йти сюди тільки за **сирими важелями компера** матеріальності, яких канон не зберіг
