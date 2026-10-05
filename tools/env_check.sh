@@ -20,6 +20,10 @@ gate=$(python3 kernel/Lens_validate.py --gov . 2>&1 | tail -1 | sed 's/─//g; s
 x=$(echo "$gate" | grep -oE '✗ [0-9]+' | grep -oE '[0-9]+'); [ "${x:-1}" -gt 0 ] && { gate="$gate ← ✗ > 0, розібратись"; rc=1; }
 last=$(grep -m1 -oE "^\| 20[0-9]{2}-[0-9]{2}-[0-9]{2}" kernel/Lens_AUDIT.md 2>/dev/null | tr -d '| ')
 if [ -n "$last" ]; then days=$(( ( $(date +%s) - $(date -d "$last" +%s) ) / 86400 )); [ "$days" -gt 30 ] && aud="аудит правил: $days дн. — ПОРА" || aud="аудит правил: $days дн. тому"; else aud="аудит правил: журналу нема"; fi
+# AUD-2 (05.10.2026): борг пакетного аудиту — коміти у файлах інструкцій після дати верхнього рядка журналу (той самий день не видно — прийнято)
+INSTR="CLAUDE.md tools/claude-code/PROFILE.md tools/claude-code/REPO_FRAME.md tools/claude-code/ADOPT.md tools/claude-code/CLAUDE_CODE.md tools/claude-code/templates tools/cloudflare/CLOUDFLARE.md kernel/wsd"
+[ -n "$last" ] && debt=$(git log --since="$last 23:59:59" --format=%s -- $INSTR 2>/dev/null | grep -vcE 'аудит: клас 0|за аудитом')
+[ "${debt:-0}" -gt 0 ] && aud="$aud · ⚠ борг аудиту: $debt коміт(ів) в інструкціях після $last — пакет за класом (tools/claude-code/templates/AUDIT_template.md)"
 echo "env: github=${g:-000} cloudflare=${c:-000} · ${vars% } · гейт --gov: $gate · $aud"
 
 # ручні завантаження (Konst 04.10: «рідко, але буває») — тіло-«404» замість файла (так зламався модуль, MOD-1) · ім'я з пробілом

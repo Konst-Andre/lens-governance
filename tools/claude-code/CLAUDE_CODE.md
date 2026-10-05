@@ -16,7 +16,7 @@
 | `tools/claude-code/ADOPTIONS.md` | журнал адаптацій: який репо, яким шляхом, тест «нова сесія без чату», що в каркасі неясно → що виправлено; черга репо | закриваєш адаптацію; правиш каркас |
 | `tools/claude-code/PROFILE.md` | **профіль Konst** — канонічна копія (у налаштуваннях акаунта — копія для вставки) | правиш профіль |
 | `tools/claude-code/templates/` | шаблони: `CLAUDE_template.md` · `REPO_LAYOUT_template.md` · `CHERGA_template.md` · `DECISIONS_template.md` · `ARCHITECTURE_template.md` · `SUMMARY_template.md` · `AUDIT_template.md` · `env_check_template.sh` · `session_start_template.sh` | створюєш файл, якого бракує |
-| `tools/claude-code/audit_prompts.sh` | подвійний `/doctor prompt-audit` (sonnet + opus high; `AUDIT_THIRD=fable` — лише за словом Konst; «`.`» — увесь репо) | копіювати в `tools/` репо як є |
+| `tools/claude-code/audit_prompts.sh` | `/doctor prompt-audit` за класом правки (1 — opus high · 2 — + sonnet; проходи по черзі, вартість у виводі; `AUDIT_THIRD=fable` — лише за словом Konst; «`.`» — увесь репо — прибрано, `AUD-2`) | копіювати в `tools/` репо як є |
 | `tools/claude-code/frame_check.sh` | детектор «репо не адаптоване під каркас»: чого бракує за ролями `ADOPT.md` (ядро · продукт Lens · не-Lens · шлях В); `--inject` — перевірка самого детектора | запускає `env_check` ядра по кожному репо сесії; руками — `bash <ядро>/tools/claude-code/frame_check.sh <тека>` |
 
 Поруч — `tools/cloudflare/` (`CLOUDFLARE.md` правила й бюджет спільного акаунта · `cf_budget.sh` замір для `env_check`): потрібен

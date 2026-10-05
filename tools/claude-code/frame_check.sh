@@ -35,6 +35,8 @@ check() {
     local qs; qs=$(python3 -c "import sys; sys.path.insert(0, '$KDIR'); from Lens_validate import queue_open as f; r=f(open('$q', encoding='utf-8').read()); print(len(r), sum(a is not None for _, a in r))" 2>/dev/null)
     case "$qs" in "0 0") miss+=("${q#$d/} — черга не таблицею з \`id\` і датою (CQ-1)");; *" 0") miss+=("${q#$d/} — пункти без дати (CQ-1)");; esac
   fi
+  # AUD-2 (05.10.2026): скрипт аудиту — копія зразка «як є»; стара копія жене дорогі паралельні проходи без класу
+  [ -s "$d/tools/audit_prompts.sh" ] && ! cmp -s "$d/tools/audit_prompts.sh" "$KDIR/../tools/claude-code/audit_prompts.sh" && miss+=("tools/audit_prompts.sh ≠ зразок ядра — скопіювати (AUD-2)")
   if [ ${#miss[@]} -eq 0 ]; then echo "✓ $n — каркас на місці ($kind)"; return 0; fi
   local list; list=$(printf ' · %s' "${miss[@]}"); echo "⚠ $n не адаптоване ($kind): бракує ${list# · } → ADOPT (lens-governance:tools/claude-code/ADOPT.md)"; return 1
 }
@@ -43,15 +45,17 @@ if [ "${1:-}" = "--inject" ]; then
   t=$(mktemp -d); mkdir -p "$t/repo/docs/summary" "$t/repo/tools" "$t/repo/.claude/hooks"
   for p in tools/env_check.sh .claude/hooks/session-start.sh tools/audit_prompts.sh docs/CHERGA.md docs/DECISIONS.md \
            docs/ARCHITECTURE.md docs/REPO_LAYOUT.md docs/AUDIT.md; do : > "$t/repo/$p"; done
+  cp "$KDIR/../tools/claude-code/audit_prompts.sh" "$t/repo/tools/audit_prompts.sh"
   printf '## Відкрите\n\n| id | предмет | дата |\n|---|---|---|\n| `Ч-1` | x | 05.10.2026 |\n\n-----\n' > "$t/repo/docs/CHERGA.md"
   echo x > "$t/repo/CLAUDE.md"; full=$(check "$t/repo"); rc_full=$?
   rm "$t/repo/CLAUDE.md";     gone=$(check "$t/repo"); rc_gone=$?
   echo x > "$t/repo/CLAUDE.md"; rm "$t/repo/docs/AUDIT.md"; part=$(check "$t/repo"); rc_part=$?
   : > "$t/repo/docs/AUDIT.md"; printf '1. пункт списком\n' > "$t/repo/docs/CHERGA.md"; qlist=$(check "$t/repo"); rc_q=$?
   printf '## Відкрите\n\n| id | предмет | дата |\n|---|---|---|\n| `Ч-1` | x | 05.10.2026 |\n\n-----\n' > "$t/repo/docs/CHERGA.md"; qok=$(check "$t/repo"); rc_qok=$?
+  echo "# стара копія" >> "$t/repo/tools/audit_prompts.sh"; aud=$(check "$t/repo"); rc_aud=$?
   rm -rf "$t"
-  ok=0; [ $rc_full -eq 0 ] || ok=1; [ $rc_gone -eq 1 ] || ok=1; [ $rc_part -eq 1 ] && [[ "$part" == *docs/AUDIT.md* ]] || ok=1; [ $rc_q -eq 1 ] && [[ "$qlist" == *CQ-1* ]] || ok=1; [ $rc_qok -eq 0 ] || ok=1
-  [ $ok -eq 0 ] && echo "✓ inject: повний — ✓, без CLAUDE.md — ⚠, без docs/AUDIT.md — ⚠ з назвою, черга списком — ⚠ CQ-1, черга таблицею — ✓" || echo "✗ inject: детектор сліпий ($full | $gone | $part)"
+  ok=0; [ $rc_full -eq 0 ] || ok=1; [ $rc_gone -eq 1 ] || ok=1; [ $rc_part -eq 1 ] && [[ "$part" == *docs/AUDIT.md* ]] || ok=1; [ $rc_q -eq 1 ] && [[ "$qlist" == *CQ-1* ]] || ok=1; [ $rc_qok -eq 0 ] || ok=1; [ $rc_aud -eq 1 ] && [[ "$aud" == *AUD-2* ]] || ok=1
+  [ $ok -eq 0 ] && echo "✓ inject: повний — ✓, без CLAUDE.md — ⚠, без docs/AUDIT.md — ⚠ з назвою, черга списком — ⚠ CQ-1, черга таблицею — ✓, стара копія скрипта аудиту — ⚠ AUD-2" || echo "✗ inject: детектор сліпий ($full | $gone | $part)"
   exit $ok
 fi
 

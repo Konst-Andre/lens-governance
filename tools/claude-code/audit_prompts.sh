@@ -1,24 +1,49 @@
 #!/usr/bin/env bash
-# Подвійний аудит інструкцій: /doctor prompt-audit двома РІЗНИМИ моделями, названими явно псевдонімами (завжди найновіша версія):
-# sonnet і opus --effort high. AUDIT_THIRD=fable — третій прохід ЛИШЕ за явним словом Konst (Fable — за реальні кошти, 04.10.2026).
+# Аудит інструкцій за класом правки: /doctor prompt-audit моделями, названими явно псевдонімами (завжди найновіша версія).
+# Клас 1 — opus --effort high · клас 2 — ще й sonnet · клас 0 — аудиту нема (скрипт не потрібен).
+# AUDIT_THIRD=fable — ще прохід ЛИШЕ за явним словом Konst (Fable — за реальні кошти, 04.10.2026).
+# Формула (клас, пакет, перед запуском) — lens-governance:tools/claude-code/templates/AUDIT_template.md «Коли і скільки» (AUD-2).
 #
-# живе доки: інструкції агента перевіряються аудитом Claude Code. Зразок: lens-governance:tools/claude-code/ — копіювати в tools/ репо як є.
+# живе доки: інструкції агента перевіряються аудитом Claude Code. Зразок: lens-governance:tools/claude-code/ — копіювати в tools/ репо як є
+# (frame_check ядра порівнює копію з зразком: різниця — ⚠).
 #
-# Запуск:  bash tools/audit_prompts.sh <файл> [<файл> …]      (шлях — від кореня репо, у якому лежить файл)
-#          bash tools/audit_prompts.sh .                      (крапка — увесь репо: /doctor prompt-audit без шляху)
-# Звіти:   $AUDIT_OUT (за замовчуванням /tmp/audit)/<ім'я>.<модель>.txt — у репо не комітяться.
+# Запуск:  bash tools/audit_prompts.sh <1|2> <файл> [<файл> …]      (шлях — від кореня репо, у якому лежить файл)
+# Звіти:   $AUDIT_OUT (за замовчуванням /tmp/audit)/<ім'я>.<модель>.txt (+ .json — сирий вивід) — у репо не комітяться.
+# Проходи — ПО ЧЕРЗІ (opus першим); перша відповідь з «limit» або помилкою — стоп, решта не запускається.
+# Вартість кожного проходу ($, токени, хвилини) — у підсумку → у колонку «проходи» журналу аудиту.
 # Аудит нічого не міняє. Синтез робить агент: знахідка обох моделей — висока впевненість; однієї — звірити грепом;
-# застосовується лише підтверджене і лише після «так» Konst; рядок — у журнал аудиту репо тим самим комітом
-# (шлях — у CLAUDE.md репо: docs/AUDIT.md · продукт Lens за Р-7 — lens/<Продукт>_AUDIT.md · ядро — kernel/Lens_AUDIT.md).
-# Потрібен Claude Code ≥ 2.1.283 (/doctor prompt-audit). Кожен прохід — кілька хвилин; усі йдуть паралельно.
+# застосовується лише підтверджене і лише після «так» Konst; рядок — у журнал аудиту репо (шлях — у CLAUDE.md репо).
+# Потрібен Claude Code ≥ 2.1.283 (/doctor prompt-audit).
 set -u
-[ $# -ge 1 ] || { echo "вкажіть файл(и) або . для всього репо"; exit 2; }
+cls="${1:-}"; shift || true
+case "$cls" in 1) models="opus";; 2) models="opus sonnet";; *) echo "перший аргумент — клас правки 1 або 2 (клас 0 — без аудиту)"; exit 2;; esac
+[ -n "${AUDIT_THIRD:-}" ] && models="$models $AUDIT_THIRD"
+[ $# -ge 1 ] || { echo "вкажіть файл(и)"; exit 2; }
+for f in "$@"; do [ -f "$f" ] || { echo "нема файла: $f"; exit 2; }; done
 OUT="${AUDIT_OUT:-/tmp/audit}"; mkdir -p "$OUT"
+total=0
 for f in "$@"; do
-  if [ "$f" = "." ]; then arg=""; n="repo"; else [ -f "$f" ] || { echo "нема файла: $f"; exit 2; }; arg=" $f"; n=$(echo "$f" | tr '/' '_'); fi
-  timeout 1500 claude -p --model sonnet "/doctor prompt-audit$arg" > "$OUT/$n.sonnet.txt" 2>&1 &
-  timeout 1500 claude -p --model opus --effort high "/doctor prompt-audit$arg" > "$OUT/$n.opus.txt" 2>&1 &
-  [ -n "${AUDIT_THIRD:-}" ] && timeout 1500 claude -p --model "$AUDIT_THIRD" --effort high "/doctor prompt-audit$arg" > "$OUT/$n.$AUDIT_THIRD.txt" 2>&1 &
+  n=$(echo "$f" | tr '/' '_')
+  for m in $models; do
+    eff=""; [ "$m" != "sonnet" ] && eff="--effort high"
+    timeout 1500 claude -p --model "$m" $eff --output-format json "/doctor prompt-audit $f" > "$OUT/$n.$m.json" 2>&1
+    line=$(python3 - "$OUT/$n.$m.json" "$OUT/$n.$m.txt" <<'PY'
+import json, sys
+raw = open(sys.argv[1], encoding='utf-8', errors='replace').read()
+try:
+    d = json.loads(raw)
+except ValueError:
+    open(sys.argv[2], 'w').write(raw); print('ERR не JSON —', raw.strip()[-160:].replace('\n', ' ')); sys.exit()
+res = d.get('result') or ''
+open(sys.argv[2], 'w').write(res)
+u = d.get('usage', {}); tok = sum(u.get(k) or 0 for k in ('input_tokens', 'cache_creation_input_tokens', 'cache_read_input_tokens'))
+bad = d.get('is_error') or (len(res) < 400 and 'limit' in res.lower())   # коротка відповідь про ліміт ≠ звіт, що згадує «limit»
+print(('ERR ' if bad else 'OK ') + f"${d.get('total_cost_usd', 0):.2f} · вхід {tok // 1000} тис. ток · вихід {(u.get('output_tokens') or 0) // 1000} тис. · {(d.get('duration_ms') or 0) // 60000} хв")
+PY
+)
+    echo "$f · $m → $OUT/$n.$m.txt · ${line#* }"
+    c=$(echo "$line" | grep -oE '\$[0-9.]+' | tr -d '$'); total=$(python3 -c "print(round($total + ${c:-0}, 2))")
+    case "$line" in ERR*) echo "СТОП: помилка або ліміт — решту проходів не запущено (сумарно \$$total)"; exit 1;; esac
+  done
 done
-wait
-for f in "$@"; do if [ "$f" = "." ]; then n="repo"; else n=$(echo "$f" | tr '/' '_'); fi; for r in "$OUT/$n".*.txt; do echo "$f → $r ($(wc -c <"$r") Б)"; done; done
+echo "сумарно: \$$total (еквівалент API; на підписці — частка квоти)"
