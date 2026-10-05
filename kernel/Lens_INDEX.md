@@ -158,7 +158,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 | **QR Lens** | `QR_Lens_srpill_valuesLOCK.md` · `QR_Lens_srmotion_valuesLOCK.md` · `QR_Lens_areachip_valuesLOCK.md` · `QR_Lens_probrow_PARAMS_LOCK.md` · `QR_Lens_statusgauge_BENCHLOCK.md` · `QR_Lens_CTA_mechanic_LOCK.md` · `QR_Lens_export_contract_v1_1.md` *(v1 витіснено B59)* |
 | **Фармастор** *(попередня назва StockCheck)* | `Фармастор_v2_MASTER_LOCK.md` · `Фармастор_history_badge_valuesLOCK.md` · `Фармастор_v2_PORT_REGISTER.md` |
 | **Drive Lens** | переїхав у свій репо 05.10.2026 (`Drive-Lens` `0309ab3`): `Drive-Lens:lens/Drive_Lens_concept_v1_3.md` · `Drive-Lens:lens/Drive_Lens_logic_audit_findings.md` · що живе — `Drive-Lens:lens/Drive_Lens_INDEX.md` |
-| **PharmaLens** *(5-й продукт; ребренд робочої назви VTM Lens, 30.07.2026)* | `PharmaLens_Claude_Handover.md` — консолідований контекст напрацювань · `PharmaLens_Independent_Design_Research_Handover.md` — бриф на пошук варіативності (токени/мова/структура). **Ще не читані Claude** — читаються на старті арку PharmaLens, після governance-паса. Джерела-попередники (VTM) — §7 |
+| **PharmaLens** *(5-й продукт; ребренд робочої назви VTM Lens, 30.07.2026)* | переїхав у свій репо 05.10.2026 (`PharmaLens` `a6d1b83`): `PharmaLens:lens/PharmaLens_MASTER_LOCK.md` · `PharmaLens:lens/PharmaLens_Claude_Handover.md` · `PharmaLens:lens/PharmaLens_Independent_Design_Research_Handover.md` · що живе — `PharmaLens:lens/PharmaLens_INDEX.md`. Джерела-попередники (VTM) — §7 |
 | **EquipLens** *(6-й продукт; польовий нотатник потреби в обладнанні, старт 18.08.2026)* | `EquipLens_MASTER_LOCK.md` — єдиний канон, замінює три джерела (два `Planner_Handoff`, GPT-аналіз). **Окремий продукт від QR Lens** — межа й підстава в §2 LOCK, злиття заборонене |
 | **крос-Lens** *(належать родині, не продукту)* | `Lens_glass_FINDINGS.md` — острівець + скло: закони backdrop-root, матеріальність ярусу, виріз у склі. *Колишнє ім'я* `StockCheck_island_glass_FINDINGS.md`, перейменовано 21.08.2026 (EquipLens S6): §1–§6 виросли на StockCheck, §9 — на EquipLens, закони спільні |
 
@@ -322,8 +322,8 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 | **StockCheck** | `StockCheck_session_summary_b32_7_s20s21_STORAGE_TRUTH.md` · `StockCheck_session_summary_b32_5_s18s19_STORAGE_DONE.md` |
 | **QR Lens** | `QR_Lens_session_summary_b60_PRESSBENCH_v3_1.md` · `QR_Lens_session_summary_b60_AREACHIP_PORT.md` |
 | **EquipLens** | `EquipLens_session_summary_S35_OSTRIVETS.md` · `EquipLens_session_summary_S34_AURORA_HYBRID.md` *(у репо `EquipLens`: живі — `sessions/`, витіснені S1…S33 — `archive/summaries/`; оголошення — `EquipLens:lens/EquipLens_INDEX.md`, G-Z)* |
-| **PharmaLens** | `PharmaLens_session_summary_S1_FOUNDATION.md` *(продукт заморожено — чекає `.pptx` від Олі; єдине самері, стеля не задіяна)* |
-| **KPI Lens** | `KPI_Lens_session_summary_Batch15_2.md` |
+| **PharmaLens** | `PharmaLens:sessions/PharmaLens_session_summary_S1_FOUNDATION.md` *(продукт заморожено — чекає `.pptx` від Олі; у своєму репо з 05.10)* |
+| **KPI Lens** | `KPI-Lens:sessions/KPI_Lens_session_summary_Batch15_2.md` *(у своєму репо з 05.10)* |
 | **Lens** *(governance)* | `Lens_governance_session_summary_HA_CC4_YADRO_ADOPT.md` (ядро під каркас Claude Code; §0.0 — тест пам'яті ПЕРШИМ) · `Lens_governance_session_summary_GZ_EQUIPLENS_HOME.md` (числа бази · §0 — усе відкрите, план H-A; поглинає GY · LGH-3) · супутник `Lens_inventory_GT_v1.md` · тимчасовий журнал переїзду `Lens_MIGRATION_GW_ledger.md` (живе доки перенос Ф3 не завершено, потім видаляється) — **лежать у репо, тека `sessions/Lens_gov/`, не в Project** (Ф2 для governance, `Lens_REPO_LAYOUT.md` §2, G-U 24.09.2026; читати з clone/raw) *(GY · LGH3 — G-Z; GX · LGH1 · LGH2 — LGH-3; GW — G-Y; GV — G-Y; GU — G-W; GT — G-V; GR · GQ витіснено G-U, файли не збережено — зміст у комітах `39681fd`…`fcfc3ec`; F · G — сироти G-C3; GP — G-S; GO — G-R; GN — G-Q; GM — G-P; GL — G-O; GK — G-N; GJ — G-M; GI — G-L; GH — G-K; GG — G-J; GF — G-H; GA…GE — 17.09.2026 → `archive/summaries/Lens_gov/`)* |
 | **Фармастор** | `АРХІВ-УСІ` — продукт перейменовано на StockCheck; канон живе у `Фармастор_v2_MASTER_LOCK.md` і `Фармастор_v2_PORT_REGISTER.md`, самері не потрібні жодні |
 
@@ -383,7 +383,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 
 | файл | ймовірний дім |
 |---|---|
-| `PharmaLens_Claude_Handover.md` · `PharmaLens_Independent_Design_Research_Handover.md` | §3 називає їх `products/`-файлами, у репо їх **немає** (404, звірено 13.08.2026) — залити в `products/` або переоголосити як Project-only |
+| `PharmaLens_Claude_Handover.md` · `PharmaLens_Independent_Design_Research_Handover.md` | §3 називає їх `products/`-файлами, у репо їх **немає** (404, звірено 13.08.2026) — ✅ 05.10.2026: у `PharmaLens:lens/` (переїзд) |
 | `VTM_Lens_foundation_spec_v0_3.md` · `VTM_Lens_deep-research-report_GPT.md` · `Аналіз_Дизайну_ВТМ_Lens_Gemini__3_6.md` · `vtm_lens_spa_with_gemini_ai.html` | **джерела-попередники PharmaLens** (писані Gemini / GPT, Claude їх не читав). Тригер архівації = звірка з `PharmaLens_*_Handover` виконана |
 | `QR_Lens_session_summary_B59_halo_stagebench_REBUILD.md` | третє самері QR при стелі 2 — в архів при першому дотику до QR Lens |
 
