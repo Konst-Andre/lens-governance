@@ -480,7 +480,9 @@ def gov(root):
     # ── G10 — перепис самері (wsd 1.8: ≤2 на продукт) ─────────────────────
     print('\n[G10] перепис самері — що виселяти')
     groups = {}
-    for f in mds:
+    # G3-1 (GATE, 06.10.2026): archive/ — уже виселене; судити його як живе = шум у кожному прогоні
+    # («НА АРХІВ 33 з 34» перелічувало файли, що вже в архіві). Живі — поза archive/ (sessions/, Ф2).
+    for f in [x for x in mds if not _in_archive(root, x)]:
         m = re.match(r'(.+?)_session_summary', f)
         if m:
             groups.setdefault(m.group(1), []).append(f)
