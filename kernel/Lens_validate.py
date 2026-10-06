@@ -706,6 +706,7 @@ def gov(root):
     # давали ✓ без детектора (1.15 пастка 5). «Лише до ###» відкинуто: детектор
     # батька часто стоїть після підрозділу (2.3 · 13.2 · 1.19) → хибний ⚠ (12.12).
     DET_LABEL = re.compile(r'(?m)^[ \t>]*\*\*Детектор[^*\n]*\*\*')
+    TRIG_LABEL = re.compile(r'(?m)^[ \t>]*\*\*Тригер[^*\n]*\*\*')
     print('\n[G16] правила без детектора (К2)')
     seen_rule_file = False
     for f in sorted(live):
@@ -738,6 +739,15 @@ def gov(root):
             and not re.search(r'K2:n/a\s*—\s*\S', r_)
             and (DET_LABEL.search(r_)))
         total = len(naked) + na + with_det
+        # К1-1 (GATE, 06.10.2026) — друга перевірка: правило без тригера — режим провалу №1 (gov К1/К2):
+        # його ніхто не викличе, бо не сказано, КОЛИ. Ознака — мітка `**Тригер…**` на початку рядка
+        # (як DET_LABEL); виняток — `T:n/a — причина` у тілі (правило-процедура, що діє завжди).
+        no_trig = [re.match(r'#{2}\s*(\S+)', r_).group(1) for r_ in rules
+                   if not (is_route(r_) or len(r_.encode('utf-8')) < 400)
+                   and not re.search(r'T:n/a\s*—\s*\S', r_) and not TRIG_LABEL.search(r_)]
+        if no_trig:
+            warn(f'{f} — {len(no_trig)} правил без тригера (К1-1: «**Тригер.** коли …» або `T:n/a — причина`): '
+                 + ' '.join(no_trig[:12]) + (f' …та ще {len(no_trig) - 12}' if len(no_trig) > 12 else ''))
         if not naked:
             ok(f'{f} — усі {total} правил мають детектор або маркер K2:n/a')
         else:
