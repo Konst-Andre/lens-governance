@@ -889,6 +889,20 @@ def g19(root):
         for n in sorted(os.listdir(d)):
             if n.endswith('.md'):
                 docs.append((n + ' [live]', open(os.path.join(d, n), encoding='utf-8').read()))
+    # G19-1 (GATE, 06.10.2026): корпус продуктів виїхав із ядра (Р-3) — сліди правил у їхніх самері
+    # гейт бачить лише з локальних коренів --repo (archive/summaries/** і sessions/** продукту; мережі нема).
+    try:
+        _preg = _products(open(R(root, 'Lens_INDEX.md'), encoding='utf-8').read())
+    except OSError:
+        _preg = {}
+    prod_repos = {v[0] for v in _preg.values() if v[0]}
+    got_repos = sorted(r for r in prod_repos if r in REPO_ROOTS)
+    for rp in got_repos:
+        for sub in ('archive/summaries', 'sessions'):
+            for dp, _, fns in os.walk(os.path.join(REPO_ROOTS[rp], sub)):
+                for n in sorted(fns):
+                    if n.endswith('.md'):
+                        docs.append((f'{rp}:{n}', open(os.path.join(dp, n), encoding='utf-8').read()))
     if not docs:
         warn('корпусу самері не знайдено (archive/summaries порожня, --live не дано) — '
              'G19 не виконався, це НЕ зелений результат')
@@ -910,9 +924,14 @@ def g19(root):
     if born_zeros:
         print(f'  народжені, спрацювати ще не встигли ({len(born_zeros)}): '
               f'{" ".join(born_zeros)}')
-    if zeros:
-        warn(f'{len(zeros)} з {len(RU)} правил без жодного сліду — кандидати на '
-             f'виселення (К3-1): {" ".join(zeros)}')
+    missing = sorted(prod_repos - set(got_repos))
+    if zeros and missing:
+        # корпус неповний — нуль не доводить смерть правила: ⓘ, не ⚠ (хибний ⚠ вчить ігнорувати G19)
+        print(f'  ⓘ {len(zeros)} з {len(RU)} правил без сліду в корпусі ЯДРА: {" ".join(zeros)} — '
+              f'корпус неповний (продукти без --repo: {" ".join(missing)}); вирок «виселити» — лише з усіма коренями')
+    elif zeros:
+        warn(f'{len(zeros)} з {len(RU)} правил без жодного сліду (корпус ядра + {len(got_repos)} продуктів) — '
+             f'кандидати на виселення (К3-1): {" ".join(zeros)}')
     else:
         ok(f'усі {len(RU)} правил мають слід у корпусі самері')
     if not LIVE_DIRS:
