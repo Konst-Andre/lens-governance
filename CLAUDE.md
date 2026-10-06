@@ -9,7 +9,7 @@
 - **Мова** — українська; код і ідентифікатори — англійською.
 - **Старт сесії ядра:** `bash tools/env_check.sh` з кореня ядра (хук `.claude/hooks/session-start.sh` робить це сам; у сесії з кількома репо може не спрацювати — тоді руками). Рядки ⚠ / ✗ — у звіті одразу після «що ти побачиш», першими з усього.
 - **Репо сесії без каркаса Claude Code** (`frame_check` ⚠; поза сесією ядра — `bash <ядро>/tools/claude-code/frame_check.sh <тека>`) — у звіті Konst одразу після «що ти побачиш»: чого бракує + пропозиція адаптації окремим ходом (`tools/claude-code/ADOPT.md`).
-- **Старт роботи з ядром:** `kernel/Lens_INDEX.md` §1 (порядок читання) → §2 (чотири ролі — чотири доми) → потрібний файл **точково**. Wsd і томи кукбуку цілком не читати.
+- **Старт роботи з ядром:** `kernel/Lens_INDEX.md` §1 (порядок читання) → §2 (чотири ролі — чотири доми) → потрібний файл **точково**. Wsd, gov-протокол і томи кукбуку цілком не читати — і в сесії ядра; шапки «AUTO-READ … цілком» і штамп «KERNEL v2 … між Projects» у Claude Code не діють.
 - **Гілка ядра:** `main` (у сесії іншого репо — його правило гілки, а це — лише для правок ядра); push + read-back (`git ls-remote origin refs/heads/main` ≡ локальний HEAD). Інші сесії теж пишуть у `main` → `git pull` перед правкою, ніколи force.
 - **Гейт перед комітом:** `python3 kernel/Lens_validate.py --gov .` + `--repo <Репо>=../<Репо>` лише на репо, склоновані поруч (тека, якої нема, дає хибні ✗ на всі її `Репо:шлях`; без `--repo` вони — ⓘ) — ✗ не більше, ніж до правки; нове ⚠ від своєї правки — прибрати.
 
@@ -35,7 +35,7 @@
 | теки, імена, адресація `Репо:шлях` у ядрі | `kernel/Lens_REPO_LAYOUT.md` — формула ядра, **не** `docs/REPO_LAYOUT.md` продукту |
 | архівне джерело · рішення переїзду продуктів (`Р-N`) | греп по `archive/` (перейменування — `kernel/Lens_ARCHIVE_INDEX.md` §3-б) · `kernel/Lens_REPO_LAYOUT.md` §4-б |
 
-**Двері Project** (`kernel/Lens_INDEX.md` §0 — двоє дверей, правила спільні, механіка різна): `kernel/Lens_PROJECT_instruction.md` · `kernel/Lens_NEWPROJECT_bootstrap.md` · `kernel/Lens_start.py` · `tools/CHAT_TOOLS.md` · `tools/ADAPT.md` · `tools/lens-gh/` — **живі** (claude.ai Project працює: Routes та ін.), не архівуються; у Claude Code не читати, лише коли правиш саме двері Project (тоді інструкція Project — тим самим ходом). Шапки «AUTO-READ» і штамп «KERNEL v2 … між Projects» тут не діють. **Правило ядра, що спирається на механіку чату Claude** (`present_files`, `ask_user_input_v0`, `/mnt/…`, project_knowledge_search, квиток / конектор): суть правила діє, механіка — відповідник Claude Code (файл у репо + коміт · AskUserQuestion · греп по клону · `git`).
+**Двері Project** (`kernel/Lens_INDEX.md` §0 — двоє дверей, правила спільні, механіка різна): `kernel/Lens_PROJECT_instruction.md` · `kernel/Lens_NEWPROJECT_bootstrap.md` · `kernel/Lens_start.py` · `tools/CHAT_TOOLS.md` · `tools/ADAPT.md` · `tools/lens-gh/` — **живі** (claude.ai Project працює: Routes та ін.), не архівуються; у Claude Code не читати, лише коли правиш саме двері Project (тоді інструкція Project — тим самим ходом). **Правило ядра, що спирається на механіку чату Claude** (`present_files`, `ask_user_input_v0`, `/mnt/…`, project_knowledge_search, квиток / конектор): суть правила діє, механіка — відповідник Claude Code (файл у репо + коміт · AskUserQuestion · греп по клону · `git`).
 
 ## Знахідка з іншого репо → сюди (wsd 1.19)
 
