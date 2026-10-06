@@ -31,7 +31,7 @@
 
 ## FX-1 · Border Beam 🟡
 
-- **джерело:** https://beam.jakubantalik.com — Jakub Antalik. Оригінал = React-компонент («animated glowing border beam, sizes / color variants / themes»).
+- **джерело:** https://beam.jakubantalik.com — Jakub Antalik. Оригінал = React-компонент («animated glowing border beam, sizes / color variants / themes»). *(дата звірки джерела не записана — не перевірено, К5-1)*
 - **механіка:** `conic-gradient` із анімованим кутом + маска рамки (`padding-box` XOR `content-box`). Кут анімується через зареєстровану custom-property: `@property --beamA{syntax:'<angle>'}`. Без цього реєстру кут не інтерполюється — властивість анімується стрибком.
 - **стек:** ✅ чистий vanilla CSS, нуль JS-залежностей. React у джерелі — обгортка, не суть.
 - **вартість кадру:** ⚠️ **per-frame repaint по периметру**. Це родина A70/A72: градієнт на рамці перемальовується щокадру.
@@ -47,7 +47,7 @@
 
 ## FX-2 · Liquid metal 🔴
 
-- **джерело:** https://metal.jakubantalik.com — «real-time WebGL metal shader effect for buttons, three presets, one slider».
+- **джерело:** https://metal.jakubantalik.com — «real-time WebGL metal shader effect for buttons, three presets, one slider». *(дата звірки джерела не записана — не перевірено, К5-1)*
 - **механіка:** справжній WebGL-шейдер у `<canvas>`.
 - **стек:** 🔴 чужий. Вимагає canvas + GL-контекст на кожну кнопку.
 - **вартість кадру:** GPU-контекст + постійний render-loop. На iPhone XS у PWA це батарея й пам'ять за нуль функціональної користі.
@@ -58,7 +58,7 @@
 
 ## FX-3 · Thinking orbs 🔴
 
-- **джерело:** https://orbs.jakubantalik.com — «dotted thought-orb loading indicators for AI and agent UIs, six states, two sizes, auto dark/light».
+- **джерело:** https://orbs.jakubantalik.com — «dotted thought-orb loading indicators for AI and agent UIs, six states, two sizes, auto dark/light». *(дата звірки джерела не записана — не перевірено, К5-1)*
 - **механіка:** точкові орби, CSS/canvas-анімація стану очікування.
 - **призначення:** індикатор «модель думає» для AI/agent-інтерфейсів.
 - **вердикт:** 🔴 **не потрібно.** У Lens-продуктах немає стану, який це обслуговує: усі операції локальні й миттєві. Єдиний реальний асинхрон у StockCheck — `fetch` самоперевірки версії (Node 2.2), і там уже стоїть device-locked `fx-duo`. Заводити другий словник очікування = дві мови для одного стану.

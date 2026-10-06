@@ -766,9 +766,39 @@ def gov(root):
     g22(root)
     g17(root, R(root, 'Lens_governance_CHERGA.md'))
     g20(root)
+    g26(root)
 
 # ─────────────────────────── G21 · ОДИН ДІМ НОМЕРА ──────────────────────────
 WSD_VER = re.compile(r'^2\.(?:1[6-9]|[2-9]\d)$')   # «wsd 2.42» — версія файла (правила кластера 2 — до 2.15), не адреса
+
+
+def g26(root):
+    """G26 — зовнішнє джерело без дати (К5-1, H-C 06.10.2026). Рядок живого .md (поза archive/ і sessions/)
+    із зовнішнім URL, а дати нема ні в рядку, ні в найближчому заголовку вище → ⚠ «звірено коли?».
+    URL у бектиках (шаблон адреси, код) і власні адреси Konst (github.com/Konst-Andre, raw, Pages, workers.dev,
+    claude.ai) — не судяться. ⚠, не ✗: дата — евристика (рядок-продовження, дата в абзаці вище)."""
+    print('\n[G26] зовнішнє джерело без дати (К5-1)')
+    own = r'(?!konst-andre\.github\.io|github\.com/Konst-Andre|raw\.githubusercontent\.com/Konst-Andre|[a-z0-9.-]*workers\.dev|claude\.ai/)'
+    url = re.compile(r'https?://' + own)
+    date = re.compile(r'\d{2}\.\d{2}\.\d{4}|\d{4}-\d{2}|\b20\d\d\b|не перевірено|дати не видно|дат не видно')
+    hits = []
+    for dp, dns, fns in os.walk(root):
+        dns[:] = [d for d in dns if d not in ('.git', 'archive', 'sessions', 'node_modules')]
+        for fn in fns:
+            if not fn.endswith('.md'):
+                continue
+            head = ''
+            for i, l in enumerate(open(os.path.join(dp, fn), encoding='utf-8').read().split('\n'), 1):
+                if l.startswith('#'):
+                    head = l
+                bare = re.sub(r'`[^`]*`', '', l)
+                if url.search(bare) and not date.search(l) and not date.search(head):
+                    hits.append(f'{fn}:{i}')
+    if hits:
+        warn(f'{len(hits)} рядків із зовнішнім джерелом без дати (джерело + дата або «не перевірено»): '
+             + ' '.join(hits[:10]) + (f' …та ще {len(hits) - 10}' if len(hits) > 10 else ''))
+    else:
+        ok('зовнішні джерела в живому каноні мають дату або позначку «не перевірено»')
 
 
 def g20(root):
