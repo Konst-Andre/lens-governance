@@ -28,7 +28,7 @@
 | правило wsd за номером (`1.x`, `12.x`) | `kernel/wsd/Work_Standard.md` — «Зміст» і маршрут |
 | веду канон: куди записати, правка вічного файла | `kernel/wsd/Lens_governance_protocol.md` (К1/К2 · 12.11 · 12.15–12.20) |
 | питання з варіантами, форма 💡, двійне пояснення | `kernel/Lens_PROFILE.md` §7 (`13.1`–`13.3`) |
-| зовнішній візуальний ефект · скло й острівець | `kernel/Lens_fx_candidates.md` · `products/Lens_glass_FINDINGS.md` |
+| зовнішній візуальний ефект · скло й острівець | `kernel/Lens_fx_candidates.md` · `kernel/Lens_glass_FINDINGS.md` |
 | Excel, Power Query, VBA (KPI · QR Lens) | `kernel/Lens_excel_protocol.md` |
 | порт блоку «Обслуговування» | `kernel/modules/Lens_module_1_maint_v1.md` (пара — кукбук A79) |
 | Cloudflare · каркас репо під Claude Code | `tools/cloudflare/CLOUDFLARE.md` · `tools/claude-code/CLAUDE_CODE.md` |

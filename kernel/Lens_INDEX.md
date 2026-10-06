@@ -155,7 +155,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 | продукт | файли |
 |---|---|
 | **StockCheck** | переїхав у свій репо 06.10.2026 (`stock-check` `e2463c3`): що живе — `stock-check:lens/StockCheck_INDEX.md` (локи · реєстр мереж · локи Фармастора) |
-| **QR Lens** | `QR_Lens_srpill_valuesLOCK.md` · `QR_Lens_srmotion_valuesLOCK.md` · `QR_Lens_areachip_valuesLOCK.md` · `QR_Lens_probrow_PARAMS_LOCK.md` · `QR_Lens_statusgauge_BENCHLOCK.md` · `QR_Lens_CTA_mechanic_LOCK.md` · `QR_Lens_export_contract_v1_1.md` *(v1 витіснено B59)* |
+| **QR Lens** | переїхав у свій репо 06.10.2026 (`QR-Lens` `99484fc`): що живе — `QR-Lens:lens/QR_Lens_INDEX.md` (локи · контракт експорту · whitelist; 3 локи — лише в Project, `QR-Lens:lens/QR_Lens_CHERGA.md` `QRL-2`) |
 | **Фармастор** *(попередня назва StockCheck)* | разом зі StockCheck: `stock-check:lens/Фармастор_v2_MASTER_LOCK.md` · архів — `stock-check:archive/*/Farmastor/` |
 | **Drive Lens** | переїхав у свій репо 05.10.2026 (`Drive-Lens` `0309ab3`): `Drive-Lens:lens/Drive_Lens_concept_v1_3.md` · `Drive-Lens:lens/Drive_Lens_logic_audit_findings.md` · що живе — `Drive-Lens:lens/Drive_Lens_INDEX.md` |
 | **PharmaLens** *(5-й продукт; ребренд робочої назви VTM Lens, 30.07.2026)* | переїхав у свій репо 05.10.2026 (`PharmaLens` `a6d1b83`): `PharmaLens:lens/PharmaLens_MASTER_LOCK.md` · `PharmaLens:lens/PharmaLens_Claude_Handover.md` · `PharmaLens:lens/PharmaLens_Independent_Design_Research_Handover.md` · що живе — `PharmaLens:lens/PharmaLens_INDEX.md`. Джерела-попередники (VTM) — §7 |
@@ -209,7 +209,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 | продукт | білд | стан |
 |---|---|---|
 | **StockCheck** | `stock-check:index.html` — v2.27.2 · b32.7 (`b32_7_s21_persist`) | переїхав у свій репо 06.10.2026 (`stock-check` `e2463c3`): що живе — `stock-check:lens/StockCheck_INDEX.md`; device-вирок — `stock-check:sessions/` |
-| **QR Lens** | `QR_Lens_preview_batch61_press_s4.html` + `QR_Lens_template_v2.html` | 🟢 device✓ B61 (прес Area-чіпа · surgical · свайп-гард) · експорт перевірено на регенерованому шаблоні |
+| **QR Lens** | `QR-Lens:docs/index.html` → воркер `qr-lens.konstandre.workers.dev` | переїхав у свій репо 06.10.2026 (`QR-Lens` `99484fc`): що живе — `QR-Lens:lens/QR_Lens_INDEX.md` |
 | **KPI Lens** | `KPI_Lens_v2_preview_batch15_2.html` | 🟡 VBA/PQ у черзі |
 | **Drive Lens** | — | 🟡 Tab-3 / Tab-4 відкриті |
 
@@ -223,14 +223,10 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 
 | файл | роль | живе доки |
 |---|---|---|
-| `QR_Lens___html_export.xlsm` | VBA-шаблон експорту QR Lens (496 KB бінарник; Project його не читає, тримається як робочий артефакт оператора) | QR Lens має Excel-експорт |
-| `QRLens_areachip_halo_stagebench_v1.html` | стенд halo area-чіпа | числа не портовані в `preview_batch59` |
-| `QR_Lens_PeoplePicker_handoff_for_Opus_v1.md` | хендофф A58 SR-селектора | A58 не закрито |
 | `Lens_xlsx_strict.py` | гейт цілісності пакета (родинний; генератор іконок StockCheck — `stock-check:tools/`) | назавжди |
 | `EquipLens_headbench_v*.html` | **головний стенд EquipLens** · живий = найбільший номер під маскою (`12.20`). Числа стенда — табі/групи, важелі, пікери, паритет `S`, обсяг `LOCK_SEED` — живуть у шапці самого стенда, не тут | не витіснений новим стендом |
 | `smoke_v*.js` | матриця головного стенда · живий = найбільший номер (`12.20`). Кількість тверджень і улов `--inject` — у виводі самого смоука; ганяти з обома режимами | стенд живий |
 | `EquipLens_Z_REGISTR.md` | реєстр З-серії: 62 номери · адреса повного тексту · стан. **Роль — адресація, не переказ** (`Г-14`, 30.08.2026) | доки EquipLens активний |
-| `QR_Lens_equipment_whitelist.md` | whitelist позицій обладнання QR Lens — джерело для `wsd 3.6`. *(Був у репо як `Equipment_name_.md`, не оголошений; §7 помилково числив його неіснуючим.)* | назавжди |
 | `EquipLens_S17_STARTPOINTS_and_QUEUE_v7.md` | супутник EquipLens (105 KB, ⚠ жодного разу не ревізований — аудит `Г-11`) | аудит `Г-11` не пройдено |
 
 > 🧹 **Знято 13.08.2026 (G-1) як мертве оголошення, не як архівація (Р-6):**
@@ -250,7 +246,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 |---|---|
 | **EquipLens** | `EquipLens:lens/EquipLens_CHERGA.md` — у репо продукту з G-Z (оголошення — `EquipLens:lens/EquipLens_INDEX.md`) · заведено 28.08.2026 · з 31.08 несе **план у 9 кроків**, не список |
 | **StockCheck** | `stock-check:lens/StockCheck_CHERGA.md` — у репо продукту з 06.10.2026 (оголошення — `stock-check:lens/StockCheck_INDEX.md`) |
-| **QR Lens** | ⬜ завести при наступному дотику. Звірено 31.08.2026: `QR_Lens_forward_plan.md` — носій **плану**, не черги; `MASTER_LOCK` у QR Lens немає **за задумом** — канон значень розкладений по семи `*_LOCK` (§3), єдиного зведеного файлу ніколи не оголошували. Це не борг |
+| **QR Lens** | `QR-Lens:lens/QR_Lens_CHERGA.md` — у репо продукту з 06.10.2026 (оголошення — `QR-Lens:lens/QR_Lens_INDEX.md`) |
 | **Drive Lens · PharmaLens · KPI Lens** | ⬜ |
 
 **Що це.** Єдиний адресований носій **відкритого** по продукту: рядок = покажчик + вік,
@@ -294,7 +290,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 |---|---|---|---|
 | **EquipLens** | `EquipLens` | `EquipLens` | `EquipLens_` · `smoke_v` |
 | **StockCheck** *(+ Фармастор — його історія)* | `stock-check` | — (переїхав 06.10.2026; у репо продукту `Фармастор/` → `Farmastor/`, Ф5) | `StockCheck_` · `Фармастор_` · `farmastor_` · `nets_assets_` |
-| **QR Lens** | `QR-Lens` | `QR_Lens` | `QR_Lens_` · `QRLens_` |
+| **QR Lens** | `QR-Lens` | — (переїхав 06.10.2026) | `QR_Lens_` · `QRLens_` |
 | **Drive Lens** | `Drive-Lens` | `Drive_Lens` | `Drive_Lens_` |
 | **PharmaLens** | `PharmaLens` | `PharmaLens` | `PharmaLens_` · `VTM_Lens_` |
 | **KPI Lens** | `KPI-Lens` | `KPI_Lens` | `KPI_Lens_` |
@@ -312,7 +308,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 | продукт | живі самері |
 |---|---|
 | **StockCheck** | `stock-check:sessions/StockCheck_session_summary_b32_7_s20s21_STORAGE_TRUTH.md` · `stock-check:sessions/StockCheck_session_summary_b32_5_s18s19_STORAGE_DONE.md` *(у своєму репо з 06.10)* |
-| **QR Lens** | `QR_Lens_session_summary_b60_PRESSBENCH_v3_1.md` · `QR_Lens_session_summary_b60_AREACHIP_PORT.md` |
+| **QR Lens** | у репо продукту — `QR-Lens:lens/QR_Lens_INDEX.md` «Живі самері» (b60 ×2 поки лише в Project, `QRL-2`) |
 | **EquipLens** | `EquipLens_session_summary_S35_OSTRIVETS.md` · `EquipLens_session_summary_S34_AURORA_HYBRID.md` *(у репо `EquipLens`: живі — `sessions/`, витіснені S1…S33 — `archive/summaries/`; оголошення — `EquipLens:lens/EquipLens_INDEX.md`, G-Z)* |
 | **PharmaLens** | `PharmaLens:sessions/PharmaLens_session_summary_S1_FOUNDATION.md` *(продукт заморожено — чекає `.pptx` від Олі; у своєму репо з 05.10)* |
 | **KPI Lens** | `KPI-Lens:sessions/KPI_Lens_session_summary_Batch15_2.md` *(у своєму репо з 05.10)* |

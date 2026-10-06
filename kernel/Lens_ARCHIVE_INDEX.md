@@ -40,7 +40,6 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 ```
 archive/
   summaries/    самері, старші за 2 останніх на продукт (плоско, без підтек)
-  stands/       стенди: bench · harness · компер (закриті) + витіснені білди
   superseded/   витіснене іншим файлом: концепти, буфери, разові брифи
 ```
 
@@ -76,7 +75,7 @@ archive/
 
 | старе ім'я (лишилось в архіві) | чинне ім'я | коли · чому |
 |---|---|---|
-| `StockCheck_island_glass_FINDINGS.md` | **`products/Lens_glass_FINDINGS.md`** | 21.08.2026, EquipLens S6. Знахідки виявились крос-Lens: §1–§6 виросли на StockCheck-острівці, §9 «Виріз у склі» — на EquipLens-бульбашці. Числа лишились прив'язані до продукту, закони — ні. **17 входжень старого імені в `archive/` залишено навмисно** |
+| `StockCheck_island_glass_FINDINGS.md` | **`kernel/Lens_glass_FINDINGS.md`** | 21.08.2026, EquipLens S6. Знахідки виявились крос-Lens: §1–§6 виросли на StockCheck-острівці, §9 «Виріз у склі» — на EquipLens-бульбашці. Числа лишились прив'язані до продукту, закони — ні. **17 входжень старого імені в `archive/` залишено навмисно** |
 
 **Правило:** перейменував вічний файл → рядок сюди **в тій самій сесії**.
 Перейменування без рядка тут = битий лінк у кожному архівному самері, який на нього
@@ -350,37 +349,9 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 - `Lens_governance_session_summary_GY_GIT_APP_2B.md` · 27.09.2026 · Lens governance · G-Y (Р-4′ · Р-8 · Р-9, коміт А EquipLens, план G-Z): витіснене G-Z, §0 перенесено в G-Z §0
 - `Lens_governance_session_summary_LGH3_ADAPT_PREVIEW.md` · 27.09.2026 · Lens governance · LGH-3 (адаптер · прев'ю-стенд · інструкція v4, П-LGH12…15): витіснене G-Z, §0 перенесено в G-Z §0
 
-### `archive/stands/` — 28 файлів
+### Стенди — виїхали з ядра
 
-- `Dinamika_colhead_bench_v2.html`
-- `Farmastor_arc_anim_harness_v1.html`
-- `Farmastor_dynamika_colheaddim_v8.html`
-- `Farmastor_dynamika_deltacolor_harness_v1.html`
-- `Farmastor_dynamika_harness_v3.html`
-- `Farmastor_dynamika_harness_v4_3.html`
-- `Farmastor_fillcta_compare_v3.html`
-- `Farmastor_filltail_harness_v1.html`
-- `Farmastor_history_badge_harness_v2.html`
-- `Farmastor_material_bench_v2.html`
-- `Farmastor_motion_harness_collapse_glow_v2.html`
-- `Farmastor_multibrand_harness_v1.html`
-- `Farmastor_status_filter_harness_v2.html`
-- `Farmastor_toparea_harness_v4.html`
-- `QR_Lens_brand_harness_v6.html`
-- `StockCheck_dpicker_stagebench_v2_3.html`
-- `StockCheck_glyph_stagebench_v1.html`
-- `StockCheck_headbench_v1.html`
-- `StockCheck_island_harness_v2.html`
-- `StockCheck_maint_stagebench_v3.html`
-- `StockCheck_materiality_stagebench_v1.html`
-- `StockCheck_materiality_stagebench_v2.html`
-- `StockCheck_ctareward_bench_v3.html` — 🗄 01.08.2026. Стенд вибору **характеру нагороди** на 📋 (кандидати C/E). Результат канонізовано: Cookbook **A82**. Йти сюди при виборі нагороди для будь-якої «віддавальної» дії — важелі вже знайдені (v1/v2 застарілі, не тягнути)
-
-- `StockCheck_port_b32_0.html` — 🗄 13.08.2026. Білд v2.24.0 b32.0 «шов»: `NETS[]` повним масивом, `S.net`, `AREA_ORDER`. Витіснений b32.2 (device✓)
-- `StockCheck_b32_0_matrix_v2.js` + `b32_0_baseline.json` — 🗄 13.08.2026. Матриця b32.0 **без jsdom**: витяг функцій із живого білда регексами + baseline b31. Йти сюди за формою «матриця без DOM», не за числами
-- `StockCheck_netmark_stagebench_v3_7.html` + `lock_smoke_v37.js` — 🗄 13.08.2026. Стенд мітки мережі: ярус Р-46, О-47 шіт/ніша, ЛОК-регістр Р-50. **О-20 закрито** оператором 13.08; числа живуть у `StockCheck_materiality_valuesLOCK` §11/§12
-- `StockCheck_netpick_matrix.js` + `StockCheck_netpick_v3_smoke_b6.js` + `StockCheck_netpick_v3_live_b6.js` — 🗄 13.08.2026. Матриці сітки NetPick v3, числа b6. Портовано в b32.1 (s6–s11)
-- `StockCheck_h2_msl_data.py` — 🗄 13.08.2026. Дані H2; витіснено `StockCheck_msl_gen.py` (b31)
+Теки `archive/stands/` у ядрі більше нема (05–06.10.2026, журнал GW кроки 3–4): стенди StockCheck і Фармастора — `stock-check:archive/stands/`, QR Lens — `QR-Lens:archive/stands/`. Перелік до виїзду — історія git цього файла.
 
 ### `archive/superseded/` — 7 рядків · у теці 6 файлів (звірено 27.09.2026, LGH-2: `farmastor_v2_data.js` фізично в `archive/matrices/Фармастор/`; `StockCheck_B32_STAGEBENCH_HANDOFF.md` у теці нема; `StockCheck_collapse_C_CANON_delta.md` у теці **є**, хоч записаний у «Втрачене» — розібрати, `Lens_governance_CHERGA.md`)
 
