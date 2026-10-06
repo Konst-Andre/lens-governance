@@ -279,7 +279,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 
 ### Реєстр продуктів — продукт → репо → теки → префікси (гейт ядра, Р-4′)
 
-> Заведено G-Z 27.09.2026 (хід 7-а журналу переїзду `sessions/Lens_gov/Lens_MIGRATION_GW_ledger.md`).
+> Заведено G-Z 27.09.2026 (хід 7-а переїзду; рішення Р-1…Р-9 — `kernel/Lens_REPO_LAYOUT.md` §4-б).
 > **Ядро — мозок, продукт — самодостатній дім, гейт перевіряє лише свій репо** (слово Konst G-Y, підтверджено G-Z).
 > `Lens_validate.py --gov` читає цю таблицю (`G25`): файл у теці продукту (`products/<тека>/` · `archive/*/<тека>/`)
 > або з префіксом продукту — **не ядро**. Гейти ядра його не судять; згадка в ядрі → ⓘ; файл, що ще лежить
@@ -312,7 +312,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 | **EquipLens** | `EquipLens_session_summary_S35_OSTRIVETS.md` · `EquipLens_session_summary_S34_AURORA_HYBRID.md` *(у репо `EquipLens`: живі — `sessions/`, витіснені S1…S33 — `archive/summaries/`; оголошення — `EquipLens:lens/EquipLens_INDEX.md`, G-Z)* |
 | **PharmaLens** | `PharmaLens:sessions/PharmaLens_session_summary_S1_FOUNDATION.md` *(продукт заморожено — чекає `.pptx` від Олі; у своєму репо з 05.10)* |
 | **KPI Lens** | `KPI-Lens:sessions/KPI_Lens_session_summary_Batch15_2.md` *(у своєму репо з 05.10)* |
-| **Lens** *(governance)* | `Lens_governance_session_summary_HB_AUDIT_MIGRATE.md` (ціна аудиту · переїзд StockCheck і QR · воркер з гіта; §0 — адаптація QR-Lens першою) · `Lens_governance_session_summary_GZ_EQUIPLENS_HOME.md` (числа бази · §0 — усе відкрите, план H-A; поглинає GY · LGH-3) · супутник `Lens_inventory_GT_v1.md` · тимчасовий журнал переїзду `Lens_MIGRATION_GW_ledger.md` (живе доки перенос Ф3 не завершено, потім видаляється) — **лежать у репо, тека `sessions/Lens_gov/`, не в Project** (Ф2 для governance, `Lens_REPO_LAYOUT.md` §2, G-U 24.09.2026; читати з clone/raw) *(GY · LGH3 — G-Z; GX · LGH1 · LGH2 — LGH-3; GW — G-Y; GV — G-Y; GU — G-W; GT — G-V; GR · GQ витіснено G-U, файли не збережено — зміст у комітах `39681fd`…`fcfc3ec`; F · G — сироти G-C3; GP — G-S; GO — G-R; GN — G-Q; GM — G-P; GL — G-O; GK — G-N; GJ — G-M; GI — G-L; GH — G-K; GG — G-J; GF — G-H; GA…GE — 17.09.2026 → `archive/summaries/Lens_gov/`)* |
+| **Lens** *(governance)* | `Lens_governance_session_summary_HB_AUDIT_MIGRATE.md` (ціна аудиту · переїзд StockCheck і QR · воркер з гіта; §0 — адаптація QR-Lens першою) · `Lens_governance_session_summary_GZ_EQUIPLENS_HOME.md` (числа бази · §0 — усе відкрите, план H-A; поглинає GY · LGH-3) — **лежать у репо, тека `sessions/Lens_gov/`, не в Project** (Ф2 для governance, `Lens_REPO_LAYOUT.md` §2, G-U 24.09.2026; читати з clone/raw) *(GY · LGH3 — G-Z; GX · LGH1 · LGH2 — LGH-3; GW — G-Y; GV — G-Y; GU — G-W; GT — G-V; GR · GQ витіснено G-U, файли не збережено — зміст у комітах `39681fd`…`fcfc3ec`; F · G — сироти G-C3; GP — G-S; GO — G-R; GN — G-Q; GM — G-P; GL — G-O; GK — G-N; GJ — G-M; GI — G-L; GH — G-K; GG — G-J; GF — G-H; GA…GE — 17.09.2026 → `archive/summaries/Lens_gov/`)* |
 | **Фармастор** | `АРХІВ-УСІ` — продукт перейменовано на StockCheck; канон живе у `stock-check:lens/Фармастор_v2_MASTER_LOCK.md` і `stock-check:lens/Фармастор_v2_PORT_REGISTER.md`, самері не потрібні жодні |
 
 > ⚠ **Звірено скриптом 30.08.2026 — таблиця протухла по ТРЬОХ продуктах одночасно,

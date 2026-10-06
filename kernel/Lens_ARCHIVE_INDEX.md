@@ -339,7 +339,7 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 - `Lens_session_summary_governance_G_MASKA.md` · 24.09.2026 · Lens governance · governance G (маска, `12.20`): витіснене G-C3 17.09.2026, у Project лежало сиротою до G-U (Ф-15, старий префікс — звірено вручну)
 - `gu_step1_archive_v1.py` · `gu_step2_f1_v1.py` · `gu_step3_f2_v1.py` · 24.09.2026 · Lens governance · пакет G-U (хід 1 — §5 → GT + сироти F·G; хід 2 — Ф1, дім формули; хід 3 — Ф2 для governance). Коміти `e53b104` · `2d1cc26` · хід 3
 - `Lens_session_summary_governance_E_PROJECT.md` · 24.09.2026 · Lens governance · друга редакція самері governance E (11 285 B, md5 `f79e66ca`), що лежала в Project під іменем архівної (`dac233a8`, 22 929 B); перейменовано, щоб не було дубля імені
-- `Lens_governance_session_summary_GT_S35_INVENTAR.md` · 24.09.2026 · Lens governance · G-T (інвентар перед переїздом, Ф1–Ф8 питаннями): витіснене G-V (стеля 2) з `sessions/Lens_gov/`; супутник `Lens_inventory_GT_v1.md` лишається живим до кінця формули
+- `Lens_governance_session_summary_GT_S35_INVENTAR.md` · 24.09.2026 · Lens governance · G-T (інвентар перед переїздом, Ф1–Ф8 питаннями): витіснене G-V (стеля 2) з `sessions/Lens_gov/`; супутник `Lens_inventory_GT_v1.md` — теж тут з 06.10.2026 (нижче)
 - `Lens_governance_session_summary_GU_F1_ADRESA.md` · 24.09.2026 · Lens governance · G-U (Ф1 адресація `Репо:шлях`, Ф2 governance-самері в репо): витіснене G-W (стеля 2) з `sessions/Lens_gov/`
 - `Lens_governance_session_summary_GV_F4_KORPUS.md` · 24.09.2026 · Lens governance · G-V (Ф4 корпус у ядрі, детектор Ф1 — `G24`, Ф1 чинне): витіснене G-Y (стеля 2) з `sessions/Lens_gov/`
 - `Lens_governance_session_summary_GW_F3_YADRO.md` · 24.09.2026 · Lens governance · G-W (Ф3 «ядро ⟂ продукти», журнал переїзду, Р-1…Р-7): витіснене G-Y (стеля 2) з `sessions/Lens_gov/`
@@ -349,6 +349,7 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 - `Lens_governance_session_summary_GY_GIT_APP_2B.md` · 27.09.2026 · Lens governance · G-Y (Р-4′ · Р-8 · Р-9, коміт А EquipLens, план G-Z): витіснене G-Z, §0 перенесено в G-Z §0
 - `Lens_governance_session_summary_LGH3_ADAPT_PREVIEW.md` · 27.09.2026 · Lens governance · LGH-3 (адаптер · прев'ю-стенд · інструкція v4, П-LGH12…15): витіснене G-Z, §0 перенесено в G-Z §0
 - `Lens_governance_session_summary_HA_CC4_YADRO_ADOPT.md` · 05–06.10.2026 · Lens governance · H-A (ядро під каркас Claude Code, ревізія CC-4; дописувала H-B): витіснене H-B, §0 перенесено в H-B §0
+- `Lens_inventory_GT_v1.md` · 24.09.2026 · Lens governance · інвентар G-T перед переїздом (Ф1–Ф8): «живе доки» виконано (формула — `kernel/Lens_REPO_LAYOUT.md`); виселено з `sessions/Lens_gov/` 06.10.2026 (ХІД-8)
 
 ### Стенди — виїхали з ядра
 

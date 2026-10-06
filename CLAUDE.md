@@ -33,7 +33,7 @@
 | порт блоку «Обслуговування» | `kernel/modules/Lens_module_1_maint_v1.md` (пара — кукбук A79) |
 | Cloudflare · каркас репо під Claude Code | `tools/cloudflare/CLOUDFLARE.md` · `tools/claude-code/CLAUDE_CODE.md` |
 | теки, імена, адресація `Репо:шлях` у ядрі | `kernel/Lens_REPO_LAYOUT.md` — формула ядра, **не** `docs/REPO_LAYOUT.md` продукту |
-| архівне джерело · переїзд продуктів | греп по `archive/` (перейменування — `kernel/Lens_ARCHIVE_INDEX.md` §3-б) · `sessions/Lens_gov/Lens_MIGRATION_GW_ledger.md` |
+| архівне джерело · рішення переїзду продуктів (`Р-N`) | греп по `archive/` (перейменування — `kernel/Lens_ARCHIVE_INDEX.md` §3-б) · `kernel/Lens_REPO_LAYOUT.md` §4-б |
 
 **Ера Project — у Claude Code не читати:** `kernel/Lens_PROJECT_instruction.md` · `kernel/Lens_NEWPROJECT_bootstrap.md` · `kernel/Lens_github_push_protocol.md` · `tools/CHAT_TOOLS.md` · `tools/ADAPT.md` · `tools/lens-gh/`. Шапки «AUTO-READ» і штамп «KERNEL v2 … між Projects» тут не діють. **Правило ядра, що спирається на механіку чату Claude** (`present_files`, `ask_user_input_v0`, `/mnt/…`, project_knowledge_search, квиток / конектор): суть правила діє, механіка — відповідник Claude Code (файл у репо + коміт · AskUserQuestion · греп по клону · `git`).
 
