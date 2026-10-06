@@ -8,13 +8,15 @@
 
 **0.1 · Перша робота — адаптація `QR-Lens` під каркас** (`QR-Lens:lens/QR_Lens_CHERGA.md` `QRL-3`, за `tools/claude-code/ADOPT.md`). Розкладка за Р-7 уже є (06.10), бракує каркаса: `CLAUDE.md`, хук, `env_check` (з перевіркою «живий сайт ≡ `docs/index.html`»), журнал аудиту. Аудит `CLAUDE.md` — клас 2.
 
-**0.2 · Друга — розмова з Konst про дані QR** (`QRL-5` автоматизація KPI → Excel → `index` · `QRL-6` додати PSR Києва й Черкас за запитом керівника). Читати першим — `QR-Lens:lens/QR_Lens_export_contract_v1_1.md`; зразки вже в репо (`sources/KPI.xlsx`, `tools/` — xlsm і шаблон v2). Мапа «людина → область» захардкоджена в шаблоні (`SR_AREA`) — правити шаблон, не `index.html`.
+**0.2 · Друга — розмова з Konst про дані QR** (`QRL-5` автоматизація KPI → Excel → `index` · `QRL-6` додати PSR Києва й Черкас за запитом керівника). Читати першим — `QR-Lens:lens/QR_Lens_ARCHITECTURE.md` (ланцюг «робочий білд → шаблон → Excel → сайт», правила; записано 06.10 зі слів Konst), потім `QR-Lens:lens/QR_Lens_export_contract_v1_1.md`; зразки вже в репо (`sources/KPI.xlsx`, `tools/` — xlsm і шаблон v2). Мапа «людина → область» захардкоджена в шаблоні (`SR_AREA`) — правити шаблон, не `index.html`.
 
 **0.3 · QR — хостинг** (`QRL-1`): сайт — воркер з Workers Builds (коміт у `docs/` сам деплоїть, перевірено 06.10); Pages `qr-lens` (тека виводу `docs`) живе, доки люди переходять → **видаляє Konst** (знімає старі деплої зі списком PSR).
 
 **0.4 · Черга ядра — 6 відкритих** (`kernel/Lens_governance_CHERGA.md`): пакети `ХІД-8` (індекс) · `GATE` (інструменти гейта, з `G19-1`) · `WSD` (канон) — **коли, вирішує Konst**; `CQ-2` (черги AE/AirLens — у їхніх сесіях) · `CC-5` (профіль ⟂ wsd 1.19 — вирок Konst).
 
 **0.5 · Продукти, що чекають своїх сесій:** `stock-check` (`SC-1` сайт → `docs/` — прод · `SC-3` каркас · `SC-4` відтворити втрачене) · EquipLens («З ЯДРА»: `Г-11` `Г-13` `ADR-1`) · AE (переїзд на воркер — `AE-Simulator:docs/CHERGA.md` §0 п.5; правило — `CLOUDFLARE.md` §2 п.9–11).
+
+**0.55 · Ядро — що лишилось до «добудовано»** (Konst 06.10: «не загубитись»): переїзд продуктів (журнал GW кроки 1–6) ✅ — лишився **хід 8** = пакет `ХІД-8` (переписати `Lens_INDEX` під Claude Code, `ARCHIVE_INDEX`, `GH-1` — інструменти ери Project в архів, журнал GW → видалити) · `GATE` (гейт під нову реальність, `G19-1`) · `WSD` (борги канону). Порядок і час — слово Konst. **Правило фокусу:** нова думка посеред сесії → рядок у черзі, а не зміна напрямку; сесія починає з першого пункту §0.
 
 **0.6 · Відкрите з GZ §0** (п.3 хід 8 + `GH-1` · п.4 `G19` · п.5–8, 11–12) — текст у GZ, не тут.
 
@@ -50,7 +52,7 @@
 Сесія ядра Lens (репо Konst-Andre/lens-governance, main; ПУБЛІЧНЕ — секретів ніколи). Відповідай українською, простою мовою.
 Старт: env_check (хук) → самері sessions/Lens_gov/Lens_governance_session_summary_HB_AUDIT_MIGRATE.md §0 → kernel/Lens_governance_CHERGA.md.
 ПЕРША РОБОТА — адаптація QR-Lens під каркас (QR-Lens:lens/QR_Lens_CHERGA.md QRL-3, за tools/claude-code/ADOPT.md; репо підключити add_repo).
-ДРУГА — розмова про дані QR: QRL-5 (автоматизація KPI → Excel → index) і QRL-6 (додати PSR Києва й Черкас). Спершу прочитати QR-Lens:lens/QR_Lens_export_contract_v1_1.md, потім слухати мене.
+ДРУГА — розмова про дані QR: QRL-5 (автоматизація KPI → Excel → index) і QRL-6 (додати PSR Києва й Черкас). Спершу прочитати QR-Lens:lens/QR_Lens_ARCHITECTURE.md і QR-Lens:lens/QR_Lens_export_contract_v1_1.md, потім слухати мене.
 Пакети ХІД-8 / GATE / WSD — лише за моїм словом.
 Аудит інструкцій — за класом, пакетом перед самері (tools/claude-code/templates/AUDIT_template.md «Коли і скільки»); перед запуском — rate_limit_info. Fable — лише за моїм словом. Маркер контексту — get_session щоразу. Делегування: вирішуй сам, пояснюй простою мовою.
 ```
