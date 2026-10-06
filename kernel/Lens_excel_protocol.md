@@ -4,13 +4,13 @@
 # Lens · EXCEL-ПРОТОКОЛ — Power Query + HTML/VBA синхронізація
 
 > **Що це.** Кластери **5** і **6** `Work_Standard.md`, виселені 13.08.2026 (v2.29).
-> Нумерація **не мінялась**: 5.1…5.5 і 6.0…6.6 — ті самі номери, посилання дійсні.
+> Номери «wsd 5.x / 6.x» — адреси цього файла (5.1…5.6 · 6.0…6.6 · кластер 11).
 >
 > **Область застосування (scope-guard).** Тільки продукти з Excel-експортом:
 > **KPI Lens** і **QR Lens**. StockCheck і Drive Lens сюди не заходять узагалі —
 > відсутність шаблону в Drive Lens є **правильним станом**, а не боргом.
 >
-> **Чому виселено.** wsd читається цілком щосесії. Правило з доменним тригером
+> **Чому окремо.** wsd читається щосесії. Правило з доменним тригером
 > у такому файлі платить увагою кожної сесії за користь в одній із десяти.
 
 -----
@@ -130,7 +130,7 @@ Filtered   = Table.SelectRows(t, each List.Contains(ValidList, [Field])),
 
 Не патчити template інкрементально. Working preview уже містить ВСІ актуальні зміни (тестовані юзером на пристрої) — це готовий source of truth.
 
-- Якщо template відстає на N batch-ів → це **1 операція** (`str_replace` DATA-рядка на `/*__DATA__*/`) замість N патчів старого template.
+- Якщо template відстає на N batch-ів → це **1 операція** — регенерація з working preview за 6.3 (усі плейсхолдери, не лише DATA) замість N патчів старого template.
 - Менше точок помилок, не треба повторно валідувати інваріанти sort/eqBrand/UI/CSS — вони вже доведені у preview.
 
 **Anti-pattern:** брати старий template і вручну переносити кожен batch — марнує час, ризикує розсинхронізації з validated preview, додає когнітивне навантаження.
@@ -154,7 +154,7 @@ Filtered   = Table.SelectRows(t, each List.Contains(ValidList, [Field])),
 
 ## 6.4 Універсальна нейминг конвенція
 
-`<Product>_template_v2.html` для всіх продуктів сім’ї (KPI Lens, QR Lens, Drive Lens, наступні Lens-и).
+`<Product>_template_v2.html` для продуктів сім’ї з template (KPI Lens, QR Lens; Drive Lens template не має — 6.0).
 
 ## 6.5 Static assets versioning — `?v=batchNN` cache-busting
 

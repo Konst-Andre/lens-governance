@@ -26,7 +26,7 @@
 | пишу детектор, гейт, смоук; патч перед комітом; діагноз помилки | `kernel/wsd/Lens_patch_check_protocol.md` |
 | прев'ю для Konst | `tools/PREVIEW.md` — повний текст (у профілі — стиснення); крок «квиток / `gh_commit`» тут = `git push` у `Konst-Andre/sandbox` |
 | правило wsd за номером (`1.x`, `12.x`) | `kernel/wsd/Work_Standard.md` — «Зміст» і маршрут |
-| веду канон: куди записати, правка вічного файла | `kernel/wsd/Lens_governance_protocol.md` (К1/К2 · 12.11 · 12.15–12.20) |
+| веду канон: куди записати, правка вічного файла | `kernel/wsd/Lens_governance_protocol.md` («Зміст» · К1/К2 і INTAKE · 12.11 · 12.15–12.20) |
 | питання з варіантами, форма 💡, двійне пояснення | `kernel/Lens_PROFILE.md` §7 (`13.1`–`13.3`) |
 | зовнішній візуальний ефект · скло й острівець | `kernel/Lens_fx_candidates.md` · `kernel/Lens_glass_FINDINGS.md` |
 | Excel, Power Query, VBA (KPI · QR Lens) | `kernel/Lens_excel_protocol.md` |
