@@ -16,7 +16,7 @@ GZ (`Lens_governance_session_summary_GZ_EQUIPLENS_HOME.md`) лишається �
 
 **0.05 · ✅ 05.10 `AUD-2` закрито** (сесія H-B, дописує це самері): клас правки → проходи, пакетом; канон — `tools/claude-code/templates/AUDIT_template.md` «Коли і скільки»; заміри — `kernel/Lens_AUDIT.md`, верхній рядок. Відкрите з аудиту — `AUD-3` (премортем wsd ⟂ профіль).
 
-**0.1 · StockCheck — хід А на гілці** `stock-check:claude/lens-migrate` `bc45548` (журнал GW, рядок кроку 3: 143 файли, md5 ≡, `--product` ✓5 ✗0). Далі: «так» Konst → злиття в `main` (деплой Pages; перевірка — md5 сайту `285a0c68` ≡ до/після) → хід Б: прибрати 143 з ядра + `Lens_INDEX` §5 вказівники на `stock-check:lens/StockCheck_INDEX.md` → `--gov` до/після. Відкрите продукту — `stock-check:lens/StockCheck_CHERGA.md` (`SC-1` сайт → `docs/` · `SC-2` 11 файлів лише в Project · `SC-3` каркас).
+**0.1 · ✅ 06.10 StockCheck переїхав** (журнал GW, крок 3 ✅): `stock-check` `e2463c3` злито за «так» Konst, сайт md5 ≡; файли з Project розкладено; 143 прибрано з ядра (`b1d6f0a`). Відкрите продукту — `stock-check:lens/StockCheck_CHERGA.md` (`SC-1` сайт → `docs/` · `SC-3` каркас · `SC-4` відтворити втрачене). Відкрите ядра звідси — `G19-1`. Аудит: `AUD-3` ✅ (wsd 2.42), борги wsd → `WSD-3`; sonnet в аудиті — `--effort high` (`kernel/Lens_AUDIT.md`, рядок 06.10).
 
 **0.1-а · ✅ 05.10 переїхали Drive Lens · KPI Lens · PharmaLens** (журнал GW, кроки 1–2: `Drive-Lens` `0309ab3` · `KPI-Lens` `b634148` · `PharmaLens` `a6d1b83`; ядро `fdeb633` · `889a1c1`; `--gov` ⚠ 23 → 21). Метод — рядок кроку 5 журналу (шаблон для наступних). Далі: **StockCheck + Фармастор** (журнал, крок 3: 143 файли; Ф5 — кирилична тека; файли «лише в Project» `G8` ×10 — вкладенням Konst) → QR (крок 4, разом із `QR-W`) → хід 8. Адаптація кожного продукту під каркас — першим ходом його власної сесії (`frame_check` ⚠ нагадує).
 
@@ -29,8 +29,8 @@ GZ (`Lens_governance_session_summary_GZ_EQUIPLENS_HOME.md`) лишається �
 **0.4 · Відкрите з GZ §0** (п.3 хід 8 + `GH-1` · п.4 `G19` худне з корпусом · п.5 не перевірено наживо · п.6 лічильники `archive/superseded/` · п.7 `Lens_REPO_LAYOUT` про `tools/` · п.8 13.2-б · п.11 черга · п.12 руки Konst) — текст у GZ, не тут.
 
 **Від Konst:**
-- ✅ 05.10 профіль v8 вставлено · ⏳ профіль **v10** — вставити (блок ```text``` у `tools/claude-code/PROFILE.md`; текст — у чаті H-B 05.10; v9 пропустити).
-- ⏳ «так» на злиття `stock-check:claude/lens-migrate` у `main` (деплой GitHub Pages, сайт не змінюється) · файли «лише в Project» (`SC-2`) — вкладенням.
+- ✅ 06.10 профіль **v10** вставлено.
+- ✅ 06.10 «так» на злиття `stock-check` · файли з Project — у `project-files-for-claude-code/` (`3fed072`), інших нема.
 - ✅ 05.10 гілку `claude/kernel-adopt` видалено конектором (після перепідключення); у ядрі лише `main`.
 - ✅ 05.10 проєкт Cloudflare `drive-lens-preview` видалено Konst; репо `Drive-Lens-preview` — Konst вирішить сам.
 - ⏳ AE-Simulator теж на `pages.dev` — чи Оля в мережі Київстар / Vodafone? (`QR-W`)
@@ -67,7 +67,7 @@ GZ (`Lens_governance_session_summary_GZ_EQUIPLENS_HOME.md`) лишається �
 ```text
 Сесія ядра Lens (репо Konst-Andre/lens-governance, main; ПУБЛІЧНЕ — секретів ніколи). Відповідай українською, простою мовою.
 Старт: env_check (хук) → самері sessions/Lens_gov/Lens_governance_session_summary_HA_CC4_YADRO_ADOPT.md §0 → kernel/Lens_governance_CHERGA.md.
-ПЕРША РОБОТА — §0.1: StockCheck хід Б. Якщо Konst сказав «так» на злиття stock-check:claude/lens-migrate → злити в main, звірити md5 сайту до/після, прибрати 143 файли з ядра, Lens_INDEX §5 — вказівники; --gov до/після. Без «так» — спитати першим.
-Далі — §0.25: QR + QR-W (сайт → docs/, воркер). Черга ядра понад стелю (CQ-1) — прополка вільним ходом.
+ПЕРША РОБОТА — §0.25 крок 3: QR + QR-W (сайт QR-Lens → docs/, воркер [assets]; прод — лише з мого «так»). Перед тим — прополка черги ядра (CQ-1: 28 при стелі 12) одним ходом.
+Далі за чергою: WSD-3 (борги wsd з аудиту 06.10) · G19-1 (гейт худне з корпусом).
 Аудит інструкцій — за класом, пакетом перед самері (tools/claude-code/templates/AUDIT_template.md «Коли і скільки»); перед запуском — rate_limit_info. Fable — лише за моїм словом. Маркер контексту — get_session щоразу. Делегування: вирішуй сам, пояснюй простою мовою.
 ```

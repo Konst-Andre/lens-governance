@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Аудит інструкцій за класом правки: /doctor prompt-audit моделями, названими явно псевдонімами (завжди найновіша версія).
-# Клас 1 — opus --effort high · клас 2 — ще й sonnet · клас 0 — аудиту нема (скрипт не потрібен).
+# Клас 1 — opus --effort high · клас 2 — ще й sonnet --effort high · клас 0 — аудиту нема (скрипт не потрібен).
 # AUDIT_THIRD=fable — ще прохід ЛИШЕ за явним словом Konst (Fable — за реальні кошти, 04.10.2026).
 # Формула (клас, пакет, перед запуском) — lens-governance:tools/claude-code/templates/AUDIT_template.md «Коли і скільки» (AUD-2).
 #
@@ -25,7 +25,7 @@ total=0
 for f in "$@"; do
   n=$(echo "$f" | tr '/' '_')
   for m in $models; do
-    eff=""; [ "$m" != "sonnet" ] && eff="--effort high"
+    eff="--effort high"   # sonnet теж high: 06.10 на wsd знайшов ядро знахідок opus за пів ціни; без --effort думав у 7 разів менше
     timeout 1500 claude -p --model "$m" $eff --output-format json "/doctor prompt-audit $f" > "$OUT/$n.$m.json" 2>&1
     line=$(python3 - "$OUT/$n.$m.json" "$OUT/$n.$m.txt" <<'PY'
 import json, sys
