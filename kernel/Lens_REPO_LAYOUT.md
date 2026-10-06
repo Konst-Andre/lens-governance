@@ -116,7 +116,7 @@
 **Тригер.** Файл продукту шукає дім; нова сесія продукту; заводиться новий продукт; правка гейта, що читає продуктові файли.
 
 **Дія.**
-1. **`lens-governance` тримає тільки родинне:** `kernel/` (правила, протоколи, Cookbook, модулі, гейт-скрипти) · крос-Lens FINDINGS (`kernel/Lens_glass_FINDINGS.md`) · `archive/summaries/Lens_gov/` · `archive/Lens_iOS_cookbook.md` · `archive/superseded/canon_delta_A45_material_lever_manifest.md`.
+1. **`lens-governance` тримає тільки родинне:** `kernel/` (правила, протоколи, Cookbook, модулі, гейт-скрипти) · `tools/` (інструменти обох дверей: `CHAT_TOOLS` · `PREVIEW` · `ADAPT` · `lens-gh/` · `claude-code/` · `cloudflare/` · `env_check.sh` · `Lens_xlsx_strict.py`; дописано 06.10.2026 з GZ §0 п.7) · крос-Lens FINDINGS (`kernel/Lens_glass_FINDINGS.md`) · `archive/summaries/Lens_gov/` · `archive/Lens_iOS_cookbook.md` · `archive/superseded/canon_delta_A45_material_lever_manifest.md`.
 2. **Продуктовий репо самодостатній:** код і білд · README · manifest · канон продукту (`*_MASTER_LOCK` · `*_valuesLOCK` · реєстри · `*_CHERGA`) · `sessions/` (живі самері, Ф2-б) · `archive/` (витіснені самері, стенди, матриці) · стенди · смоуки · скрипти й продуктові гейти.
 3. **Залежність одностороння.** Продукт посилається на ядро (правило за номером). Ядро посилається на продукт лише як на **історію походження** — `Репо:шлях` (Ф1); правило ядра мусить працювати, не відкриваючи продуктового файлу. Старі посилання іменем не переписуються (§1 п.3).
 4. **Гейти підлаштовуються під модель, не навпаки.** `G19` · `G22` · `G10` · `G8` читають продуктові репо з локальних коренів `--repo ІМ'Я=тека`, зібраних на старті сесії; кореня нема → ⓘ, не ✗; мережі в гейті немає (§3 п.2–3 чинні).
