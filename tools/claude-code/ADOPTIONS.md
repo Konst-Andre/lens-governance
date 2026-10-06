@@ -16,4 +16,4 @@
 |---|---|---|
 | QR-Lens | Б · переїзд; продукт Lens (Р-7) — **наступний** (`QR-Lens:lens/QR_Lens_CHERGA.md` `QRL-3`) | 06.10 вже: продукт у своєму репо за Р-7, сайт у `docs/` → воркер з Workers Builds; бракує лише каркаса (`CLAUDE.md`, хук, `env_check`, аудит) — чистий тест «каркас поверх готової розкладки» |
 | EquipLens | Б · дотягнути; продукт Lens (Р-7) | наполовину за Р-7 (`lens/`, `sessions/` є, сайт у корені) — тест таблиці відповідності ролей |
-| Routes | В · міст | Konst лишає роботу в Project |
+| Routes | ~~В · міст~~ → **Б + двері Project** (слово Konst 06.10: працювати в обох — Claude Code і Project) | ⏳ наступна сесія Routes: бриф і знімок пам'яті Project-агента — `Routes:project_for_claude_code/` (`02a60db`); `CLAUDE.md` за `ADOPT.md`, `kernel/PROJECT_INSTRUCTION.md` лишається (двоє дверей, `kernel/Lens_INDEX.md` §0); черга ядра `PRJ-2` |
