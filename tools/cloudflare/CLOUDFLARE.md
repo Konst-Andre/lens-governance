@@ -81,7 +81,7 @@ fresh_days=30
 | ~~`airlens`~~ | ~~Pages (`airlens-8bd.pages.dev`)~~ | AirLens | — | — | **видалено 03.10** (AirLens S11, Р-78): перевірено — доменів нема, 404, посилань у репо нема; 131 деплой + проєкт через API; бот і Mini App живі (воркер) |
 | `qr-lens` | **воркер** `[assets]`=`docs/` (`qr-lens.konstandre.workers.dev`) + Pages (тека `docs`, на час переходу людей) | QR-Lens | воркер: Workers Builds `main`, include `*`, exclude `lens/*` `archive/*` `sessions/*` `tools/*` `.claude/*` `CLAUDE.md` `README.md` (06.10, перевірено двома комітами) | Pages: усі гілки | ⚠ Pages: старі деплої віддають список PSR — видалити, коли люди перейдуть (`QR-Lens` `QRL-1`) |
 | ~~`drive-lens-preview`~~ | Pages | Drive-Lens-preview | — | — | видалено Konst 05.10 (репо поки лишається) |
-| `lens-gh` | воркер | lens-governance | — | — | — |
+| `lens-gh` | воркер | lens-governance (`tools/lens-gh/`) | — (деплой руками) | — | сервер конектора «Lens GitHub» для Project — **живий, не сирітка** (Project працює: Routes та ін., Konst 06.10) |
 
 ## 4. Як репо підключається (раз)
 
