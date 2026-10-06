@@ -64,7 +64,7 @@ fresh_days=30
 | `ae-edit` · `ae-proxy` | воркери | AE-Simulator (`ae-proxy` — лише дашборд) | CI GitHub (`deploy-edit.yml`) | — | — |
 | `airlens` | воркер + `[assets]` (бот і Mini App: `airlens.konstandre.workers.dev`) | AirLens | Workers Builds: include `*`, exclude `docs/*` `tools/*` `.claude/*` `CLAUDE.md` `README.md` (жовтень: 13 з 25 комітів — без збірки) | — | налаштовано 03.10 (AirLens S12, Р-80) через Builds API; перевірено — коміт лише з `docs/` збірки не дав; детектор «прод ≡ репо» в `env_check` ✓; тривога власнику про запити **акаунта** з півночі UTC — Р-79 |
 | ~~`airlens`~~ | ~~Pages (`airlens-8bd.pages.dev`)~~ | AirLens | — | — | **видалено 03.10** (AirLens S11, Р-78): перевірено — доменів нема, 404, посилань у репо нема; 131 деплой + проєкт через API; бот і Mini App живі (воркер) |
-| `qr-lens` | Pages | QR-Lens | `*` | усі гілки | ⚠ заводські; тека виводу — корінь (усе в корені публічне); **`*.pages.dev` не відкривається в мобільних мережах Київстар і Vodafone — ERR_NAME_NOT_RESOLVED** (вирок пристрою Konst 05.10; `*.workers.dev` на Vodafone відкривається) → переїзд на воркер (`lens-governance` черга `QR-W`) |
+| `qr-lens` | **воркер** `[assets]`=`docs/` (`qr-lens.konstandre.workers.dev`, деплой `wrangler deploy` з сесії, 06.10) + Pages (корінь, `73e9f22`) — **до видалення** після вироку пристрою | QR-Lens | Pages: `*` · воркер: без Workers Builds (деплой руками з сесії) | усі гілки (Pages) | ⚠ Pages: старі деплої й кеш краю віддають список PSR — видалити проєкт; до того коміти QR-Lens — `[CF-Pages-Skip]` (QR-W) |
 | ~~`drive-lens-preview`~~ | Pages | Drive-Lens-preview | — | — | видалено Konst 05.10 (репо поки лишається) |
 | `lens-gh` | воркер | lens-governance | — | — | — |
 
