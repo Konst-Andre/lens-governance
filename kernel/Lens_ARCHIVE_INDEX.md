@@ -4,18 +4,14 @@
 
 # Lens · ARCHIVE INDEX — що лежить в архіві й коли туди йти
 
-> **Навіщо.** Архів фізично лежить у репо (`archive/`), **поза** project knowledge —
-> інакше він з'їдає ліміт Project. Але те, чого немає в project knowledge, Claude **не бачить
-> і не може шукати**. Цей файл — міст: він **лишається в Project**, коштує кілька KB
-> і називає вміст архіву. Claude читає індекс локально, а сам файл тягне з мережі
-> тільки коли він справді потрібен.
+> **Навіщо — двоє дверей.** Архів лежить у репо (`archive/`).
+> · **Claude Code** — архів у клоні: шукати грепом (`git grep -n <що> -- archive/`, повний список — `git ls-files archive/`); цей файл дає **сенс** рядка (що всередині, чому виселено), а не адресу.
+> · **claude.ai Project** — `archive/` **не підключено** (з'їдає ліміт Project): Claude бачить лише цей файл і тягне архівний — точним іменем звідси, `gh_read` конектора (`tools/CHAT_TOOLS.md`). Немає імені тут — файл для Project не існує.
 >
-> **Без цього файлу архівація = видалення.** З ним — відкладене зберігання.
+> **Без цього файлу архівація = видалення** (для Project) і пошук без сенсу (для Claude Code).
 
-**Raw-база архіву:**
-```
-https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<тека>/<файл>
-```
+**Адреса архівного файла** (шлях від кореня репо, Ф1): `archive/<тека>/<файл>` — для Project raw-база
+`https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<тека>/<файл>`.
 
 ---
 
@@ -23,9 +19,9 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 
 | тригер | що робити |
 |---|---|
-| «як ми робили X», «ми це вже вирішували», «колись було» — і в **живих** файлах відповіді немає | шукати по цьому індексу → `curl` потрібного файлу |
+| «як ми робили X», «ми це вже вирішували», «колись було» — і в **живих** файлах відповіді немає | Claude Code — греп по `archive/`; Project — ім'я з цього індексу → `gh_read` |
 | будую **стенд** для компонента, у якого стенд уже був | взяти попередній як базу — важелі й уроки вже знайдені, не винаходити заново |
-| канон посилається на самері, якого **немає** в Project (напр. «b26_1 §4») | дістати те самері з архіву |
+| канон посилається на самері, якого **немає** серед живих (напр. «b26_1 §4») | дістати те самері з архіву (продуктове — з `archive/` репо продукту) |
 | **регресія**: працювало раніше — зламалось | знайти батч, де воно було device✓, і звірити |
 | стартує **новий продукт** | знайти найближчий аналог серед стендів і концептів |
 
@@ -37,11 +33,15 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 
 ## §2 Структура тек
 
+*(звірено `git ls-files archive/` 06.10.2026, ХІД-8 · `IDX-13`)*
+
 ```
 archive/
-  summaries/    самері, старші за 2 останніх на продукт (плоско, без підтек)
-  superseded/   витіснене іншим файлом: концепти, буфери, разові брифи
+  summaries/    самері governance і тексти їхніх кроків — уся тека в підтеці Lens_gov/
+  superseded/   витіснене іншим файлом: буфер A45, ТЗ конектора lens-gh
 ```
+У корені `archive/` — лише моноліт кукбуку `Lens_iOS_cookbook.md`. **Продуктового архіву в ядрі нема**
+(`kernel/Lens_REPO_LAYOUT.md` §4-б, Р-3): самері, стенди й матриці продуктів — `archive/` репо продукту.
 
 ---
 
@@ -62,7 +62,7 @@ archive/
 у відповідній секції нижче.
 
 **Чого в архів НЕ класти:** нічого, на що посилається живий канон-файл.
-Якщо wsd або Cookbook посилається на документ — він лишається в Project.
+Якщо wsd або Cookbook посилається на документ — він лишається живим (поза `archive/`).
 
 ---
 
@@ -93,20 +93,12 @@ archive/
 
 ---
 
-## Перепис архіву · завантажено 31.07.2026 (governance-сесія B/C)
+## Перепис архіву *(заведено 31.07.2026 · звірено з деревом 06.10.2026, ХІД-8)*
 
-**Як Claude це читає** — живим запитом, без завантаження в Project:
-
-```
-https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<тека>/<файл>
-```
-
-Перевірено сьогодні на `kernel/` — 200 по всіх 12 файлах. Репо публічний,
-авторизації немає, тож обмеження одне: **точне ім'я файлу мусить бути тут**.
-Немає в цьому переписі → я його не знайду.
-
-**Правило.** Перед тим як сказати «цього файлу не існує» — подивитись сюди.
-Файл, виселений із Project, не мертвий: він переїхав (`Lens_INDEX.md` §8).
+**Правило.** Перед тим як сказати «цього файлу не існує» — греп по `archive/` (Claude Code) або
+пошук тут (Project). Файл, виселений із живих, не мертвий: він переїхав (`Lens_INDEX.md` §8).
+**Порядок рядків — оголошення:** `G19` бере з нього порядок сесій (`kernel/Lens_validate.py`, `_declared_order`) —
+нові рядки дописувати в кінець своєї теки, не сортувати.
 
 ### `archive/` — корінь
 
@@ -115,110 +107,13 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
   тому старі посилання «Cookbook A45» дійсні для томів. Піднімати лише
   для археології (звірка, чи щось загубилось при розпилі).
 
-### `archive/summaries/` — 89 файлів
+### `archive/summaries/` — 131 файл, усі в підтеці `Lens_gov/`
 
-- `Lens_session_summary_governance_A.md`
-- `Lens_session_summary_governance_B.md`
-- `Lens_session_summary_governance_C.md`
-- `Lens_session_summary_governance_D.md`
-- `QR_Lens_session_summary_A58_harness_v1.md`
-- `QR_Lens_session_summary_A58_portplan_LOCK.md`
-- `QR_Lens_session_summary_A58motion_persist_PLAN.md`
-- `QR_Lens_session_summary_B58_B58_2.md`
-- `QR_Lens_session_summary_T2harness_v3.md`
-- `QR_Lens_session_summary_srmotion_LOCK_B58plan.md`
-- `QR_Lens_session_summary_srpill_LOCK.md`
-- `QR_Lens_session_summary_srpill_implPLAN.md`
-- `StockCheck_session_summary_Node2_1_maintBench.md`
-- `StockCheck_session_summary_H3_7_stagebench_v3.md` *(лежало в архіві, в індексі названо не було — виправлено 08.08.2026)*
-- `StockCheck_session_summary_H3_8_b5_channels.md` *(те саме)*
-- `StockCheck_session_summary_H4_0_b32_0_PLAN.md` — розтин порту, закриття О-20, Р-28…Р-32
-- `StockCheck_session_summary_H4_1_b32_0_BASELINE.md` — мікроскоп плану (7 дефектів) + BASELINE b31
-- `StockCheck_session_summary_H4_2_b32_0_PATCH.md` — збірка b32.0 «шов», device✓ 08.08.2026; витіснено `H5_0_O20_stand_PLAN` (§0 і §7 перенесено туди повністю, канон уже змерджено)
-- `StockCheck_session_summary_H5_0_O20_stand_PLAN.md` — план і мікроскоп стенда О-20; витіснено `H5_1_eyebrow_LOCK` (стенд v1 відхилено, О-41/О-43 закрито рішенням Р-44)
-- `StockCheck_session_summary_b16_materialPort.md`
-- `StockCheck_session_summary_b17_collapseC.md`
-- `StockCheck_session_summary_b18_collapseShip_canonMerge.md`
-- `StockCheck_session_summary_b19_tails_LOCK.md`
-- `StockCheck_session_summary_b22_anchoredTile.md`
-- `StockCheck_session_summary_b23.md`
-- `StockCheck_session_summary_b24_dpickerPort.md`
-- `StockCheck_session_summary_b25_PWA.md`
-- `StockCheck_session_summary_bench_v1_device.md`
-- `StockCheck_session_summary_bench_v2_materialLOCK.md`
-- `StockCheck_session_summary_dpicker_LOCK.md`
-- `StockCheck_session_summary_headbench_v7.md`
-- `StockCheck_session_summary_islandHarness_v2.md`
-- `StockCheck_session_summary_islandPort_Stage1.md`
-- `StockCheck_session_summary_money_home_PORT.md`
-- `Фармастор_session_summary_v1_3.md`
-- `Фармастор_session_summary_v2_REBUILD_brief.md`
-- `Фармастор_session_summary_v2_STEP1_shell_HANDOFF.md`
-- `Фармастор_session_summary_v2_STEP1_structure_LOCK.md`
-- `Фармастор_session_summary_v2_STEP2_FILLharness.md`
-- `Фармастор_session_summary_v2_STEP2_multibrand_DONE_labels_ideation.md`
-- `Фармастор_session_summary_v2_STEP2_v6_LOCK_relabel_multibrand_plan.md`
-- `Фармастор_session_summary_v2_b10_ctaDesign_dynMetric.md`
-- `Фармастор_session_summary_v2_b10_ship_b11plan.md`
-- `Фармастор_session_summary_v2_b11_materialLOCK.md`
-- `Фармастор_session_summary_v2_b12.md`
-- `Фармастор_session_summary_v2_b13_2_materialfix.md`
-- `Фармастор_session_summary_v2_b13_dynamikaCore_s54.md`
-- `Фармастор_session_summary_v2_b14_historyBadge_A3ring_canonMerge.md`
-- `Фармастор_session_summary_v2_b14_historyBadge_harnessLOCK.md`
-- `Фармастор_session_summary_v2_b5_motion_harness.md`
-- `Фармастор_session_summary_v2_b6_motion_port.md`
-- `Фармастор_session_summary_v2_b7_Node6_HomeHarness.md`
-- `Фармастор_session_summary_v2_b7_Node7_HomeCard_LOCK.md`
-- `Фармастор_session_summary_v2_b8_Node5_arcLOCK.md`
-- `Фармастор_session_summary_v2_b9_arcPort_Node8_exportDyn.md`
-- `Фармастор_session_summary_v2_colorLOCK_MASTERLOCK.md`
-- `Фармастор_session_summary_v2_dynamika_colheaddim_v6.md`
-- `Фармастор_session_summary_v2_dynamika_deltacolorB_b13handoff.md`
-- `Фармастор_session_summary_v2_dynamika_harnessLOCK.md`
-- `Фармастор_session_summary_v2_dynamika_v4_LOCK.md`
-- `Фармастор_session_summary_v2_dynamika_v8_Glock_stickyfix.md`
-- `Фармастор_session_summary_v2_planning_LOCK.md`
-- `Фармастор_session_summary_v2_shell_b3_PORThandoff.md`
-- `Фармастор_session_summary_v2_statusfilter_colhead.md`
+Самері продуктів (StockCheck · Фармастор · QR Lens · EquipLens · Drive Lens · KPI Lens) виїхали в `archive/summaries/`
+своїх репо (Р-3, переїзд 24.09–06.10.2026). Перелік, що стояв тут до виїзду (89 рядків, лише продуктові),
+— історія git цього файла до ХІД-8 (`315ad49`).
 
-- `StockCheck_session_summary_H5_5_eb_LOCK_O47.md` · 13.08.2026 · StockCheck · ярус eyebrow ЛОК + О-47
-- `StockCheck_session_summary_H6_0_O47_SHEET.md` · 13.08.2026 · StockCheck · шіт вибору мережі О-47
-- `StockCheck_session_summary_b29_ARCHIVE_ROADMAP.md` · 13.08.2026 · StockCheck · попередня дорожня карта архіву — витіснена `G1_ARCHIVE_MANIFEST_v1.md`
-- `StockCheck_session_summary_b32_1_PORTFIX_PLAN.md` · 13.08.2026 · StockCheck · план порту b32.0→b32.1
-- `StockCheck_session_summary_b32_1_s1s2_DONE_O48_NEXT.md` · 13.08.2026 · StockCheck
-- `StockCheck_session_summary_b32_1_s3_O48_DONE_P8_NEXT.md` · 13.08.2026 · StockCheck · О-48 фільтр мереж за областю
-- `StockCheck_session_summary_b32_1_s4_PICKER_REWORK_PLAN.md` · 13.08.2026 · StockCheck
-- `StockCheck_session_summary_b32_1_s5_CROP_DONE.md` · 13.08.2026 · StockCheck
-- `StockCheck_session_summary_b32_1_s6s11_P8_PICKER_DONE.md` · 13.08.2026 · StockCheck · пікер мереж, числа портовані в b32.1
-- `StockCheck_session_summary_b32_1_s12_ADDR_DONE_O49_SPEC.md` · 13.08.2026 · StockCheck · адресний шум О-50 закрито, спека О-49
-- `StockCheck_session_summary_b32_1_s13_STAGEBENCH_v1_FAIL_v2_SPEC.md` · 13.08.2026 · StockCheck · відбраковка стенда v1 → **народження Г-1**
-- `StockCheck_session_summary_b32_1_s14_STAGEBENCH_v2_DONE.md` · 13.08.2026 · StockCheck · стенд грошей v2 · **єдиний носій повного тексту Г-1…Г-3** до мерджу в буфер 13.08
-- `StockCheck_session_summary_b32_1_s15c_STAGEBENCH_LOCK.md` · 13.08.2026 · StockCheck · ЛОК чисел форми грошей (device-судимо) · **єдиний носій повного тексту Г-4** до мерджу в буфер 13.08
-
-
-**EquipLens — 12 самері, виселено 24.08.2026 (S14).** Живими лишились `S13` і `S14`
-(`Lens_INDEX §5`, стеля `G10`). Тексти рішень S11/S12 влиті в канон — самері тримались
-лише як переказ.
-
-- `EquipLens_session_summary_S1_FOUNDATION.md`
-- `EquipLens_session_summary_S2_TOKEN_HARNESS.md`
-- `EquipLens_session_summary_S3_HEADBENCH_THESIS.md`
-- `EquipLens_session_summary_S4_HEADBENCH_v5.md`
-- `EquipLens_session_summary_S5_UX_GLASS_v7.md`
-- `EquipLens_session_summary_S6_GOV_v8_TABS.md` — 3 таби (`Потреби · Обладнання · Огляд`), перейменування FINDINGS
-- `EquipLens_session_summary_S7_V9_BOTTOM_HEAD.md`
-- `EquipLens_session_summary_S8_LOCK_HEADGLASS.md`
-- `EquipLens_session_summary_S9_BAKE_SPLIT_VOLUME.md`
-- `EquipLens_session_summary_S10_VOLUME_SHADING_EDGE.md`
-- `EquipLens_session_summary_S11_SPLIT_GLASSKIT.md` — 33 світлі значення шейдингу запечені, `LOCK_MIGRATE`, 5 зовнішніх Liquid Glass репо; тексти влиті в Cookbook `A91`–`A102`
-- `EquipLens_session_summary_S12_GOVERNANCE_DRAIN.md` — черга 26 записів, вичерпана в S13
-- `EquipLens_session_summary_S30_SCALE_VERDICT.md` · 24.09.2026 · витіснено S34/S35 (G-T)
-- `EquipLens_session_summary_S31_HEAD_LEVERS.md` · 24.09.2026 · витіснено S34/S35 (G-T)
-- `EquipLens_session_summary_S32_FONT.md` · 24.09.2026 · витіснено S34/S35 (G-T)
-- `EquipLens_session_summary_S33_CHILLAX.md` · 24.09.2026 · витіснено S34/S35 (G-T)
-
-### `archive/summaries/Lens_gov/` — 121 файл *(заведено G-C3 17.09.2026; шлях з підтекою — raw без `Lens_gov/` дає 404; лічильник «Разом» нижче і §2 «плоско» не перераховані — `IDX-13`)*
+### `archive/summaries/Lens_gov/` — 131 файл *(заведено G-C3 17.09.2026; самері · тексти кроків · скрипти пакетів; кожен файл названий — звірено 06.10.2026)*
 
 - `Lens_session_summary_governance_A.md` · governance A (31.07)
 - `Lens_session_summary_governance_B.md` · governance B
@@ -355,24 +250,17 @@ https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/archive/<те
 
 Теки `archive/stands/` у ядрі більше нема (05–06.10.2026, журнал GW кроки 3–4): стенди StockCheck і Фармастора — `stock-check:archive/stands/`, QR Lens — `QR-Lens:archive/stands/`. Перелік до виїзду — історія git цього файла.
 
-### `archive/superseded/` — 7 рядків · у теці 6 файлів (звірено 27.09.2026, LGH-2: `farmastor_v2_data.js` фізично в `archive/matrices/Фармастор/`; `StockCheck_B32_STAGEBENCH_HANDOFF.md` у теці нема; `StockCheck_collapse_C_CANON_delta.md` у теці **є**, хоч записаний у «Втрачене» — розібрати, `Lens_governance_CHERGA.md`)
+### `archive/superseded/` — 2 файли *(звірено `git ls-files` 06.10.2026)*
 
-- ~~`Drive_Lens_concept_v1.md`~~ · ~~`Drive_Lens_concept_v1_2.md`~~ → переїхали в `Drive-Lens:archive/superseded/` 05.10.2026 (пілот переїзду, Р-3)
-- ~~`KPI_Lens_categories_Excel_impl_Batch15.md`~~ → переїхав у `KPI-Lens:archive/superseded/` 05.10.2026 (Р-3)
-- `farmastor_v2_data.js`
+Продуктове витіснене виїхало з продуктами: Drive Lens концепти → `Drive-Lens:archive/superseded/`, KPI → `KPI-Lens:archive/superseded/`
+(05.10.2026), `farmastor_v2_data.js` · `StockCheck_B32_STAGEBENCH_HANDOFF.md` · `StockCheck_collapse_C_CANON_delta.md` — зі StockCheck у `stock-check` (06.10.2026).
+
 - `canon_delta_A45_material_lever_manifest.md` — 🗄 01.08.2026. Буфер **пережив ціль**: A45 канонізовано в `Lens_iOS_cookbook_3_material.md`. Йти сюди тільки за **сирими важелями компера** матеріальності, яких канон не зберіг
 
-- `StockCheck_B32_STAGEBENCH_HANDOFF.md` — 🗄 13.08.2026. Хендофф на побудову стенда грошей. Ціль досягнута: стенд v2 побудовано й залочено (s15c)
 - `lens-gh_SPEC_v1.2.md` · 27.09.2026 · Lens (інструменти чату) · ТЗ конектора lens-gh v1.2 «квиток» (контейнер ↔ воркер ↔ GitHub повз контекст), ред. 3 · задеплоєно й прийнято Konst (LGH-2), зміст влито в `tools/lens-gh/README.md` і `tools/CHAT_TOOLS.md` §2-б; до архіву лежав у теці tools/lens-gh/ під іменем SPEC_v1.2.md
 
 ### ❌ Втрачене при переїзді — НЕ шукати
 
-Файли, які були **оголошені** як заархівовані, але фізично до архіву не доїхали.
-Тримаються тут іменем, щоб наступний, хто спіткнеться об посилання, не витрачав
-час на пошук і не вирішив, що архів зламався.
+Порожньо в ядрі: єдиний рядок (`StockCheck_collapse_C_CANON_delta.md`, «втрату» скасовано 30.08.2026, інцидент — історія git `kernel/Lens_INDEX.md`) — продуктовий, виїхав зі StockCheck.
 
-- `StockCheck_collapse_C_CANON_delta.md` — оголошений виїзд 01.08.2026 (сесія E),
-  фактично **404**. Втрачено транспорт, не зміст: ціль буфера канонізована як **A72**
-  у `Lens_iOS_cookbook_5_motion.md`. Закрито 13.08.2026 як Р-5, відновлення не потрібне.
-
-**Разом: 114 файлів.** *(+1 `lens-gh_SPEC_v1.2.md`, LGH-2 27.09.2026)* *(лічильники перераховані за фактом рядків 13.08.2026, сесія G-1 — стара цифра 81 розходилась із переліком)*
+**Разом: 134 файли** — корінь 1 · `summaries/Lens_gov/` 131 · `superseded/` 2 (`git ls-files archive | wc -l`, 06.10.2026).
