@@ -3,80 +3,52 @@
 
 # Lens · INDEX — маршрутизатор бази знань
 
-**Ядро: KERNEL v2 (31.07.2026).** Штамп несуть **14 файлів ядра** — 13 `.md`
-+ `Lens_validate.py`. Вони лежать **не плоско**: `kernel/` має підтеки (§8, таблиця фізичних місць)
-+ `Lens_validate.py`. Це **переносний** між Projects набір. Решта вічних файлів (маніфести
-методів, `*_valuesLOCK`, `*_MASTER_LOCK`) штампа НЕ несуть: вони прив'язані до продукту,
-а не до ядра. Штамп не збігається → ядро розійшлось → правити ДО початку роботи.
+**Ядро: KERNEL v2 (31.07.2026).** Штамп `KERNEL vN` у шапці несуть **16 `.md` ядра** — список
+`KERNEL_FILES` у `kernel/Lens_validate.py`; гейт **G2** звіряє рівно їх і мовчить про решту — задумано.
+Сам `Lens_validate.py` штамп теж несе, G2 його не перевіряє. Файли лежать у підтеках `kernel/` (§8).
+Решта вічних файлів (маніфести методів, LOCK-и продуктів) штампа не несуть. Штамп не збігається →
+ядро розійшлось → правити ДО початку роботи.
 
-> **Чому не «всі вічні»:** штамп означає «мене можна цілком перенести в новий Project».
-> `StockCheck_MASTER_LOCK` переносити нікуди — він помре разом із продуктом.
-> Гейт **G2** перевіряє рівно ці 13 і мовчить про решту — це задумано, не прогалина.
-
-> **Що це.** Єдина карта: *яке питання → який файл*. Коштує ~6 KB і скорочує решту читань,
-> бо називає адресата задачі одразу, замість «прочитати wsd наосліп і сподіватись».
-> Заведено 30.07.2026 (governance-пас, сесія A).
+> **Що це.** Єдина карта: *яке питання → який файл*. Читається **точково**: §1 → §2 → потрібний рядок;
+> цілком не читати — файл великий (49 KB, `wc -c`). Заведено 30.07.2026 (governance-пас, сесія A).
 >
 > **Правило актуальності.** Послався на файл, якого тут немає → або файл заведено поза
 > wsd 1.8, або індекс протух. Правиться в тій самій сесії, не відкладається. *(wsd 1.1, детектор К2.)*
 
 ---
 
-## §0 Канон живе в репозиторії — і як його звіряти
+## §0 Двоє дверей — звідки читається канон
 
-**Джерело правди:** `https://github.com/Konst-Andre/lens-governance`
+**Джерело правди одне:** репо `https://github.com/Konst-Andre/lens-governance`, гілка `main`. Канон правиться
+лише в репо. Читають його **двоє дверей** (слово Konst 06.10.2026: claude.ai Project живий — Routes та ін.;
+інструменти Project не архівуються):
 
-| тека репо | що там | у Project |
-|---|---|---|
-| **`kernel/`** *(корінь)* | маршрутизатори + `Lens_validate.py` + маніфести методів + буфер стендів | ✅ підключена |
-| **`kernel/wsd/`** | `Work_Standard.md` · `Lens_governance_protocol.md` · `Lens_verdict_protocol.md` · `Lens_patch_check_protocol.md` · `Work_Standard_HISTORY.md` · `wsd_delta_running.md` | ✅ підключена |
-| **`kernel/cookbook/`** | `Lens_cookbook_INDEX.md` · 6 томів · `Lens_cookbook_delta_running.md` | ✅ підключена |
-| **`kernel/modules/`** | донор-модулі коду `Lens_module_*.md` | ✅ підключена |
-| **`products/`** | `*_MASTER_LOCK` · `*_valuesLOCK` · FINDINGS · реєстри — прив'язані до продукту, **нікуди не переносяться** | ✅ підключена |
-| **`archive/`** | `summaries/` · `stands/` · `superseded/` — те, що відслужило «живе доки» | ❌ **свідомо НЕ підключена** (§8) |
+| двері | що вантажиться само | як читає ядро | як пише | старт сесії |
+|---|---|---|---|---|
+| **Claude Code** | `CLAUDE.md` кореня ядра (у кожній сесії, де ядро підключене) + профіль Konst | клон: шлях від кореня, `git grep`, `git ls-files` | `git commit` → `git push` → read-back | хук `.claude/hooks/session-start.sh` → `tools/env_check.sh` |
+| **claude.ai Project** | поле Instructions = блок `kernel/Lens_PROJECT_instruction.md` (вставляє Konst) | Sync-копія `kernel/` (пласко, пошуком) + `gh_read` / квиток конектора «Lens GitHub» | конектор: `dry_run` → «так» → `gh_commit` (`tools/CHAT_TOOLS.md`) | розділ «Старт» поля Instructions |
 
-> **⚠ Підтеки ⟂ плаский Project (01.08.2026, сесія F).** У репо `kernel/` має три підтеки;
-> у Project усе приходить **плоско**. Наслідок: посилатись треба **іменем файлу**,
-> а не шляхом — `kernel/wsd/Work_Standard.md` у Project не існує. Гейти не постраждали:
-> `Lens_validate.py` ходить через `os.walk`, тобто рекурсивно (перевірено).
-> **Ще один наслідок:** у Project файли ядра доступні лише пошуком, не як шлях на диску —
-> `/mnt/project/` містить тільки те, що покладено руками.
+**Правила спільні — механіка своя.** Правило живе в каноні (wsd · gov · кукбук · профіль) і діє в обох
+дверях; двері тримають лише механіку й вказівник. Правило, що спирається на механіку чату (`present_files`,
+віджет питань, `/mnt/…`, project_knowledge_search, квиток), у Claude Code діє суттю — відповідник названо
+в `CLAUDE.md` ядра, абзац «Двері Project». Практика ззовні: спільні інструкції — в одному файлі, у файлі
+інструмента — лише його механіка (eesel.ai, morphllm.com — 2026). Беремо принцип; не беремо AGENTS.md:
+Project не читає файлів репо як інструкцію, а `CLAUDE.md` уже на місці.
 
-**Raw-база для читання (будь-яка тека):**
-```
-https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/<тека>/<файл>
-```
+**Що вміє лише одна з дверей** — звіряти, коли план каже «агент зробить сам»:
 
-Копія в Project — для швидкого локального читання. **Канон правиться в репо**, не в Project.
-
-### Коли Claude звіряє САМ, без нагадування
-
-| тригер | дія |
+| лише Claude Code | лише Project |
 |---|---|
-| перша сесія в **новому** Project | звірити ядро повністю перед роботою |
-| збираюсь **правити** будь-який файл ядра | звірити цей файл — чи не старша копія за канон |
-| гейт **G2** дав розходження штампів | звірити всі файли ядра |
-| штамп у файлі ≠ версія, названа в §0 нижче | звірити цей файл |
-| явний запит «звір ядро» | звірити повністю |
+| кілька репо поруч (`add_repo`) і гейт з `--repo ІМ'Я=тека` | бачить knowledge-файли й поле Instructions свого Project |
+| `git` повністю: гілки, історія, `git mv`, видалення | запис лише конектором (`gh_commit`: один коміт, багато файлів) |
+| хук старту, `tools/env_check.sh`, `tools/claude-code/frame_check.sh`, аудит `claude -p` | документи Project — естафета самері (`tools/CHAT_TOOLS.md` §4) |
+| браузер (Playwright) і мережа за політикою середовища | картка файлу й віджет питань чату |
+| **не бачить Project** узагалі (Р-8, `kernel/Lens_REPO_LAYOUT.md` §4-б) | `archive/` не підключено — файл лише за іменем з `Lens_ARCHIVE_INDEX.md` |
 
-**Коли НЕ звіряти:** штатний старт сесії. Мережа коштує, а штамп `KERNEL vN` (гейт G2)
-ловить розходження всередині Project безкоштовно. Raw-звірка потрібна для іншого класу
-помилок — коли всі копії в Project **однаково** застаріли й тому виглядають узгодженими.
-
-**Команда звірки** (одним рядком, друкує код відповіді + штамп кожного файлу):
-```bash
-B=https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/kernel
-for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md \
-         Lens_cookbook_INDEX.md Lens_NEWPROJECT_bootstrap.md Lens_ARCHIVE_INDEX.md \
-         Lens_iOS_cookbook_1_platform.md Lens_iOS_cookbook_2_navigation.md \
-         Lens_iOS_cookbook_3_material.md Lens_iOS_cookbook_4_components.md \
-         Lens_iOS_cookbook_5_motion.md Lens_bot_cookbook_6_telegram_workers.md; do
-  c=$(curl -s -o /tmp/f -w "%{http_code}" "$B/$f")
-  echo "$c $(head -3 /tmp/f | grep -o 'KERNEL v[0-9]*' | head -1) $f"; done
-```
-
-**Обмеження:** працює лише для **публічного** репо — авторизації в Claude немає.
-Приватний репо → лишається тільки штамп-рівень (G2).
+**Звірка канону.** Claude Code: `git pull` перед правкою; після push — `git ls-remote origin refs/heads/main` ≡
+локальний HEAD. Project: копія — читальня, Sync після кожної governance-сесії; розходження копій ловить штамп
+(`G2`); коли всі копії однаково застаріли, виглядають узгодженими — тому перед правкою файла ядра читати
+сам файл конектором (`gh_read`), не копію.
 
 ---
 
@@ -84,14 +56,13 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 
 | # | файл | коли |
 |---|---|---|
-| 1 | **`Lens_INDEX.md`** | завжди |
-| 2 | **останнє самері продукту** | завжди (відкриті питання — зверху) |
+| 1 | **`Lens_INDEX.md`** | завжди — §1, §2, далі точково (у Claude Code перед ним — `CLAUDE.md` ядра, вантажиться сам; у Project — поле Instructions) |
+| 2 | **останнє самері** продукту або governance | завжди (відкрите — §0 зверху); шлях — §5 «Живі самері» або індекс продукту |
 | 3 | **`Work_Standard.md`** | завжди — точково: «Зміст» і таблиця маршрутів, далі потрібні номери |
 | 4 | `Lens_cookbook_INDEX.md` → потрібний том | точково за індексом, якщо задача торкається iOS/PWA/UI або бота на Workers (том 6). **Том цілком не читати** |
-| 5 | `<Product>_MASTER_LOCK.md` + релевантні `*_valuesLOCK.md` | якщо торкаємось локнутого компонента |
+| 5 | `<Product>_MASTER_LOCK.md` + релевантні `*_valuesLOCK.md` | у репо продукту (`lens/`, Р-7), якщо торкаємось локнутого компонента |
 | 6 | `Work_Standard_HISTORY.md` | **лише** якщо правило посилається на `14.x` і треба контекст |
-| `Lens_excel_protocol.md` | Excel-протокол: Power Query (5.x) + HTML/VBA sync (6.x). **Scope: KPI Lens / QR Lens.** Виселено з wsd 13.08.2026 (v2.29), нумерація не мінялась |
-| `Lens_github_push_protocol.md` | Запис у GitHub із чату Claude (П-GH1): токен, запобіжник у 4 шари, переїзд між акаунтами. **Читати точково** — коли задача пише в репо. Заведено 16.09.2026 · **§8 прев'ю переїхав у `tools/PREVIEW.md`** (LGH-3); сам протокол — старий шлях через токен, заміна — `tools/CHAT_TOOLS.md` |
+| 7 | `Lens_excel_protocol.md` | точково: Excel — Power Query (5.x) + HTML/VBA sync (6.x). **Scope: KPI Lens / QR Lens.** Виселено з wsd 13.08.2026 (v2.29), нумерація не мінялась |
 
 ---
 
@@ -137,19 +108,19 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 |---|---|
 | `Lens_stagebench_manifest.md` | стенди: bench / harness / компер — рецепт і еталони |
 | `Lens_sandbox_manifest.md` | пісочниця: копія білда із синтетичними даними, 7 кроків |
-| `tools/PREVIEW.md` | **прев'ю-стенд** `Konst-Andre/sandbox`: прев'ю → деплой Pages зелений → посилання в чат → вирок → промоція тим самим blob. Спільне для всіх Projects (LGH-3) |
-| `tools/ADAPT.md` | **адаптер**: канон → короткий промпт → агент Project сам адаптує інструкцію й видає в чат · паспорт адаптації · реєстр канонів «кому» (LGH-3) |
-| `tools/CHAT_TOOLS.md` | інструменти чату: конектор «Lens GitHub» · квиток · правила запису · документи Project. Спільне для всіх Projects |
+| `tools/PREVIEW.md` | **прев'ю-стенд** `Konst-Andre/sandbox`: прев'ю → деплой Pages зелений → посилання в чат → вирок → промоція тим самим blob. Спільне для обох дверей (LGH-3; у Claude Code «квиток / `gh_commit`» = `git push`) |
+| `tools/ADAPT.md` | *(двері Project)* **адаптер**: канон → короткий промпт → агент Project сам адаптує інструкцію й видає в чат · паспорт адаптації · реєстр канонів «кому» (LGH-3) |
+| `tools/CHAT_TOOLS.md` | *(двері Project)* інструменти чату: конектор «Lens GitHub» · квиток · правила запису · документи Project. Спільне для всіх Projects |
 | `tools/cloudflare/CLOUDFLARE.md` | **спільний акаунт Cloudflare** (усі проєкти): ліміти й бюджет (`cf_budget.sh`), правила збірок — watch paths (для воркера — виключення, кукбук том 6 · T13), прев'ю лише `claude/*`, сирітки · реєстр проєктів · журнал звірок. **Читати:** перед будь-якою зміною налаштувань Cloudflare |
-| `CLAUDE.md` (корінь) | **двері ядра для Claude Code** — вантажиться сам у кожній сесії, де підключено ядро: публічне репо, гейт `--gov`, старт = цей індекс §1, **«звідки брати, коли…»** (тригер → файл ядра; ревізія CC-4, 04.10.2026), **куди нести знахідку з іншого репо** (тест wsd 1.19 → таблиця домів), аудит двома моделями. Карти не дублює |
-| `tools/claude-code/CLAUDE_CODE.md` | **Claude Code — каркас для всіх репо Konst** (вхід): як влаштувати репо, щоб агент працював і пам'ятав. Каркас — `tools/claude-code/REPO_FRAME.md` (принципи · пам'ять агента · розкладка тек · документи й ролі · куди записувати · цикл сесії · перевірки · прод · анти-приклади · джерела); адаптація наявного репо — `tools/claude-code/ADOPT.md` (журнал — `tools/claude-code/ADOPTIONS.md`); канонічний профіль Konst — `tools/claude-code/PROFILE.md`; шаблони — `tools/claude-code/templates/`: CLAUDE_template.md · REPO_LAYOUT_template.md · CHERGA_template.md · DECISIONS_template.md · ARCHITECTURE_template.md · SUMMARY_template.md · AUDIT_template.md · env_check_template.sh · session_start_template.sh; подвійний аудит — `tools/claude-code/audit_prompts.sh`. Народилось AE-Simulator S88, 02.10.2026 |
+| `CLAUDE.md` (корінь) | **двері ядра для Claude Code** — вантажиться сам у кожній сесії, де підключено ядро: публічне репо, гейт `--gov`, старт = цей індекс §1, **«звідки брати, коли…»** (тригер → файл ядра; ревізія CC-4, 04.10.2026), **куди нести знахідку з іншого репо** (тест wsd 1.19 → таблиця домів), аудит за класом правки, абзац «Двері Project». Карти не дублює |
+| `tools/claude-code/CLAUDE_CODE.md` | **Claude Code — каркас для всіх репо Konst** (вхід): як влаштувати репо, щоб агент працював і пам'ятав. Каркас — `tools/claude-code/REPO_FRAME.md` (принципи · пам'ять агента · розкладка тек · документи й ролі · куди записувати · цикл сесії · перевірки · прод · анти-приклади · джерела); адаптація наявного репо — `tools/claude-code/ADOPT.md` (журнал — `tools/claude-code/ADOPTIONS.md`); канонічний профіль Konst — `tools/claude-code/PROFILE.md`; шаблони — `tools/claude-code/templates/`: CLAUDE_template.md · REPO_LAYOUT_template.md · CHERGA_template.md · DECISIONS_template.md · ARCHITECTURE_template.md · SUMMARY_template.md · AUDIT_template.md · env_check_template.sh · session_start_template.sh; аудит за класом правки — `tools/claude-code/audit_prompts.sh` (формула — `tools/claude-code/templates/AUDIT_template.md` «Коли і скільки»). Народилось AE-Simulator S88, 02.10.2026 |
 | `Lens_fx_candidates.md` | реєстр **зовнішніх** ефектів: FX-1 Border Beam · FX-2 Liquid metal · FX-3 Thinking orbs · FX-4 Gooey · **FX-5 GlassKit-Elements** (драбина inset · прожектор · волосинка · `color-mix` · фон-аврора) + **§Н** черга нерозібраних джерел |
 | `Lens_PROFILE.md` | робочий профіль оператора: стиль пояснень, віджети, зворотний зв'язок · **§7 — правила UX `13.1` `13.2` `13.2-б` `13.3`** (з wsd, G-L) · **читається:** точково за номером `13.x` (маршрут з wsd); цілком — при заведенні Project (bootstrap п.2) |
-| `Lens_NEWPROJECT_bootstrap.md` | рецепт заведення нового Project із тим самим ядром |
-| `Lens_PROJECT_instruction.md` | готовий текст інструкції Project + що змінилось проти старої |
-| `Lens_ARCHIVE_INDEX.md` | що лежить в `archive/` репо + 5 тригерів, коли туди йти |
-| `Lens_AUDIT.md` | журнал аудиту інструкцій ядра (`/doctor prompt-audit`, sonnet + opus high): рядок на кожну правку інструкцій, нові зверху. Заведено 04.10.2026 — до того рядки ядра жили в `AE-Simulator:docs/AUDIT.md` |
-| `Lens_REPO_LAYOUT.md` | **формула архітектури**: тека · ім'я · адресація · носії — по Ф (Ф1 ухвалено G-U 24.09.2026). Аналог `Routes:REPO_LAYOUT.md` |
+| `Lens_NEWPROJECT_bootstrap.md` | *(двері Project)* рецепт заведення нового Project із тим самим ядром |
+| `Lens_PROJECT_instruction.md` | *(двері Project)* готовий текст поля Instructions + що змінилось проти старої редакції; відповідник `CLAUDE.md` для Project |
+| `Lens_ARCHIVE_INDEX.md` | що лежить в `archive/` ядра (сенс кожного рядка) + 5 тригерів, коли туди йти; для Project — єдиний шлях до архіву |
+| `Lens_AUDIT.md` | журнал аудиту інструкцій ядра (`/doctor prompt-audit`, проходи за класом правки): рядок на кожну правку інструкцій, нові зверху. Заведено 04.10.2026 — до того рядки ядра жили в `AE-Simulator:docs/AUDIT.md` |
+| `Lens_REPO_LAYOUT.md` | **формула архітектури**: тека · ім'я · адресація · носії — по Ф (Ф1 ухвалено G-U 24.09.2026). Аналог `Routes:REPO_LAYOUT.md` · **§4-б — рішення переїзду Р-1…Р-9** (з 06.10.2026, журнал GW видалено) · не плутати з docs/REPO_LAYOUT продуктів (шаблон каркаса) |
 
 ### Значення — по продуктах
 | продукт | файли |
@@ -159,22 +130,17 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 | **Фармастор** *(попередня назва StockCheck)* | разом зі StockCheck: `stock-check:lens/Фармастор_v2_MASTER_LOCK.md` · архів — `stock-check:archive/*/Farmastor/` |
 | **Drive Lens** | переїхав у свій репо 05.10.2026 (`Drive-Lens` `0309ab3`): `Drive-Lens:lens/Drive_Lens_concept_v1_3.md` · `Drive-Lens:lens/Drive_Lens_logic_audit_findings.md` · що живе — `Drive-Lens:lens/Drive_Lens_INDEX.md` |
 | **PharmaLens** *(5-й продукт; ребренд робочої назви VTM Lens, 30.07.2026)* | переїхав у свій репо 05.10.2026 (`PharmaLens` `a6d1b83`): `PharmaLens:lens/PharmaLens_MASTER_LOCK.md` · `PharmaLens:lens/PharmaLens_Claude_Handover.md` · `PharmaLens:lens/PharmaLens_Independent_Design_Research_Handover.md` · що живе — `PharmaLens:lens/PharmaLens_INDEX.md`. Джерела-попередники (VTM) — §7 |
-| **EquipLens** *(6-й продукт; польовий нотатник потреби в обладнанні, старт 18.08.2026)* | `EquipLens_MASTER_LOCK.md` — єдиний канон, замінює три джерела (два `Planner_Handoff`, GPT-аналіз). **Окремий продукт від QR Lens** — межа й підстава в §2 LOCK, злиття заборонене |
+| **EquipLens** *(6-й продукт; польовий нотатник потреби в обладнанні, старт 18.08.2026)* | у своєму репо з G-Z 27.09.2026: що живе — `EquipLens:lens/EquipLens_INDEX.md` (`EquipLens_MASTER_LOCK.md` — єдиний канон). **Окремий продукт від QR Lens** — межа й підстава в §2 LOCK, злиття заборонене |
 | **крос-Lens** *(належать родині, не продукту)* | `Lens_glass_FINDINGS.md` — острівець + скло: закони backdrop-root, матеріальність ярусу, виріз у склі. *Колишнє ім'я* `StockCheck_island_glass_FINDINGS.md`, перейменовано 21.08.2026 (EquipLens S6): §1–§6 виросли на StockCheck, §9 — на EquipLens, закони спільні |
-
-> **⌛ Названі тут, але фізично поза Project** (у локальному архіві — підняти при дотику до компонента):
-> `QR_Lens_probrow_PARAMS_LOCK.md` · `QR_Lens_statusgauge_BENCHLOCK.md` · `QR_Lens_CTA_mechanic_LOCK.md`.
-> Гейт **G8** показує їх як ⚠, і це коректний стан, не помилка.
 
 ### Код і інструменти
 | файл | що це |
 |---|---|
-| `StockCheck_maint_jsdom_matrix.js` | jsdom-матриця блоку «Обслуговування», 61 твердження |
-| `StockCheck_b27_jsdom_matrix.js` | jsdom-матриця b27 (CTA sweep + тост), 34 твердження |
 | `stock-check:tools/StockCheck_icon_gen.py` | генератор іконок PWA з локнутого гліфа (у репо продукту з 06.10) |
-| `Lens_validate.py` | гейт-скрипт: `--gov [тека] [--live <тека живих самері>]` (G1–G13 · G16 · G19 governance; номери — §5 «Стан номерів гейтів») · `--html <file>` (H1–H4 білд) · `--product <корінь репо продукту>` — гейт продукту (Р-9, G-Z): G24 G1 G3 G10 G14 з власного `lens/<Продукт>_INDEX.md` |
-| `Lens_claude_github_push.py` | пуш з чату одним атомарним комітом; двоходовий запобіжник `--dry-run` → `--confirm PLAN-ID`; v2 — видалення файлу `--delete` під тим самим PLAN-ID; без видалення гілок і force-push (протокол `Lens_github_push_protocol.md`) |
-| `Lens_start.py` | **старт сесії однією командою** (І-1, G-X 24.09.2026): клон ядра + `--product` · числа бази проти §5 живого самері (самері — з рядка §5, не вгадується) · стеля черг · лістинг репо (П-GV1) · `--gov-session` «Зміст» gov-протоколу · `--instr` diff поля Instructions ⟂ `Lens_PROJECT_instruction.md` (токен маскується). Нічого не пише; exit 1 = розбіжність |
+| `Lens_validate.py` | гейт-скрипт: `--gov [тека] [--repo ІМ'Я=тека …] [--live <тека живих самері>]` (`--repo` — лише на репо, склоновані поруч; без нього `Репо:шлях` — ⓘ) (G1–G13 · G16 · G19 governance; номери — §5 «Стан номерів гейтів») · `--html <file>` (H1–H4 білд) · `--product <корінь репо продукту>` — гейт продукту (Р-9, G-Z): G24 G1 G3 G10 G14 з власного `lens/<Продукт>_INDEX.md` |
+| `Lens_claude_github_push.py` | *(старий шлях Project, витіснений конектором)* пуш з чату одним атомарним комітом; двоходовий запобіжник `--dry-run` → `--confirm PLAN-ID`; v2 — видалення файлу `--delete` під тим самим PLAN-ID; без видалення гілок і force-push (протокол `Lens_github_push_protocol.md`) |
+| `Lens_start.py` | *(двері Project)* **старт сесії однією командою** (І-1, G-X 24.09.2026): клон ядра + `--product` · числа бази проти §5 живого самері (самері — з рядка §5, не вгадується) · стеля черг · лістинг репо (П-GV1) · `--gov-session` «Зміст» gov-протоколу · `--instr` diff поля Instructions ⟂ `Lens_PROJECT_instruction.md` (токен маскується). Нічого не пише; exit 1 = розбіжність |
+| `tools/env_check.sh` | *(двері Claude Code)* старт-перевірка ядра: HEAD ≡ origin · гейт `--gov` · тіла «404» й імена з пробілом · вік журналу аудиту · черга (пункти й вік) · `frame_check` по сусідніх репо · бюджет Cloudflare. Запускає хук `.claude/hooks/session-start.sh` |
 
 ---
 
@@ -191,7 +157,7 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 
 | буфер | канон-ціль | стан |
 |---|---|---|
-| `Lens_cookbook_delta_running.md` | Cookbook | 🟡 **12 записів** (G-D 17.09.2026: 5 змерджено в томи 3/4/5; `G11` ✓) · решта заблоковані: `A103` · `A**nn**` · `К-1`…`К-8` device✗ · `З-37`/`З-40` → `Г-11` |
+| `Lens_cookbook_delta_running.md` | Cookbook | 🟡 **13 записів** (`G5`, 06.10.2026; G-D 17.09.2026: 5 змерджено в томи 3/4/5; `G11` ✓) · решта заблоковані: `A103` · `A**nn**` · `К-1`…`К-8` device✗ · `З-37`/`З-40` → `Г-11` |
 | `Lens_stagebench_delta_running.md` | `Lens_stagebench_manifest.md` | 🟢 **порожній** (G-B3 17.09.2026, `G11` ✓) · злиття G-B завершено: група А → §8.7-д · §8.12 · §8.14–§8.17 · Б → §8.10 · §8.11 · §8.13 · §8.18 · §6-а · §6-б · В → §6 · §8.9 · §2-п.7 |
 | `wsd_delta_running.md` *(фізично `kernel/wsd/`, **не** `kernel/`)* | `Work_Standard.md` | 🟢 **порожній** (G-C2b 17.09.2026, `G11` ✓) · злиття G-C завершено: А погашено `Г-8` `Г-12` · Б → `1.19-б` · `2.13` · `2.14` · В → `1.20` · `2.15` · `4.5` · Г → `12.1-б` · `1.17-б` · gov `12.19-б` |
 
@@ -210,35 +176,15 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 |---|---|---|
 | **StockCheck** | `stock-check:index.html` — v2.27.2 · b32.7 (`b32_7_s21_persist`) | переїхав у свій репо 06.10.2026 (`stock-check` `e2463c3`): що живе — `stock-check:lens/StockCheck_INDEX.md`; device-вирок — `stock-check:sessions/` |
 | **QR Lens** | `QR-Lens:docs/index.html` → воркер `qr-lens.konstandre.workers.dev` | переїхав у свій репо 06.10.2026 (`QR-Lens` `99484fc`): що живе — `QR-Lens:lens/QR_Lens_INDEX.md` |
-| **KPI Lens** | `KPI_Lens_v2_preview_batch15_2.html` | 🟡 VBA/PQ у черзі |
-| **Drive Lens** | — | 🟡 Tab-3 / Tab-4 відкриті |
-
-> **Норматив читається так:** `✗4` — це **оголошений** стан білда, а не «зламано».
-> Розбіжність із ним = подія, яку треба пояснити. Зростання ✗ проти старого `✗3`
-> сталось через **фікс детектора**, не через регрес коду (`G1_REPO_PATCH_block2a_v1.md` §P2).
-> **Крихке:** `⚠ span 208/208` тримається на випадковій компенсації, не на фіксі —
-> будь-яка правка розмітки в JS може повернути його в ⚠, і це не регрес.
+| **KPI Lens** | у репо `KPI-Lens` | переїхав у свій репо 05.10.2026 (`KPI-Lens` `b634148`): що живе — `KPI-Lens:lens/KPI_Lens_INDEX.md` |
+| **Drive Lens** | у репо `Drive-Lens` (`docs/`) | переїхав у свій репо 05.10.2026 (`Drive-Lens` `0309ab3`): що живе — `Drive-Lens:lens/Drive_Lens_INDEX.md` |
 
 ### Живі стенди й інструменти — оголошення для гейта G3
 
 | файл | роль | живе доки |
 |---|---|---|
 | `Lens_xlsx_strict.py` | гейт цілісності пакета (родинний; генератор іконок StockCheck — `stock-check:tools/`) | назавжди |
-| `EquipLens_headbench_v*.html` | **головний стенд EquipLens** · живий = найбільший номер під маскою (`12.20`). Числа стенда — табі/групи, важелі, пікери, паритет `S`, обсяг `LOCK_SEED` — живуть у шапці самого стенда, не тут | не витіснений новим стендом |
-| `smoke_v*.js` | матриця головного стенда · живий = найбільший номер (`12.20`). Кількість тверджень і улов `--inject` — у виводі самого смоука; ганяти з обома режимами | стенд живий |
-| `EquipLens_Z_REGISTR.md` | реєстр З-серії: 62 номери · адреса повного тексту · стан. **Роль — адресація, не переказ** (`Г-14`, 30.08.2026) | доки EquipLens активний |
-| `EquipLens_S17_STARTPOINTS_and_QUEUE_v7.md` | супутник EquipLens (105 KB, ⚠ жодного разу не ревізований — аудит `Г-11`) | аудит `Г-11` не пройдено |
-
-> 🧹 **Знято 13.08.2026 (G-1) як мертве оголошення, не як архівація (Р-6):**
-> `StockCheck_journal_stagebench_v3.html` · `StockCheck_jr_stagebench_smoke_v3.js` ·
-> `StockCheck_port_b29_5_RULER.html` · `StockCheck_h1_money_sign.js` ·
-> `StockCheck_netpick_stagebench_v3_b6.html` · `StockCheck_maint_jsdom_matrix.js`
-> та сусідні `_b29_1_` / `_b27_` / `_b29_3_smoke` / `_b29_5_export`.
-> Жодного з них немає ні в Project, ні в репо. Якщо вони лежать на ПК оператора —
-> вони там і лишаються; база знань їх не має і не оголошує.
-
-> Запускати матриці з read-only теки не можна: `require('jsdom')` шукає `node_modules`
-> відносно скрипта. Копія в `/home/claude` + `npm install jsdom` — див. wsd §3.11.
+| стенди, смоук, реєстр З, супутник EquipLens | продуктове | у репо `EquipLens` з G-Z 27.09.2026 — оголошення в `EquipLens:lens/EquipLens_INDEX.md` (маски `v*` — `12.20`) |
 
 ### Черги продуктів — `<Продукт>_CHERGA.md` (дім оголошення для гейта **G14**)
 
@@ -247,10 +193,10 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 | **EquipLens** | `EquipLens:lens/EquipLens_CHERGA.md` — у репо продукту з G-Z (оголошення — `EquipLens:lens/EquipLens_INDEX.md`) · заведено 28.08.2026 · з 31.08 несе **план у 9 кроків**, не список |
 | **StockCheck** | `stock-check:lens/StockCheck_CHERGA.md` — у репо продукту з 06.10.2026 (оголошення — `stock-check:lens/StockCheck_INDEX.md`) |
 | **QR Lens** | `QR-Lens:lens/QR_Lens_CHERGA.md` — у репо продукту з 06.10.2026 (оголошення — `QR-Lens:lens/QR_Lens_INDEX.md`) |
-| **Drive Lens · PharmaLens · KPI Lens** | ⬜ |
+| **Drive Lens · PharmaLens · KPI Lens** | `<Репо>:lens/<Продукт>_CHERGA.md` — заведено при переїзді 05.10.2026 (оголошення — індекс продукту) |
 
 **Що це.** Єдиний адресований носій **відкритого** по продукту: рядок = покажчик + вік,
-повний текст лишається там, де народився. Живе в `products/<Продукт>/`, читається
+повний текст лишається там, де народився. Живе в репо продукту (`lens/<Продукт>_CHERGA.md`, Р-7), читається
 **цілком** на старті кожної сесії, **не має редакцій** — правиться на місці.
 **Стеля — 12 відкритих пунктів; пункт, старший за 30 днів, — ⚠** (`CQ-1`, слово Konst 04.10.2026: стеля потрібна, щоб пункти **виконувались**, а не щоб файл був малим). Числа канонічні **тут**, решта посилається (`12.20`); у коді — `Q_MAX`, `Q_AGE` у `kernel/Lens_validate.py` (`queue_open` — одна мірка для `G14`, `kernel/check_cherga.py`, `kernel/Lens_start.py`, `tools/env_check.sh`). Пункт = рядок таблиці з `id` у 1-й або 2-й комірці, не «закрито»; вік — з його дати. Понад стелю чи застарілий пункт → **сигнал, не блок**: спершу виконати, розрізати або свідомо відкласти з датою перегляду, потім додавати нове. Робочі розділи з «живе доки» (стартове повідомлення, таблиця ревізії) — не пункти. **Байти — лише ⓘ.** *Чому не байти:* 8 192 B (G-H 18.09, `IDX-10`) мірили розмір, а біда була в застої — замір 04.10: черга ядра за 28 днів закрила 6 пунктів і отримала 17; черга EquipLens — 7 348 B «✓», а всередині 25 пунктів, 24 старші за 30 днів. Агенти впирались у байти й стискали текст замість виконувати. Практика: канбан рахує WIP-ліміт у пунктах, вік пункту — сигнал застою (businessmap.io, aktiasolutions.com — дат не видно, не перевірено).
 
@@ -269,12 +215,11 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 Написані: `G1`–`G13`, `G16`, `G19` (спрацювання правил, К4-1), `G21` (номер правила —
 один дім, `IDX-7`, G-J), `G22`, `G23`, `G24` (дубль імені, G-V), `G25` (продуктове в ядрі, реєстр нижче — Р-4′, G-Z). Файли правил — константа `RULE_FILES` у `Lens_validate.py`;
 новий дім правил = рядок там + рядок тут (`G4` `G16` `G19` `G21` читають її). Код влитий із
-`rules_hits.py`; надгробок видалено з чату 18.09.2026 (G-K, `--delete`, П-GH1 v2),
-стан до надгробка — `archive/summaries/Lens_gov/rules_hits_v1.py`. **`G14` (черга продукту: оголошена, існує, стеля — пункти й вік, `CQ-1` 04.10.2026) — написаний.** Зарезервований без коду: **`G15`
-(протухання §5)** — індекс обіцяє машинну перевірку,
-якої не існує; борг `IDX-9`.
-Заявки без коду: `G17` — детектор черг (`IDX-11`) · `G18` — кандидат детектора `1.19-б` ·
-`G20` — ворота INTAKE (`К3-1`).
+rules_hits.py; надгробок видалено з чату 18.09.2026 (G-K, `--delete`, П-GH1 v2),
+стан до надгробка — `archive/summaries/Lens_gov/rules_hits_v1.py`. **`G14` (черга продукту: оголошена, існує, стеля — пункти й вік, `CQ-1` 04.10.2026) — написаний.**
+Заявки без коду (номер тримається, перевірки **нема** — не посилатись як на чинну): `G15` — протухання §5
+(оголошення «зарезервований» знято 06.10.2026, `IDX-9`) · `G17` — детектор черг (`IDX-11`) ·
+`G18` — кандидат детектора `1.19-б` · `G20` — ворота INTAKE (`К3-1`).
 Перший вільний номер — **`G26`** (звірено регексом `G\d+` по `Lens_validate.py`, G-Z 27.09.2026; `G25` — продуктове в ядрі, Р-4′; `G22` — стартове в code block, G-Q · `G23` — тригер читання, К6-1 · `G24` — дубль імені, детектор Ф1, G-V). Колізію `Г-10`/`G12` розведено G-C (`Г-12'` закрито).
 
 ### Реєстр продуктів — продукт → репо → теки → префікси (гейт ядра, Р-4′)
@@ -315,12 +260,8 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 | **Lens** *(governance)* | `Lens_governance_session_summary_HB_AUDIT_MIGRATE.md` (ціна аудиту · переїзд StockCheck і QR · воркер з гіта; §0 — адаптація QR-Lens першою) · `Lens_governance_session_summary_GZ_EQUIPLENS_HOME.md` (числа бази · §0 — усе відкрите, план H-A; поглинає GY · LGH-3) — **лежать у репо, тека `sessions/Lens_gov/`, не в Project** (Ф2 для governance, `Lens_REPO_LAYOUT.md` §2, G-U 24.09.2026; читати з clone/raw) *(GY · LGH3 — G-Z; GX · LGH1 · LGH2 — LGH-3; GW — G-Y; GV — G-Y; GU — G-W; GT — G-V; GR · GQ витіснено G-U, файли не збережено — зміст у комітах `39681fd`…`fcfc3ec`; F · G — сироти G-C3; GP — G-S; GO — G-R; GN — G-Q; GM — G-P; GL — G-O; GK — G-N; GJ — G-M; GI — G-L; GH — G-K; GG — G-J; GF — G-H; GA…GE — 17.09.2026 → `archive/summaries/Lens_gov/`)* |
 | **Фармастор** | `АРХІВ-УСІ` — продукт перейменовано на StockCheck; канон живе у `stock-check:lens/Фармастор_v2_MASTER_LOCK.md` і `stock-check:lens/Фармастор_v2_PORT_REGISTER.md`, самері не потрібні жодні |
 
-> ⚠ **Звірено скриптом 30.08.2026 — таблиця протухла по ТРЬОХ продуктах одночасно,
-> і два оголошені файли не існують узагалі:** `StockCheck_session_summary_G1_HYGIENE.md`
-> (у Project — `G2_PROPOLKA`) і `QR_Lens_session_summary_B61_PRESS_PORT_DONE.md`
-> (білд `B61` живий, самері по ньому не написане — окремий борг). Тобто `G10` ганявся
-> по фантомах і мовчав. Виправлено за фактом; **дефект «B61 без самері» лишається
-> відкритим**.
+> ⚠ **30.08.2026 таблиця протухла по трьох продуктах одночасно, два оголошені файли не існували** —
+> `G10` ганявся по фантомах і мовчав (повний запис — історія git цього файла). Звідси детектор нижче.
 
 **Детектор протухання (`IDX-5`, K2).** Разова правка цієї таблиці не лікує — вона
 протухає щобілда. Гейт мусить звіряти три речі механічно:
@@ -329,12 +270,12 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 2. **старшинство** — у Project немає самері того ж продукту, **новішого** за оголошене
    (порівняння за версією в імені, не за датою: дати губляться при завантаженні);
 3. **стеля** — рівно 2 на продукт, крім явно позначених винятків (PharmaLens, KPI Lens).
-Номер гейта — **`G15`**: `G14` зайнятий чергами продуктів (оголошено вище), і повторне
+Номер — **`G15`, заявка без коду** (вище): `G14` зайнятий чергами продуктів (оголошено вище), і повторне
 використання дало б дві різні перевірки під одним іменем.
 
 **Четверта перевірка — маски (`gov 12.20`, заведено 31.08.2026).** Рядки, оголошені
 маскою (`EquipLens_headbench_v*.html`, `smoke_v*.js`), імені для звірки не мають —
-і саме тому не протухають. `G15` перевіряє в них **однозначність**: під маскою рівно
+і саме тому не протухають. `G15` (заявка) перевірятиме в них **однозначність**: під маскою рівно
 один кандидат на «найновіший», і він не сирота. Це друге твердження того самого гейта,
 не новий номер: предмет `G15` — «`§5` не протух», а таблиця самері й маски стендів —
 два його випадки.
@@ -344,24 +285,13 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 в Project дати губляться; алфавіт ставить `b27` перед `b9` → гейт пропонував би
 виселити найновіше). Оголошення замість вгадування — той самий механізм, що й G3.
 
-Плани продуктів: `QR_Lens_forward_plan.md` *(колишній `wsd_TODO_running.md`)*.
-
 ---
 
 ## §6 Що зараз у роботі
 
-**Governance-пас** (з `StockCheck_session_summary_b27.md` §11):
-
-| сесія | зміст | стан |
-|---|---|---|
-| **A** | виселення історії з wsd · `Lens_INDEX` · `Lens_PROFILE` · `wsd_delta_running` · розділ TODO | ✅ 30.07.2026 |
-| B | Cookbook → тематичні томи + `Lens_cookbook_INDEX.md` | ✅ 31.07.2026 |
-| C | звірка переносу · гейти G7–G10 · вісь фізичних місць (§8) | ✅ 31.07.2026 |
-| **D** | **прополка wsd → v2.27** · мердж буфера · 7 прецедентів · схема репо↔Project | ✅ 01.08.2026 |
-| **E** | **канонізація StockCheck:** `Lens_module_1_maint_v1` · A79–A82 · контракт xlsx · hole #1 WONTFIX · рішення по SW · G8-розпил + фікс G5/G7 · мердж wsd→v2.28 | ✅ 01.08.2026 |
-| F | `Lens_matrix_INDEX.md` + `Lens_jsdom_boot.js` · мердж stagebench-буфера · розбір §7 | ⬜ |
-| G | **PharmaLens** — старт арку (новий чат, свіжий контекст) | ⬜ |
-| H | **EquipLens** — Ф0 канон ✅ 18.08.2026 · далі Ф1 дизайн-бенч + Ф2 стенд острівця | 🔄 |
+Не тут — у черзі ядра `kernel/Lens_governance_CHERGA.md` (пакети й пункти з віком) і в §0 живого
+самері governance (§5). Таблиця governance-пасу A–H (30.07–18.08.2026) застигла й знята 06.10.2026
+(ХІД-8, `IDX-15`) — історія git цього файла.
 
 ---
 
@@ -369,49 +299,14 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 
 Файли, що лежать у теці, але не мають дому за wsd 12.11. Кожен → або в дім, або в архів.
 
-| файл | ймовірний дім |
-|---|---|
-| `PharmaLens_Claude_Handover.md` · `PharmaLens_Independent_Design_Research_Handover.md` | §3 називає їх `products/`-файлами, у репо їх **немає** (404, звірено 13.08.2026) — ✅ 05.10.2026: у `PharmaLens:lens/` (переїзд) |
-| `VTM_Lens_foundation_spec_v0_3.md` · `VTM_Lens_deep-research-report_GPT.md` · `Аналіз_Дизайну_ВТМ_Lens_Gemini__3_6.md` · `vtm_lens_spa_with_gemini_ai.html` | **джерела-попередники PharmaLens** (писані Gemini / GPT, Claude їх не читав). Тригер архівації = звірка з `PharmaLens_*_Handover` виконана |
-| `QR_Lens_session_summary_B59_halo_stagebench_REBUILD.md` | третє самері QR при стелі 2 — в архів при першому дотику до QR Lens |
+**Стан 06.10.2026: порожньо.** Останні рядки (джерела-попередники PharmaLens, третє самері QR) — продуктові,
+виїхали з продуктами (`kernel/Lens_REPO_LAYOUT.md` §4-б).
 
-> 🧹 **Розчищено 13.08.2026 (сесія G-1):** 12 рядків старої редакції знято — жодного
-> з названих файлів у Project немає (`KONST_MEMORY_FINAL` · `Equipment_name_` ·
-> `wsd_TODO_delta_collapsible-cat-levers` · `QR_Lens_bannerJank_external_brief` ·
-> `KPI_Lens_categories_Excel_impl_Batch15` · `Drive_Lens_concept_v1`/`_v1_2`).
-> Знято як **мертве оголошення**, не як архівацію.
->
-> ⚠ **ДВА З НИХ СПРОСТОВАНО 30.08.2026** — повний лістинг репо показав, що вони є:
-> · `Equipment_name_.md` (1 802 B, `products/`) — **живий вічний файл**, whitelist позицій
->   обладнання QR Lens, у шапці прямо оголошений джерелом для `wsd 3.6`. Перейменований на
->   `QR_Lens_equipment_whitelist.md` і оголошений у §5;
-> · `wsd_TODO_delta_collapsible-cat-levers.md` (2 731 B, `kernel/wsd/`) — **невлитий буфер**
->   із живою ідеєю категорійних згортаних важелів (12.07.2026), прострочений на сім тижнів.
->   Зміст канонізовано як `Д-К` у `Lens_stagebench_delta_running.md`, після мерджу файл
->   видаляється.
->
-> **Клас помилки G-1:** перевірка робилась **тільки по Project**, а висновок записаний
-> як «файлів немає» взагалі. Project — не джерело правди (§0). Правильний детектор —
-> лістинг репо, а не `ls` теки Project.
-
-> 🗄 **Виїхали 01.08.2026 (сесія E):** `canon_delta_A45_material_lever_manifest.md` —
-> в `archive/superseded/`, названий у `Lens_ARCHIVE_INDEX` (перевірено 13.08: raw дає 200).
->
-> ⚠ **`StockCheck_collapse_C_CANON_delta.md` — ЗНАЙДЕНИЙ 30.08.2026, «втрату» скасовано.**
-> Файл лежить у `products/` (11 936 B) і лежав там весь час: 13.08 його шукали
-> в `archive/superseded/`, не знайшли й оголосили втраченим. Перевірка велася за
-> **очікуваною адресою**, а не за іменем по всьому дереву — той самий клас, що й вище.
-> **Дія:** файл переїжджає в `archive/superseded/` (зміст справді канонізовано як `A72`,
-> перевірено 30.08 — запис у `Lens_iOS_cookbook_5_motion.md` існує і device-locked),
-> рядок в `Lens_ARCHIVE_INDEX` пишеться тим самим патчем. **Не видаляти:** файл —
-> свідчення про інцидент `Р-5`, на якому тримається правило нижче.
->
-> *Історичний запис 13.08.2026 (визнаний хибним, лишається як прецедент):*
-> **Не шукати й не відновлювати:** ціль буфера — механіка collapse C — уже канонізована
-> як **A72** у `Lens_iOS_cookbook_5_motion.md`, тобто втрачено транспорт, а не зміст.
-> **Ціна інциденту — не файл, а довіра до перепису:** індекс півмісяця стверджував
-> наявність того, чого немає. Тому `Lens_ARCHIVE_INDEX` §3 (рядок пишеться **одночасно**
-> з переміщенням, одним патчем) — не бюрократія, а єдине, що ловить цей клас втрат.
+> **Уроки розбору §7** (повні записи 13.08 і 30.08.2026 — історія git цього файла):
+> · «файлу немає» — лише за **лістингом репо** (`git ls-files`), не за теками Project (клас G-1: два «зниклі»
+>   файли лежали в репо весь час);
+> · шукати **за іменем по всьому дереву**, не за очікуваною адресою (`Р-5`: «втрачений» буфер лежав у
+>   сусідній теці; рядок `Lens_ARCHIVE_INDEX` пишеться одним патчем із переміщенням).
 
 **Детектор (К2):** `python3 Lens_validate.py --gov .` → гейт G3 валить кожен .md,
 не названий у цьому файлі. Секція §7 — легальний дім для «ще не розібраного»,
@@ -427,15 +322,17 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 
 | місце | що там живе | хто і як править |
 |---|---|---|
-| **репо `kernel/`** *(корінь)* | маршрутизатори й інструмент: `Lens_INDEX` · `Lens_validate.py` · `Lens_ARCHIVE_INDEX` · `Lens_PROFILE` · `Lens_PROJECT_instruction` · `Lens_NEWPROJECT_bootstrap` · манифести стендів | **джерело правди.** Канон правиться тут |
+| **репо `kernel/`** *(корінь)* | маршрутизатори й інструмент: `Lens_INDEX` · `Lens_validate.py` · `Lens_ARCHIVE_INDEX` · `Lens_PROFILE` · `Lens_PROJECT_instruction` · `Lens_NEWPROJECT_bootstrap` · маніфести стендів | **джерело правди.** Канон правиться тут |
 | **репо `kernel/wsd/`** | `Work_Standard.md` · `Lens_governance_protocol.md` · `Lens_verdict_protocol.md` · `Lens_patch_check_protocol.md` · `Work_Standard_HISTORY.md` · `wsd_delta_running.md` | те саме |
 | **репо `kernel/cookbook/`** | `Lens_cookbook_INDEX.md` · 6 томів · `Lens_cookbook_delta_running.md` | те саме |
 | **репо `kernel/modules/`** | донор-модулі коду: `Lens_module_*.md` | те саме |
-| **репо `archive/`** | `summaries/` · `stands/` · `superseded/` — канон-файли, що відслужили | `git mv`, **не** `rm` — нічого не гине |
-| **Project knowledge** | копія ядра · `*_valuesLOCK` / `*_MASTER_LOCK` продуктів · непорожні буфери · **живі самері (§5)** · живі білди й стенди | завантаження копій; читальня |
-| **локальний ПК** | усе, що вижило своє «живе доки» | звалище; звідти нічого не видаляється |
+| **репо `tools/` · `sessions/Lens_gov/` · `.claude/`** | інструменти обох дверей · живі самері governance (Ф2) · хук старту Claude Code | те саме |
+| **репо `archive/`** | `summaries/Lens_gov/` · `superseded/` · моноліт кукбуку — те, що відслужило «живе доки» | `git mv`, **не** `rm` — нічого не гине |
+| **клон Claude Code** | усе дерево репо, шляхи від кореня; поруч — склоновані репо продуктів | читальня з повним доступом; пише `git push` |
+| **Project knowledge** | Sync-копія `kernel/` (пласко) · ручні копії лише того, чого в репо немає | читальня; оновлення — кнопка **Sync** |
+| **локальний ПК** | усе, що вижило своє «живе доки» до появи `archive/` | звалище; звідти нічого не видаляється |
 
-**Одним рядком:** репо — джерело · Project — читальня · ПК — архів.
+**Одним рядком:** репо — джерело · клон і Project — читальні · ПК — звалище.
 
 ### Підтеки в `kernel/` ⟂ плаский Project *(заведено 01.08.2026)*
 
@@ -466,8 +363,8 @@ for f in Lens_INDEX.md Lens_PROFILE.md Work_Standard.md Work_Standard_HISTORY.md
 тому Cookbook, у якому живе парний A-запис. Номер стоїть **у імені файлу, не в описі**:
 `Lens_module_1_maint_v1.md`, не `Lens_module_maint_v1.md`.
 
-> ⚠️ **Прецедент Р-4 (13.08.2026).** Індекс тричі називав модуль без номера теми —
-> `Lens_module_maint_v1.md`. Файл існує (49 414 B), але за оголошеним іменем raw давав
+> ⚠️ **Прецедент Р-4 (13.08.2026).** Індекс тричі називав модуль без номера теми
+> (ім'я без цифри `1_`). Файл існує (49 414 B), але за оголошеним іменем raw давав
 > **404**, і модуль пів дня рахувався втраченим. Конвенція була описана правильно;
 > помилка жила в **посиланнях** на неї. **Детектор (К2):** ім'я файлу, що йде в оголошення,
 > копіюється з `git ls-files` / raw-відповіді 200, а не набирається з голови за конвенцією —
@@ -492,29 +389,26 @@ Project під час розмови в GitHub не ходить: він три�
 2. **Ручних копій підключених файлів у Project не тримати.** Ручне завантаження і
    GitHub-джерело — два різні механізми; вони не замінюють один одного, а **співіснують**,
    тобто дають дублі й подвійну плату. Оновлення підключеної теки = кнопка **Sync**, не перезалив.
-3. **Вручну в Project лежить тільки те, чого в репо немає:** живі самері · живі білди `.html` ·
-   jsdom-матриці · `StockCheck_icon_gen.py`.
+3. **Вручну в Project лежить тільки те, чого в репо немає.** З Ф2 і Р-7 (самері й білди живуть у репо)
+   таких файлів майже нема; файл «лише в Project» — борг переносу в репо (Р-8: Claude Code його не бачить).
 4. **capacity Project ≠ контекст чату.** Файл, що лежить у Project, не витрачає контекст
    сесії, доки його не прочитано. Це два різні бюджети; плутати їх — переоцінювати ціну зберігання.
 
-### Фолбек-драбина доступу до архіву
+### Доступ до архіву — по дверях
 
-|рівень|канал|стан|
-|---|---|---|
-|**0**|`kernel/` + `products/` уже в Project | мережа не потрібна взагалі — 95% роботи|
-|**1**|`api.github.com/…/git/trees/main?recursive=1` | увесь список одним запитом, найдешевше. **Ловить `403 rate limit`** — IP спільний|
-|**1-б**|`codeload.github.com/<owner>/<repo>/zip/refs/heads/<гілка>` | **повне дерево одним запитом**, коли рівень 1 під лімітом. Тільки публічні репо; тягне репозиторій цілком; розпаковувати **тільки** `python3 zipfile` (`unzip` нівечить кирилицю). Правило й межі — wsd `1.9`, вісь 3|
-|**2**|`github.com/…/tree/main/<тека>` (HTML) | працює, коли API під лімітом — перевірено 01.08.2026|
-|**3**|**`Lens_ARCHIVE_INDEX.md`** → точне ім'я → raw-URL | **справжня страховка**: індекс лежить у `kernel/`, тобто **без мережі**; маючи ім'я, список не потрібен|
-|**4**|Konst скидає файл у чат | спрацьовує завжди|
+|двері|канал|
+|---|---|
+|**Claude Code**|клон: `git grep -n <що> -- archive/` · `git ls-files archive/` — увесь архів без мережі|
+|**Project · 1**|ім'я з **`Lens_ARCHIVE_INDEX.md`** (лежить у `kernel/`, тобто в Project) → `gh_read` / квиток конектора (`tools/CHAT_TOOLS.md`)|
+|**Project · 2**|raw-URL за точним іменем — лише публічний репо|
+|**Project · 3**|Konst скидає файл у чат — спрацьовує завжди|
 
-**Чому рівень 3 головний.** Він не залежить від жодного зовнішнього сервісу для *пошуку* —
-лише для *завантаження*. Це той самий принцип, що й 1.10: **звірка з оголошенням замість
-запиту до системи, яка може не відповісти**.
+**Чому індекс головний для Project.** Він не залежить від мережі для *пошуку* — лише для *завантаження*:
+звірка з оголошенням замість запиту до системи, яка може не відповісти (той самий принцип, що й 1.10).
 
 **Тригер переїзду** — рядок «живе доки» (wsd 1.8) вичерпався:
 буфер змерджено → ПК · самері випало з §5 → репо `archive/summaries/` (`gov 1.14`) · канон-файл розпиляно → репо `archive/`.
 
 **Детектор (К2).** Не тримати цей маршрут у голові: гейти рахують його самі —
 **G10** називає самері на виселення, **G7** ловить буфер, що пережив ціль,
-**G8** показує посилання на те, чого в Project уже немає.
+**G8** показує посилання на те, чого в дереві вже немає.
