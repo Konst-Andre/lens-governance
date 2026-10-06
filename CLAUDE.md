@@ -35,7 +35,7 @@
 | теки, імена, адресація `Репо:шлях` у ядрі | `kernel/Lens_REPO_LAYOUT.md` — формула ядра, **не** `docs/REPO_LAYOUT.md` продукту |
 | архівне джерело · рішення переїзду продуктів (`Р-N`) | греп по `archive/` (перейменування — `kernel/Lens_ARCHIVE_INDEX.md` §3-б) · `kernel/Lens_REPO_LAYOUT.md` §4-б |
 
-**Ера Project — у Claude Code не читати:** `kernel/Lens_PROJECT_instruction.md` · `kernel/Lens_NEWPROJECT_bootstrap.md` · `kernel/Lens_github_push_protocol.md` · `tools/CHAT_TOOLS.md` · `tools/ADAPT.md` · `tools/lens-gh/`. Шапки «AUTO-READ» і штамп «KERNEL v2 … між Projects» тут не діють. **Правило ядра, що спирається на механіку чату Claude** (`present_files`, `ask_user_input_v0`, `/mnt/…`, project_knowledge_search, квиток / конектор): суть правила діє, механіка — відповідник Claude Code (файл у репо + коміт · AskUserQuestion · греп по клону · `git`).
+**Двері Project** (`kernel/Lens_INDEX.md` §0 — двоє дверей, правила спільні, механіка різна): `kernel/Lens_PROJECT_instruction.md` · `kernel/Lens_NEWPROJECT_bootstrap.md` · `kernel/Lens_start.py` · `tools/CHAT_TOOLS.md` · `tools/ADAPT.md` · `tools/lens-gh/` — **живі** (claude.ai Project працює: Routes та ін.), не архівуються; у Claude Code не читати, лише коли правиш саме двері Project (тоді інструкція Project — тим самим ходом). Шапки «AUTO-READ» і штамп «KERNEL v2 … між Projects» тут не діють. **Правило ядра, що спирається на механіку чату Claude** (`present_files`, `ask_user_input_v0`, `/mnt/…`, project_knowledge_search, квиток / конектор): суть правила діє, механіка — відповідник Claude Code (файл у репо + коміт · AskUserQuestion · греп по клону · `git`).
 
 ## Знахідка з іншого репо → сюди (wsd 1.19)
 

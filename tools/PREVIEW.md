@@ -2,7 +2,7 @@
 
 > живе доки: існує репо `Konst-Andre/sandbox` з GitHub Pages. Змінився шлях прев'ю — правиться ЦЕЙ файл, Projects перечитують його адаптером (`tools/ADAPT.md`).
 > дім: `lens-governance/tools/PREVIEW.md` · інструменти запису — `tools/CHAT_TOOLS.md`
-> версія: 1.1 · 27.09.2026 · сесія LGH-3 · перенесено з `kernel/Lens_github_push_protocol.md` §8 (О-5, ідея Konst G-X · форма G-Y 25.09.2026) + кроки «деплой зелений» і «промоція»
+> версія: 1.1 · 27.09.2026 · сесія LGH-3 · перенесено з `archive/superseded/Lens_github_push_protocol.md` §8 (О-5, ідея Konst G-X · форма G-Y 25.09.2026) + кроки «деплой зелений» і «промоція»
 > Файл самодостатній: читається без знання Lens і без інших файлів цього репо, крім `tools/CHAT_TOOLS.md`.
 
 ## §1 Навіщо

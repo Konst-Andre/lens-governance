@@ -38,7 +38,7 @@
 ```
 archive/
   summaries/    самері governance і тексти їхніх кроків — уся тека в підтеці Lens_gov/
-  superseded/   витіснене іншим файлом: буфер A45, ТЗ конектора lens-gh
+  superseded/   витіснене іншим файлом: буфер A45, ТЗ конектора lens-gh, запис токеном із чату
 ```
 У корені `archive/` — лише моноліт кукбуку `Lens_iOS_cookbook.md`. **Продуктового архіву в ядрі нема**
 (`kernel/Lens_REPO_LAYOUT.md` §4-б, Р-3): самері, стенди й матриці продуктів — `archive/` репо продукту.
@@ -250,7 +250,7 @@ archive/
 
 Теки `archive/stands/` у ядрі більше нема (05–06.10.2026, журнал GW кроки 3–4): стенди StockCheck і Фармастора — `stock-check:archive/stands/`, QR Lens — `QR-Lens:archive/stands/`. Перелік до виїзду — історія git цього файла.
 
-### `archive/superseded/` — 2 файли *(звірено `git ls-files` 06.10.2026)*
+### `archive/superseded/` — 4 файли *(звірено `git ls-files` 06.10.2026)*
 
 Продуктове витіснене виїхало з продуктами: Drive Lens концепти → `Drive-Lens:archive/superseded/`, KPI → `KPI-Lens:archive/superseded/`
 (05.10.2026), `farmastor_v2_data.js` · `StockCheck_B32_STAGEBENCH_HANDOFF.md` · `StockCheck_collapse_C_CANON_delta.md` — зі StockCheck у `stock-check` (06.10.2026).
@@ -258,9 +258,10 @@ archive/
 - `canon_delta_A45_material_lever_manifest.md` — 🗄 01.08.2026. Буфер **пережив ціль**: A45 канонізовано в `Lens_iOS_cookbook_3_material.md`. Йти сюди тільки за **сирими важелями компера** матеріальності, яких канон не зберіг
 
 - `lens-gh_SPEC_v1.2.md` · 27.09.2026 · Lens (інструменти чату) · ТЗ конектора lens-gh v1.2 «квиток» (контейнер ↔ воркер ↔ GitHub повз контекст), ред. 3 · задеплоєно й прийнято Konst (LGH-2), зміст влито в `tools/lens-gh/README.md` і `tools/CHAT_TOOLS.md` §2-б; до архіву лежав у теці tools/lens-gh/ під іменем SPEC_v1.2.md
+- `Lens_github_push_protocol.md` · `Lens_claude_github_push.py` · 06.10.2026 · Lens (двері Project) · запис у GitHub із чату токеном (П-GH1, v2–v3, PLAN-ID) · витіснено конектором «Lens GitHub» (`tools/CHAT_TOOLS.md`, інструкція Project v4 27.09.2026); у Claude Code — `git`. Живі інструменти Project не архівуються (`Lens_INDEX` §0) — цей уже не живий (`GH-1`, ХІД-8)
 
 ### ❌ Втрачене при переїзді — НЕ шукати
 
 Порожньо в ядрі: єдиний рядок (`StockCheck_collapse_C_CANON_delta.md`, «втрату» скасовано 30.08.2026, інцидент — історія git `kernel/Lens_INDEX.md`) — продуктовий, виїхав зі StockCheck.
 
-**Разом: 134 файли** — корінь 1 · `summaries/Lens_gov/` 131 · `superseded/` 2 (`git ls-files archive | wc -l`, 06.10.2026).
+**Разом: 136 файлів** — корінь 1 · `summaries/Lens_gov/` 131 · `superseded/` 4 (`git ls-files archive | wc -l`, 06.10.2026).
