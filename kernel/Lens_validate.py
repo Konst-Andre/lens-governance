@@ -764,8 +764,76 @@ def gov(root):
     g23(root)
     g19(root)
     g22(root)
+    g17(root, R(root, 'Lens_governance_CHERGA.md'))
+    g20(root)
 
 # ─────────────────────────── G21 · ОДИН ДІМ НОМЕРА ──────────────────────────
+WSD_VER = re.compile(r'^2\.(?:1[6-9]|[2-9]\d)$')   # «wsd 2.42» — версія файла (правила кластера 2 — до 2.15), не адреса
+
+
+def g20(root):
+    """G20 — досяжність правила (К3-1, GATE 06.10.2026).
+    (а) БИТА АДРЕСА: «wsd N.N» / «gov N.N» у живому .md (поза archive/ і sessions/), а заголовка N.N
+        нема в жодному файлі правил (RULE_FILES + Lens_excel_protocol: 5.x · 6.x) → ✗. Не судиться:
+        14.x (прецеденти — G4), версія wsd (WSD_VER), дата.
+    (б) ВОРОТА INTAKE: правило, якого не було в HEAD (нове), без мітки «**Тригер…**» або без
+        «**Детектор…**» (чи маркерів T:n/a · K2:n/a з причиною) → ✗ — правило народжується повним
+        (gov К1/К2, INTAKE). Без git — ⓘ «не перевірено»."""
+    print('\n[G20] досяжність правила — биті адреси · ворота нового правила (К3-1)')
+    hdr = re.compile(r'^##+\s+`?(\d+\.\d+(?:-[а-яґєіїь])?)`?[\s|]', re.M)
+    ids = set()
+    for f in list(RULE_FILES) + ['Lens_excel_protocol.md']:
+        try:
+            ids |= {m.group(1) for m in hdr.finditer(open(R(root, f), encoding='utf-8').read())}
+        except OSError:
+            pass
+    bad = []
+    for dp, dns, fns in os.walk(root):
+        dns[:] = [d for d in dns if d not in ('.git', 'archive', 'sessions', 'node_modules')]
+        for fn in fns:
+            if not fn.endswith('.md'):
+                continue
+            t = open(os.path.join(dp, fn), encoding='utf-8').read()
+            for m in re.finditer(r'\b(?:wsd|gov)\s+(\d+\.\d+(?:-[а-яґєіїь])?)(?![\d.])', t):
+                n = m.group(1)
+                if n in ids or n.startswith('14.') or WSD_VER.match(n) or re.fullmatch(r'\d{2}\.\d{2}', n):
+                    continue
+                bad.append((n, fn))
+    for n, fn in sorted(set(bad)):
+        fail(f'`{n}` — адреса правила без заголовка в жодному файлі правил (згадка: {fn}); перенумеровано чи не влито?')
+    if not bad:
+        ok(f'адреси wsd/gov N.N резолвляться ({len(ids)} заголовків правил)')
+    new_bad, seen_git = [], False
+    for f in RULE_FILES:
+        path = R(root, f)
+        if not os.path.exists(path):
+            continue
+        rel = os.path.relpath(path, root).replace('\\', '/')
+        try:
+            h = subprocess.run(['git', '-C', root, 'show', f'HEAD:{rel}'], capture_output=True, text=True, timeout=20)
+        except (OSError, subprocess.SubprocessError):
+            continue
+        if h.returncode != 0:
+            continue
+        seen_git = True
+        old_ids = {m.group(1) for m in hdr.finditer(h.stdout)}
+        body = open(path, encoding='utf-8').read()
+        for r_ in [x for x in re.split(r'\n(?=#{2}\s*\d+\.\d+)', body) if re.match(r'#{2}\s*\d+\.\d+', x)]:
+            num = re.match(r'#{2}\s*`?(\d+\.\d+(?:-[а-яґєіїь])?)', r_).group(1)
+            if num in old_ids or is_route(r_):
+                continue
+            trig = re.search(r'(?m)^[ \t>]*\*\*Тригер', r_) or re.search(r'T:n/a\s*—\s*\S', r_)
+            det = re.search(r'(?m)^[ \t>]*\*\*Детектор', r_) or re.search(r'K2:n/a\s*—\s*\S', r_)
+            if not (trig and det):
+                new_bad.append(f'{num} ({f}: ' + ('' if trig else 'без тригера ') + ('' if det else 'без детектора') + ')')
+    for x in new_bad:
+        fail(f'нове правило {x} — INTAKE: правило народжується з тригером і детектором')
+    if not seen_git:
+        print('  ⓘ git HEAD недоступний — ворота нового правила не перевірено')
+    elif not new_bad:
+        ok('нових правил без тригера чи детектора нема (проти HEAD)')
+
+
 def g21(root):
     """Номер правила з тілом — рівно в одному файлі RULE_FILES (IDX-7, G-J).
     Маршрут (заглушка за is_route, Ф-25, або <400 B) — не тіло: на старому місці він законний.
@@ -997,7 +1065,7 @@ def g22(root):
 # Гейт продукту: той самий скрипт ядра, запущений на КОРЕНІ репо продукту. Оголошення —
 # з власного індексу продукту `lens/<Продукт>_INDEX.md` (Р-9), не з Lens_INDEX ядра:
 # гейт перевіряє лише свій репо (Р-4′). Шляхи в індексі — від кореня репо продукту.
-Q_MAX, Q_AGE = 12, 30     # стеля черги — відкритих пунктів і вік у днях; канон — Lens_INDEX §5 ядра (CQ-1, 04.10.2026) · ті самі числа: check_cherga.py · Lens_start.py · tools/env_check.sh
+Q_MAX, Q_AGE = 12, 30     # стеля черги — відкритих пунктів і вік у днях; канон — Lens_INDEX §5 ядра (CQ-1, 04.10.2026) · ті самі числа: G17 · Lens_start.py · tools/env_check.sh
 Q_CEIL = 8192             # колишня стеля в байтах — лише ⓘ (CQ-1) · CEIL
 Q_THR = Q_CEIL * 9 // 10  # колишній поріг Ф-10 — лише ⓘ
 
@@ -1023,6 +1091,63 @@ def queue_open(txt):
                 age = (today - dt).days; break
         out.append((m.group(1), age))
     return out
+def _q_ids(txt):
+    """`id` рядків таблиць черги (1-а або 2-а комірка) — мірка колишнього check_cherga.ids."""
+    out = []
+    for l in txt.splitlines():
+        if not l.startswith('|'):
+            continue
+        for c in [x.strip() for x in l.strip('|').split('|')][:2]:
+            m = re.fullmatch(r'\*{0,2}`([^`]+)`\*{0,2}', c)
+            if m:
+                out.append(m.group(1)); break
+    return out
+
+
+def g17(root, qpath):
+    """G17 — цілісність черги (IDX-11, GATE 06.10.2026; влито kernel/check_cherga.py).
+    (а) стеля — відкриті пункти й вік (Q_MAX · Q_AGE, CQ-1) → ⚠;
+    (б) дубль `id` у черзі → ✗ (два рядки одного пункту розходяться);
+    (в) загублений `id` — був у черзі в git HEAD, а в новому тексті не згаданий НІДЕ → ✗
+        (закритий пункт можна прибрати, але його `id` лишається в рядку, що його закрив, або в «Знято»);
+        без git — ⓘ «не перевірено» (Project: tar без .git);
+    (г) план із кроками `| **N** |` (черга продукту) — крок без рядка → ✗; черга без плану — не судиться."""
+    print('\n[G17] цілісність черги — стеля · дублі · загублені id (IDX-11)')
+    if not os.path.exists(qpath):
+        warn(f'черги немає: {qpath}'); return
+    txt = open(qpath, encoding='utf-8').read()
+    q = queue_open(txt)
+    old = [i for i, a in q if a is not None and a > Q_AGE]
+    if len(q) > Q_MAX or old:
+        warn(f'відкритих {len(q)} (стеля {Q_MAX}) · старших за {Q_AGE} дн.: {len(old)} '
+             f'({" ".join(old)}) — спершу виконати, розрізати або відкласти з датою (CQ-1)')
+    else:
+        ok(f'відкритих {len(q)} (стеля {Q_MAX}), старших за {Q_AGE} дн. нема')
+    ids = _q_ids(txt)
+    dup = sorted({i for i in ids if ids.count(i) > 1})
+    for d in dup:
+        fail(f'`{d}` — два рядки черги з одним id (який із них правда?)')
+    rel = os.path.relpath(qpath, root).replace('\\', '/')
+    try:
+        head = subprocess.run(['git', '-C', root, 'show', f'HEAD:{rel}'], capture_output=True,
+                              text=True, timeout=20)
+    except (OSError, subprocess.SubprocessError):
+        head = None
+    if head is None or head.returncode != 0:
+        print('  ⓘ git HEAD недоступний — загублені id не перевірено')
+    else:
+        lost = sorted(i for i in set(_q_ids(head.stdout)) if f'`{i}`' not in txt)
+        for i in lost:
+            fail(f'`{i}` — був у черзі (HEAD), зник без сліду: ні рядка, ні згадки в рядку, що його закрив')
+        if not lost and not dup:
+            ok(f'id: {len(set(ids))} · загублених проти HEAD нема')
+    steps = sorted({int(x) for x in re.findall(r'\|\s*\*\*(\d+)\*\*\s*\|', txt)})
+    if steps:
+        for n in range(1, steps[-1] + 1):
+            if n not in steps:
+                fail(f'план черги: крок {n} без рядка')
+
+
 P_LIVE = ('lens', 'sessions', 'tools')   # теки, що оголошуються; archive/ — історія, сайт — не канон
 
 
