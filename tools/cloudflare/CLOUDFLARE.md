@@ -56,6 +56,20 @@ fresh_days=30
 7. **Міряти, потім казати.** Число в чаті чи документі — з `cf_budget.sh` або API, з датою; без заміру — «≈» або «не перевірено».
 8. **Фільтра ще нема, а коміт не про сайт** — повідомлення коміту **починається** з `[CF-Pages-Skip]` (також `[CI Skip]` · `[Skip CI]`; регістр не важить) — Pages цей коміт не збирає (developers.cloudflare.com/pages/configuration/git-integration/github-integration, оновлено 21.04.2026). Чи рахує Cloudflare такий пропуск у 500 і що збирає push із кількох комітів — не перевірено. Це латка до правила 1, не заміна.
 
+9. **Новий сайт — воркер з `[assets]`, не Pages; наявні Pages — переїзд** (`CF-1`). `*.pages.dev` не відкривається в мобільних мережах Київстар
+   і Vodafone, `*.workers.dev` — відкривається (вирок пристрою Konst 05–06.10.2026; публічного джерела нема). Воркер без коду віддає лише
+   теку сайту: `wrangler.toml` → `[assets] directory = "./docs"` (тека за правилом 3) і `not_found_handling = "single-page-application"` —
+   як Pages без `404.html` (старі ярлики PWA лишаються робочими). Зразок — `QR-Lens:wrangler.toml`.
+10. **Воркер під'єднаний до гіта (Workers Builds) з першого дня.** Ручний `wrangler deploy` з сесії — лише перший раз: інакше файл,
+   завантажений з телефона (GitHub web), до сайту не доходить (QR 06.10). Фільтр — правило 1 (include `*`, exclude документів).
+   Під'єднати може й сесія через API: `builds/repos/connections` → `builds/triggers` (06.10, QR-Lens). Перевірка — два коміти: лише
+   документ → нового запису в `builds/workers/<tag>/builds` нема; конфіг або сайт → збірка `success`, md5 сайту ≡ репо.
+11. **Після переїзду проєкт Pages видаляється.** Старі деплої живуть вічно за `<hash>.<проєкт>.pages.dev` і віддають прибрані файли;
+   кеш краю тримає голу адресу до 7 днів (`s-maxage=604800`, QR 06.10). Порядок: на час переходу людей тека виводу Pages = тека сайту
+   (інакше Pages збирає корінь і віддає 404) → люди перейшли → видалити (правило 5: «так» Konst).
+12. **Порада, не правило — свій домен** (Konst 06.10): коли всі сайти на воркерах — домен на акаунт (`qr.<домен>` як Custom Domain
+   воркера): блок оператора на `workers.dev` не вб'є сайти, адреса людська й стала. Ціна ≈ $10/рік + DNS разово; ризик — не продовжити домен.
+
 ## 3. Реєстр проєктів акаунта (оновлює агент, коли бачить зміну; джерело — API)
 
 | проєкт | тип | репо | що будить збірку | прев'ю | стан (03.10.2026) |
@@ -64,7 +78,7 @@ fresh_days=30
 | `ae-edit` · `ae-proxy` | воркери | AE-Simulator (`ae-proxy` — лише дашборд) | CI GitHub (`deploy-edit.yml`) | — | — |
 | `airlens` | воркер + `[assets]` (бот і Mini App: `airlens.konstandre.workers.dev`) | AirLens | Workers Builds: include `*`, exclude `docs/*` `tools/*` `.claude/*` `CLAUDE.md` `README.md` (жовтень: 13 з 25 комітів — без збірки) | — | налаштовано 03.10 (AirLens S12, Р-80) через Builds API; перевірено — коміт лише з `docs/` збірки не дав; детектор «прод ≡ репо» в `env_check` ✓; тривога власнику про запити **акаунта** з півночі UTC — Р-79 |
 | ~~`airlens`~~ | ~~Pages (`airlens-8bd.pages.dev`)~~ | AirLens | — | — | **видалено 03.10** (AirLens S11, Р-78): перевірено — доменів нема, 404, посилань у репо нема; 131 деплой + проєкт через API; бот і Mini App живі (воркер) |
-| `qr-lens` | **воркер** `[assets]`=`docs/` (`qr-lens.konstandre.workers.dev`, деплой `wrangler deploy` з сесії, 06.10) + Pages (корінь, `73e9f22`) — **до видалення** після вироку пристрою | QR-Lens | Pages: `*` · воркер: без Workers Builds (деплой руками з сесії) | усі гілки (Pages) | ⚠ Pages: старі деплої й кеш краю віддають список PSR — видалити проєкт; до того коміти QR-Lens — `[CF-Pages-Skip]` (QR-W) |
+| `qr-lens` | **воркер** `[assets]`=`docs/` (`qr-lens.konstandre.workers.dev`) + Pages (тека `docs`, на час переходу людей) | QR-Lens | воркер: Workers Builds `main`, include `*`, exclude `lens/*` `archive/*` `sessions/*` `tools/*` `.claude/*` `CLAUDE.md` `README.md` (06.10, перевірено двома комітами) | Pages: усі гілки | ⚠ Pages: старі деплої віддають список PSR — видалити, коли люди перейдуть (`QR-Lens` `QRL-1`) |
 | ~~`drive-lens-preview`~~ | Pages | Drive-Lens-preview | — | — | видалено Konst 05.10 (репо поки лишається) |
 | `lens-gh` | воркер | lens-governance | — | — | — |
 
