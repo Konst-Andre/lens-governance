@@ -26,14 +26,15 @@ for f in "$@"; do
   n=$(echo "$f" | tr '/' '_')
   for m in $models; do
     eff="--effort high"   # sonnet теж high: 06.10 на wsd знайшов ядро знахідок opus за пів ціни; без --effort думав у 7 разів менше
-    timeout 1500 claude -p --model "$m" $eff --output-format json "/doctor prompt-audit $f" > "$OUT/$n.$m.json" 2>&1
+    timeout 1500 claude -p --model "$m" $eff --output-format json "/doctor prompt-audit $f" > "$OUT/$n.$m.json" 2> "$OUT/$n.$m.err"   # stderr окремо: попередження CLI (06.10: «Ignoring … permissions») ламали JSON
     line=$(python3 - "$OUT/$n.$m.json" "$OUT/$n.$m.txt" <<'PY'
 import json, sys
 raw = open(sys.argv[1], encoding='utf-8', errors='replace').read()
 try:
     d = json.loads(raw)
 except ValueError:
-    open(sys.argv[2], 'w').write(raw); print('ERR не JSON —', raw.strip()[-160:].replace('\n', ' ')); sys.exit()
+    err = open(sys.argv[1][:-5] + '.err', encoding='utf-8', errors='replace').read() if raw.strip() == '' else raw
+    open(sys.argv[2], 'w').write(raw); print('ERR не JSON —', err.strip()[-160:].replace('\n', ' ')); sys.exit()
 res = d.get('result') or ''
 open(sys.argv[2], 'w').write(res)
 u = d.get('usage', {}); tok = sum(u.get(k) or 0 for k in ('input_tokens', 'cache_creation_input_tokens', 'cache_read_input_tokens'))

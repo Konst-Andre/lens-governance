@@ -22,7 +22,7 @@ GZ (`Lens_governance_session_summary_GZ_EQUIPLENS_HOME.md`) лишається �
 
 **0.2 · ✅ 06.10 QR Lens переїхав** (журнал GW крок 4): воркер `qr-lens.konstandre.workers.dev` (вирок Konst: Київстар і Vodafone ✓) · 18 файлів → `QR-Lens` `99484fc` · ядро без `products/` (`Lens_glass_FINDINGS` → `kernel/`). Відкрите — черга продукту: `QRL-1` хостинг (Workers Builds + Pages: тека `docs`, потім видалити) · `QRL-2` файли лише в Project · `QRL-3` каркас · `QRL-4` start_url.
 
-**0.21 · Порядок Konst 06.10** (слово Konst; ядро — `id` черги): (1) ✅ перенос QR · (2) ✅ чому сайт не оновився → `QRL-1` · (3) ✅ `Lens_glass_FINDINGS` → `kernel/` · (4) ✅ архів QR → продукт · (5) **адаптація `QR-Lens` під каркас — наступною** (`QRL-3`) · далі `CF-1` (правило + порада «свій домен»). Пакети `ХІД-8` (індекс) · `GATE` (інструменти гейта) · `WSD` (канон) — **коли робити, вирішує Konst** після своїх корективів.
+**0.21 · Порядок Konst 06.10** (слово Konst; ядро — `id` черги): (1) ✅ перенос QR · (2) ✅ чому сайт не оновився → `QRL-1` · (3) ✅ `Lens_glass_FINDINGS` → `kernel/` · (4) ✅ архів QR → продукт · (5) **адаптація `QR-Lens` під каркас — наступною** (`QRL-3`) · ✅ `CF-1` (`CLOUDFLARE.md` §2 п.9–12, аудит) · ✅ воркер QR під'єднано до гіта з сесії (API Workers Builds, перевірено двома комітами) · **тема наступної розмови — автоматизація Excel керівника → index** (`QR-Lens:lens/QR_Lens_CHERGA.md` `QRL-5`, Konst пояснить процес). Пакети `ХІД-8` (індекс) · `GATE` (інструменти гейта) · `WSD` (канон) — **коли робити, вирішує Konst** після своїх корективів.
 
 **0.25 · Порядок наступних сесій** (Konst 05.10: великі кроки — у новій сесії, по одному): (1) §0.0 тест пам'яті → (2) StockCheck + Фармастор → `stock-check` (журнал, крок 3; ≈10 файлів «лише в Project» — Konst кладе вкладенням або в репо) → (3) QR + `QR-W` (сайт → `docs/`, воркер `[assets]`) → (4) правило «нові сайти — воркер» у `CLOUDFLARE.md` §2 (аудит) → (5) хід 8 (індекс під Claude Code, `IDX-15`, перейменування `Lens_REPO_LAYOUT`, `GH-1`). Черги AE і AirLens у форму `CQ-1` і переїзд AE на воркер — у **їхніх** сесіях (`CQ-2`, `AE-Simulator:docs/CHERGA.md` §0 п.5).
 
@@ -73,7 +73,9 @@ GZ (`Lens_governance_session_summary_GZ_EQUIPLENS_HOME.md`) лишається �
 
 ```text
 Сесія ядра Lens (репо Konst-Andre/lens-governance, main; ПУБЛІЧНЕ — секретів ніколи). Відповідай українською, простою мовою.
-Старт: env_check (хук) → самері sessions/Lens_gov/Lens_governance_session_summary_HA_CC4_YADRO_ADOPT.md §0 → kernel/Lens_governance_CHERGA.md.
-ПЕРША РОБОТА — адаптація QR-Lens під каркас (QR-Lens:lens/QR_Lens_CHERGA.md QRL-3, за tools/claude-code/ADOPT.md; репо підключити add_repo). Перед тим спитати Konst про QRL-1: чи під'єднав воркер до гіта (Workers Builds) і чи поставив Pages теку виводу docs. Далі — CF-1 (правило «сайти — воркер» + порада «свій домен» у CLOUDFLARE.md, аудит класу 1). Пакети ХІД-8 / GATE / WSD — лише за словом Konst.
+Старт: env_check (хук) → самері sessions/Lens_gov/Lens_governance_session_summary_HA_CC4_YADRO_ADOPT.md §0 (порядок Konst — §0.21) → kernel/Lens_governance_CHERGA.md.
+ПЕРША РОБОТА — адаптація QR-Lens під каркас (QR-Lens:lens/QR_Lens_CHERGA.md QRL-3, за tools/claude-code/ADOPT.md; репо підключити add_repo). Сайт QR — воркер з гіта (Workers Builds), Pages qr-lens видаляє Konst, коли люди перейдуть (QRL-1).
+ДРУГА — розмова з Konst про автоматизацію: Excel керівника → свій Excel → docs/index.html (QRL-5; спершу слухати, як зараз; потім варіанти).
+Пакети ХІД-8 / GATE / WSD — лише за словом Konst.
 Аудит інструкцій — за класом, пакетом перед самері (tools/claude-code/templates/AUDIT_template.md «Коли і скільки»); перед запуском — rate_limit_info. Fable — лише за моїм словом. Маркер контексту — get_session щоразу. Делегування: вирішуй сам, пояснюй простою мовою.
 ```

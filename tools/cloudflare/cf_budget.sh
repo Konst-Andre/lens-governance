@@ -69,7 +69,7 @@ try:
         warn.append(f'⚠ ТРИВОГА cloudflare: збірки Pages — прогноз {fc:.0f}/{lim:.0f} до кінця місяця (темп {total / max(now.day, 1):.0f}/день) · CLOUDFLARE.md §2 п.1–2')
     if wide: warn.append('⚠ cloudflare: заводські збірки Pages — ' + ', '.join(wide) + ' · CLOUDFLARE.md §2 п.1–2')
 except Exception as e: parts.append('збірки Pages — не заміряно (' + type(e).__name__ + ')')
-parts.append('хвилини Workers Builds — не міряються (API не перевірено; дашборд)')
+parts.append('хвилини Workers Builds — не міряються (тривалість у Builds API не перевірено; дашборд)')
 # 3 · свіжість правил (замкнений цикл, CLOUDFLARE.md §5)
 m = re.search(r'Перевірено: (\d{4}-\d{2}-\d{2})', doc)
 if m:
