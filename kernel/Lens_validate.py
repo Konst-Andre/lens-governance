@@ -391,7 +391,10 @@ def gov(root):
     # Ф1 (REPO_LAYOUT §1): шлях від кореня свого репо та `Репо:шлях` чужого.
     # Регекс імені вище `/` не бачить — без цього блоку сирота-шлях для G8 не існує.
     path_bad, x_skip, x_n = [], set(), 0
-    for f in canon:
+    # G8-1 (GATE, 06.10.2026): шляхи черги ядра — теж координати (рядок черги веде до файла);
+    # імена без шляху в черзі не судяться — там історія ідентифікаторів, не посилання.
+    path_src = canon + [q for q in ('Lens_governance_CHERGA.md',) if q in mds]
+    for f in path_src:
         body = open(R(root, f), encoding='utf-8').read()
         for ref in set(re.findall(r'`((?:[\w.\-]+/)+[\w.\-]+\.(?:md|py|js))`', body)):
             if not os.path.exists(os.path.join(root, ref)):
