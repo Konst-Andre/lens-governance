@@ -101,13 +101,13 @@ archive/
   тому старі посилання «Cookbook A45» дійсні для томів. Піднімати лише
   для археології (звірка, чи щось загубилось при розпилі).
 
-### `archive/summaries/` — 132 файли, усі в підтеці `Lens_gov/`
+### `archive/summaries/` — 133 файли, усі в підтеці `Lens_gov/`
 
 Самері продуктів (StockCheck · Фармастор · QR Lens · EquipLens · Drive Lens · KPI Lens) виїхали в `archive/summaries/`
 своїх репо (Р-3, переїзд 24.09–06.10.2026). Перелік, що стояв тут до виїзду (89 рядків, лише продуктові),
 — історія git цього файла до ХІД-8 (`315ad49`).
 
-### `archive/summaries/Lens_gov/` — 132 файли *(заведено G-C3 17.09.2026; самері · тексти кроків · скрипти пакетів; кожен файл названий — звірено 06.10.2026)*
+### `archive/summaries/Lens_gov/` — 133 файли *(заведено G-C3 17.09.2026; самері · тексти кроків · скрипти пакетів; кожен файл названий — звірено 06.10.2026)*
 
 - `Lens_session_summary_governance_A.md` · governance A (31.07)
 - `Lens_session_summary_governance_B.md` · governance B
@@ -240,6 +240,7 @@ archive/
 - `Lens_governance_session_summary_HA_CC4_YADRO_ADOPT.md` · 05–06.10.2026 · Lens governance · H-A (ядро під каркас Claude Code, ревізія CC-4; дописувала H-B): витіснене H-B, §0 перенесено в H-B §0
 - `Lens_inventory_GT_v1.md` · 24.09.2026 · Lens governance · інвентар G-T перед переїздом (Ф1–Ф8): «живе доки» виконано (формула — `kernel/Lens_REPO_LAYOUT.md`); виселено з `sessions/Lens_gov/` 06.10.2026 (ХІД-8)
 - `Lens_governance_session_summary_GZ_EQUIPLENS_HOME.md` · 27.09.2026 · Lens governance · G-Z (EquipLens удома, гейт — свій репо: `G25`, `--product`; П-GZ1…3): витіснене H-C 06.10.2026 (стеля 2); §0 — закрито переїздом і ХІД-8, решта → черга ядра `GZ-1` · `PRJ-1`
+- `Lens_governance_session_summary_HB_AUDIT_MIGRATE.md` · 05–06.10.2026 · Lens governance · H-B (ціна аудиту `AUD-2` · переїзд StockCheck і QR · воркер QR з гіта): витіснене H-C 06.10.2026, §0 перенесено в H-C §0
 
 ### Стенди — виїхали з ядра
 
@@ -259,4 +260,4 @@ archive/
 
 Порожньо.
 
-**Разом: 137 файлів** — корінь 1 · `summaries/Lens_gov/` 132 · `superseded/` 4 (`git ls-files archive | wc -l`, 06.10.2026).
+**Разом: 138 файлів** — корінь 1 · `summaries/Lens_gov/` 133 · `superseded/` 4 (`git ls-files archive | wc -l`, 06.10.2026).
