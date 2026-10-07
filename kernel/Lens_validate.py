@@ -1208,7 +1208,7 @@ def product(root):
     def sect(word):
         m = re.search(rf'^##\s*[^\n]*{word}[^\n]*$(.*?)(?=^##\s|\Z)', txt, re.M | re.S)
         return m.group(1) if m else ''
-    pat = r'`((?:[\w.\-]+/)+[\w.\-*]+\.[A-Za-z0-9]+)`'
+    pat = r'`((?:[\w.\-]+/)+[\w.\-*]*\.[A-Za-z0-9]+)`'   # `*` після імені: файл з крапки (`tools/.gitignore`) теж оголошується (QR 08.10.2026)
     decl = sorted(set(re.findall(pat, txt)))
     masks = [d for d in decl if '*' in d]
     exact = [d for d in decl if '*' not in d]
