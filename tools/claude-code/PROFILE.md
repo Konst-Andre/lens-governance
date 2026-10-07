@@ -3,8 +3,8 @@
 > живе доки: Konst працює з Claude Code. Дім профілю — ЦЕЙ файл; у налаштуваннях акаунта — копія для вставки.
 > Правка: змінити тут → аудит класу 2 (`bash tools/claude-code/audit_prompts.sh 2 tools/claude-code/PROFILE.md` з кореня ядра: opus high + sonnet high; Fable — лише за словом Konst) → текст у чат Konst цілком → Konst вставляє.
 > Konst поправив профіль руками в налаштуваннях — кидає текст агентові, агент оновлює цей файл (інакше два тексти розійдуться).
-> версія: **v13** · 07.10.2026 (САМЕРІ — живий журнал сесії, `SUM-1`). Історія версій — `kernel/Lens_AUDIT.md` і `git log` цього файла.
-> **Діє скрізь:** налаштування акаунта вантажаться в кожен чат — і в Claude Code, і в claude.ai Project (support.claude.com «Understanding Claude's personalization features», дати не видно). Тому механіка лише однієї з дверей тут позначена, а інструкція Project блоків профілю не дублює (`tools/ADAPT.md` §4-б). Історія версій — `kernel/Lens_AUDIT.md` і `git log` цього файла.
+> версія: **v13** · 07.10.2026. Історія версій — `kernel/Lens_AUDIT.md` і `git log` цього файла.
+> **Діє скрізь:** налаштування акаунта вантажаться в кожен чат — і в Claude Code, і в claude.ai Project (support.claude.com «Understanding Claude's personalization features», дати не видно). Тому механіка лише однієї з дверей тут позначена, а інструкція Project блоків профілю не дублює (`tools/ADAPT.md` §4-б).
 
 Що свідомо лишено всупереч одній з моделей (рішення Konst): маркер навантаження з відсотком (Sonnet «лишити» ⟂ Opus «прибрати») — відсоток заміряний; великі літери в «ДО коду», «НОВИМ входом» — стиль Konst.
 
