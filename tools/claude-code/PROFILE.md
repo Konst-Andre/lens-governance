@@ -1,7 +1,7 @@
 # Профіль Konst — обидві двері (Claude Code і claude.ai Project) — канонічна копія
 
 > живе доки: Konst працює з Claude Code. Дім профілю — ЦЕЙ файл; у налаштуваннях акаунта — копія для вставки.
-> Правка: змінити тут → аудит класу 2 (`bash tools/claude-code/audit_prompts.sh 2 tools/claude-code/PROFILE.md` з кореня ядра: opus high + sonnet high; Fable — лише за словом Konst) → текст у чат Konst цілком → Konst вставляє.
+> Правка: змінити тут → аудит класу 2 (`bash tools/claude-code/audit_prompts.sh 2 tools/claude-code/PROFILE.md` з кореня ядра: opus high + sonnet high; Fable — лише за словом Konst) → текст у чат Konst цілком → Konst вставляє. **Додаєш правило — спершу шукай, що прибрати або злити** (07.10: ≈3,7 тис. токенів, 66 рядків; ріст без потреби розмиває увагу до кожного правила).
 > Konst поправив профіль руками в налаштуваннях — кидає текст агентові, агент оновлює цей файл (інакше два тексти розійдуться).
 > версія: **v13** · 07.10.2026. Історія версій — `kernel/Lens_AUDIT.md` і `git log` цього файла.
 > **Діє скрізь:** налаштування акаунта вантажаться в кожен чат — і в Claude Code, і в claude.ai Project (support.claude.com «Understanding Claude's personalization features», дати не видно). Тому механіка лише однієї з дверей тут позначена, а інструкція Project блоків профілю не дублює (`tools/ADAPT.md` §4-б).
