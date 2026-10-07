@@ -126,7 +126,7 @@ Project не читає файлів репо як інструкцію, а `CLA
 | продукт | файли |
 |---|---|
 | **StockCheck** | переїхав у свій репо 06.10.2026 (`stock-check` `e2463c3`): що живе — `stock-check:lens/StockCheck_INDEX.md` (локи · реєстр мереж · локи Фармастора) |
-| **QR Lens** | переїхав у свій репо 06.10.2026 (`QR-Lens` `99484fc`): що живе — `QR-Lens:lens/QR_Lens_INDEX.md` (локи · контракт експорту · whitelist; 3 локи — лише в Project, `QR-Lens:lens/QR_Lens_CHERGA.md` `QRL-2`) |
+| **QR Lens** | переїхав у свій репо 06.10.2026 (`QR-Lens` `99484fc`): що живе — `QR-Lens:lens/QR_Lens_INDEX.md` (локи · контракт експорту · whitelist; 3 локи втрачено — `QR-Lens:lens/QR_Lens_CHERGA.md` `QRL-2` ✅) |
 | **Фармастор** *(попередня назва StockCheck)* | разом зі StockCheck: `stock-check:lens/Фармастор_v2_MASTER_LOCK.md` · архів — `stock-check:archive/*/Farmastor/` |
 | **Drive Lens** | переїхав у свій репо 05.10.2026 (`Drive-Lens` `0309ab3`): `Drive-Lens:lens/Drive_Lens_concept_v1_3.md` · `Drive-Lens:lens/Drive_Lens_logic_audit_findings.md` · що живе — `Drive-Lens:lens/Drive_Lens_INDEX.md` |
 | **PharmaLens** *(5-й продукт; ребренд робочої назви VTM Lens, 30.07.2026)* | переїхав у свій репо 05.10.2026 (`PharmaLens` `a6d1b83`): `PharmaLens:lens/PharmaLens_MASTER_LOCK.md` · `PharmaLens:lens/PharmaLens_Claude_Handover.md` · `PharmaLens:lens/PharmaLens_Independent_Design_Research_Handover.md` · що живе — `PharmaLens:lens/PharmaLens_INDEX.md`. Джерела-попередники (VTM) — §7 |
@@ -253,7 +253,7 @@ GATE 06.10.2026 ще: `G8` — шляхи й у черзі ядра · `G10` —
 | продукт | живі самері |
 |---|---|
 | **StockCheck** | `stock-check:sessions/StockCheck_session_summary_b32_7_s20s21_STORAGE_TRUTH.md` · `stock-check:sessions/StockCheck_session_summary_b32_5_s18s19_STORAGE_DONE.md` *(у своєму репо з 06.10)* |
-| **QR Lens** | у репо продукту — `QR-Lens:lens/QR_Lens_INDEX.md` «Живі самері» (b60 ×2 поки лише в Project, `QRL-2`) |
+| **QR Lens** | у репо продукту — `QR-Lens:lens/QR_Lens_INDEX.md` «Живі самері» (b60 ×2 втрачено, `QRL-2` ✅) |
 | **EquipLens** | `EquipLens_session_summary_S35_OSTRIVETS.md` · `EquipLens_session_summary_S34_AURORA_HYBRID.md` *(у репо `EquipLens`: живі — `sessions/`, витіснені S1…S33 — `archive/summaries/`; оголошення — `EquipLens:lens/EquipLens_INDEX.md`, G-Z)* |
 | **PharmaLens** | `PharmaLens:sessions/PharmaLens_session_summary_S1_FOUNDATION.md` *(продукт заморожено — чекає `.pptx` від Олі; у своєму репо з 05.10)* |
 | **KPI Lens** | `KPI-Lens:sessions/KPI_Lens_session_summary_Batch15_2.md` *(у своєму репо з 05.10)* |
