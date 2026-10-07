@@ -8,7 +8,8 @@ cd "$(dirname "$0")/.."
 
 # ── налаштувати під репо ──
 EXTRA_VARS=""                  # імена змінних середовища через пробіл (значення не друкуються), напр. "GROQ_KEY BOT_TOKEN"
-GATE_CMD="echo гейт не задано"  # головний гейт; останній рядок виводу — підсумок, напр. "node tools/validate.js"
+GATE_CMD="echo гейт не задано"
+SUMDIR="docs/summary"           # тека самері (продукт Lens — sessions)  # головний гейт; останній рядок виводу — підсумок, напр. "node tools/validate.js"
 code() { curl -sS -m 10 -o /dev/null -w '%{http_code}' "$1" 2>/dev/null || true; }
 
 # база
@@ -22,6 +23,12 @@ gate=$(bash -c "$GATE_CMD" 2>&1 | tail -1)
 last=$(grep -m1 -oE "^\| 20[0-9]{2}-[0-9]{2}-[0-9]{2}" docs/AUDIT.md 2>/dev/null | tr -d '| ')
 if [ -n "$last" ]; then days=$(( ( $(date +%s) - $(date -d "$last" +%s) ) / 86400 )); [ "$days" -gt 30 ] && aud="аудит правил: $days дн. — ПОРА" || aud="аудит правил: $days дн. тому"; else aud="аудит правил: журналу нема"; fi
 echo "env: github=${g:-000} cloudflare=${c:-000} · ${vars% } · гейт: $gate · $aud"
+
+# самері — живий журнал (профіль Konst, САМЕРІ): коміти агента (трейлер Claude-Session) після останнього оновлення самері.
+# >0 → попередня сесія комітила, не оновивши самері: звірити git log і дописати §0/§1 ДО роботи. Коміти Konst і ботів не рахуються.
+sm=$(git log -1 --format=%h -- "$SUMDIR" 2>/dev/null)
+if [ -z "$sm" ]; then echo "самері: — (у $SUMDIR ще нема)"
+else n=$(git rev-list --count --grep='Claude-Session' "$sm"..HEAD 2>/dev/null); [ "${n:-0}" -gt 0 ] && echo "⚠ самері відстає: після $sm комітів агента без самері — $n (git log $sm..HEAD)" || echo "самері: ≡ (останнє оновлення $sm)"; fi
 
 # прод (лише читання): <живий код ≡ репо; тека публікації; службове не видно — судити за ВМІСТОМ, не за HTTP-кодом>
 echo "прод: — (додати: живий код ≡ репо; тека публікації; службове не видно — за ВМІСТОМ)"
