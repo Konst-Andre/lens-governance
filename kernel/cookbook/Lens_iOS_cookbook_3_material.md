@@ -322,6 +322,8 @@
 
 Споживачі: `.guid-box`, `.ph-srch`, `.flt-btn` → `background:var(--well-bg);box-shadow:var(--well-sh)`. Одна правка токена = всі well-поля обох тем.
 
+> **Поправка 08.10.2026 (Konst, device QR-Lens CC-3):** `.flt-btn` у переліку вище — **помилка самого рецепта**: кнопка фільтра — дія, не ввід → **lift** (A66; обраний — A66.1), не well. Так само `.icon-btn` (тема) і `.sr-pill` (вибір людини) — кнопки, а в QR вони втоплені (продукт: `QR-Lens:lens/QR_Lens_CHERGA.md` `QRL-11` (6)). Well лишається лише для поля, куди пишуть (`.ph-srch`) і для контейнера-вмісту (`.guid-box`). Зразок lift для кнопок обох тем — `QR-Lens:tools/QR_Lens_zvit_template.html` `.zv-lift`.
+
 **⚠ Не плутати з `--band`/`--band-sh` (хедер-родина).** `--band` несе ВАЖЧИЙ хедер-тір (sr-pill/icon-btn, device-locked .37/.09) — окрема родина, НЕ well. Раніше `.ph-srch`/`.flt-btn` помилково тягли `--band-sh` (на темній `inset 0 1px 0 rgba(255,255,255,.05)` = біле ЗГОРИ = **EMBOSS** → поля читались як ПІДНЯТІ). Фікс = перевести їх на `--well-*`. **НЕ чіпати** окремими well-правками: `#ph-banner` (мʼякий lift — банер, не поле) і хедер-родину.
 
 **Хедер-родина dark DEBOSS — повний блок (sr-pill/icon-btn, B27.2, device-locked):**
