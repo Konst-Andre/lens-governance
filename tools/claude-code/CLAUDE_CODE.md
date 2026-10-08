@@ -60,6 +60,7 @@
 | `hooks/ui-guard.sh` | Pre `Write\|Edit\|Bash` · Post `Read\|Bash\|Grep` | запис `.html`/`.css` (і через Bash) без звернення до індексу кукбука в цій сесії → відмова з причиною; раз на сесію (`HOOK-1`) |
 | `hooks/commit-gate.sh` | Pre `Bash` | `git commit` → гейт ядра для кожного репо коміту (ядро `--gov` · продукт Lens `--product` · інше — тиша), ✗ → відмова з рядками ✗; ~1 с (`HOOK-2` п.1) |
 | `hooks/review-remind.sh` | Post `Bash` · Pre `Write\|Edit\|Bash` (останнім) | **нагадування, не заборона** (`ARCH-1` (ґ)(д), 08.10.2026): щойно зроблений `git commit` змінив `.html`/`.css` → у контекст агента правило «огляд окремим проходом» (раз на SHA; коміт старший за 2 хв — тиша); запис `.html` зі «стенд / bench / harness / компер» у шляху, а `kernel/Lens_stagebench_manifest.md` у сесії не відкривали → нагадування про маніфест (раз на сесію). Формат — `hookSpecificOutput.additionalContext`, текст фактами; **Pre без `permissionDecision` доходить до агента — перевірено наживо (QR CC-3)** |
+| `hooks/memory-guard.sh` | Stop | **гачок пам'яті** (`HOOK-3`, 08.10.2026, урок QR CC-4): в останньому повідомленні Konst слова-рішення («так», «дозволяю», «згоден», «рішення»…), а в ході нема коміту (`git commit` · `gh_commit` · `push_files`) → `decision: block` з причиною: агент записує в репо або одним рядком пояснює, чому нічого. Раз на хід (`stop_hook_active`). Зуби: `bash memory-guard.sh selftest` 6/6 + живий журнал QR CC-4 (хід без коміту → block, наступний з комітом → тиша) |
 | `hooks/lens-hooks.sh` | — | **диспетчер**: setup script вказує лише на нього; новий гачок = рядок тут, середовище Konst не чіпає |
 
 - **Де діють.** Claude Code бере гачки з налаштувань **кореня сесії** і користувача (`~/.claude/settings.json`). У хмарній сесії з кількох репо корінь — `/home/user`, тож `.claude/settings.json` **репо не вантажиться** (і його `SessionStart` теж — звідси «у сесії з кількома репо — руками»). Налаштування користувача й кореня Claude Code підхоплює й посеред сесії (живі тести CC-2: HTML до індексу → відмова, після → дозвіл; коміт із підкинутим ✗ → відмова).
@@ -69,7 +70,7 @@
 # Гачки Lens — диспетчер ядра lens-governance/tools/claude-code/hooks/lens-hooks.sh (нові гачки — там, середовище не чіпати)
 mkdir -p ~/.claude
 cat > ~/.claude/settings.json <<'JSON'
-{"hooks":{"PreToolUse":[{"matcher":"Write|Edit|Bash","hooks":[{"type":"command","command":"f=/home/user/lens-governance/tools/claude-code/hooks/lens-hooks.sh; [ -f $f ] && bash $f pre || true"}]}],"PostToolUse":[{"matcher":"Read|Bash|Grep","hooks":[{"type":"command","command":"f=/home/user/lens-governance/tools/claude-code/hooks/lens-hooks.sh; [ -f $f ] && bash $f post || true"}]}]}}
+{"hooks":{"PreToolUse":[{"matcher":"Write|Edit|Bash","hooks":[{"type":"command","command":"f=/home/user/lens-governance/tools/claude-code/hooks/lens-hooks.sh; [ -f $f ] && bash $f pre || true"}]}],"PostToolUse":[{"matcher":"Read|Bash|Grep","hooks":[{"type":"command","command":"f=/home/user/lens-governance/tools/claude-code/hooks/lens-hooks.sh; [ -f $f ] && bash $f post || true"}]}],"Stop":[{"hooks":[{"type":"command","command":"f=/home/user/lens-governance/tools/claude-code/hooks/lens-hooks.sh; [ -f $f ] && bash $f stop || true"}]}]}}
 JSON
 ```
 
