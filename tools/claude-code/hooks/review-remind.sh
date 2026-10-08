@@ -19,8 +19,9 @@ def say(event, text):
 if mode == "post":
     if "Lens_stagebench_manifest" in raw: open(seen, "w").close()
     cmd = str(ti.get("command", ""))
-    if d.get("tool_name") != "Bash" or not re.search(r"\bgit\b[^;&|]*\bcommit\b", cmd): sys.exit(0)
-    cds = re.findall(r"(?:^|&&|;)\s*cd\s+([^\s;&|]+)", cmd)
+    m = re.search(r"\bgit\b[^;&|]*\bcommit\b", cmd)
+    if d.get("tool_name") != "Bash" or not m: sys.exit(0)
+    cds = re.findall(r"(?:^|&&|;)\s*cd\s+([^\s;&|]+)", cmd[:m.start()])   # тека коміту — останній cd ПЕРЕД git commit (QR CC-3: cd після коміту збивав)
     repo = os.path.expanduser(cds[-1]) if cds else d.get("cwd") or "."
     g = lambda *a: subprocess.run(["git", "-C", repo, *a], capture_output=True, text=True).stdout.strip()
     sha, when = g("log", "-1", "--format=%h"), g("log", "-1", "--format=%ct")
