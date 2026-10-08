@@ -179,6 +179,8 @@ Theme dropdown: `aria-label/aria-haspopup/aria-expanded`, `role="menu"`+`role="m
 
 Усі inline (не icon-font): `stroke="currentColor"`, `fill="none"`, `stroke-width` 2/1.8/2.5, `linecap/linejoin="round"`. Розміри: chevron 12; menu/search/filter 14; theme/close 16; nav tabs 20; nav arrows 18; empty state 34.
 
+> **Поправка 08.10.2026 (QR-Lens CC-3, заміряно):** іконка в flex-рядку з довгим підписом **стискається** — у плитці «ОБЛАДНАННЯ» SVG 14 px став 10,9 px, і Konst на телефоні бачив «іконка менша за сусідні». Іконці в рядку з текстом — `flex-shrink:0` завжди. Перевірка: `getBoundingClientRect().width` кожної іконки ряду однаковий.
+
 ## A30. Premium polish
 
 1. **Scroll-fade краї chips:** `mask-image:linear-gradient(to right,transparent,#000 20px,#000 calc(100% - 20px),transparent)` + `scrollbar-width:none`.
