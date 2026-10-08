@@ -17,6 +17,7 @@
 | `tools/claude-code/PROFILE.md` | **профіль Konst** — канонічна копія (у налаштуваннях акаунта — копія для вставки) | правиш профіль |
 | `tools/claude-code/templates/` | шаблони: `CLAUDE_template.md` · `REPO_LAYOUT_template.md` · `CHERGA_template.md` · `DECISIONS_template.md` · `ARCHITECTURE_template.md` · `SUMMARY_template.md` · `AUDIT_template.md` · `env_check_template.sh` · `session_start_template.sh` | створюєш файл, якого бракує |
 | `tools/claude-code/audit_prompts.sh` | `/doctor prompt-audit` за класом правки (1 — opus high · 2 — + sonnet high; проходи по черзі, вартість у виводі; `AUDIT_THIRD=fable` — лише за словом Konst; «`.`» — увесь репо — прибрано, `AUD-2`) | копіювати в `tools/` репо як є |
+| `tools/claude-code/hooks/ui-guard.sh` | **гачок «UI без кукбука — не пиши»** (`HOOK-1`, 08.10.2026): запис `.html`/`.css` (і через Bash) без звернення до індексу кукбука → відмова з причиною; раз на сесію. Вмикання — розділ «Гачки» нижче | ставиш гачок у нове середовище чи репо |
 | `tools/claude-code/frame_check.sh` | детектор «репо не адаптоване під каркас»: чого бракує за ролями `ADOPT.md` (ядро · продукт Lens · не-Lens · шлях В); `--inject` — перевірка самого детектора | запускає `env_check` ядра по кожному репо сесії; руками — `bash <ядро>/tools/claude-code/frame_check.sh <тека>` |
 
 Поруч — `tools/cloudflare/` (`CLOUDFLARE.md` правила й бюджет спільного акаунта · `cf_budget.sh` замір для `env_check`): потрібен
@@ -49,6 +50,22 @@
 | ☐ | `tools/audit_prompts.sh` | `audit_prompts.sh` (як є) |
 | ☐ | `.claude/hooks/session-start.sh` + `.claude/settings.json` | `templates/session_start_template.sh` · skill `session-start-hook` |
 | ☐ | тека публікації окремо від службового | `REPO_FRAME.md` §3 |
+
+## Гачки — правила, які тримає програма, а не пам'ять моделі (`HOOK-1`, заміряно 08.10.2026)
+
+- **Де вони діють.** Claude Code бере гачки з налаштувань **кореня сесії** і користувача (`~/.claude/settings.json`). У хмарній сесії з кількох репо корінь — `/home/user`, тож `.claude/settings.json` **репо не вантажиться** (і його `SessionStart` теж — звідси «у сесії з кількома репо — руками»). Налаштування кореня Claude Code підхоплює посеред сесії (живий тест QR-Lens CC-2: запис `.html` → відмова; після індексу кукбука → дозвіл).
+- **Як увімкнути назавжди** — setup script середовища (Konst: меню середовища → Edit → Setup script), разово:
+
+```bash
+# Гачки Lens (lens-governance tools/claude-code/hooks) — у кожній сесії, з будь-якою кількістю репо
+mkdir -p ~/.claude
+cat > ~/.claude/settings.json <<'JSON'
+{"hooks":{"PreToolUse":[{"matcher":"Write|Edit|Bash","hooks":[{"type":"command","command":"f=/home/user/lens-governance/tools/claude-code/hooks/ui-guard.sh; [ -f $f ] || f=$(ls /home/user/*/.claude/hooks/ui-guard.sh 2>/dev/null | head -1); [ -n \"$f\" ] && bash \"$f\" check || true"}]}],"PostToolUse":[{"matcher":"Read|Bash|Grep","hooks":[{"type":"command","command":"f=/home/user/lens-governance/tools/claude-code/hooks/ui-guard.sh; [ -f $f ] || f=$(ls /home/user/*/.claude/hooks/ui-guard.sh 2>/dev/null | head -1); [ -n \"$f\" ] && bash \"$f\" mark || true"}]}]}}
+JSON
+```
+
+- **Агент сам у налаштування поза репо не пише** — захист Claude Code («самозміна») блокує; лише з явним дозволом Konst на цей крок (08.10 так і було).
+- **Перевірка гачка — наживо:** запис тестового `.html` до індексу → відмова, після → дозвіл, тестовий файл прибрати.
 
 ## Практики коротко (правила — `PROFILE.md`, будова — `REPO_FRAME.md`; тут — і практики, яких там нема)
 
