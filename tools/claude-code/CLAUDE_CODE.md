@@ -17,7 +17,7 @@
 | `tools/claude-code/PROFILE.md` | **профіль Konst** — канонічна копія (у налаштуваннях акаунта — копія для вставки) | правиш профіль |
 | `tools/claude-code/templates/` | шаблони: `CLAUDE_template.md` · `REPO_LAYOUT_template.md` · `CHERGA_template.md` · `DECISIONS_template.md` · `ARCHITECTURE_template.md` · `SUMMARY_template.md` · `AUDIT_template.md` · `env_check_template.sh` · `session_start_template.sh` | створюєш файл, якого бракує |
 | `tools/claude-code/audit_prompts.sh` | `/doctor prompt-audit` за класом правки (1 — opus high · 2 — + sonnet high; проходи по черзі, вартість у виводі; `AUDIT_THIRD=fable` — лише за словом Konst; «`.`» — увесь репо — прибрано, `AUD-2`) | копіювати в `tools/` репо як є |
-| `tools/claude-code/hooks/ui-guard.sh` | **гачок «UI без кукбука — не пиши»** (`HOOK-1`, 08.10.2026): запис `.html`/`.css` (і через Bash) без звернення до індексу кукбука → відмова з причиною; раз на сесію. Вмикання — розділ «Гачки» нижче | ставиш гачок у нове середовище чи репо |
+| `tools/claude-code/hooks/` | **гачки** (08.10.2026): диспетчер `lens-hooks.sh` · `ui-guard.sh` «UI без кукбука — не пиши» (`HOOK-1`) · `commit-gate.sh` «коміт → спершу гейт» (`HOOK-2`). Вмикання — розділ «Гачки» нижче | ставиш гачки в середовище · додаєш новий гачок |
 | `tools/claude-code/frame_check.sh` | детектор «репо не адаптоване під каркас»: чого бракує за ролями `ADOPT.md` (ядро · продукт Lens · не-Lens · шлях В); `--inject` — перевірка самого детектора | запускає `env_check` ядра по кожному репо сесії; руками — `bash <ядро>/tools/claude-code/frame_check.sh <тека>` |
 
 Поруч — `tools/cloudflare/` (`CLOUDFLARE.md` правила й бюджет спільного акаунта · `cf_budget.sh` замір для `env_check`): потрібен
@@ -51,21 +51,30 @@
 | ☐ | `.claude/hooks/session-start.sh` + `.claude/settings.json` | `templates/session_start_template.sh` · skill `session-start-hook` |
 | ☐ | тека публікації окремо від службового | `REPO_FRAME.md` §3 |
 
-## Гачки — правила, які тримає програма, а не пам'ять моделі (`HOOK-1`, заміряно 08.10.2026)
+## Гачки — правила, які тримає програма, а не пам'ять моделі (`HOOK-1`, `HOOK-2`; заміряно 08.10.2026)
 
-- **Де вони діють.** Claude Code бере гачки з налаштувань **кореня сесії** і користувача (`~/.claude/settings.json`). У хмарній сесії з кількох репо корінь — `/home/user`, тож `.claude/settings.json` **репо не вантажиться** (і його `SessionStart` теж — звідси «у сесії з кількома репо — руками»). Налаштування кореня Claude Code підхоплює посеред сесії (живий тест QR-Lens CC-2: запис `.html` → відмова; після індексу кукбука → дозвіл).
-- **Як увімкнути назавжди** — setup script середовища (Konst: меню середовища → Edit → Setup script), разово:
+**Навіщо.** Профіль і `CLAUDE.md` — текст: модель може «забути» (QR-Lens CC-2: сторінку звіту зробили без кукбука; коміт пішов з ✗ гейта). Гачок запускає **сам Claude Code** — модель його не обійде. **Коли правило стає гачком:** помилка дорога **і** її видно машинно (шлях файла, команда, вміст). «Прочитай X перед Y» без машинної ознаки — не гачок, а текст (інакше шум). Кожен гачок — мікроскоп + зуби (імітації stdin) + живий тест у сесії.
+
+| гачок | подія | що робить |
+|---|---|---|
+| `hooks/ui-guard.sh` | Pre `Write\|Edit\|Bash` · Post `Read\|Bash\|Grep` | запис `.html`/`.css` (і через Bash) без звернення до індексу кукбука в цій сесії → відмова з причиною; раз на сесію (`HOOK-1`) |
+| `hooks/commit-gate.sh` | Pre `Bash` | `git commit` → гейт ядра для кожного репо коміту (ядро `--gov` · продукт Lens `--product` · інше — тиша), ✗ → відмова з рядками ✗; ~1 с (`HOOK-2` п.1) |
+| `hooks/lens-hooks.sh` | — | **диспетчер**: setup script вказує лише на нього; новий гачок = рядок тут, середовище Konst не чіпає |
+
+- **Де діють.** Claude Code бере гачки з налаштувань **кореня сесії** і користувача (`~/.claude/settings.json`). У хмарній сесії з кількох репо корінь — `/home/user`, тож `.claude/settings.json` **репо не вантажиться** (і його `SessionStart` теж — звідси «у сесії з кількома репо — руками»). Налаштування користувача й кореня Claude Code підхоплює й посеред сесії (живі тести CC-2: HTML до індексу → відмова, після → дозвіл; коміт із підкинутим ✗ → відмова).
+- **Як увімкнути назавжди** — setup script середовища (меню середовища → Edit → Setup script; поле «runs when a new session starts, before Claude Code launches»), разово; текст **остаточний** — нові гачки додаються в диспетчер ядра:
 
 ```bash
-# Гачки Lens (lens-governance tools/claude-code/hooks) — у кожній сесії, з будь-якою кількістю репо
+# Гачки Lens — диспетчер ядра lens-governance/tools/claude-code/hooks/lens-hooks.sh (нові гачки — там, середовище не чіпати)
 mkdir -p ~/.claude
 cat > ~/.claude/settings.json <<'JSON'
-{"hooks":{"PreToolUse":[{"matcher":"Write|Edit|Bash","hooks":[{"type":"command","command":"f=/home/user/lens-governance/tools/claude-code/hooks/ui-guard.sh; [ -f $f ] || f=$(ls /home/user/*/.claude/hooks/ui-guard.sh 2>/dev/null | head -1); [ -n \"$f\" ] && bash \"$f\" check || true"}]}],"PostToolUse":[{"matcher":"Read|Bash|Grep","hooks":[{"type":"command","command":"f=/home/user/lens-governance/tools/claude-code/hooks/ui-guard.sh; [ -f $f ] || f=$(ls /home/user/*/.claude/hooks/ui-guard.sh 2>/dev/null | head -1); [ -n \"$f\" ] && bash \"$f\" mark || true"}]}]}}
+{"hooks":{"PreToolUse":[{"matcher":"Write|Edit|Bash","hooks":[{"type":"command","command":"f=/home/user/lens-governance/tools/claude-code/hooks/lens-hooks.sh; [ -f $f ] && bash $f pre || true"}]}],"PostToolUse":[{"matcher":"Read|Bash|Grep","hooks":[{"type":"command","command":"f=/home/user/lens-governance/tools/claude-code/hooks/lens-hooks.sh; [ -f $f ] && bash $f post || true"}]}]}}
 JSON
 ```
 
+- **Ядра в сесії нема** — диспетчера нема → гачки мовчать (`|| true`), сесії не заважають.
 - **Агент сам у налаштування поза репо не пише** — захист Claude Code («самозміна») блокує; лише з явним дозволом Konst на цей крок (08.10 так і було).
-- **Перевірка гачка — наживо:** запис тестового `.html` до індексу → відмова, після → дозвіл, тестовий файл прибрати.
+- **Середовища.** Хмарне середовище — це налаштування контейнера (мережа, секрети, змінні, setup script); репо обираються в кожній сесії окремо. Тож **одного середовища вистачає на всі проєкти Lens**; окреме — лише коли проєкту потрібні інші секрети чи мережа. Кілька однакових середовищ = кілька копій setup script і змінних, які розходяться. Секрети — у **Network secrets** (сесія викликає API, не бачачи значення), де це підходить; значення токена на скриншот чи в чат не потрапляє — засвітився → заміна.
 
 ## Практики коротко (правила — `PROFILE.md`, будова — `REPO_FRAME.md`; тут — і практики, яких там нема)
 
