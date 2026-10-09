@@ -1098,6 +1098,7 @@ def g22(root):
 Q_MAX, Q_AGE = 12, 30     # стеля черги — відкритих пунктів і вік у днях; канон — Lens_INDEX §5 ядра (CQ-1, 04.10.2026) · ті самі числа: G17 · Lens_start.py · tools/env_check.sh
 Q_CEIL = 8192             # колишня стеля в байтах — лише ⓘ (CQ-1) · CEIL
 Q_THR = Q_CEIL * 9 // 10  # колишній поріг Ф-10 — лише ⓘ
+Q_ROW = 2000              # рядок черги довший — «наріс шарами»: винести в бриф/план, у черзі — вказівник (BRIEF-1; урок QR CC-4 09.10: QRL-10 3,9 тис. знаків)
 
 def queue_open(txt):
     """Відкриті пункти черги (CQ-1): рядок таблиці, де `id` у 1-й або 2-й комірці (як check_cherga.ids), без «| закрито |»
@@ -1121,6 +1122,11 @@ def queue_open(txt):
                 age = (today - dt).days; break
         out.append((m.group(1), age))
     return out
+def q_long(txt, where=''):
+    """(ґ) Рядок черги довший за Q_ROW → ⚠ «наріс шарами» (BRIEF-1): спільне для черги ядра (G17) і продукту (G14)."""
+    for l in txt.splitlines():
+        m = re.search(r'^\|\s*\*{0,2}`([^`]+)`', l) if l.startswith('|') and len(l) > Q_ROW else None
+        if m: warn(f'{where}`{m.group(1)}` — рядок черги {len(l)} знаків (> {Q_ROW}): наріс шарами — винести в бриф/план, у черзі — стан і вказівник (BRIEF-1)')
 def _q_ids(txt):
     """`id` рядків таблиць черги (1-а або 2-а комірка) — мірка колишнього check_cherga.ids."""
     out = []
@@ -1141,7 +1147,8 @@ def g17(root, qpath):
     (в) загублений `id` — був у черзі в git HEAD, а в новому тексті не згаданий НІДЕ → ✗
         (закритий пункт можна прибрати, але його `id` лишається в рядку, що його закрив, або в «Знято»);
         без git — ⓘ «не перевірено» (Project: tar без .git);
-    (г) план із кроками `| **N** |` (черга продукту) — крок без рядка → ✗; черга без плану — не судиться."""
+    (г) план із кроками `| **N** |` (черга продукту) — крок без рядка → ✗; черга без плану — не судиться;
+    (ґ) рядок відкритого пункту довший за Q_ROW → ⚠ «винести в бриф/план» (BRIEF-1) — поки лише черги продуктів (G14)."""
     print('\n[G17] цілісність черги — стеля · дублі · загублені id (IDX-11)')
     if not os.path.exists(qpath):
         warn(f'черги немає: {qpath}'); return
@@ -1153,6 +1160,7 @@ def g17(root, qpath):
              f'({" ".join(old)}) — спершу виконати, розрізати або відкласти з датою (CQ-1)')
     else:
         ok(f'відкритих {len(q)} (стеля {Q_MAX}), старших за {Q_AGE} дн. нема')
+    # (ґ) для черги ядра — вмикається, коли ARCH-1 і BRIEF-1 винесено в бриф (BRIEF-1 (в), 09.10): тоді — q_long(txt)
     ids = _q_ids(txt)
     dup = sorted({i for i in ids if ids.count(i) > 1})
     for d in dup:
@@ -1273,7 +1281,7 @@ def product(root):
         ok(f'оголошено {len(sdecl)} · у sessions/ {len(sfiles)}')
 
     # G14 — черга продукту: оголошена, існує, у стелі
-    print('\n[G14] черга продукту — стеля Lens_INDEX §5 ядра: пункти й вік (CQ-1)')
+    print('\n[G14] черга продукту — стеля Lens_INDEX §5 ядра: пункти й вік (CQ-1) · рядок > Q_ROW знаків (BRIEF-1)')
     qd = re.findall(pat, sect('Черга'))
     if len(qd) != 1:
         fail(f'розділ «Черга» оголошує {len(qd)} файл(ів), треба рівно 1')
@@ -1283,7 +1291,9 @@ def product(root):
             fail(f'{qd[0]} — черги немає')
         else:
             n = os.path.getsize(qp)
-            q = queue_open(open(qp, encoding='utf-8').read())
+            qt = open(qp, encoding='utf-8').read()
+            q = queue_open(qt)
+            q_long(qt, f'{qd[0]}: ')
             old = [i for i, a in q if a is not None and a > Q_AGE]
             if not q:
                 print(f'  ⓘ {qd[0]}: таблиці з `id` нема — лічильник пунктів не застосовний ({n} B, байти — лише ⓘ)')
