@@ -40,14 +40,17 @@ def starter(text):
 
 
 def live_summary(repo):
-    """Найновіше за комітом самері в sessions/ (і sessions/*/)."""
-    best, bt = None, -1
+    """Живе самері в sessions/ (і sessions/*/): ще не в коміті → найновіше; інакше — останній коміт, при рівному — пізніше створене
+    (заморожене попереднє й нове міняються одним комітом)."""
+    best, bt = None, None
     for root, _, files in os.walk(os.path.join(repo, 'sessions')):
         for f in files:
             if not (f.endswith('.md') and 'summary' in f): continue
             p = os.path.join(root, f); rel = os.path.relpath(p, repo)
-            t = int(git(repo, 'log', '-1', '--format=%ct', '--', rel) or 0)
-            if t > bt: best, bt = rel, t
+            last = int(git(repo, 'log', '-1', '--format=%ct', '--', rel) or 0)
+            born = git(repo, 'log', '--diff-filter=A', '--format=%ct', '--', rel).split()
+            t = (float('inf'), 0) if not last else (last, int(born[-1]) if born else 0)
+            if bt is None or t > bt: best, bt = rel, t
     return best
 
 
@@ -158,14 +161,22 @@ def report(repos):
 
 def selftest():
     def sh(d, *c): subprocess.run(c, cwd=d, check=True, capture_output=True)
-    def mk(summary, extra=None, commit_after=False):
+    def mk(summary, extra=None, commit_after=False, new_after=False, both=False):
         d = tempfile.mkdtemp(prefix='hc-'); r = os.path.join(d, 'Prod'); os.makedirs(os.path.join(r, 'sessions')); os.makedirs(os.path.join(r, 'lens'))
         sh(r, 'git', 'init', '-q'); sh(r, 'git', 'config', 'user.email', 't@t'); sh(r, 'git', 'config', 'user.name', 't')
         open(os.path.join(r, 'lens/A.md'), 'w').write('## 0. Коротко\n- далі `lens/A.md`\n')
         open(os.path.join(r, 'CLAUDE.md'), 'w').write('x')
-        for p, t in (extra or {}).items(): open(os.path.join(r, p), 'w').write(t)
+        later = extra if new_after else {}
+        for p, t in (extra or {}).items():
+            if p not in later: open(os.path.join(r, p), 'w').write(t)
         open(os.path.join(r, 'sessions/P_session_summary_X.md'), 'w').write(summary)
         sh(r, 'git', 'add', '-A'); sh(r, 'git', 'commit', '-qm', 'самері\n\nClaude-Session: https://claude.ai/code/session_T')
+        if later:
+            time.sleep(1.1)
+            for p, t in later.items(): open(os.path.join(r, p), 'w').write(t)
+            if both:
+                open(os.path.join(r, 'sessions/P_session_summary_X.md'), 'a').write('заморожено\n')
+                sh(r, 'git', 'add', '-A'); sh(r, 'git', 'commit', '-qm', 'нове самері\n\nClaude-Session: https://claude.ai/code/session_T')
         if commit_after:
             open(os.path.join(r, 'lens/A.md'), 'a').write('y'); sh(r, 'git', 'commit', '-qam', 'код\n\nClaude-Session: https://claude.ai/code/session_T')
         return r
@@ -179,12 +190,14 @@ def selftest():
         ('мертвий шлях у «Коротко» плану → ✗', mk(good, {'lens/A.md': '## 0. Коротко\n- `lens/Gone.md`\n'}), 'мертві шляхи'),
         ('коміт агента після самері → ✗', mk(good, commit_after=True), 'самері відстає'),
         ('«цей коміт» у §0 → ⚠', mk(good.replace('- далі', '- цей коміт; далі')), '§0 має «цей коміт»'),
+        ('нове самері ще не в коміті → бере його (без стартового → ✗)', mk(good, {'sessions/P_session_summary_Y.md': '## §0 В\n- `lens/A.md`\n'}, new_after=True), 'P_session_summary_Y'),
+        ('старе й нове в одному коміті → бере пізніше створене', mk(good, {'sessions/P_session_summary_Y.md': '## §0 В\n- `lens/A.md`\n'}, new_after=True, both=True), 'P_session_summary_Y'),
     ]
     bad = 0
     for name, r, want in cases:
         _, L = check_repo(r)
         hit = [t for s, t in L if s in '✗⚠']
-        ok = (not hit) if want is None else any(want in t for t in hit)
+        ok = (not hit) if want is None else any(want in t for t in (hit if 'summary' not in want else [t for _, t in L]))
         if want is None and not ok: print('   ', hit)
         print(('✓' if ok else '✗') + ' ' + name); bad += not ok
     print(f'selftest: {len(cases) - bad}/{len(cases)}')
