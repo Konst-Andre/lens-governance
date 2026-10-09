@@ -6,11 +6,12 @@
 #   pre  | PreToolUse          — лише Write|Edit|Bash: гачки по черзі, перший з відповіддю (deny/ask) перемагає; огляд UI до коміту (ui-review-gate, HOOK-2 п.4); нагадування (review-remind stand) — останнім
 #   post | PostToolUse         — лише Read|Bash|Grep: позначки (ui-guard mark) + нагадування після коміту з UI (review-remind post)
 #   stop | Stop                — гачок пам'яті (memory-guard, HOOK-3)
-#   SessionStart · UserPromptSubmit · PostToolUseFailure · SubagentStop · PreCompact · SessionEnd — поки без гачків: вихід одразу
+#   UserPromptSubmit           — перевірка пам'яті перед переїздом (handoff-remind, HOOK-3.2): лише на слово-тригер (перевіряє Python: grep -i на кирилиці залежить від локалі; ~50 мс раз на повідомлення)
+#   SessionStart · PostToolUseFailure · SubagentStop · PreCompact · SessionEnd — поки без гачків: вихід одразу
 # Ціна: подія без гачка й інструмент поза фільтром — лише bash, без Python (заміряно 09.10: ~2 мс; з гачками — ~140 мс, як і в v1).
 h="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ev="$1"
-case "$ev" in pre|PreToolUse) ev=pre;; post|PostToolUse) ev=post;; stop|Stop) ev=stop;; *) exit 0;; esac
+case "$ev" in pre|PreToolUse) ev=pre;; post|PostToolUse) ev=post;; stop|Stop) ev=stop;; UserPromptSubmit) ev=prompt;; *) exit 0;; esac
 in="$(cat)"
 tool="$(printf '%s' "$in" | grep -o '"tool_name" *: *"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/')"
 case "$ev" in
@@ -27,5 +28,7 @@ case "$ev" in
     printf '%s' "$in" | bash "$h/review-remind.sh" post 2>/dev/null ;;
   stop)
     printf '%s' "$in" | bash "$h/memory-guard.sh" stop 2>/dev/null ;;
+  prompt)
+    printf '%s' "$in" | bash "$h/handoff-remind.sh" 2>/dev/null ;;
 esac
 exit 0
