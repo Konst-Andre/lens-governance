@@ -3,7 +3,7 @@
 # Диспетчер: setup script середовища вказує лише на цей файл — на ВСІ потрібні події, без фільтра інструментів (v2, HOOK-4, 09.10.2026).
 # Новий гачок — рядок тут (подія → файл, фільтр інструмента — тут же), setup script Konst більше не чіпає.
 # Аргумент — подія (у setup script v2) або старе ім'я v1 (pre · post · stop — середовища з текстом 08.10 працюють і далі):
-#   pre  | PreToolUse          — лише Write|Edit|Bash: гачки по черзі, перший з відповіддю (deny/ask) перемагає; нагадування (review-remind stand) — останнім
+#   pre  | PreToolUse          — лише Write|Edit|Bash: гачки по черзі, перший з відповіддю (deny/ask) перемагає; огляд UI до коміту (ui-review-gate, HOOK-2 п.4); нагадування (review-remind stand) — останнім
 #   post | PostToolUse         — лише Read|Bash|Grep: позначки (ui-guard mark) + нагадування після коміту з UI (review-remind post)
 #   stop | Stop                — гачок пам'яті (memory-guard, HOOK-3)
 #   SessionStart · UserPromptSubmit · PostToolUseFailure · SubagentStop · PreCompact · SessionEnd — поки без гачків: вихід одразу
@@ -16,7 +16,7 @@ tool="$(printf '%s' "$in" | grep -o '"tool_name" *: *"[^"]*"' | head -1 | sed 's
 case "$ev" in
   pre)
     case "$tool" in Write|Edit|Bash) ;; *) exit 0;; esac
-    for g in "ui-guard.sh check" "commit-gate.sh" "review-remind.sh stand"; do
+    for g in "ui-guard.sh check" "commit-gate.sh" "ui-review-gate.sh gate" "review-remind.sh stand"; do
       read -r f a <<<"$g"
       out="$(printf '%s' "$in" | bash "$h/$f" $a 2>/dev/null)"
       [ -n "$out" ] && { printf '%s\n' "$out"; exit 0; }
