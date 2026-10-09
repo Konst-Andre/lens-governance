@@ -26,13 +26,14 @@ if tool in ("Write", "Edit"):
     hit = bool(ui.search(str(ti.get("file_path", ""))))
 elif tool == "Bash":
     cmd = str(ti.get("command", ""))
-    hit = bool(ui.search(cmd)) and bool(re.search(r"(>|\btee\b|\bcp\b|\bmv\b|sed\s+-i|\.write|open\()", cmd))
+    w = re.sub(r"\d?>>?&?\s*/dev/null|\d>&\d", "", cmd)   # 2>/dev/null, >/dev/null, 2>&1 — не запис (хибна відмова на «grep … 2>/dev/null», аудит 09.10)
+    hit = bool(ui.search(cmd)) and bool(re.search(r"(>|\btee\b|\bcp\b|\bmv\b|sed\s+-i|\.write|open\()", w))
 else:
     hit = False
 if hit:
     print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny",
         "permissionDecisionReason": "UI-крок (HTML/CSS) без кукбука: спершу відкрий kernel/cookbook/Lens_cookbook_INDEX.md ядра (../lens-governance/ або /tmp/lens-governance/) "
         "(§2 «задача → запис» → потрібні рецепти точково) і знайди зразки ззовні (профіль, ЦИКЛ п.4). Рецепт — фундамент, не шаблон. "
-        "Після одного звернення до індексу гачок пропускає все в цій сесії (HOOK-1)."}}, ensure_ascii=False))
+        "Без цього кроку правка UI повторює вже розв\u2019язане сімейством або йде проти рецепта (HOOK-1)."}}, ensure_ascii=False))
 sys.exit(0)
 ' "$mode"

@@ -28,13 +28,16 @@ for dd in dict.fromkeys(dirs):
         run = ["python3", kern + "/kernel/Lens_validate.py", "--product", top]
     else:
         continue
-    r = subprocess.run(run, capture_output=True, text=True, cwd=top, timeout=60)
+    try:
+        r = subprocess.run(run, capture_output=True, text=True, cwd=top, timeout=60)
+    except subprocess.TimeoutExpired:   # без цього Python падає з 1 → Claude Code вважає помилку гачка незначною і пропускає коміт без гейта
+        bad.append(f"{os.path.basename(top)}: гейт не встиг за 60 с — запусти руками"); continue
     if r.returncode != 0:
         lines = [l.strip() for l in r.stdout.splitlines() if "✗" in l][:8]
         bad.append(f"{os.path.basename(top)}: " + " · ".join(lines))
 if bad:
     print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny",
         "permissionDecisionReason": "Гейт ✗ — коміт зупинено (HOOK-2 п.1). " + " | ".join(bad) +
-        " → виправ ✗ або, якщо ✗ було й до правки, назви це Konst; потім коміть знову."}}, ensure_ascii=False))
+        " → виправ ✗ і коміть знову; гачок пропускає лише ✗ 0 (до/після не порівнює) — ✗, що був і до правки, назви Konst. Гейт бачить стан ДО всієї команди: правки — однією командою, коміт — наступною."}}, ensure_ascii=False))
 sys.exit(0)
 '

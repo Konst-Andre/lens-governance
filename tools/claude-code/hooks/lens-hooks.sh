@@ -1,14 +1,14 @@
 #!/bin/bash
 # живе доки: гачки Lens вмикаються через налаштування користувача (tools/claude-code/CLAUDE_CODE.md «Гачки»).
 # Диспетчер: setup script середовища вказує лише на цей файл — на ВСІ потрібні події, без фільтра інструментів (v2, HOOK-4, 09.10.2026).
-# Новий гачок — рядок тут (подія → файл, фільтр інструмента — тут же), setup script Konst більше не чіпає.
-# Аргумент — подія (у setup script v2) або старе ім'я v1 (pre · post · stop — середовища з текстом 08.10 працюють і далі):
+# Новий гачок на одну з 9 подій — рядок тут (подія → файл, фільтр інструмента — тут же), setup script не чіпати; нова подія поза 9 — тоді й setup script.
+# Аргумент — подія (setup script v2 і v3) або старе ім'я v1 (pre · post · stop — середовища з текстом 08.10 працюють і далі):
 #   pre  | PreToolUse          — лише Write|Edit|Bash: гачки по черзі, перший з відповіддю (deny/ask) перемагає; огляд UI до коміту (ui-review-gate, HOOK-2 п.4); нагадування (review-remind stand) — останнім
 #   post | PostToolUse         — лише Read|Bash|Grep: позначки (ui-guard mark) + нагадування після коміту з UI (review-remind post)
 #   stop | Stop                — гачок пам'яті (memory-guard, HOOK-3), далі перевірка перед переїздом, коли його оголошує агент (handoff-remind stop, HOOK-3.2)
 #   UserPromptSubmit           — перевірка пам'яті перед переїздом (handoff-remind, HOOK-3.2): лише на слово-тригер (перевіряє Python: grep -i на кирилиці залежить від локалі; ~50 мс раз на повідомлення)
 #   SessionStart · PostToolUseFailure · SubagentStop · PreCompact · SessionEnd — поки без гачків: вихід одразу
-# Ціна: подія без гачка й інструмент поза фільтром — лише bash, без Python (заміряно 09.10: ~2 мс; з гачками — ~140 мс, як і в v1).
+# Ціна: подія без гачка й інструмент поза фільтром — лише bash, без Python (заміряно 09.10: подія без гачка ~6 мс, інструмент поза фільтром ~13 мс; повний ланцюг ~140 мс — як у CLAUDE_CODE.md).
 h="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ev="$1"
 case "$ev" in pre|PreToolUse) ev=pre;; post|PostToolUse) ev=post;; stop|Stop) ev=stop;; UserPromptSubmit) ev=prompt;; *) exit 0;; esac
