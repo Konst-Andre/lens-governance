@@ -6,7 +6,7 @@
 #           огляду САМЕ ЦЬОГО диффу нема → deny з чек-листом. Будь-яка нова правка UI після позначки міняє дифф → знову deny.
 #   done  — `bash ui-review-gate.sh done "<що переглянуто>" [тека репо]` → позначка /tmp/lens-uireview-<хеш диффу> (рядок ≥ 40 знаків:
 #           які стани, які теми, що бачить людина після дії). Самоствердження, але в потрібну мить і по конкретному диффу.
-#   selftest — 6 випадків у тимчасовому репо (зуби: UI без позначки → deny; позначка → тиша; правка після позначки → deny).
+#   selftest — 9 випадків (+ сітка review-remind post) у тимчасовому репо (зуби: UI без позначки → deny; позначка → тиша; правка після позначки → deny).
 # Діє в усіх репо, де підключено гачки ядра (tools/claude-code/CLAUDE_CODE.md «Гачки»), — не лише в QR.
 mode="$1"; shift
 [ "$mode" = gate ] && HOOK_IN="$(cat)" || HOOK_IN="{}"   # stdin — тут: heredoc нижче займає stdin python
@@ -100,6 +100,16 @@ if mode == "selftest":
         say(gate(ev("git add -A && git commit -m x")) is not None, "новий .css (ще не в git) теж рахується → deny")
         r = subprocess.run(["bash", os.environ["UI_GATE_SELF"], "gate"], input=json.dumps(ev("git add -A && git commit -m x")), capture_output=True, text=True)
         say('"deny"' in r.stdout, "зуби: справжній виклик гачка (JSON через stdin, як від Claude Code) → deny")
+        os.remove(mark(hx))
+        # сітка review-remind post: UI-коміт без позначки → озивається; з позначкою на ці файли → тиша (без дубля)
+        rr = os.path.join(os.path.dirname(os.environ["UI_GATE_SELF"]), "review-remind.sh")
+        post = lambda sid: subprocess.run(["bash", rr, "post"], input=json.dumps({"tool_name": "Bash", "session_id": sid, "cwd": tmp, "tool_input": {"command": "git commit -am x"}}), capture_output=True, text=True).stdout
+        subprocess.run(["git", "-C", tmp, "add", "-A"], check=True); subprocess.run(["git", "-C", tmp, "commit", "-qm", "1"], check=True)
+        say(bool(post(f"st{os.getpid()}a")), "сітка: UI-коміт без позначки огляду → нагадування «обійшов огляд»")
+        open(f"{tmp}/a.html", "w").write("<p>4</p>"); files, hx = ui_state(tmp)
+        open(mark(hx), "w").write("огляд: світла й темна\n" + "\n".join(files) + "\n")
+        subprocess.run(["git", "-C", tmp, "commit", "-qam", "2"], check=True)
+        say(not post(f"st{os.getpid()}b"), "сітка: UI-коміт з позначкою → тиша (без дубля з воротами)")
         os.remove(mark(hx))
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

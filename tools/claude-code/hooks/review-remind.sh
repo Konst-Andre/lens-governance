@@ -1,7 +1,9 @@
 #!/bin/bash
 # живе доки: UI-кроки (HTML/CSS, стенди) робить агент Claude Code. Дім — lens-governance:tools/claude-code/hooks/ (черга ARCH-1 (ґ)(д)).
 # Нагадування, не заборона: програма не може вимагати огляд, але може покласти факт у контекст агента в потрібну мить.
-#   post  — PostToolUse (Bash): щойно зроблений `git commit` змінив .html/.css → нагадування «огляд окремим проходом» (раз на SHA)
+#   post  — PostToolUse (Bash): щойно зроблений `git commit` змінив .html/.css, а позначки огляду (ui-review-gate done) на ці файли
+#           за останні 2 год нема → «коміт UI обійшов огляд» (раз на SHA). Є позначка — тиша: огляд до коміту вже вимагає ui-review-gate
+#           (HOOK-2 п.4, 09.10.2026); тут лишилась страхувальна сітка — гачок-ворота впав, вимкнений чи коміт пройшов повз нього
 #           + позначка «маніфест стендів прочитано», якщо виклик згадав Lens_stagebench_manifest
 #   stand — PreToolUse (Write|Edit|Bash): запис .html зі «стенд / bench / harness / компер» у шляху, а маніфест у цій сесії не читано → нагадування
 # Формат — hookSpecificOutput.additionalContext (code.claude.com/docs/en/hooks, 08.10.2026): текст — фактами, не наказами.
@@ -33,9 +35,16 @@ if mode == "post":
         if os.path.exists(mark): continue
         ui = [f for f in g("show", "--name-only", "--format=", sha).splitlines() if re.search(r"\.(html?|css)$", f, re.I)]
         if not ui: continue
-        open(mark, "w").close(); out.append(f"{sha} ({chr(44).join(ui[:5])})")
+        open(mark, "w").close()
+        import glob
+        seen_ui = set()
+        for mk in glob.glob("/tmp/lens-uireview-*"):   # позначки ui-review-gate: рядок огляду + файли диффу
+            if time.time() - os.path.getmtime(mk) < 7200: seen_ui |= set(open(mk, encoding="utf-8").read().splitlines()[1:])
+        if set(ui) <= seen_ui: continue
+        out.append(f"{sha} ({chr(44).join(ui[:5])})")
     if out:
-        say("PostToolUse", f"Коміт {chr(59).join(out)} змінив UI-файли. За правилом Konst (черга ядра ARCH-1 (ґ), 08.10.2026) після такого кроку йде "
+        say("PostToolUse", f"Коміт {chr(59).join(out)} змінив UI-файли **без позначки огляду** (ворота ui-review-gate його не зупинили — "
+            "гачок упав, вимкнений чи коміт пройшов повз). Скажи Konst і зроби огляд зараз, до наступного кроку (HOOK-2 п.4; ARCH-1 (ґ)): "
             "огляд окремим проходом: як користувач — кожен стан і кожна дія (таби, шіти, пошук, тапи, зміна висоти вікна); кожна тема окремо — "
             "спершу світла цілком, потім темна (тема ≠ інверсія); чек-лист: **кожна кнопка — шлях до кінця, приймач її розуміє, є зворотна дія (wsd 3.9 «Без заглушок»)** · сильне · слабке · текст «як кажуть люди» · глибина (поле = well, кнопка = lift) · "
             "матеріал карток · переноси й обрізання · консоль · скрол убік; знахідки → правки → ще прохід → лише тоді прев\u2019ю Konst.")
