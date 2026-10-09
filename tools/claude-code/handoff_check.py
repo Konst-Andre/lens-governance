@@ -140,12 +140,33 @@ def check_repo(repo, now=None):
         tot = [x for x in r.stdout.splitlines() if 'ПІДСУМОК' in x]
         s = tot[-1].strip() if tot else 'підсумку нема'
         L.append(('✗' if re.search(r'✗ [1-9]', s) else '✓', 'гейт: ' + s))
-    # (6) README старший за 7 дн., а CLAUDE.md новіший
-    rt = int(git(repo, 'log', '-1', '--format=%ct', '--', 'README.md') or 0)
-    ct = int(git(repo, 'log', '-1', '--format=%ct', '--', 'CLAUDE.md') or 0)
-    if os.path.isfile(os.path.join(repo, 'README.md')):
-        if not rt: L.append(('ⓘ', 'README: дата невідома (неглибока історія)'))
-        elif now - rt > 7 * 86400 and ct > rt: L.append(('⚠', f'README не мінявся {int((now - rt) // 86400)} дн., а CLAUDE.md мінявся після — перевір README'))
+    # (6) описи відстали від змін (уточнення Konst 09.10, CC-6: README був прикладом, суть — «новий агент не зрозуміє»):
+    # код, змінений комітами цієї сесії → усі .md, що його згадують (README · ARCHITECTURE · план · INDEX · CLAUDE.md …), а сесія їх не міняла → ⚠ перевір
+    if tail:
+        ch = [x for x in git(repo, 'log', f'--grep=session_{tail}', '--name-only', '--format=').split('\n') if x]
+        code = sorted({x for x in ch if not x.endswith('.md') and not x.startswith(('sessions/', 'archive/')) and os.path.isfile(os.path.join(repo, x))})
+        touched = {x for x in ch if x.endswith('.md')}
+        docs = [d for d in git(repo, 'ls-files', '*.md').split('\n') if d and not d.startswith(('sessions/', 'archive/'))]
+        stale = {}
+        for d in docs:
+            if d in touched: continue
+            try: t = open(os.path.join(repo, d), encoding='utf-8').read()
+            except OSError: continue
+            hits = [c for c in code if c in t or (len(os.path.basename(c)) >= 8 and os.path.basename(c) in t)]
+            if hits: stale[d] = hits
+        if stale:
+            top = sorted(stale, key=lambda d: -len(stale[d]))[:6]
+            L.append(('⚠', 'описи, що згадують змінений у сесії код, але не мінялись: ' + ' · '.join(f"{d} ({', '.join(os.path.basename(c) for c in stale[d][:3])})" for d in top) +
+                      (f' (+{len(stale) - 6})' if len(stale) > 6 else '') + ' — перевір, чи новий агент не піде за протухлим описом'))
+        elif code: L.append(('✓', f'описи змін сесії оновлено (код: {len(code)} файлів)'))
+    # (7) незбережене: контейнер скинеться — пропаде
+    dirty = [x for x in subprocess.run(['git', '-C', repo, 'status', '--porcelain'], capture_output=True, text=True).stdout.split('\n') if x.strip()]
+    if dirty: L.append(('✗', f'незакомічене: {len(dirty)} ({", ".join(x[3:] for x in dirty[:4])}) — коміт і push до переїзду'))
+    if git(repo, 'remote'):
+        if not git(repo, 'branch', '-r', '--contains', 'HEAD'): L.append(('✗', 'HEAD нема на жодній гілці GitHub — push до переїзду'))
+        else:
+            n_main = git(repo, 'rev-list', '--count', 'origin/main..HEAD')
+            if n_main and n_main != '0': L.append(('ⓘ', f'у main нема {n_main} комітів (лише гілка сесії) — так задумано?'))
     return name, L
 
 
@@ -161,7 +182,7 @@ def report(repos):
 
 def selftest():
     def sh(d, *c): subprocess.run(c, cwd=d, check=True, capture_output=True)
-    def mk(summary, extra=None, commit_after=False, new_after=False, both=False):
+    def mk(summary, extra=None, commit_after=False, new_after=False, both=False, dirty=False, code_after=False):
         d = tempfile.mkdtemp(prefix='hc-'); r = os.path.join(d, 'Prod'); os.makedirs(os.path.join(r, 'sessions')); os.makedirs(os.path.join(r, 'lens'))
         sh(r, 'git', 'init', '-q'); sh(r, 'git', 'config', 'user.email', 't@t'); sh(r, 'git', 'config', 'user.name', 't')
         open(os.path.join(r, 'lens/A.md'), 'w').write('## 0. Коротко\n- далі `lens/A.md`\n')
@@ -170,13 +191,18 @@ def selftest():
         for p, t in (extra or {}).items():
             if p not in later: open(os.path.join(r, p), 'w').write(t)
         open(os.path.join(r, 'sessions/P_session_summary_X.md'), 'w').write(summary)
-        sh(r, 'git', 'add', '-A'); sh(r, 'git', 'commit', '-qm', 'самері\n\nClaude-Session: https://claude.ai/code/session_T')
+        sh(r, 'git', 'add', '-A'); sh(r, 'git', 'commit', '-qm', 'самері\n\nClaude-Session: https://claude.ai/code/session_' + ('OLD' if code_after else 'T'))   # опис — від попередньої сесії
         if later:
             time.sleep(1.1)
             for p, t in later.items(): open(os.path.join(r, p), 'w').write(t)
             if both:
                 open(os.path.join(r, 'sessions/P_session_summary_X.md'), 'a').write('заморожено\n')
                 sh(r, 'git', 'add', '-A'); sh(r, 'git', 'commit', '-qm', 'нове самері\n\nClaude-Session: https://claude.ai/code/session_T')
+        if code_after:
+            os.makedirs(os.path.join(r, 'tools')); open(os.path.join(r, 'tools/run_me.sh'), 'w').write('echo')
+            sh(r, 'git', 'add', '-A'); sh(r, 'git', 'commit', '-qm', 'код\n\nClaude-Session: https://claude.ai/code/session_T')
+            open(os.path.join(r, 'sessions/P_session_summary_X.md'), 'a').write('\n'); sh(r, 'git', 'commit', '-qam', 'самері\n\nClaude-Session: https://claude.ai/code/session_T')
+        if dirty: open(os.path.join(r, 'lens/A.md'), 'a').write('z')
         if commit_after:
             open(os.path.join(r, 'lens/A.md'), 'a').write('y'); sh(r, 'git', 'commit', '-qam', 'код\n\nClaude-Session: https://claude.ai/code/session_T')
         return r
@@ -191,6 +217,8 @@ def selftest():
         ('коміт агента після самері → ✗', mk(good, commit_after=True), 'самері відстає'),
         ('«цей коміт» у §0 → ⚠', mk(good.replace('- далі', '- цей коміт; далі')), '§0 має «цей коміт»'),
         ('нове самері ще не в коміті → бере його (без стартового → ✗)', mk(good, {'sessions/P_session_summary_Y.md': '## §0 В\n- `lens/A.md`\n'}, new_after=True), 'P_session_summary_Y'),
+        ('незакомічена правка → ✗ «незакомічене»', mk(good, dirty=True), 'незакомічене'),
+        ('код змінено в сесії, опис, що його згадує, — ні → ⚠ «описи»', mk(good, {'lens/B.md': 'запуск — `tools/run_me.sh`\n'}, code_after=True), 'описи, що згадують'),
         ('старе й нове в одному коміті → бере пізніше створене', mk(good, {'sessions/P_session_summary_Y.md': '## §0 В\n- `lens/A.md`\n'}, new_after=True, both=True), 'P_session_summary_Y'),
     ]
     bad = 0

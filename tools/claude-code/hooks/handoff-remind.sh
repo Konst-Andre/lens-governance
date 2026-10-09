@@ -6,13 +6,15 @@
 # «очима нового агента». Повідомлення Konst не блокує. Тиша: перше повідомлення сесії (стартове саме містить «переїзд» — переїжджати
 # ще нема з чого) · повтор без нових комітів (позначка /tmp/lens-handoff-<session_id> = HEAD усіх репо) · помилка розбору.
 # Формат — code.claude.com/docs/en/hooks «UserPromptSubmit» (поле prompt; additionalContext ≤ 10 000 знаків), 09.10.2026.
-# Зуби: bash handoff-remind.sh selftest — 5 випадків (тригер → контекст з ✗; не тригер → тиша; перше повідомлення → тиша; повтор → тиша; новий коміт → знову).
+# + Stop (bash handoff-remind.sh stop): переїзд оголошує АГЕНТ (стартове ```text чи «переїжджаємо» у відповіді) і є ✗ → decision: block (раз на стан HEAD; stop_hook_active → тиша).
+# Зуби: bash handoff-remind.sh selftest — 9 випадків (тригер → контекст з ✗; не тригер · «в новій сесії» в розповіді · перше повідомлення · повтор → тиша;
+# новий коміт → знову; Stop: стартове з ✗ → block, звичайна відповідь і повтор → тиша).
 mode="${1:-run}"
 [ "$mode" = selftest ] && HOOK_IN="{}" || HOOK_IN="$(cat)"
 export HOOK_IN HC="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/handoff_check.py"
 python3 - "$mode" <<'PY'
 import json, os, re, subprocess, sys, tempfile, glob
-TRIG = re.compile(r"переїжджа\w*|переїзд\w*|нов\w+\s+сесі\w*|стартов\w+\s+повідомлен\w*", re.I)
+TRIG = re.compile(r"переїжджа\w*|переїзд\w*|переїха\w*|переїдемо|стартов\w+\s+повідомлен\w*|\bнов[ау]\s+сесі[яю]\b", re.I)   # не «в новій сесії» — це розповідь, не переїзд (хибне 09.10, CC-6)
 HC = os.environ['HC']
 
 def repos(roots):
@@ -47,7 +49,8 @@ def run(d, roots, mark_dir='/tmp'):
             "\n\nДо стартового повідомлення: ✗ — виправ і закоміть; ⚠ — звір. Потім прочитай §0 і стартове ОЧИМА НОВОГО АГЕНТА: "
             "(а) з першого екрана ясно, що робимо далі й у якому порядку? (б) нема історії замість «як є»? "
             "(в) кожне правило сесії — у своєму домі, а не лише в самері? (г) план має «зараз і далі» зверху? "
-            "Знахідки — виправ і закоміть, тоді стартове в чат.")
+            "(д) що новий агент мусить знати, а воно є лише в чаті (рішення, побажання й побоювання Konst — як побажання, не як догма)? "
+            "Знахідки — виправ і закоміть, тоді стартове в чат. Якщо Konst не переїжджає (слово випадкове) — проігноруй цей контекст.")
 
 def selftest():
     t = tempfile.mkdtemp(prefix='hr-'); r = os.path.join(t, 'Prod')
@@ -72,10 +75,40 @@ def selftest():
     open(os.path.join(r, 'x.md'), 'w').write('x'); sh('git', 'add', '-A'); sh('git', 'commit', '-qm', 'x')
     ok = run(D('Стартове повідомлення дай', mid), [t], t) is not None
     print(('✓' if ok else '✗') + ' новий коміт після проходу → знову'); bad += not ok
-    print(f'selftest: {5 - bad}/5'); return 1 if bad else 0
+    ok = run(D('боюсь, що в новій сесії агент нічого не зрозуміє', mid, 's5'), [t], t) is None
+    print(('✓' if ok else '✗') + ' «в новій сесії» у розповіді (хибне 09.10) → тиша'); bad += not ok
+    S = lambda m, a=False, s='p1': {'last_assistant_message': m, 'stop_hook_active': a, 'session_id': s}
+    for name, d, want in [('Stop: агент дає стартове, є ✗ → block', S('Переїжджаємо. ```text\nСтарт: …\n```'), True),
+                          ('Stop: звичайна відповідь → тиша', S('Готово, коміт abc.', s='p2'), False),
+                          ('Stop: повтор через гачок (stop_hook_active) → тиша', S('```text\nx\n```', True, 'p3'), False)]:
+        out = stop(d, [t], t); ok = (out is not None and '✗' in out) == want
+        print(('✓' if ok else '✗') + ' ' + name); bad += not ok
+    print(f'selftest: {9 - bad}/9'); return 1 if bad else 0
+
+def stop(d, roots, mark_dir='/tmp'):
+    """Stop: переїзд оголошує агент (стартове чи «переїжджаємо» у відповіді) — є ✗ → block, щоб виправив до кінця ходу."""
+    if d.get('stop_hook_active'): return None
+    msg = d.get('last_assistant_message') or ''
+    if not (TRIG.search(msg) or re.search(r'```text', msg)): return None
+    rs = repos(roots)
+    if not rs: return None
+    mark = os.path.join(mark_dir, 'lens-handoff-stop-' + re.sub(r'\W', '', d.get('session_id') or 'x'))
+    h = heads(rs)
+    if os.path.exists(mark) and open(mark).read() == h: return None
+    open(mark, 'w').write(h)
+    r = subprocess.run([sys.executable, HC, *rs], capture_output=True, text=True)
+    bad = [l for l in r.stdout.splitlines() if l.strip().startswith('✗')]
+    if not bad: return None
+    return ("Гачок «перевірка пам'яті перед переїздом» (HOOK-3.2, Stop): ти оголошуєш переїзд, а handoff_check має ✗ —\n" + '\n'.join(bad)[:4000] +
+            "\nВиправ, закоміть і запуш, тоді стартове. Якщо це не переїзд — одним рядком скажи це й заверши.")
 
 mode = sys.argv[1]
 if mode == 'selftest': sys.exit(selftest())
+if mode == 'stop':
+    try: out = stop(json.loads(os.environ.get('HOOK_IN') or '{}'), ['/home/user'])
+    except Exception: out = None
+    if out: print(json.dumps({'decision': 'block', 'reason': out}, ensure_ascii=False))
+    sys.exit(0)
 try:
     d = json.loads(os.environ.get('HOOK_IN') or '{}')
     roots = ['/home/user']
