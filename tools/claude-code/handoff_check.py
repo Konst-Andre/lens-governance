@@ -8,7 +8,7 @@
 # Запуск:  python3 tools/claude-code/handoff_check.py <тека репо> [<тека репо> …]    → рядки ✓ / ⚠ / ✗ / ⓘ; exit 1 на ✗
 #          python3 tools/claude-code/handoff_check.py selftest                         → зуби: тимчасові репо, усі випадки брифу
 # «Свої» коміти — за трейлером Claude-Session ≡ CLAUDE_CODE_REMOTE_SESSION_ID (cse_X ↔ session_X); нема змінної — усі коміти агента.
-import os, re, subprocess, sys, tempfile, time
+import glob, os, re, subprocess, sys, tempfile, time
 
 KERNEL_NAMES = ('lens-governance',)
 EXT = r'(?:md|sh|py|mjs|js|json|toml|ya?ml|html|htm|css|xlsx|txt|csv)'
@@ -166,6 +166,19 @@ def check_repo(repo, now=None):
             L.append(('⚠', 'описи, що згадують змінений у сесії код, але не мінялись: ' + ' · '.join(f"{d} ({', '.join(os.path.basename(c) for c in stale[d][:3])})" for d in top) +
                       (f' (+{len(stale) - 6})' if len(stale) > 6 else '') + ' — перевір, чи новий агент не піде за протухлим описом'))
         elif code: L.append(('✓', f'описи змін сесії оновлено (код: {len(code)} файлів)'))
+    # (8) кандидат у бриф (BRIEF-1, розширення 10.10): id відкритої черги згадано в самері ≥ 3 різних сесій, а брифу / плану з цим id нема
+    qf = [f for f in (glob.glob(os.path.join(repo, 'lens', '*_CHERGA.md')) + glob.glob(os.path.join(repo, 'kernel', '*_CHERGA.md')))]
+    if qf:
+        qt = open(qf[0], encoding='utf-8').read(); qt = qt[qt.find('## Відкрите'):] if '## Відкрите' in qt else qt
+        ids = sorted(set(re.findall(r'^\|\s*\*{0,2}`([A-Z]+-\d+(?:\.\d+)?)`', qt, re.M)))
+        sums = [p for p in glob.glob(os.path.join(repo, 'sessions', '**', '*summary*.md'), recursive=True) + glob.glob(os.path.join(repo, 'archive', 'summaries', '**', '*summary*.md'), recursive=True)]
+        briefs = [p for p in glob.glob(os.path.join(repo, '**', '*.md'), recursive=True) if re.search(r'brief|BRIEF|PLAN|_plan', os.path.basename(p)) and '/archive/' not in p]
+        btxt = ' '.join(open(p, encoding='utf-8', errors='replace').read() for p in briefs)
+        cand = []
+        for i in ids:
+            n = sum(1 for p in sums if re.search(r'(?<![\w-])' + re.escape(i) + r'(?![\w.])', open(p, encoding='utf-8', errors='replace').read()))
+            if n >= 3 and not re.search(r'(?<![\w-])' + re.escape(i) + r'(?![\w.])', btxt): cand.append(f'{i} ({n} самері)')
+        if cand: L.append(('⚠', 'кандидат у бриф — пункт тягнеться ≥ 3 сесії, а брифу нема: ' + ' · '.join(cand[:5]) + ' → tools/claude-code/templates/BRIEF_template.md (з прополкою джерел) або рядок «чому не треба»'))
     # (7) незбережене: контейнер скинеться — пропаде
     dirty = [x for x in subprocess.run(['git', '-C', repo, 'status', '--porcelain'], capture_output=True, text=True).stdout.split('\n') if x.strip()]
     if dirty: L.append(('✗', f'незакомічене: {len(dirty)} ({", ".join(x[3:] for x in dirty[:4])}) — коміт і push до переїзду'))
@@ -177,6 +190,22 @@ def check_repo(repo, now=None):
     return name, L
 
 
+def hooks_journal(repos):
+    """HOOK-5: спрацювання гачків цієї сесії (/tmp/lens-hooks-<сесія>.tsv, пише диспетчер) мають вердикти в журналі ядра."""
+    sid = re.sub(r'[^A-Za-z0-9_-]', '', os.environ.get('CLAUDE_CODE_SESSION_ID', ''))
+    log = f'/tmp/lens-hooks-{sid}.tsv' if sid else ''
+    if not log or not os.path.isfile(log): return [('ⓘ', 'журнал гачків: спрацювань цієї сесії не записано (лог диспетчера порожній)')]
+    rows = [l.split('\t') for l in open(log, encoding='utf-8', errors='replace') if l.strip()]
+    by = {}
+    for r in rows:
+        if len(r) >= 3: by[r[2]] = by.get(r[2], 0) + 1
+    k = next((os.path.join(r, 'tools/claude-code/hooks/HOOK_JOURNAL.md') for r in list(repos) + ['/tmp/lens-governance'] if os.path.isfile(os.path.join(r, 'tools/claude-code/hooks/HOOK_JOURNAL.md'))), None)
+    tail = mine_tail()
+    seen = k and tail and ('session_' + tail[:8]) in open(k, encoding='utf-8').read()
+    msg = 'гачки цієї сесії спрацювали: ' + ' · '.join(f'{h} {n}' for h, n in sorted(by.items()))
+    if seen: return [('✓', msg + ' — вердикти в журналі гачків є')]
+    return [('✗', msg + f' — вердиктів нема: розібрати (справжнє · хибне · дубль · пропуск) у tools/claude-code/hooks/HOOK_JOURNAL.md §1, ідентифікатор `session_{tail[:8] if tail else "?"}`; хибне чи пропуск — виправити гачок + тест')]
+
 def report(repos):
     bad = False
     for r in repos:
@@ -184,6 +213,9 @@ def report(repos):
         print(f'— {name}')
         for s, t in L:
             print(f'  {s} {t}'); bad |= s == '✗'
+    print('— гачки')
+    for s, t in hooks_journal([os.path.abspath(r) for r in repos]):
+        print(f'  {s} {t}'); bad |= s == '✗'
     return 1 if bad else 0
 
 
@@ -227,6 +259,7 @@ def selftest():
         ('незакомічена правка → ✗ «незакомічене»', mk(good, dirty=True), 'незакомічене'),
         ('код змінено в сесії, опис, що його згадує, — ні → ⚠ «описи»', mk(good, {'lens/B.md': 'запуск — `tools/run_me.sh`\n'}, code_after=True), 'описи, що згадують'),
         ('вузловий файл (згадують 6 описів) → ⓘ, не ⚠ на кожен', mk(good, {**{f'lens/H{i}.md': 'див. `tools/run_me.sh`\n' for i in range(6)}}, code_after=True), 'вузлові файли'),
+        ('id черги в самері 3 сесій без брифу → ⚠ «кандидат у бриф»', mk(good, {'lens/P_CHERGA.md': '## Відкрите\n| `PX-1` | довгий пункт | 01.10 | x |\n', 'sessions/P_session_summary_A.md': '§1 PX-1 зроблено частину', 'sessions/P_session_summary_B.md': '§1 PX-1 ще частина', 'sessions/P_session_summary_C.md': '§1 PX-1 і знову'}), 'кандидат у бриф'),
         ('старе й нове в одному коміті → бере пізніше створене', mk(good, {'sessions/P_session_summary_Y.md': '## §0 В\n- `lens/A.md`\n'}, new_after=True, both=True), 'P_session_summary_Y'),
     ]
     bad = 0

@@ -14,25 +14,28 @@ ev="$1"
 case "$ev" in pre|PreToolUse) ev=pre;; post|PostToolUse) ev=post;; stop|Stop) ev=stop;; UserPromptSubmit) ev=prompt;; *) exit 0;; esac
 in="$(cat)"
 tool="$(printf '%s' "$in" | grep -o '"tool_name" *: *"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/')"
+sid="$(printf '%s' "$in" | grep -o '"session_id" *: *"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/' | tr -cd 'A-Za-z0-9_-')"
+# журнал спрацювань (HOOK-5, 10.10.2026): кожна відповідь гачка — рядок у /tmp/lens-hooks-<сесія>.tsv (час · подія · гачок · суть);
+# на переїзді handoff_check рахує їх і вимагає вердикти в tools/claude-code/hooks/HOOK_JOURNAL.md (справжнє · хибне · дубль · пропуск)
+fire() {   # $1 — гачок, $2 — його вивід (не порожній)
+  printf '%s\t%s\t%s\t%s\n' "$(date -u +%FT%TZ)" "$ev" "$1" "$(printf '%s' "$2" | tr '\n\t' '  ' | sed 's/"permissionDecisionReason": *"//;s/"reason": *"//;s/"additionalContext": *"//' | cut -c1-200)" >> "/tmp/lens-hooks-${sid:-nosession}.tsv" 2>/dev/null
+  printf '%s\n' "$2"
+}
+run() { out="$(printf '%s' "$in" | bash "$h/$1" $2 2>/dev/null)"; [ -n "$out" ] && { fire "${1%.sh}" "$out"; return 0; }; return 1; }
 case "$ev" in
   pre)
     case "$tool" in Write|Edit|Bash) ;; *) exit 0;; esac
     for g in "ui-guard.sh check" "commit-gate.sh" "ui-review-gate.sh gate" "review-remind.sh stand"; do
       read -r f a <<<"$g"
-      out="$(printf '%s' "$in" | bash "$h/$f" $a 2>/dev/null)"
-      [ -n "$out" ] && { printf '%s\n' "$out"; exit 0; }
+      run "$f" "$a" && exit 0
     done ;;
   post)
     case "$tool" in Read|Bash|Grep|WebSearch|WebFetch) ;; *) exit 0;; esac
     printf '%s' "$in" | bash "$h/ui-guard.sh" mark 2>/dev/null
-    printf '%s' "$in" | bash "$h/review-remind.sh" post 2>/dev/null ;;
-  stop)   # перший з відповіддю перемагає: гачок пам'яті, потім перевірка перед переїздом (HOOK-3.2)
-    out="$(printf '%s' "$in" | bash "$h/memory-guard.sh" stop 2>/dev/null)"
-    [ -n "$out" ] && { printf '%s\n' "$out"; exit 0; }
-    out="$(printf '%s' "$in" | bash "$h/handoff-remind.sh" stop 2>/dev/null)"
-    [ -n "$out" ] && { printf '%s\n' "$out"; exit 0; }
-    printf '%s' "$in" | bash "$h/plan-web.sh" stop 2>/dev/null ;;   # план без пошуку ззовні (профіль ЦИКЛ п.4; HOOK-2.5, 10.10.2026)
+    run review-remind.sh post ;;
+  stop)   # перший з відповіддю перемагає: гачок пам'яті, перевірка перед переїздом (HOOK-3.2), «план без світу» (HOOK-2.5)
+    run memory-guard.sh stop || run handoff-remind.sh stop || run plan-web.sh stop ;;
   prompt)
-    printf '%s' "$in" | bash "$h/handoff-remind.sh" 2>/dev/null ;;
+    run handoff-remind.sh "" ;;
 esac
 exit 0
