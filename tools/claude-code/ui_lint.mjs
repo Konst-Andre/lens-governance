@@ -8,6 +8,7 @@
 //          <repo>/.ui-lint-accept — відомі вади, прийняті Konst: рядок «вид | шматок адреси елемента | причина · дата» → ⓘ (не блокує, але друкується щоразу).
 //          node ui_lint.mjs selftest — зуби: сторінка з підкинутими вадами (кожна мусить дати свій рядок) і чиста (0).
 // Перевірки 10–11 (QR CC-7, пропуски Konst): дія в прокрутці (✗) · кнопки одного ряду різної висоти (⚠).
+// Перевірки 12–14 (QR CC-8, пропуск Konst «Історія читається злитно»): сирота — останній рядок 1–2 знаки · злито — дата + ≥ 2 речі через «·» · однакові заголовки рядків (усі ⚠).
 // Вивід: ✗ (ворота не пустять) · ⚠ (подивись очима) · ⓘ (не виміряно); exit 1 на ✗.
 // Пороги: контраст 4,5:1 (великий текст 3:1) — WCAG 2.x AA · ціль тапу 24 px ✗ (WCAG 2.2 2.5.8) / 44 px ⚠ (Apple HIG) · поле вводу < 16 px — iOS Safari збільшує сторінку ·
 // текст < 11 px ⚠ (HIG) · прилипання < 2 px до краю картки — наш поріг (QR CC-5 «капсула», CC-6 бейдж). Джерела й дати — бриф §HOOK-2.5.
@@ -100,6 +101,25 @@ function probe() {
     const hs = ks.map(k => Math.round(k.getBoundingClientRect().height));
     if (Math.max(...hs) - Math.min(...hs) > 4) add('⚠', 'кнопки ряду', ks[0], `кнопки в одному ряду різної висоти: ${hs.join('·')} px — одна висота або одне тіло (перемикач)`);
   }
+  // 12–14 (QR CC-8, пропуск Konst: «Історія» — «текст у підвалі читається злитно»): рядок тексту, який людина не розбирає з одного погляду
+  const inl = el => [...el.children].every(c => /inline|contents/.test(getComputedStyle(c).display) && !/inline-(block|flex|grid)/.test(getComputedStyle(c).display));
+  const seen = new Set(), once = (lvl, kind, el, msg) => { const k = kind + path(el); if (!seen.has(k)) { seen.add(k); add(lvl, kind, el, msg); } };
+  for (const el of all) {
+    if (!el.childNodes.length || !inl(el) || !el.textContent.trim() || el.matches('svg, svg *')) continue;
+    const s = getComputedStyle(el), px = parseFloat(s.fontSize);
+    // 12. сирота: останній рядок — 1–2 знаки («збірка 26 / с») — розрив усередині шматка, що мав бути цілим
+    const rg = document.createRange(); rg.selectNodeContents(el); const lines = {};
+    for (const q of rg.getClientRects()) if (q.width > 0) { const k = Math.round(q.top / 3); lines[k] = (lines[k] || 0) + q.width; }
+    const ks = Object.keys(lines).map(Number).sort((x, y) => x - y);
+    if (ks.length >= 2 && lines[ks[ks.length - 1]] < px * 1.6) once('⚠', 'сирота', el, `останній рядок — ${Math.round(lines[ks[ks.length - 1]])} px (1–2 знаки) — розрив усередині шматка; тримати цілим (white-space: nowrap / нерозривний пробіл)`);
+    // 13. злитий підпис: дата/час і ще ≥ 2 різні речі через «·» в одному рядку — око не відділяє «коли» від «що» й «стан» (стан — значком, що — заголовком)
+    const seg = el.innerText.split('·').map(x => x.trim()).filter(Boolean), dt = x => /^[\d.:\s]+$/.test(x) && /\d{1,2}[.:]\d{2}/.test(x);
+    if (seg.length >= 3 && seg.some(x => /\d{1,2}[.:]\d{2}/.test(x)) && seg.filter(x => !dt(x)).length >= 2) once('⚠', 'злито', el, `в одному рядку дата і ще ${seg.filter(x => !dt(x)).length} різні речі через «·» («${el.innerText.trim().slice(0, 40)}») — один рядок — одна річ`);
+  }
+  // 14. однакові заголовки рядків: ≥ 3 сусіди-рядки з тим самим першим жирним текстом — різниця схована в сірому підписі
+  for (const p of new Set(all.map(e => e.parentElement))) { if (!p) continue;
+    const g = {}; for (const k of p.children) if (all.includes(k)) { const h = k.querySelector('b, strong, h1, h2, h3, h4'); if (h && h.textContent.trim()) (g[k.tagName + '.' + k.className + '|' + h.textContent.trim()] ||= []).push(k); }
+    for (const [key, ks] of Object.entries(g)) if (ks.length >= 3) add('⚠', 'однакові заголовки', ks[0], `${ks.length} рядки з однаковим заголовком «${key.split('|')[1].slice(0, 30)}» — у заголовок те, чим рядки відрізняються`); }
   // 9. текст для людини: сміття з коду — ✗; жаргон — ⚠
   const txt = document.body.innerText;
   for (const bad of ['undefined', 'NaN', '[object', 'null']) if (new RegExp(`(^|[^\\w])${bad.replace('[', '\\[')}($|[^\\w])`).test(txt)) add('✗', 'текст', document.body, `на екрані «${bad}» — дані не підставились`);
@@ -128,6 +148,9 @@ const DEFECTS = {
   'дія в прокрутці': `<div class=card><div style="height:110px;overflow-y:auto"><p style="height:160px;margin:0">Довгий текст шіта</p><button style="min-height:48px;width:100%">Закрити</button></div></div>`,   // QR CC-7: кнопки шіта в прокрутці
   'дія в прокрутці ': `<div class=card><div style="height:120px;overflow-y:auto"><p style="height:150px;margin:0">Текст</p><div style="display:flex;flex-direction:column"><button style="min-height:48px;width:100%">Закрити</button><button style="min-height:48px;width:100%;order:-1">Скопіювати</button></div></div></div>`,   // QR CC-7: CSS order — дія візуально нижче, ніж у коді
   'кнопки ряду': `<div class=card style="display:flex;gap:8px;align-items:center"><button style="height:34px;padding:0 14px">Ще раз</button><button style="height:44px;width:44px" aria-label="Прибрати">x</button></div>`,   // QR CC-7: «Ще раз» ⟂ кошик
+  'сирота': `<div class=card><div style="width:126px;font:15px monospace">збірка-0000026 с</div></div>`,   // QR CC-8: «збірка 26 / с» на 375 px
+  'злито': `<div class=card><small>10.10 22:46 · оновлення адмінки · успішно</small></div>`,   // QR CC-8: «Історія» — дата · чому · стан в одній сірій смузі
+  'однакові заголовки': `<div class=card>${[1, 2, 3].map(i => `<div class=hr><b>Бот зібрав дані</b><br><small>10.10 1${i}:00</small></div>`).join('')}</div>`,   // QR CC-8: шість «Бот зібрав дані»
   'натискання': `<div class=card><a href="#x" style="display:inline-block;padding:14px 18px">Відкрити звіт</a></div>`,
 };
 
