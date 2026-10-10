@@ -199,10 +199,13 @@ def hooks_journal(repos):
     by = {}
     for r in rows:
         if len(r) >= 3: by[r[2]] = by.get(r[2], 0) + 1
-    k = next((os.path.join(r, 'tools/claude-code/hooks/HOOK_JOURNAL.md') for r in list(repos) + ['/tmp/lens-governance'] if os.path.isfile(os.path.join(r, 'tools/claude-code/hooks/HOOK_JOURNAL.md'))), None)
+    # ядро — серед репо, поруч із ними (../lens-governance) або клон env_check; без «поруч» сесія продукту брала старий /tmp-клон → хибне ✗ (10.10)
+    roots = list(repos) + [os.path.join(os.path.dirname(r), 'lens-governance') for r in repos] + ['/tmp/lens-governance']
+    k = next((os.path.join(r, 'tools/claude-code/hooks/HOOK_JOURNAL.md') for r in roots if os.path.isfile(os.path.join(r, 'tools/claude-code/hooks/HOOK_JOURNAL.md'))), None)
     tail = mine_tail()
-    seen = k and tail and ('session_' + tail[:8]) in open(k, encoding='utf-8').read()
     msg = 'гачки цієї сесії спрацювали: ' + ' · '.join(f'{h} {n}' for h, n in sorted(by.items()))
+    if not k: return [('⚠', msg + ' — журнал гачків не знайдено (ядра нема ні поруч, ні в /tmp/lens-governance): склонувати ядро й записати вердикти')]
+    seen = tail and ('session_' + tail[:8]) in open(k, encoding='utf-8').read()
     if seen: return [('✓', msg + ' — вердикти в журналі гачків є')]
     return [('✗', msg + f' — вердиктів нема: розібрати (справжнє · хибне · дубль · пропуск) у tools/claude-code/hooks/HOOK_JOURNAL.md §1, ідентифікатор `session_{tail[:8] if tail else "?"}`; хибне чи пропуск — виправити гачок + тест')]
 
@@ -269,7 +272,18 @@ def selftest():
         ok = (not hit) if want is None else any(want in t for t in (hit if 'summary' not in want and 'вузлові' not in want else [t for _, t in L])) and not ('вузлові' in want and any('описи, що згадують' in t for t in hit))
         if want is None and not ok: print('   ', hit)
         print(('✓' if ok else '✗') + ' ' + name); bad += not ok
-    print(f'selftest: {len(cases) - bad}/{len(cases)}')
+    # журнал гачків: ядро поруч з продуктом (../lens-governance) — знаходить і бачить рядок сесії
+    d = tempfile.mkdtemp(prefix='hj-'); prod = os.path.join(d, 'Prod'); os.makedirs(prod); jd = os.path.join(d, 'lens-governance/tools/claude-code/hooks'); os.makedirs(jd)
+    os.environ['CLAUDE_CODE_SESSION_ID'] = 'hjtest' + str(os.getpid()); log = f"/tmp/lens-hooks-{os.environ['CLAUDE_CODE_SESSION_ID']}.tsv"
+    open(log, 'w').write('2026-10-10T00:00:00Z\tprompt\thandoff-remind\tx\n')
+    jcases = [('журнал ядра поруч з рядком сесії → ✓', '| 10.10 | `session_T` | x |\n', '✓'), ('журнал ядра поруч без рядка → ✗', '| 10.10 | `session_Z` | x |\n', '✗')]
+    for name, body, want in jcases:
+        open(os.path.join(jd, 'HOOK_JOURNAL.md'), 'w').write(body)
+        got = hooks_journal([prod])[0][0]; ok = got == want
+        print(('✓' if ok else '✗') + ' ' + name); bad += not ok
+    os.remove(log)
+    total = len(cases) + len(jcases)
+    print(f'selftest: {total - bad}/{total}')
     return 1 if bad else 0
 
 
