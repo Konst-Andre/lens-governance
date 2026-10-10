@@ -243,6 +243,9 @@ def report(repos):
     roots = [os.path.abspath(r) for r in repos]; roots += [os.path.join(os.path.dirname(r), 'lens-governance') for r in roots] + ['/tmp/lens-governance']
     k = next((os.path.join(r, JPATH) for r in roots if os.path.isfile(os.path.join(r, JPATH))), None)
     if k: s, t = journal_health(k); print(f'  {s} {t}')   # ріст — ⚠, не ✗: переїзд не блокує, але нагадує ротацію
+    dh = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'doc_health.py')   # документи кожного репо — ⚠ на переїзді, щоб не висіли без господаря (DOC-1)
+    for r in repos:
+        if os.path.isfile(dh): out = subprocess.run([sys.executable, dh, r], capture_output=True, text=True).stdout.strip().splitlines(); out and print(f'  {os.path.basename(os.path.abspath(r))}: {out[-1]}')
     return 1 if bad else 0
 JPATH = 'tools/claude-code/hooks/HOOK_JOURNAL.md'
 

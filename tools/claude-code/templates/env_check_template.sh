@@ -33,6 +33,10 @@ else n=$(git rev-list --count --grep='Claude-Session' "$sm"..HEAD 2>/dev/null); 
 # прод (лише читання): <живий код ≡ репо; тека публікації; службове не видно — судити за ВМІСТОМ, не за HTTP-кодом>
 echo "прод: — (додати: живий код ≡ репо; тека публікації; службове не видно — за ВМІСТОМ)"
 
+# документи — ціна читання в Claude Code (ядро DOC-1: щосесійні ≤ 200 рядків · старт ≤ 25 КБ · розділ ≤ 16 КБ · > 80 КБ з маршрутом); лише ⚠, exit 0
+if dh=$(curl -sSf -m 20 https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/tools/claude-code/doc_health.py 2>/dev/null); then
+  printf '%s\n' "$dh" | python3 - .; else echo "документи: — (doc_health не завантажено)"; fi
+
 # Cloudflare — СПІЛЬНИЙ акаунт усіх проєктів: бюджет (запити · збірки · прогноз) і свіжість правил. Рядки «⚠» — читати й діяти
 # за lens-governance:tools/cloudflare/CLOUDFLARE.md. Скрипт лише читає й завжди exit 0. Репо без Cloudflare — рядок прибрати.
 # ⚠ не «curl | bash || echo»: bash на порожньому вході (404) виходить з 0, і збій мовчить
