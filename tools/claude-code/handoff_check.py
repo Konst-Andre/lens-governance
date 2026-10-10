@@ -154,6 +154,13 @@ def check_repo(repo, now=None):
             except OSError: continue
             hits = [c for c in code if c in t or (len(os.path.basename(c)) >= 8 and os.path.basename(c) in t)]
             if hits: stale[d] = hits
+        # вузловий файл (його згадують > 4 описів, що не мінялись) — згадки довідкові: один рядок ⓘ замість ⚠ на кожен документ
+        # (еволюція гачка 10.10: Lens_validate.py дав ⚠ на 10 документів ядра — шум; слово Konst «гачок має самопокращуватись»)
+        cnt = {c: sum(c in v for v in stale.values()) for c in code}
+        hubs = sorted(c for c, n in cnt.items() if n > 4)
+        if hubs:
+            L.append(('ⓘ', 'вузлові файли сесії — їх згадують багато описів: ' + ' · '.join(f"{os.path.basename(c)} ({cnt[c]})" for c in hubs) + ' — перевір лише ті описи, що розповідають саме про змінену поведінку'))
+            stale = {d: [c for c in v if c not in hubs] for d, v in stale.items()}; stale = {d: v for d, v in stale.items() if v}
         if stale:
             top = sorted(stale, key=lambda d: -len(stale[d]))[:6]
             L.append(('⚠', 'описи, що згадують змінений у сесії код, але не мінялись: ' + ' · '.join(f"{d} ({', '.join(os.path.basename(c) for c in stale[d][:3])})" for d in top) +
@@ -219,13 +226,14 @@ def selftest():
         ('нове самері ще не в коміті → бере його (без стартового → ✗)', mk(good, {'sessions/P_session_summary_Y.md': '## §0 В\n- `lens/A.md`\n'}, new_after=True), 'P_session_summary_Y'),
         ('незакомічена правка → ✗ «незакомічене»', mk(good, dirty=True), 'незакомічене'),
         ('код змінено в сесії, опис, що його згадує, — ні → ⚠ «описи»', mk(good, {'lens/B.md': 'запуск — `tools/run_me.sh`\n'}, code_after=True), 'описи, що згадують'),
+        ('вузловий файл (згадують 6 описів) → ⓘ, не ⚠ на кожен', mk(good, {**{f'lens/H{i}.md': 'див. `tools/run_me.sh`\n' for i in range(6)}}, code_after=True), 'вузлові файли'),
         ('старе й нове в одному коміті → бере пізніше створене', mk(good, {'sessions/P_session_summary_Y.md': '## §0 В\n- `lens/A.md`\n'}, new_after=True, both=True), 'P_session_summary_Y'),
     ]
     bad = 0
     for name, r, want in cases:
         _, L = check_repo(r)
         hit = [t for s, t in L if s in '✗⚠']
-        ok = (not hit) if want is None else any(want in t for t in (hit if 'summary' not in want else [t for _, t in L]))
+        ok = (not hit) if want is None else any(want in t for t in (hit if 'summary' not in want and 'вузлові' not in want else [t for _, t in L])) and not ('вузлові' in want and any('описи, що згадують' in t for t in hit))
         if want is None and not ok: print('   ', hit)
         print(('✓' if ok else '✗') + ' ' + name); bad += not ok
     print(f'selftest: {len(cases) - bad}/{len(cases)}')
