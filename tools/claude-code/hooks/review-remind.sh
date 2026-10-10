@@ -8,6 +8,16 @@
 #   stand — PreToolUse (Write|Edit|Bash): запис .html зі «стенд / bench / harness / компер» у шляху, а маніфест у цій сесії не читано → нагадування
 # Формат — hookSpecificOutput.additionalContext (code.claude.com/docs/en/hooks, 08.10.2026): текст — фактами, не наказами.
 mode="$1"
+if [ "$mode" = selftest ]; then   # stand: адреса з «stand» усередині слова — тиша; .html стенда чи компера — нагадування (хибне QR CC-8)
+  ok=0; n=0
+  for c in "0|curl -s https://qr-lens.konstandre.workers.dev/ | grep -o 'x[^>]*'; grep a tools/QR_Lens_zvit_template.html" \
+           "1|cat a > kernel/stage/AE_stand_v3.html" "1|cp x tools/compare_v2.htm" "0|echo hi > notes.md"; do
+    n=$((n+1)); want="${c%%|*}"; cmd="${c#*|}"
+    got=$(python3 -c 'import json,sys; print(json.dumps({"session_id":"selftest%s" % sys.argv[2],"tool_name":"Bash","tool_input":{"command":sys.argv[1]}}))' "$cmd" "$n$$" | bash "$0" stand | grep -c 'Стенди')
+    [ "$got" = "$want" ] && ok=$((ok+1)) || echo "✗ stand: «$cmd» → $got, очікував $want"
+  done
+  echo "review-remind selftest: $ok/$n"; [ "$ok" = "$n" ]; exit
+fi
 export RR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 python3 -c '
 import json, sys, re, os, subprocess, time, ast
@@ -57,7 +67,8 @@ elif mode == "stand":
     tool = d.get("tool_name", "")
     path = str(ti.get("file_path", "")) if tool in ("Write", "Edit") else str(ti.get("command", ""))
     if tool == "Bash" and not re.search(r"(>|\btee\b|\bcp\b|\bmv\b)", path): sys.exit(0)
-    if re.search(r"\.html?\b", path, re.I) and re.search(r"(stand|stend|bench|harness|compar|стенд|компер)", path, re.I):
+    # лише в імені .html-файлу, не в усій команді: «konstandre» в адресі давало хибне (QR CC-8, 10.10)
+    if any(re.search(r"(stand|stend|bench|harness|compar|стенд|компер)", f, re.I) for f in re.findall(r"[^\s\x27\x22|;&<>]+\.html?\b", path, re.I)):
         open(seen, "w").close()
         say("PreToolUse", "Стенди, харнеси й компери Lens описує маніфест ядра kernel/Lens_stagebench_manifest.md (буфер — kernel/Lens_stagebench_delta_running.md); "
             "у цій сесії його ще не відкривали (lens-governance:CLAUDE.md «Звідки брати»: «будую чи правлю стенд, харнес, компер, важелі»).")
