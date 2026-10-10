@@ -14,7 +14,7 @@ KERNEL v2 · 31.07.2026
       G3 покриття індексом: кожен .md названий у Lens_INDEX.md
       G4 посилання 14.x з усіх файлів правил (RULE_FILES) резолвляться у Work_Standard_HISTORY.md
       G5 вік буферів: непорожній *_delta_running.md → нагадування про стелю 2-3 сесії
-      G6 стеля обсягу: >120KB сигнал, >200KB червона межа · сигнал не діє на файл, що в шапці
+      G6 обсяг — переїхав у tools/claude-code/doc_health.py (DOC-1, 10.10.2026): мірки під Claude Code, лише ⚠
          оголошує «читається ТОЧКОВО» (HISTORY, томи cookbook); червона межа — для всіх (G-Q)
       G7 мертвий буфер: «Куди канонити/мерджити» вказує на неіснуючий файл
          АБО цільовий A-запис уже стоїть у томі Cookbook
@@ -319,23 +319,10 @@ def gov(root):
         else:
             ok(f'{f} — порожній')
 
-    # G6 — обсяг
+    # G6 — обсяг: ПЕРЕЇХАВ у tools/claude-code/doc_health.py (DOC-1, 10.10.2026): межі 120/200 КБ Project-епохи без заміру
+    # замінено мірками під Claude Code (щосесійні рядки · старт цілком · розділ · маршрут > 80 КБ). Номер G6 лишається адресою.
     print('\n[G6] обсяг файлів')
-    big = False
-    for f in mds:
-        if _in_archive(root, f):
-            continue   # G3-1: архів не читається — обсяг не важить (§8)
-        kb = os.path.getsize(R(root, f)) / 1024
-        if kb > RED_KB:
-            fail(f'{f} — {kb:.0f} KB > {RED_KB} KB червона межа: різати на томи'); big = True
-        elif kb > SIGNAL_KB:
-            head = open(R(root, f), encoding='utf-8').read().splitlines()[:12]
-            if any('читається ТОЧКОВО' in l for l in head):
-                print(f'  ⓘ {f} — {kb:.0f} KB > {SIGNAL_KB} KB, але читається ТОЧКОВО (шапка) — сигнал не діє')
-                continue
-            warn(f'{f} — {kb:.0f} KB > {SIGNAL_KB} KB сигнал: планувати розпил'); big = True
-    if not big:
-        ok(f'усі файли ≤ {SIGNAL_KB} KB')
+    print('  ⓘ переїхав у tools/claude-code/doc_health.py (рядок «документи» в env_check) — DOC-1')
 
     # ── G7 — мертвий буфер ────────────────────────────────────────────────
     # Тригер: файл несе рядок «Куди канонити» / «Куди мерджити».
