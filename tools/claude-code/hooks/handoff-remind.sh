@@ -14,7 +14,7 @@ mode="${1:-run}"
 export HOOK_IN HC="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/handoff_check.py"
 python3 - "$mode" <<'PY'
 import json, os, re, subprocess, sys, tempfile, glob
-TRIG = re.compile(r"переїжджа\w*|\bпереїзд\b|переїхати|переїдемо|стартов\w+\s+повідомлен\w*|\bнов[ау]\s+сесі[яю]\b", re.I)   # не «в новій сесії», не «перед переїздом» — це розповідь про гачок, не переїзд (двічі хибне 09.10, CC-6)
+TRIG = re.compile(r"переїжджа\w*|переїхати|переїдемо|стартов\w+\s+повідомлен\w*|\bнов[ау]\s+сесі[яю]\b", re.I)   # лише команди: «переїжджаємо / переїхати / стартове / нову сесію»; іменник «переїзд» — розповідь (тричі хибне 10.10, журнал гачків §1)
 HC = os.environ['HC']
 
 def repos(roots):
@@ -75,7 +75,7 @@ def selftest():
     open(os.path.join(r, 'x.md'), 'w').write('x'); sh('git', 'add', '-A'); sh('git', 'commit', '-qm', 'x')
     ok = run(D('Стартове повідомлення дай', mid), [t], t) is not None
     print(('✓' if ok else '✗') + ' новий коміт після проходу → знову'); bad += not ok
-    ok = run(D('боюсь, що в новій сесії агент нічого не зрозуміє, а гачок перед переїздом перевіряє документи', mid, 's5'), [t], t) is None
+    ok = run(D('боюсь, що в новій сесії агент нічого не зрозуміє, а гачок перед переїздом перевіряє документи. Бо переїзд це по суті кінець сесії', mid, 's5'), [t], t) is None
     print(('✓' if ok else '✗') + ' «в новій сесії» · «перед переїздом» у розповіді (хибне 09.10) → тиша'); bad += not ok
     S = lambda m, a=False, s='p1': {'last_assistant_message': m, 'stop_hook_active': a, 'session_id': s}
     for name, d, want in [('Stop: агент дає стартове, є ✗ → block', S('Переїжджаємо. ```text\nСтарт: …\n```'), True),
