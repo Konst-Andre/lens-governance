@@ -22,8 +22,8 @@ async function pw() { for (const p of PW) { try { return await import(p); } catc
 // ── перевірки — виконуються В СТОРІНЦІ (жодних залежностей; лише DOM і getComputedStyle) ──
 function probe() {
   const out = [], add = (lvl, kind, el, msg) => out.push({ lvl, kind, where: path(el), msg });
-  const path = el => { if (!el || el === document.body) return 'body'; const id = el.id ? '#' + el.id : ''; const c = [...el.classList].slice(0, 2).map(x => '.' + x).join('');
-    const t = (el.innerText || el.getAttribute('aria-label') || '').trim().replace(/\s+/g, ' ').slice(0, 28); return `${el.tagName.toLowerCase()}${id}${c}${t ? ` «${t}»` : ''}`; };
+  const path = el => { if (!el || el === document.body) return 'body'; const id = el.id ? '#' + el.id : ''; const pc = !id && !el.classList.length && el.parentElement?.classList[0] ? '.' + el.parentElement.classList[0] + ' › ' : ''; const c = [...el.classList].slice(0, 2).map(x => '.' + x).join('');
+    const t = (el.innerText || el.getAttribute('aria-label') || '').trim().replace(/\s+/g, ' ').slice(0, 28); return `${pc}${el.tagName.toLowerCase()}${id}${c}${t ? ` «${t}»` : ''}`; };
   const vis = el => { const s = getComputedStyle(el), r = el.getBoundingClientRect(); return s.display !== 'none' && s.visibility !== 'hidden' && +s.opacity > 0.05 && r.width > 0 && r.height > 0 && !el.closest('[hidden],[aria-hidden="true"]:not(.zv-bdg)'); };
   const rgba = c => { const m = c.match(/rgba?\(([^)]+)\)/); if (m) { const v = m[1].split(/[ ,/]+/).filter(Boolean).map(Number); return [v[0], v[1], v[2], v[3] ?? 1]; }
     const n = c.match(/color\(srgb ([^)]+)\)/); if (n) { const v = n[1].split(/[ /]+/).filter(Boolean).map(Number); return [v[0] * 255, v[1] * 255, v[2] * 255, v[3] ?? 1]; } return null; };
@@ -95,8 +95,8 @@ const SELF = `<!doctype html><html><head><meta name=viewport content="width=devi
 body{margin:0;font:15px/1.4 sans-serif;background:#fff;color:#111}@media(prefers-color-scheme:dark){body{background:#111;color:#eee}}
 .card{margin:16px;padding:14px;border-radius:14px;background:#f2f2f2;position:relative}@media(prefers-color-scheme:dark){.card{background:#222}}
 .pill{display:inline-block;padding:2px 8px;border-radius:99px;background:#237770;color:#fff}.tl{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px}.ic{width:30px;height:30px;border-radius:50%;background:#bbb}.row{display:flex;gap:8px}.tile{flex:1;border-radius:10px;background:#ddd;padding:8px}
-.grey{color:#aaa}.clip{width:60px;overflow:hidden;white-space:nowrap}</style></head><body>
-<div class=card id=ok><button style="min-height:48px;padding:0 16px">Завантажити KPI</button> <span class=pill>6 дн.</span></div>
+.grey{color:#aaa}.clip{width:60px;overflow:hidden;white-space:nowrap}button:active{transform:scale(.97)}.jsp{color:inherit}.jsp.pressing{transform:scale(.9)}</style><script>document.addEventListener('touchstart',()=>{},{passive:true});document.addEventListener('pointerdown',e=>{const c=e.target.closest('.jsp');if(c)c.classList.add('pressing')});document.addEventListener('pointercancel',()=>document.querySelectorAll('.pressing').forEach(x=>x.classList.remove('pressing')))</script></head><body>
+<div class=card id=ok><button style="min-height:48px;padding:0 16px">Завантажити KPI</button> <span class=pill>6 дн.</span> <a class=jsp href="#j" style="display:inline-block;padding:14px 18px">Відкрити (A67)</a></div>
 ${'BAD'}</body></html>`;
 const DEFECTS = {
   'прилипло': `<div class=card><span class=pill style="position:absolute;top:1px;right:30px">прилипла</span>.</div>`,
@@ -107,16 +107,48 @@ const DEFECTS = {
   'скрол': `<div style="width:600px;height:4px"></div>`,
   'ряд': `<div class="card row"><div class="tile tl"><i class=ic></i>Сайт</div><div class="tile tl"><i class=ic></i>Історія</div><div class="tile tl"><i class=ic></i>KPI<br>6 дн.</div></div>`,   // вада QR CC-6: другий рядок підняв значок
   'текст': `<div class=card>Дані: undefined · хеш у репо</div>`,
+  'натискання': `<div class=card><a href="#x" style="display:inline-block;padding:14px 18px">Відкрити звіт</a></div>`,
 };
 
 async function lint(target, states, width, theme, browser) {
   const ctx = await browser.newContext({ viewport: { width, height: 844 }, deviceScaleFactor: 2, colorScheme: theme });
   const p = await ctx.newPage(), errs = []; p.on('pageerror', e => errs.push(e.message)); p.on('console', m => m.type() === 'error' && !/Failed to load resource/.test(m.text()) && errs.push(m.text()));
   const res = [];
-  for (const [i, st] of (states.length ? states : [null]).entries()) {
+  for (const [i, st] of [null, ...states].entries()) {   // початковий екран — завжди, далі кожен стан
     await p.goto(target, { waitUntil: 'load' }); await p.waitForTimeout(400);
-    if (st) { try { await p.evaluate(st); } catch (e) { res.push({ lvl: '✗', kind: 'стан', where: `стан ${i + 1}`, msg: 'JS стану впав: ' + e.message.split('\n')[0] }); } await p.waitForTimeout(700); }
-    for (const f of await p.evaluate(probe)) res.push({ ...f, state: st ? `стан ${i + 1}` : 'початковий' });
+    if (st) { try { await p.evaluate(st); } catch (e) { res.push({ lvl: '✗', kind: 'стан', where: `стан ${i}`, msg: 'JS стану впав: ' + e.message.split('\n')[0] }); } await p.waitForTimeout(700); }
+    for (const f of await p.evaluate(probe)) res.push({ ...f, state: st ? `стан ${i}` : 'початковий' });
+    // натискання: притиснути, виміряти, відпустити ПОЗА елементом (клік не спрацює). Однаковий вигляд → ⚠ «нема відгуку» (Konst 10.10: анімація пресу)
+    const sig = await p.evaluate(() => { const seen = new Set(), out = [];
+      for (const e of document.querySelectorAll('a[href],button,[role=button],summary,label[for]')) { const s = getComputedStyle(e); if (s.display === 'none' || !e.getClientRects().length) continue; e.scrollIntoView({ block: 'center', behavior: 'instant' }); const r = e.getBoundingClientRect();
+        if (!r.width || !r.height || s.visibility === 'hidden' || e.disabled || e.closest('[hidden]')) continue;
+        const k = e.tagName + '.' + [...e.classList].sort().join('.'); if (seen.has(k)) continue;
+        // досяжна пальцем: у центрі — саме вона (не під шаром, не в закритому шіті); інакше беремо наступну таку саму
+        const c = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); if (!c || !(c === e || e.contains(c))) continue;
+        seen.add(k); e.dataset.uilPress = out.length; out.push(k); }
+      return out; });
+    // вмикаємо :active примусово (DevTools CSS.forcePseudoState) — без кліків: справжнє натискання мишею закривало шіт (тап «по фону») і псувало решту вимірів
+    const cdp = await p.context().newCDPSession(p); await cdp.send('DOM.enable'); await cdp.send('CSS.enable');
+    const { root } = await cdp.send('DOM.getDocument', { depth: 0 });
+    for (let j = 0; j < Math.min(sig.length, 40); j++) {
+      const el = p.locator(`[data-uil-press="${j}"]`);
+      // вигляд = сама кнопка + її підкладка ::before + перший вкладений елемент (стиск часто на них: квадратик галочки, капсула в полі); колір тексту — ні: браузер сам фарбує посилання на :active
+      const look = () => el.evaluate(e => [getComputedStyle(e), getComputedStyle(e, '::before'), e.firstElementChild && getComputedStyle(e.firstElementChild)].filter(Boolean).map(s => [s.transform, s.backgroundColor, s.boxShadow, s.opacity, s.filter].join('|')).join('#'));
+      let nodeId; try { ({ nodeId } = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector: `[data-uil-press="${j}"]` })); } catch { continue; }
+      if (!nodeId) continue;
+      const before = await look();
+      await cdp.send('CSS.forcePseudoState', { nodeId, forcedPseudoClasses: ['active'] }); await p.waitForTimeout(400);   // довше за будь-який перехід відгуку
+      const css = await look();
+      await cdp.send('CSS.forcePseudoState', { nodeId, forcedPseudoClasses: [] }); await p.waitForTimeout(350);
+      // і JS-натискання (кукбук A67: клас .pressing на pointerdown) — синтетична подія без кліку
+      await el.evaluate(e => e.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerType: 'touch', isPrimary: true }))); await p.waitForTimeout(200);
+      const js = await look();
+      await el.evaluate(e => e.dispatchEvent(new PointerEvent('pointercancel', { bubbles: true, pointerType: 'touch', isPrimary: true }))); await p.waitForTimeout(350);
+      if (before === css && before === js) res.push({ lvl: '⚠', kind: 'натискання', where: sig[j].toLowerCase(), msg: 'на натискання вигляд не змінюється (ні :active, ні JS pointerdown) — палець не відчуває кнопку; рецепт — кукбук A67', state: st ? `стан ${i}` : 'початковий' });
+    }
+    await cdp.detach();
+    if (i === 0 && !(await p.evaluate(() => /touchstart/.test([...document.scripts].map(x => x.textContent).join(' ')) || document.body.hasAttribute('ontouchstart'))))
+      res.push({ lvl: '⚠', kind: 'натискання', where: 'сторінка', msg: 'нема слухача touchstart — у Safari iOS :active на дотик не спрацює (додай document.addEventListener(\'touchstart\', () => {}, { passive: true }))', state: '' });
   }
   for (const e of errs) res.push({ lvl: '✗', kind: 'JS', where: 'консоль', msg: e.slice(0, 160), state: '' });
   await ctx.close(); return res;
@@ -155,7 +187,7 @@ for (const t of ['light', 'dark']) {
     for (const f of rows.filter(f => f.acc)) console.log(`  ⓘ ${f.kind} · ${f.where} — ${f.msg}`);
     const n = rows.filter(f => f.lvl === 'ⓘ' && !f.acc).length; if (n) console.log(`  ⓘ не виміряно контраст на ${n} елементах (градієнт / картинка) — глянь очима`); }
 }
-console.log(`─── ui_lint: ✗ ${x} · ⚠ ${w} · станів ${states.length || 1} × 2 теми ───`);
+console.log(`─── ui_lint: ✗ ${x} · ⚠ ${w} · екранів ${states.length + 1} (початковий + станів ${states.length}) × 2 теми ───`);
 if (opt.repo && !x) {   // позначка для воріт: той самий хеш диффу UI, що рахує ui-review-gate
   const hx = execFileSync('bash', [join(here, 'hooks/ui-review-gate.sh'), 'hash', resolve(opt.repo)], { encoding: 'utf8' }).trim();
   if (hx) { writeFileSync(`/tmp/lens-uilint-${hx}`, `${new Date().toISOString()} ✗0 ⚠${w} ${target} states=${states.length || 1}\n`); console.log(`✓ позначка ui_lint для диффу ${hx.slice(0, 8)} — ворота огляду приймуть done`); }

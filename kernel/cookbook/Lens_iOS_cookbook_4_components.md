@@ -554,6 +554,20 @@ function confirmAction(title,desc,onOk){
 
 Джерело: Drive Lens `.sr-inp` (родоначальник). Двічі вкусило при перенесенні clear-× у QR (batch23.1) і KPI (batch14.2) — обидва мали `type="search"` без глушіння. Глушити в тій же сесії, що й додаєш свій clear-×.
 
+**B3.2. Поле пошуку = іконка · поле · хрест · фільтр у ОДНОМУ полі** 🆕 (QR Admin, шіт «Кандидати», 10.10.2026; ідея Konst — фільтр не окремою кнопкою поруч, а всередині поля).
+- **Поле — заглиблене (well), кнопка в ньому — піднята (lift)** (A65): гола іконка фільтра в полі губиться (Konst 10.10). Підкладка — `::before` 30 px (`inset:7px`, `background:var(--card)`, тонка рамка й тінь), **тап лишається 44 px** (A73). Увімкнений фільтр — `--accent-soft` + рамка `--accent-border`, іконка `--accent-text` (у темній — приглушено, без кислоти).
+- **Під час набору — хрест замість фільтра** (не дві кнопки поруч): `hidden` на фільтрі + clear-× (B3.1 — нативний хрест заглушити). Хрест — на круглій підкладці.
+- **Тап по всій висоті поля, не по рядку тексту:** `input{padding-block:9px;align-self:stretch}` + `padding-block:0` у поля — інакше тап вище/нижче тексту не відкриває клавіатуру (ui_lint 10.10: зона input 22 px при полі 40). Шрифт поля ≥ 16 px — інакше iOS збільшує сторінку.
+- **Натискання** — фільтр і хрест стискаються (A67, `.pressing` на підкладці `::before`, `.88`).
+```css
+.f{position:relative;width:44px;height:44px;margin:-12px -12px -12px -8px;border:none;background:none}
+.f svg{position:relative;width:16px;height:16px}
+.f::before{content:"";position:absolute;inset:7px;border-radius:9px;background:var(--card);box-shadow:0 1px 2px rgba(20,40,35,.14),0 0 0 1px var(--border);transition:transform 280ms cubic-bezier(.34,1.5,.64,1)}
+.f.on::before{background:var(--accent-soft);box-shadow:0 0 0 1px var(--accent-border)}.f.on{color:var(--accent-text)}
+.f.pressing::before{transform:scale(.88);transition-duration:80ms}
+```
+Джерело: `QR-Lens:tools/QR_Lens_zvit_template.html` (`.zv-sb .ph-srch`, `.zv-fin`).
+
 ## B4. Numeric fuel gauge — 12 поділів 🆕 (Drive Lens)
 
 Не `<input type="number">`, а візуальний `role="slider"` (12 ticks, кожен 3-й major), `.fg-fill` width%, tap/drag/arrow-keys, `aria-valuemin/max/now`. + опц. «Запас ходу» numeric input.
