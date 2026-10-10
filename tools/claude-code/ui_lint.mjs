@@ -2,11 +2,12 @@
 // ui_lint — машинна частина огляду UI: те, що видно програмі, ловить програма, а не Konst («капсула прилипла», «текст обрізаний», «іконка вище»).
 // Очі агента лишаються: машина бачить ~третину вад (розвідка 10.10: axe/WCAG-огляди), решта — чек-лист воріт ui-review-gate.
 //
-// Запуск:  node ui_lint.mjs <url|файл.html> [--state "<js>"]… [--repo <тека>] [--width 390] [--json]
+// Запуск:  node ui_lint.mjs <url|файл.html> [--state "<js>"]… [--repo <тека>] [--width 390] [--height 844] [--json]   (низький екран Safari: --width 375 --height 634)
 //          кожен --state — окремий стан (JS виконується на сторінці; між станами сторінка перезавантажується); без --state — лише початковий.
 //          Обидві теми (prefers-color-scheme light/dark) завжди. --repo: ✗ 0 → позначка для воріт (той самий хеш диффу, що в ui-review-gate).
 //          <repo>/.ui-lint-accept — відомі вади, прийняті Konst: рядок «вид | шматок адреси елемента | причина · дата» → ⓘ (не блокує, але друкується щоразу).
 //          node ui_lint.mjs selftest — зуби: сторінка з підкинутими вадами (кожна мусить дати свій рядок) і чиста (0).
+// Перевірки 10–11 (QR CC-7, пропуски Konst): дія в прокрутці (✗) · кнопки одного ряду різної висоти (⚠).
 // Вивід: ✗ (ворота не пустять) · ⚠ (подивись очима) · ⓘ (не виміряно); exit 1 на ✗.
 // Пороги: контраст 4,5:1 (великий текст 3:1) — WCAG 2.x AA · ціль тапу 24 px ✗ (WCAG 2.2 2.5.8) / 44 px ⚠ (Apple HIG) · поле вводу < 16 px — iOS Safari збільшує сторінку ·
 // текст < 11 px ⚠ (HIG) · прилипання < 2 px до краю картки — наш поріг (QR CC-5 «капсула», CC-6 бейдж). Джерела й дати — бриф §HOOK-2.5.
@@ -83,6 +84,22 @@ function probe() {
         const tops = ks.map(k => { const f = k.firstElementChild; return f ? Math.round(f.getBoundingClientRect().top - k.getBoundingClientRect().top) : null; });
         if (tops.every(x => x != null) && Math.max(...tops) - Math.min(...tops) > 1) add('⚠', 'ряд', ks[0], `вміст у ряду на різній висоті (від верху ${tops.join('·')} px) — значки «стрибають»`); }
       else if (col) { const ws = R.map(x => Math.round(x.width)); if (Math.max(...ws) - Math.min(...ws) > 2) add('⚠', 'ряд', ks[0], `однакові елементи в стовпці різної ширини: ${ws.join('·')} px`); } } }
+  // 10. дія в прокрутці (QR CC-7, пропуск Konst: у високому шіті «Закрити» ховалась під краєм прокрутки): остання кнопка прокручуваного блока — дія —
+  //     видна повністю без прокрутки, інакше закріпити кнопки поза прокруткою. Рядок списку (≥ 3 однакових сусідів) — не судимо: обрізаний край списку — норма.
+  for (const sc of [...document.querySelectorAll('body *')].filter(e => /auto|scroll/.test(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + 2 && vis(e))) {
+    // дія шіта = широка кнопка (≥ 60 % ширини блока), найнижча на екрані — не «остання в коді» (CSS order міняє порядок) і не кнопка рядка вмісту (кошик у картці)
+    const q = sc.getBoundingClientRect(), bs = [...sc.querySelectorAll('button, a[href], [role=button]')].filter(vis).filter(b => b.getBoundingClientRect().width >= q.width * 0.6);
+    const last = bs.sort((x, y) => y.getBoundingClientRect().bottom - x.getBoundingClientRect().bottom)[0]; if (!last) continue;
+    let inList = false; for (let e = last; e && e !== sc; e = e.parentElement) { const p = e.parentElement; if (p && [...p.children].filter(c => c.className === e.className && c.tagName === e.tagName).length >= 3) { inList = true; break; } }
+    const r = last.getBoundingClientRect();
+    if (!inList && r.bottom > q.bottom + 1) add('✗', 'дія в прокрутці', last, `кнопку дії видно не повністю без прокрутки (${Math.max(0, Math.round(q.bottom - r.top))} з ${Math.round(r.height)} px) — закріпити кнопки поза прокруткою (кукбук: шіт)`);
+  }
+  // 11. кнопки одного ряду різної висоти (QR CC-7, пропуск Konst: «Ще раз» 34 px ⟂ кошик 44 px): сусідні кнопки рядка flex — одна висота або одне тіло (перемикач)
+  for (const row of [...document.querySelectorAll('body *')].filter(e => /flex/.test(getComputedStyle(e).display) && !/column/.test(getComputedStyle(e).flexDirection) && vis(e))) {
+    const ks = [...row.children].filter(c => vis(c) && c.matches('button, a[href], [role=button]')); if (ks.length < 2) continue;
+    const hs = ks.map(k => Math.round(k.getBoundingClientRect().height));
+    if (Math.max(...hs) - Math.min(...hs) > 4) add('⚠', 'кнопки ряду', ks[0], `кнопки в одному ряду різної висоти: ${hs.join('·')} px — одна висота або одне тіло (перемикач)`);
+  }
   // 9. текст для людини: сміття з коду — ✗; жаргон — ⚠
   const txt = document.body.innerText;
   for (const bad of ['undefined', 'NaN', '[object', 'null']) if (new RegExp(`(^|[^\\w])${bad.replace('[', '\\[')}($|[^\\w])`).test(txt)) add('✗', 'текст', document.body, `на екрані «${bad}» — дані не підставились`);
@@ -97,6 +114,7 @@ body{margin:0;font:15px/1.4 sans-serif;background:#fff;color:#111}@media(prefers
 .pill{display:inline-block;padding:2px 8px;border-radius:99px;background:#237770;color:#fff}.tl{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px}.ic{width:30px;height:30px;border-radius:50%;background:#bbb}.row{display:flex;gap:8px}.tile{flex:1;border-radius:10px;background:#ddd;padding:8px}
 .grey{color:#aaa}.clip{width:60px;overflow:hidden;white-space:nowrap}button:active{transform:scale(.97)}.jsp{color:inherit}.jsp.pressing{transform:scale(.9)}</style><script>document.addEventListener('touchstart',()=>{},{passive:true});document.addEventListener('pointerdown',e=>{const c=e.target.closest('.jsp');if(c)c.classList.add('pressing')});document.addEventListener('pointercancel',()=>document.querySelectorAll('.pressing').forEach(x=>x.classList.remove('pressing')))</script></head><body>
 <div class=card id=ok><button style="min-height:48px;padding:0 16px">Завантажити KPI</button> <span class=pill>6 дн.</span> <a class=jsp href="#j" style="display:inline-block;padding:14px 18px">Відкрити (A67)</a></div>
+<div class=card><div style="height:96px;overflow-y:auto">${[1, 2, 3, 4].map(i => `<div class=li style="padding:4px 0">Рядок ${i} <button style="min-height:44px">Повернути</button></div>`).join('')}</div></div>
 ${'BAD'}</body></html>`;
 const DEFECTS = {
   'прилипло': `<div class=card><span class=pill style="position:absolute;top:1px;right:30px">прилипла</span>.</div>`,
@@ -107,11 +125,14 @@ const DEFECTS = {
   'скрол': `<div style="width:600px;height:4px"></div>`,
   'ряд': `<div class="card row"><div class="tile tl"><i class=ic></i>Сайт</div><div class="tile tl"><i class=ic></i>Історія</div><div class="tile tl"><i class=ic></i>KPI<br>6 дн.</div></div>`,   // вада QR CC-6: другий рядок підняв значок
   'текст': `<div class=card>Дані: undefined · хеш у репо</div>`,
+  'дія в прокрутці': `<div class=card><div style="height:110px;overflow-y:auto"><p style="height:160px;margin:0">Довгий текст шіта</p><button style="min-height:48px;width:100%">Закрити</button></div></div>`,   // QR CC-7: кнопки шіта в прокрутці
+  'дія в прокрутці ': `<div class=card><div style="height:120px;overflow-y:auto"><p style="height:150px;margin:0">Текст</p><div style="display:flex;flex-direction:column"><button style="min-height:48px;width:100%">Закрити</button><button style="min-height:48px;width:100%;order:-1">Скопіювати</button></div></div></div>`,   // QR CC-7: CSS order — дія візуально нижче, ніж у коді
+  'кнопки ряду': `<div class=card style="display:flex;gap:8px;align-items:center"><button style="height:34px;padding:0 14px">Ще раз</button><button style="height:44px;width:44px" aria-label="Прибрати">x</button></div>`,   // QR CC-7: «Ще раз» ⟂ кошик
   'натискання': `<div class=card><a href="#x" style="display:inline-block;padding:14px 18px">Відкрити звіт</a></div>`,
 };
 
 async function lint(target, states, width, theme, browser) {
-  const ctx = await browser.newContext({ viewport: { width, height: 844 }, deviceScaleFactor: 2, colorScheme: theme });
+  const ctx = await browser.newContext({ viewport: { width, height: HEIGHT }, deviceScaleFactor: 2, colorScheme: theme });
   const p = await ctx.newPage(), errs = []; p.on('pageerror', e => errs.push(e.message)); p.on('console', m => m.type() === 'error' && !/Failed to load resource/.test(m.text()) && errs.push(m.text()));
   const res = [];
   for (const [i, st] of [null, ...states].entries()) {   // початковий екран — завжди, далі кожен стан
@@ -161,19 +182,20 @@ async function run(target, states, width) {
 }
 
 const here = dirname(fileURLToPath(import.meta.url));
+let HEIGHT = 844;   // --height: Safari з панеллю ≈ 634 на 375 px (QR CC-7: шіт влазив у 844, а на телефоні — ні)
 const a = process.argv.slice(2);
 if (a[0] === 'selftest') {
   const d = mkdtempSync(join(tmpdir(), 'uilint-')); let bad = 0;
   const page = (x, n) => { const f = join(d, n + '.html'); writeFileSync(f, SELF.replace('BAD', x)); return 'file://' + f; };
   const clean = await run(page('', 'clean'), [], 390); const cl = [...clean.light, ...clean.dark].filter(x => x.lvl !== 'ⓘ');
   console.log((cl.length ? '✗' : '✓') + ` чиста сторінка → тиша (${cl.length ? cl.map(x => x.kind + ': ' + x.msg).join(' | ') : '0'})`); bad += !!cl.length;
-  for (const [k, html] of Object.entries(DEFECTS)) { const r = await run(page(html, k), [], 390); const hit = [...r.light, ...r.dark].some(x => x.kind === k && x.lvl !== 'ⓘ');
+  for (const [k, html] of Object.entries(DEFECTS)) { const r = await run(page(html, k), [], 390); const hit = [...r.light, ...r.dark].some(x => x.kind === k.trim() && x.lvl !== 'ⓘ');
     console.log((hit ? '✓' : '✗') + ` підкинуто «${k}» → спіймано`); bad += !hit; }
   console.log(`─── ui_lint selftest: ${Object.keys(DEFECTS).length + 1 - bad}/${Object.keys(DEFECTS).length + 1} ───`); process.exit(bad ? 1 : 0);
 }
 if (!a[0]) { console.log('node ui_lint.mjs <url|файл> [--state "<js>"]… [--repo <тека>] [--width 390] [--json] | selftest'); process.exit(2); }
 let target = a[0]; if (!/^\w+:\/\//.test(target)) target = 'file://' + resolve(target);
-const states = [], opt = {}; for (let i = 1; i < a.length; i++) { if (a[i] === '--state') states.push(a[++i]); else if (a[i] === '--repo') opt.repo = a[++i]; else if (a[i] === '--width') opt.width = +a[++i]; else if (a[i] === '--json') opt.json = true; }
+const states = [], opt = {}; for (let i = 1; i < a.length; i++) { if (a[i] === '--state') states.push(a[++i]); else if (a[i] === '--repo') opt.repo = a[++i]; else if (a[i] === '--width') opt.width = +a[++i]; else if (a[i] === '--height') HEIGHT = +a[++i]; else if (a[i] === '--json') opt.json = true; }
 const r = await run(target, states, opt.width || 390);
 const acc = []; const af = opt.repo && join(resolve(opt.repo), '.ui-lint-accept');
 if (af && existsSync(af)) for (const l of (await import('node:fs')).readFileSync(af, 'utf8').split('\n')) { const [k, w, why] = l.split('|').map(x => (x || '').trim()); if (k && w && !k.startsWith('#')) acc.push({ k, w, why }); }

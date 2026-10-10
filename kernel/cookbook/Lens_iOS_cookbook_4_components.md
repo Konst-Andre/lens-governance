@@ -486,7 +486,7 @@ function confirmAction(title,desc,onOk){
 }
 ```
 
-Один шіт `sh-confirm` під будь-яке видалення (запис/заправка). **cloneNode-reset:** кнопка постійна в DOM, `onOk` щоразу інший → клонувати вузол, щоб скинути попередній listener. Це не guard (A21), а свідомий **reset one-shot handler** на постійній кнопці.
+**Межа (A108, 10.10.2026):** підтвердження з рядка **всередині шіта** — на місці (контрол стає «↩ | Прибрати»), не другим шітом іншої висоти; `confirmAction` — для дії з екрана без шіта. Один шіт `sh-confirm` під будь-яке видалення (запис/заправка). **cloneNode-reset:** кнопка постійна в DOM, `onOk` щоразу інший → клонувати вузол, щоб скинути попередній listener. Це не guard (A21), а свідомий **reset one-shot handler** на постійній кнопці.
 
 **Анти:** toast без `clearTimeout` (накладання таймерів); sync гучний на synced (шум); прямий `addEventListener` на постійну confirm-кнопку без reset (стек old-handlers). **Зв’язок:** A55/A56 (`--nav-h` для toast), A57 (тривалості), A30 (livePulse), A35 (кольори станів), A21 (listener-стек — confirmAction вирішує reset’ом), wsd 3.9 (sparkline як дозволений RESERVED). *Drive Lens: toast/sync Batch 13–16; confirmAction Batch 10; sparkline RESERVED 16a. Зведено аудитом Round 2.*
 
