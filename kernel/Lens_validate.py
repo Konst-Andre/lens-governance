@@ -1123,10 +1123,10 @@ def queue_open(txt):
         out.append((m.group(1), age))
     return out
 def q_long(txt, where=''):
-    """(ґ) Рядок черги довший за Q_ROW → ⚠ «наріс шарами» (BRIEF-1): спільне для черги ядра (G17) і продукту (G14)."""
+    """(ґ) Рядок черги довший за Q_ROW → ✗ «наріс шарами» (BRIEF-1; ⚠ → ✗ 10.10.2026, «так» Konst: агент створює бриф сам, коміт не пройде): спільне для черги ядра (G17) і продукту (G14)."""
     for l in txt.splitlines():
         m = re.search(r'^\|\s*\*{0,2}`([^`]+)`', l) if l.startswith('|') and len(l) > Q_ROW else None
-        if m: warn(f'{where}`{m.group(1)}` — рядок черги {len(l)} знаків (> {Q_ROW}): наріс шарами — винести в бриф/план, у черзі — стан і вказівник (BRIEF-1)')
+        if m: fail(f'{where}`{m.group(1)}` — рядок черги {len(l)} знаків (> {Q_ROW}): наріс шарами — винести в бриф за шаблоном tools/claude-code/templates/BRIEF_template.md (з прополкою джерел), у черзі — стан і вказівник (BRIEF-1)')
 def _q_ids(txt):
     """`id` рядків таблиць черги (1-а або 2-а комірка) — мірка колишнього check_cherga.ids."""
     out = []
