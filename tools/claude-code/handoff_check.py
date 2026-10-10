@@ -69,6 +69,7 @@ def check_paths(repo, text, where, lines):
     for m in PATH_RE.finditer(text):
         rp, p = m.group(1), m.group(2)
         if rp and rp.lower() in ('http', 'https'): continue
+        if re.match(r'^[a-z0-9-]+(\.[a-z0-9-]+)*\.(com|dev|org|net|io|app|ua)/', p, re.I): continue   # адреса без https:// («dash.cloudflare.com/…») — не шлях у репо (хибне ✗ 10.10, QR CC-7)
         key = (rp or '') + ':' + p
         if key in seen: continue
         seen.add(key)
@@ -283,6 +284,7 @@ def selftest():
         ('самері без стартового → ✗', mk(good.split('## §6')[0]), 'стартове повідомлення нема'),
         ('гола назва ui-review-gate.sh → ✗', mk(good.replace('правила — CLAUDE.md', 'гачок `ui-review-gate.sh`')), 'голі назви'),
         ('мертвий lens/X.md → ✗', mk(good.replace('правила — CLAUDE.md', 'план `lens/X.md`')), 'мертві шляхи'),
+        ('адреса без https:// (dash.cloudflare.com/…) — не шлях → тиша', mk(good.replace('правила — CLAUDE.md', 'посилання dash.cloudflare.com/?to=/:account/x')), None),
         ('мертвий шлях у «Коротко» плану → ✗', mk(good, {'lens/A.md': '## 0. Коротко\n- `lens/Gone.md`\n'}), 'мертві шляхи'),
         ('коміт агента після самері → ✗', mk(good, commit_after=True), 'самері відстає'),
         ('«цей коміт» у §0 → ⚠', mk(good.replace('- далі', '- цей коміт; далі')), '§0 має «цей коміт»'),
