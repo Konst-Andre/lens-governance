@@ -14,7 +14,7 @@ mode="${1:-run}"
 export HOOK_IN HC="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/handoff_check.py"
 python3 - "$mode" <<'PY'
 import json, os, re, subprocess, sys, tempfile, glob
-TRIG = re.compile(r"переїжджа\w*|переїхати|переїдемо|стартов\w+\s+повідомлен\w*|\bнов[ау]\s+сесі[яю]\b", re.I)   # лише команди: «переїжджаємо / переїхати / стартове / нову сесію»; іменник «переїзд» — розповідь (тричі хибне 10.10, журнал гачків §1)
+TRIG = re.compile(r"переїжджаємо|переїжджай\w*|переїхати|переїдемо|стартов\w+\s+повідомлен\w*|\bнов[ау]\s+сесі[яю]\b", re.I)   # лише команди: «переїжджаємо / переїхати / стартове / нову сесію»; іменник «переїзд» — розповідь (тричі хибне 10.10), «переїжджає» — опис (G6 «переїжджає в скрипт», хибне 10.10 QR CC-7) — журнал гачків §1
 HC = os.environ['HC']
 
 def repos(roots):
@@ -80,10 +80,11 @@ def selftest():
     S = lambda m, a=False, s='p1': {'last_assistant_message': m, 'stop_hook_active': a, 'session_id': s}
     for name, d, want in [('Stop: агент дає стартове, є ✗ → block', S('Переїжджаємо. ```text\nСтарт: …\n```'), True),
                           ('Stop: звичайна відповідь → тиша', S('Готово, коміт abc.', s='p2'), False),
+                          ('Stop: «переїжджає» в описі (межа G6 переїжджає в скрипт) → тиша', S('Стара межа G6 переїжджає в новий скрипт.', s='p4'), False),
                           ('Stop: повтор через гачок (stop_hook_active) → тиша', S('```text\nx\n```', True, 'p3'), False)]:
         out = stop(d, [t], t); ok = (out is not None and '✗' in out) == want
         print(('✓' if ok else '✗') + ' ' + name); bad += not ok
-    print(f'selftest: {9 - bad}/9'); return 1 if bad else 0
+    print(f'selftest: {10 - bad}/10'); return 1 if bad else 0
 
 def stop(d, roots, mark_dir='/tmp'):
     """Stop: переїзд оголошує агент (стартове чи «переїжджаємо» у відповіді) — є ✗ → block, щоб виправив до кінця ходу."""
