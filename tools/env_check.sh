@@ -16,7 +16,9 @@ echo "база: $(git branch --show-current) HEAD $(git rev-parse --short HEAD) 
 # мережа · змінні · гейт · аудит
 g=$(code https://api.github.com/); c=$(code https://api.cloudflare.com/client/v4/)
 vars=""; for v in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID GH_TOKEN; do [ -n "${!v:-}" ] && vars+="$v=так " || vars+="$v=ні "; done
-gate=$(python3 kernel/Lens_validate.py --gov . 2>&1 | tail -1 | sed 's/─//g; s/^ *//; s/ *$//')
+gout=$(python3 kernel/Lens_validate.py --gov . 2>&1); gate=$(echo "$gout" | tail -1 | sed 's/─//g; s/^ *//; s/ *$//')
+# ⚠ гейта — це здоров'я файлів ядра (G5 буфери · G6 обсяг · G7 мертвий буфер · G8 сироти…): назвати, які висять, а не лише число (Konst 10.10, QR CC-7)
+gw=$(echo "$gout" | awk '/^\[G[0-9]+\]/{g=$1} /^  ⚠/{c[g]++} END{for(k in c) printf "%s×%d ", k, c[k]}' | tr -d '[]'); [ -n "$gw" ] && gate="$gate (⚠: ${gw% })"
 x=$(echo "$gate" | grep -oE '✗ [0-9]+' | grep -oE '[0-9]+'); [ "${x:-1}" -gt 0 ] && { gate="$gate ← ✗ > 0, розібратись"; rc=1; }
 last=$(grep -m1 -oE "^\| 20[0-9]{2}-[0-9]{2}-[0-9]{2}" kernel/Lens_AUDIT.md 2>/dev/null | tr -d '| ')
 if [ -n "$last" ]; then days=$(( ( $(date +%s) - $(date -d "$last" +%s) ) / 86400 )); [ "$days" -gt 30 ] && aud="аудит правил: $days дн. — ПОРА" || aud="аудит правил: $days дн. тому"; else aud="аудит правил: журналу нема"; fi
