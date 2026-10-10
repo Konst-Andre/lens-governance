@@ -42,6 +42,9 @@ s = f"черга ядра: відкритих {len(q)} (стеля {Q_MAX})" + (
 print(("⚠ " + s + " — спершу виконати, розрізати або відкласти з датою (CQ-1)") if len(q) > Q_MAX or old else s)
 PY
 
+# журнал гачків і перевірок — ріст (≤ 30 дн. у §1, ≤ 24 КБ, рядок ≤ 700 знаків; ротація — шапка журналу)
+python3 tools/claude-code/handoff_check.py journal
+
 # каркас Claude Code — кожне репо сесії (сусідні теки з .git), включно з ядром
 for d in ../*/; do [ -d "$d/.git" ] && bash tools/claude-code/frame_check.sh "$d"; done
 

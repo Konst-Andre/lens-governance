@@ -209,6 +209,27 @@ def hooks_journal(repos):
     if seen: return [('✓', msg + ' — вердикти в журналі гачків є')]
     return [('✗', msg + f' — вердиктів нема: розібрати (справжнє · хибне · дубль · пропуск) у tools/claude-code/hooks/HOOK_JOURNAL.md §1, ідентифікатор `session_{tail[:8] if tail else "?"}`; хибне чи пропуск — виправити гачок + тест')]
 
+# Ріст журналу (Konst 10.10: «хто контролює, наскільки виріс файл?»): §1 — лише живі рядки (≤ 30 дн.), рядок — коротко (деталь — у коміті),
+# файл ≤ 24 КБ (читається точково, але §0 + свіжий §1 — за один погляд). Старше → ротація в теку journal/ поруч, лічильники — у §0.
+J_AGE, J_KB, J_ROW = 30, 24, 700
+def journal_health(k, today=None):
+    import datetime as dt
+    today = today or dt.date.today()
+    txt = open(k, encoding='utf-8').read()
+    body = txt.split('## §1', 1)[1].split('\n## ', 1)[0] if '## §1' in txt else ''
+    rows = [l for l in body.splitlines() if re.match(r'^\| \d\d\.\d\d \|', l)]
+    ages = []
+    for l in rows:
+        d, m = map(int, re.match(r'^\| (\d\d)\.(\d\d)', l).groups())
+        x = dt.date(today.year, m, d)
+        if x > today: x = dt.date(today.year - 1, m, d)
+        ages.append((today - x).days)
+    kb = len(txt.encode()) / 1024; old = max(ages, default=0); long = sum(len(l) > J_ROW for l in rows)
+    s = f'журнал гачків: §1 {len(rows)} рядків · {kb:.0f} КБ · найстаріший {old} дн.'
+    why = [w for c, w in [(old > J_AGE, f'рядки старші за {J_AGE} дн. → ротація: перенести в journal/HOOK_JOURNAL_<рік-міс>.md, лічильники — у §0'),
+                          (kb > J_KB, f'файл > {J_KB} КБ → ротація (те саме)'), (long, f'довгих рядків (> {J_ROW} знаків) {long} → деталь у коміт, у рядку — суть')] if c]
+    return ('⚠', s + ' — ' + ' · '.join(why)) if why else ('✓', s)
+
 def report(repos):
     bad = False
     for r in repos:
@@ -219,7 +240,11 @@ def report(repos):
     print('— гачки')
     for s, t in hooks_journal([os.path.abspath(r) for r in repos]):
         print(f'  {s} {t}'); bad |= s == '✗'
+    roots = [os.path.abspath(r) for r in repos]; roots += [os.path.join(os.path.dirname(r), 'lens-governance') for r in roots] + ['/tmp/lens-governance']
+    k = next((os.path.join(r, JPATH) for r in roots if os.path.isfile(os.path.join(r, JPATH))), None)
+    if k: s, t = journal_health(k); print(f'  {s} {t}')   # ріст — ⚠, не ✗: переїзд не блокує, але нагадує ротацію
     return 1 if bad else 0
+JPATH = 'tools/claude-code/hooks/HOOK_JOURNAL.md'
 
 
 def selftest():
@@ -282,7 +307,17 @@ def selftest():
         got = hooks_journal([prod])[0][0]; ok = got == want
         print(('✓' if ok else '✗') + ' ' + name); bad += not ok
     os.remove(log)
-    total = len(cases) + len(jcases)
+    # ріст журналу: свіжий і короткий → ✓; рядок 40 дн. → ⚠ ротація; довгий рядок → ⚠; дата «з майбутнього» = минулий рік
+    import datetime as dt
+    T0 = dt.date(2026, 10, 10); jf = os.path.join(jd, 'HOOK_JOURNAL.md')
+    hcases = [('журнал: свіжі короткі рядки → ✓', '## §1\n| 10.10 | s | x | y | z |\n## §2\n', '✓', ''),
+              ('журнал: рядок старший за 30 дн. → ⚠ ротація', '## §1\n| 31.08 | s | x | y | z |\n## §2\n', '⚠', 'ротація'),
+              ('журнал: рядок довший за 700 знаків → ⚠ «деталь у коміт»', '## §1\n| 10.10 | s | ' + 'x' * 800 + ' |\n## §2\n', '⚠', 'деталь у коміт'),
+              ('журнал: 20.12 при 10.10 — минулий рік (294 дн.) → ⚠', '## §1\n| 20.12 | s | x |\n## §2\n', '⚠', '294 дн.')]
+    for name, body, want, part in hcases:
+        open(jf, 'w').write(body); g, t = journal_health(jf, T0); ok = g == want and part in t
+        print(('✓' if ok else '✗') + ' ' + name); bad += not ok
+    total = len(cases) + len(jcases) + len(hcases)
     print(f'selftest: {total - bad}/{total}')
     return 1 if bad else 0
 
@@ -290,4 +325,6 @@ def selftest():
 if __name__ == '__main__':
     a = sys.argv[1:]
     if not a: print(__doc__ or 'handoff_check.py <тека репо> … | selftest'); sys.exit(2)
+    if a[0] == 'journal':   # рядок для env_check ядра: ріст журналу гачків щостарту
+        g, t = journal_health(JPATH if len(a) < 2 else a[1]); print((g + ' ' if g == '⚠' else '') + t); sys.exit(0)
     sys.exit(selftest() if a[0] == 'selftest' else report(a))
