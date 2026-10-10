@@ -14,6 +14,8 @@ set -u
 KDIR="$(cd "$(dirname "$0")/../../kernel" && pwd)"   # queue_open — одна мірка черги (CQ-1)
 LENS_PRODUCTS=" EquipLens stock-check QR-Lens Drive-Lens PharmaLens KPI-Lens "   # реєстр — kernel/Lens_INDEX.md §5
 
+SHARED_TOOLS="doc_health.py"   # спільні інструменти ядра для env_check кожного репо (DOC-1, 10.10.2026)
+
 check() {
   local d="${1%/}" n miss=() kind
   n=$(basename "$(git -C "$d" rev-parse --show-toplevel 2>/dev/null || echo "$d")")
@@ -35,6 +37,11 @@ check() {
     local qs; qs=$(python3 -c "import sys; sys.path.insert(0, '$KDIR'); from Lens_validate import queue_open as f; r=f(open('$q', encoding='utf-8').read()); print(len(r), sum(a is not None for _, a in r))" 2>/dev/null)
     case "$qs" in "0 0") miss+=("${q#$d/} — черга не таблицею з \`id\` і датою (CQ-1)");; *" 0") miss+=("${q#$d/} — пункти без дати (CQ-1)");; esac
   fi
+  # Спільні інструменти ядра (Konst 10.10, QR CC-7: «інструмент, що можна розповсюдити на всі продукти, — правильно розмістити»): кожен
+  # кличеться з env_check репо, інакше продукт не отримує покращень. Новий такий інструмент — сюди + у шаблон env_check ТИМ САМИМ комітом.
+  local tool; for tool in $SHARED_TOOLS; do
+    [ -s "$d/tools/env_check.sh" ] && ! grep -q "$tool" "$d/tools/env_check.sh" && miss+=("tools/env_check.sh не кличе $tool — рядок із шаблону ядра (tools/claude-code/templates/env_check_template.sh)")
+  done
   # AUD-2 (05.10.2026): скрипт аудиту — копія зразка «як є»; стара копія жене дорогі паралельні проходи без класу
   [ -s "$d/tools/audit_prompts.sh" ] && ! cmp -s "$d/tools/audit_prompts.sh" "$KDIR/../tools/claude-code/audit_prompts.sh" && miss+=("tools/audit_prompts.sh ≠ зразок ядра — скопіювати (AUD-2)")
   if [ ${#miss[@]} -eq 0 ]; then echo "✓ $n — каркас на місці ($kind)"; return 0; fi
@@ -52,10 +59,12 @@ if [ "${1:-}" = "--inject" ]; then
   echo x > "$t/repo/CLAUDE.md"; rm "$t/repo/docs/AUDIT.md"; part=$(check "$t/repo"); rc_part=$?
   : > "$t/repo/docs/AUDIT.md"; printf '1. пункт списком\n' > "$t/repo/docs/CHERGA.md"; qlist=$(check "$t/repo"); rc_q=$?
   printf '## Відкрите\n\n| id | предмет | дата |\n|---|---|---|\n| `Ч-1` | x | 05.10.2026 |\n\n-----\n' > "$t/repo/docs/CHERGA.md"; qok=$(check "$t/repo"); rc_qok=$?
+  echo 'echo база' > "$t/repo/tools/env_check.sh"; sh0=$(check "$t/repo"); rc_sh0=$?; echo 'python3 doc_health.py .' >> "$t/repo/tools/env_check.sh"; sh1=$(check "$t/repo"); rc_sh1=$?
   echo "# стара копія" >> "$t/repo/tools/audit_prompts.sh"; aud=$(check "$t/repo"); rc_aud=$?
   rm -rf "$t"
   ok=0; [ $rc_full -eq 0 ] || ok=1; [ $rc_gone -eq 1 ] || ok=1; [ $rc_part -eq 1 ] && [[ "$part" == *docs/AUDIT.md* ]] || ok=1; [ $rc_q -eq 1 ] && [[ "$qlist" == *CQ-1* ]] || ok=1; [ $rc_qok -eq 0 ] || ok=1; [ $rc_aud -eq 1 ] && [[ "$aud" == *AUD-2* ]] || ok=1
-  [ $ok -eq 0 ] && echo "✓ inject: повний — ✓, без CLAUDE.md — ⚠, без docs/AUDIT.md — ⚠ з назвою, черга списком — ⚠ CQ-1, черга таблицею — ✓, стара копія скрипта аудиту — ⚠ AUD-2" || echo "✗ inject: детектор сліпий ($full | $gone | $part)"
+  [ $rc_sh0 -eq 1 ] && [[ "$sh0" == *doc_health.py* ]] || ok=1; [ $rc_sh1 -eq 0 ] || ok=1
+  [ $ok -eq 0 ] && echo "✓ inject: повний — ✓, без CLAUDE.md — ⚠, без docs/AUDIT.md — ⚠ з назвою, черга списком — ⚠ CQ-1, черга таблицею — ✓, стара копія скрипта аудиту — ⚠ AUD-2, env_check без спільного інструмента — ⚠ з назвою, з ним — ✓" || echo "✗ inject: детектор сліпий ($full | $gone | $part)"
   exit $ok
 fi
 
