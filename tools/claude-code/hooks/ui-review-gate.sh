@@ -6,7 +6,9 @@
 #           огляду САМЕ ЦЬОГО диффу нема → deny з чек-листом. Будь-яка нова правка UI після позначки міняє дифф → знову deny.
 #   done  — `bash ui-review-gate.sh done "<що переглянуто>" [тека репо]` (відмова gate дає готову команду з текою репо коміту) → позначка /tmp/lens-uireview-<хеш диффу> (рядок ≥ 40 знаків:
 #           які стани, які теми, що бачить людина після дії). Самоствердження, але в потрібну мить і по конкретному диффу.
-#   selftest — 9 випадків (з них 2 — сітка review-remind post) у тимчасовому репо (зуби: UI без позначки → deny; позначка → тиша; правка після позначки → deny).
+#   selftest — 13 випадків (з них 2 — сітка review-remind post, 4 — done ⟂ ui_lint) у тимчасовому репо (зуби: UI без позначки → deny; позначка → тиша; правка після позначки → deny; done без ui_lint → ✗).
+#   hash  — хеш диффу UI репо (для ui_lint: позначка /tmp/lens-uilint-<хеш> — машинна частина огляду, бриф §HOOK-2.5).
+#   done вимагає позначку ui_lint САМЕ ЦЬОГО диффу (✗ 0 в обох темах) або --no-lint \"<причина ≥ 30 знаків>\" (сторінку не запустити) — причина пишеться в позначку.
 # Діє в усіх репо, де підключено гачки ядра (tools/claude-code/CLAUDE_CODE.md «Гачки»), — не лише в QR.
 mode="$1"; shift
 [ "$mode" = gate ] && HOOK_IN="$(cat)" || HOOK_IN="{}"   # stdin — тут: heredoc нижче займає stdin python
@@ -22,7 +24,11 @@ CHECK = ("чек-лист огляду (як користувач, а не ли�
          "кожен новий елемент — окремим кропом 1:1, не мініатюрою (на зменшених знімках губляться капсула, «приклеєна» до краю, і розтягнуті іконки); "
          "вага кнопок: дія > другорядна дія > перехід — різна форма, не лише колір; "
          "матеріал карток; переноси й обрізання; консоль; скрол убік; мок зовнішнього джерела — лише з його реальних кінців "
-         "(коди відповідей, права токена, пропущені кроки), не з очікуваних")
+         "(коди відповідей, права токена, пропущені кроки), не з очікуваних; "
+         "повний екран у кожному стані (порожньо · завантаження · помилка · успіх), не лише кропи нового: нове ⟂ старе на тому ж екрані (стара кнопка поруч з новою дією); "
+         "одна головна дія на екран, другорядне приглушити, а не головне роздути; відступи — зі шкали (4 · 8 · 12 · 16 · 24), не випадкові; "
+         "кнопка називає результат («Завантажити KPI», не «ОК»); помилка — що сталося · чому · що робити; текст без жаргону — або прибрати, якщо зайвий; "
+         "машинне (обрізання, прилипання, контраст, тап, ряд, iOS-зум, скрол) — tools/claude-code/ui_lint.mjs, ✗ 0 в обох темах")
 
 def git(top, *a, raw=False):
     r = subprocess.run(["git", "-C", top, *a], capture_output=True)
@@ -71,15 +77,29 @@ if mode == "gate":
     if out: print(json.dumps(out, ensure_ascii=False))
     sys.exit(0)
 
+if mode == "hash":   # для ui_lint: той самий хеш диффу UI, що й тут (позначка lint — на цей дифф)
+    top = git(args[0] if args else os.getcwd(), "rev-parse", "--show-toplevel")
+    print(ui_state(top)[1] if top else ""); sys.exit(0)
+
+def lint_mark(hx): return f"/tmp/lens-uilint-{hx}"
+
 if mode == "done":
-    note = args[0] if args else ""
-    top = git(args[1] if len(args) > 1 else os.getcwd(), "rev-parse", "--show-toplevel")
+    nolint = args[args.index("--no-lint") + 1] if "--no-lint" in args and args.index("--no-lint") + 1 < len(args) else None
+    rest = [a for i, a in enumerate(args) if a != "--no-lint" and not (i > 0 and args[i - 1] == "--no-lint")]
+    note = rest[0] if rest else ""
+    top = git(rest[1] if len(rest) > 1 else os.getcwd(), "rev-parse", "--show-toplevel")
     if len(note) < 40: print("✗ рядок огляду < 40 знаків — назви стани, теми й що бачить людина після дії"); sys.exit(1)
     if not top: print("✗ не git-репо"); sys.exit(1)
     files, hx = ui_state(top)
     if not files: print("ⓘ змін UI нема — позначка не потрібна"); sys.exit(0)
-    open(mark(hx), "w").write(note + "\n" + "\n".join(files) + "\n")
-    print(f"✓ позначка огляду {hx[:8]} · {os.path.basename(top)}: {', '.join(files)}"); sys.exit(0)
+    # машинна частина огляду (HOOK-2.5): ui_lint на ЦЬОМУ диффі дав ✗ 0 в обох темах — або чесна причина, чому сторінку не запустити
+    lint = os.path.exists(lint_mark(hx))
+    if not lint and not (nolint and len(nolint) >= 30):
+        ul = os.path.join(os.path.dirname(os.path.dirname(os.environ.get("UI_GATE_SELF", "x/x"))), "ui_lint.mjs")
+        print(f"✗ ui_lint цього диффу ({hx[:8]}) не пройдено: node {ul} <url|файл> [--state \"<js>\"]… --repo {top} → ✗ 0 в обох темах; "
+              f"сторінку не запустити — done \"<огляд>\" {top} --no-lint \"<чому, ≥ 30 знаків>\""); sys.exit(1)
+    open(mark(hx), "w").write(note + ("" if lint else f"\n[без ui_lint: {nolint}]") + "\n" + "\n".join(files) + "\n")
+    print(f"✓ позначка огляду {hx[:8]} · {os.path.basename(top)}: {', '.join(files)}" + ("" if lint else " · ⚠ без ui_lint — причина записана")); sys.exit(0)
 
 if mode == "selftest":
     tmp = tempfile.mkdtemp(); bad = 0; n = 0
@@ -103,6 +123,15 @@ if mode == "selftest":
         say(gate(ev("git add -A && git commit -m x")) is not None, "новий .css (ще не в git) теж рахується → deny")
         r = subprocess.run(["bash", os.environ["UI_GATE_SELF"], "gate"], input=json.dumps(ev("git add -A && git commit -m x")), capture_output=True, text=True)
         say('"deny"' in r.stdout, "зуби: справжній виклик гачка (JSON через stdin, як від Claude Code) → deny")
+        os.remove(mark(hx))
+        # done вимагає ui_lint на цьому диффі (HOOK-2.5)
+        dn = lambda *a: subprocess.run(["bash", os.environ["UI_GATE_SELF"], "done", *a], capture_output=True, text=True)
+        files, hx = ui_state(tmp); note = "огляд: світла й темна, стан після дії, перезавантаження сторінки"
+        r = dn(note, tmp); say(r.returncode == 1 and "ui_lint" in r.stdout and not os.path.exists(mark(hx)), "зуби: done без ui_lint цього диффу → ✗, позначки нема")
+        open(lint_mark(hx), "w").write("✗0"); r = dn(note, tmp); say(r.returncode == 0 and os.path.exists(mark(hx)), "done з позначкою ui_lint цього диффу → ✓")
+        os.remove(mark(hx)); os.remove(lint_mark(hx))
+        r = dn(note, tmp, "--no-lint", "коротко"); say(r.returncode == 1, "зуби: --no-lint без причини (< 30 знаків) → ✗")
+        r = dn(note, tmp, "--no-lint", "CSS листа, сторінки в браузері немає — лише шаблон"); say(r.returncode == 0 and "без ui_lint" in open(mark(hx)).read(), "--no-lint з причиною → ✓, причина в позначці")
         os.remove(mark(hx))
         # сітка review-remind post: UI-коміт без позначки → озивається; з позначкою на ці файли → тиша (без дубля)
         rr = os.path.join(os.path.dirname(os.environ["UI_GATE_SELF"]), "review-remind.sh")
