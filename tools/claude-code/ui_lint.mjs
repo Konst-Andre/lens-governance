@@ -10,6 +10,7 @@
 // Перевірки 10–11 (QR CC-7, пропуски Konst): дія в прокрутці (✗) · кнопки одного ряду різної висоти (⚠).
 // Перевірки 12–14 (QR CC-8, пропуск Konst «Історія читається злитно»): сирота — останній рядок 1–2 знаки · злито — дата + ≥ 2 речі через «·» · однакові заголовки рядків (усі ⚠).
 // Перевірки 15–16 (QR CC-8, пропуски Konst 11.10): дата й час одним шматком · верхній край картки зливається з тлом (A66) (⚠).
+// Перевірка 17 (QR CC-8, Konst 11.10 «покращили світлу — темна відстала»): паритет тем — поверхня обʼємна в одній темі й пласка в іншій (⚠).
 // Вивід: ✗ (ворота не пустять) · ⚠ (подивись очима) · ⓘ (не виміряно); exit 1 на ✗.
 // Пороги: контраст 4,5:1 (великий текст 3:1) — WCAG 2.x AA · ціль тапу 24 px ✗ (WCAG 2.2 2.5.8) / 44 px ⚠ (Apple HIG) · поле вводу < 16 px — iOS Safari збільшує сторінку ·
 // текст < 11 px ⚠ (HIG) · прилипання < 2 px до краю картки — наш поріг (QR CC-5 «капсула», CC-6 бейдж). Джерела й дати — бриф §HOOK-2.5.
@@ -139,6 +140,12 @@ function probe() {
     const bc = rgba(s.borderTopColor) || [0, 0, 0, 0], bw = parseFloat(s.borderTopWidth) || 0, bline = bw > 0 && bc[3] > 0 ? cr(blend(bc, ground), ground) : 1;
     const L = layers(s.boxShadow), halo = L.some(l => !l.inset && l.blur >= 14 && l.a >= 0.05), lit = L.some(l => l.inset && l.y > 0 && l.a >= 0.06);
     if (cr(edge, ground) < 1.06 && bline < 1.2 && !halo && !lit) add('⚠', 'зливається', c, `верхній край майже кольору тла (${cr(edge, ground).toFixed(2)}:1), рамка ${bline.toFixed(2)}:1, нема широкої тіні чи світла зверху — краю нічим триматись (A66: світла — blur ≥ 14, темна — inset зверху; не жирна рамка)`); }
+  // 17 (збір). обʼєм поверхні — для паритету тем (QR CC-8, пропуск Konst: «покращили світлу — темна відстала»): градієнт (не однотонний), широка мʼяка тінь, світло зверху
+  for (const el of all) { const s = getComputedStyle(el), r = el.getBoundingClientRect(); if (r.width < 120 || r.height < 24) continue;
+    const own = (rgba(s.backgroundColor) || [0, 0, 0, 0])[3] > 0.05 || s.backgroundImage !== 'none'; if (!own) continue;
+    const cs = (s.backgroundImage.match(/rgba?\([^)]*\)|color\([^)]*\)/g) || []).map(rgba), grad = /gradient/.test(s.backgroundImage) && cs.length > 1 && cs.some(x => x && cs[0] && x.join() !== cs[0].join());
+    const L = layers(s.boxShadow), v = [grad && 'градієнт', L.some(l => !l.inset && l.blur >= 14 && l.a >= 0.03) && 'тінь', L.some(l => l.inset && l.y !== 0 && l.a >= 0.06) && 'вставка'].filter(Boolean);   // вставка: світло зверху (темна) чи западина (світла) — обидва прийоми обʼєму (A65/A66); широка тінь навіть ледь помітна — свідомий обʼєм
+    out.push({ lvl: 'vol', kind: 'обʼєм', where: path(el), msg: v.join('+') }); }
   // 14. однакові заголовки рядків: ≥ 3 сусіди-рядки з тим самим першим жирним текстом — різниця схована в сірому підписі
   for (const p of new Set(all.map(e => e.parentElement))) { if (!p) continue;
     const g = {}; for (const k of p.children) if (all.includes(k)) { const h = k.querySelector('b, strong, h1, h2, h3, h4'); if (h && h.textContent.trim()) (g[k.tagName + '.' + k.className + '|' + h.textContent.trim()] ||= []).push(k); }
@@ -174,6 +181,7 @@ const DEFECTS = {
   'сирота': `<div class=card><div style="width:126px;font:15px monospace">збірка-0000026 с</div></div>`,   // QR CC-8: «збірка 26 / с» на 375 px
   'злито': `<div class=card><small>10.10 22:46 · оновлення адмінки · успішно</small></div>`,   // QR CC-8: «Історія» — дата · чому · стан в одній сірій смузі
   'однакові заголовки': `<div class=card>${[1, 2, 3].map(i => `<div class=hr><b>Бот зібрав дані</b><br><small>10.10 1${i}:00</small></div>`).join('')}</div>`,   // QR CC-8: шість «Бот зібрав дані»
+  'паритет тем': `<style>.ph{border-radius:14px;padding:14px;background:linear-gradient(180deg,#fff,#e3ebe9)}@media(prefers-color-scheme:dark){.ph{background:#232a35}}</style><div class=card><div class=ph>Шапка</div></div>`,   // QR CC-8: шапка обʼємна у світлій, пласка в темній
   'дата й час': `<div class=card><small>09.10 18:53 · QR Admin</small></div>`,   // QR CC-8: «Історія»
   'зливається': `<div style="background:#eef3f2;padding:16px"><div style="border-radius:16px;background:#fff;border:1px solid rgba(211,222,219,.4);box-shadow:0 3px 8px rgba(0,0,0,.06)"><div style="background:rgba(227,235,233,.6);padding:12px">На сайті</div><div style="padding:12px">рядок</div></div></div>`,   // QR CC-8: шапка картки в шіті світлої теми
   'натискання': `<div class=card><a href="#x" style="display:inline-block;padding:14px 18px">Відкрити звіт</a></div>`,
@@ -226,7 +234,14 @@ async function lint(target, states, width, theme, browser) {
 async function run(target, states, width) {
   const { chromium } = await pw(); const b = await chromium.launch();
   const out = {}; for (const t of ['light', 'dark']) out[t] = await lint(target, states, width, t, b);
-  await b.close(); return out;
+  await b.close();
+  // 17. паритет тем: та сама поверхня має обʼєм в одній темі й пласка в іншій (інструмент може різнитись — A66: світла тінь, темна світло зверху)
+  const V = t => Object.fromEntries(out[t].filter(f => f.lvl === 'vol').map(f => [f.state + '|' + f.where, f.msg]));
+  const L = V('light'), D = V('dark'), seen = new Set();
+  for (const k of Object.keys(L)) if (k in D && !!L[k] !== !!D[k]) { const [st, where] = k.split('|'); const key = where.replace(/ «.*$/, ''); if (seen.has(key)) continue; seen.add(key);
+    out.light.push({ lvl: '⚠', kind: 'паритет тем', where, state: st, msg: L[k] ? `обʼєм лише у світлій (${L[k]}), у темній плоско — підтягни темну (A66: світло зверху + мʼяка тінь)` : `обʼєм лише в темній (${D[k]}), у світлій плоско — підтягни світлу (A66: широка мʼяка тінь)` }); }
+  for (const t of ['light', 'dark']) out[t] = out[t].filter(f => f.lvl !== 'vol');
+  return out;
 }
 
 const here = dirname(fileURLToPath(import.meta.url));
