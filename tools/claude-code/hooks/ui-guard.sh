@@ -7,6 +7,20 @@
 #   (пошук ззовні — з 10.10.2026, слово Konst: правило профілю «ПІДСИЛЕННЯ ІНТЕРНЕТОМ» модель пропускала; раз на сесію, як і кукбук)
 # Раз на сесію: після одного звернення до індексу все дозволено. Формат — code.claude.com/docs/en/hooks (08.10.2026).
 mode="$1"
+# Теми (QR CC-8, 11.10.2026, пропуск Konst: лічильник відвідувань зробили без розвідки — «пошук ззовні» відкривався раз на сесію, і перший пошук
+# покривав усе до кінця): код, що торкається теми нижче, вимагає рецепт (де він є) і пошук ззовні САМЕ ПРО ЦЮ ТЕМУ в цій сесії — «тема → рецепт → інтернет → план».
+#   Запити пошуку пишуться в /tmp/lens-ui-<сесія>-q (mark); check шукає в них слова теми. Мапа тем — TOPICS нижче; нова тема — рядок + випадок у selftest.
+if [ "$mode" = selftest ]; then
+  ok=0; n=0; S="selftest$$"; Q="/tmp/lens-ui-$S-q"; rm -f "$Q" "/tmp/lens-ui-$S" "/tmp/lens-ui-$S-web"; touch "/tmp/lens-ui-$S" "/tmp/lens-ui-$S-web"
+  t() { n=$((n+1)); got=$(python3 -c 'import json,sys; print(json.dumps({"session_id":sys.argv[1],"tool_name":"Write","tool_input":{"file_path":sys.argv[2],"content":sys.argv[3]}}))' "$S" "$2" "$3" | bash "$0" check | grep -c '"deny"'); [ "$got" = "$1" ] && ok=$((ok+1)) || echo "✗ $4 → $got, очікував $1"; }
+  t 1 admin/worker.js "self.registration.showNotification(t)" "пуш без пошуку про пуш → стоп"
+  echo "web push ios safari vapid" >> "$Q"
+  t 0 admin/worker.js "self.registration.showNotification(t)" "пуш після пошуку про пуш → тиша"
+  t 1 tools/site.html "navigator.sendBeacon('/hit')" "лічильник, а пошук був лише про пуш → стоп"
+  t 0 lens/PLAN.md "navigator.sendBeacon('/hit')" "документ (не код) → тиша"
+  t 0 tools/claude-code/hooks/x.sh "showNotification sendBeacon" "файли гачків (мапа тем у тексті) → тиша"
+  rm -f "$Q" "/tmp/lens-ui-$S" "/tmp/lens-ui-$S-web"; echo "ui-guard selftest: $ok/$n"; [ "$ok" = "$n" ]; exit
+fi
 python3 -c '
 import json, sys, re, os
 mode = sys.argv[1]
@@ -22,7 +36,30 @@ if mode == "mark":
         open(mark, "w").close()
     if tool in ("WebSearch", "WebFetch"):
         open(web, "w").close()
+        with open(mark + "-q", "a", encoding="utf-8") as f: f.write(str(ti.get("query") or ti.get("url") or "") + " " + str(ti.get("prompt") or "")[:200] + "\n")
     sys.exit(0)
+# ── теми: код теми → рецепт + пошук саме про тему (див. шапку) ──
+TOPICS = [   # (назва, слова в коді, слова в запиті пошуку, рецепт / зразок)
+    ("пуш і сповіщення", r"PushManager|pushManager|showNotification|applicationServerKey|vapid", r"push|сповіщ|notif|vapid", "зразок — QR-Lens `admin/worker.js` (крок 4-а: SW лише для пушу, RFC 8291/8292); рецепт кукбука — після кроку 4"),
+    ("service worker", r"serviceWorker\.register|self\.addEventListener\(\s*.(fetch|install|activate)", r"service.?worker|sw\.js", "зразок — QR-Lens `admin/worker.js` SW_JS (без кешу — рішення Konst 08.10)"),
+    ("кеш і свіжість сторінки", r"cache-control|location\.reload\(|caches\.(open|match)|if-none-match|[\x27\x22]etag[\x27\x22]", r"cache|кеш|etag|stale|reload|свіж|fresh", "кукбук A79 (самоперевірка версії) · `kernel/modules/Lens_module_1_maint_v1.md`"),
+    ("лічильник і аналітика", r"sendBeacon|[\x27\x22]/hit|cloudflareinsights|rumPageload|workersInvocationsAdaptive", r"analytic|beacon|visit|відвід|лічильн|count|track", "`tools/cloudflare/CLOUDFLARE.md` §2 п.16 (Web Analytics з iPhone не доходить; свій лічильник)"),
+]
+code = ""
+if tool in ("Write", "Edit"):
+    fp = str(ti.get("file_path", ""))
+    if re.search(r"\.(html?|m?js|ts|toml|py|sh)$", fp, re.I) and "tools/claude-code/hooks/" not in fp: code = str(ti.get("content") or ti.get("new_string") or "")
+elif tool == "Bash":
+    cmd = str(ti.get("command", ""))
+    if "tools/claude-code/hooks/" not in cmd and re.search(r"(>|\btee\b|sed\s+-i|\.write|open\()", re.sub(r"\d?>>?&?\s*/dev/null|\d>&\d", "", cmd)): code = cmd
+if code:
+    qs = open(mark + "-q", encoding="utf-8").read() if os.path.exists(mark + "-q") else ""
+    miss = [(nm, rc, qw) for nm, cw, qw, rc in TOPICS if re.search(cw, code, re.I) and not re.search(qw, qs, re.I)]
+    if miss:
+        print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny",
+            "permissionDecisionReason": "Тема коду — " + "; ".join(f"«{nm}»: {rc}" for nm, rc, _ in miss) + ". Спершу рецепт / зразок, тоді пошук ззовні САМЕ ПРО ЦЮ ТЕМУ (WebSearch, запит зі словами теми) — "
+            "як це роблять сьогодні, що в рецепті застаріло, чого ми не бачимо; зважити й скласти план — тоді код (тема → рецепт → інтернет → план; одного пошуку на сесію мало — QR CC-8, лічильник без розвідки)."}}, ensure_ascii=False))
+        sys.exit(0)
 need = [x for x, f in (("кукбук", mark), ("пошук ззовні", web)) if not os.path.exists(f)]
 if not need:
     sys.exit(0)
