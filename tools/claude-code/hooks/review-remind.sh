@@ -1,7 +1,7 @@
 #!/bin/bash
 # живе доки: UI-кроки (HTML/CSS, стенди) робить агент Claude Code. Дім — lens-governance:tools/claude-code/hooks/ (черга ARCH-1 (ґ)(д)).
 # Нагадування, не заборона: програма не може вимагати огляд, але може покласти факт у контекст агента в потрібну мить.
-#   post  — PostToolUse (Read|Bash|Grep — фільтр у lens-hooks.sh; Read/Grep — для позначки маніфесту): щойно зроблений `git commit` змінив .html/.css, а позначки огляду (ui-review-gate done) на ці файли
+#   post  — PostToolUse (диспетчер lens-hooks.sh шле Read|Bash|Grep|WebSearch|WebFetch; коміт — лише Bash, позначка маніфесту — будь-який із них): щойно зроблений `git commit` змінив .html/.css, а позначки огляду (ui-review-gate done) на ці файли
 #           за останні 2 год нема → «коміт UI обійшов огляд» (раз на SHA). Є позначка — тиша: огляд до коміту вже вимагає ui-review-gate
 #           (HOOK-2 п.4, 09.10.2026); тут лишилась страхувальна сітка — гачок-ворота впав, вимкнений чи коміт пройшов повз нього
 #           + позначка «маніфест стендів прочитано», якщо виклик згадав Lens_stagebench_manifest
@@ -58,9 +58,9 @@ if mode == "post":
             src = open(os.path.join(os.environ.get("RR_DIR", "."), "ui-review-gate.sh"), encoding="utf-8").read()
             check = ast.literal_eval(re.search(r"CHECK = (\(.*?\))\n\n", src, re.S).group(1))
         except Exception:
-            check = "чек-лист — tools/claude-code/hooks/ui-review-gate.sh (CHECK)"
+            check = "чек-лист — lens-governance:tools/claude-code/hooks/ui-review-gate.sh (CHECK)"
         say("PostToolUse", f"Коміт {chr(59).join(out)} змінив UI-файли без позначки огляду: ворота ui-review-gate його не зупинили "
-            "(гачок упав, вимкнений чи коміт пройшов повз). Варто сказати Konst і зробити огляд до наступного кроку (HOOK-2 п.4; ARCH-1 (ґ)) — "
+            "(гачок упав, вимкнений чи коміт пройшов повз). Наступний крок — сказати Konst і зробити огляд, "
             f"окремим проходом, {check}; знахідки → правки → ще прохід → лише тоді прев\u2019ю Konst.")
 elif mode == "stand":
     if os.path.exists(seen): sys.exit(0)
@@ -70,7 +70,7 @@ elif mode == "stand":
     # лише в імені .html-файлу, не в усій команді: «konstandre» в адресі давало хибне (QR CC-8, 10.10)
     if any(re.search(r"(stand|stend|bench|harness|compar|стенд|компер)", f, re.I) for f in re.findall(r"[^\s\x27\x22|;&<>]+\.html?\b", path, re.I)):
         open(seen, "w").close()
-        say("PreToolUse", "Стенди, харнеси й компери Lens описує маніфест ядра kernel/Lens_stagebench_manifest.md (буфер — kernel/Lens_stagebench_delta_running.md); "
+        say("PreToolUse", "Стенди, харнеси й компери Lens описує маніфест ядра lens-governance:kernel/Lens_stagebench_manifest.md (буфер — lens-governance:kernel/Lens_stagebench_delta_running.md); "
             "у цій сесії його ще не відкривали (lens-governance:CLAUDE.md «Звідки брати»: «будую чи правлю стенд, харнес, компер, важелі»).")
 ' "$mode"
 exit 0

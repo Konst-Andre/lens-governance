@@ -7,11 +7,9 @@
 //          Обидві теми (prefers-color-scheme light/dark) завжди. --repo: ✗ 0 → позначка для воріт (той самий хеш диффу, що в ui-review-gate).
 //          <repo>/.ui-lint-accept — відомі вади, прийняті Konst: рядок «вид | шматок адреси елемента | причина · дата» → ⓘ (не блокує, але друкується щоразу).
 //          node ui_lint.mjs selftest — зуби: сторінка з підкинутими вадами (кожна мусить дати свій рядок) і чиста (0).
-// Перевірки 10–11 (QR CC-7, пропуски Konst): дія в прокрутці (✗) · кнопки одного ряду різної висоти (⚠).
-// Перевірки 12–14 (QR CC-8, пропуск Konst «Історія читається злитно»): сирота — останній рядок 1–2 знаки · злито — дата + ≥ 2 речі через «·» · однакові заголовки рядків (усі ⚠).
-// Перевірки 15–16 (QR CC-8, пропуски Konst 11.10): дата й час одним шматком · верхній край картки зливається з тлом (A66) (⚠).
-// Перевірка 17 (QR CC-8, Konst 11.10 «покращили світлу — темна відстала»): паритет тем — поверхня обʼємна в одній темі й пласка в іншій (⚠).
-// Перевірка 18 (QR CC-8, A109): кромка прокрутки — блок прокрутки в шіті без маски (⚠).
+// Перевірки: 1 скрол убік · 2 обрізано · 3 прилипло / вилазить · 4 контраст · 5 шрифт · 6 тап, без назви, iOS-зум · 7 накладання · 8 ряд · 9 текст (сміття, жаргон) ·
+// 10 дія в прокрутці · 11 кнопки ряду · 12 сирота · 13 злито · 14 однакові заголовки · 15 дата й час · 16 зливається · 17 паритет тем · 18 кромка; поза probe — натискання (:active / JS pointerdown, touchstart).
+// Звідки кожна (пропуск Konst, QR CC-N, рецепт кукбуку) — коментар біля неї.
 // Вивід: ✗ (ворота не пустять) · ⚠ (подивись очима) · ⓘ (не виміряно); exit 1 на ✗.
 // Пороги: контраст 4,5:1 (великий текст 3:1) — WCAG 2.x AA · ціль тапу 24 px ✗ (WCAG 2.2 2.5.8) / 44 px ⚠ (Apple HIG) · поле вводу < 16 px — iOS Safari збільшує сторінку ·
 // текст < 11 px ⚠ (HIG) · прилипання < 2 px до краю картки — наш поріг (QR CC-5 «капсула», CC-6 бейдж). Джерела й дати — бриф §HOOK-2.5.
@@ -96,7 +94,7 @@ function probe() {
     const last = bs.sort((x, y) => y.getBoundingClientRect().bottom - x.getBoundingClientRect().bottom)[0]; if (!last) continue;
     let inList = false; for (let e = last; e && e !== sc; e = e.parentElement) { const p = e.parentElement; if (p && [...p.children].filter(c => c.className === e.className && c.tagName === e.tagName).length >= 3) { inList = true; break; } }
     const r = last.getBoundingClientRect();
-    if (!inList && r.bottom > q.bottom + 1) add('✗', 'дія в прокрутці', last, `кнопку дії видно не повністю без прокрутки (${Math.max(0, Math.round(q.bottom - r.top))} з ${Math.round(r.height)} px) — закріпити кнопки поза прокруткою (кукбук: шіт)`);
+    if (!inList && r.bottom > q.bottom + 1) add('✗', 'дія в прокрутці', last, `кнопку дії видно не повністю без прокрутки (${Math.max(0, Math.round(q.bottom - r.top))} з ${Math.round(r.height)} px) — закріпити кнопки поза прокруткою (кукбук A108)`);
   }
   // 11. кнопки одного ряду різної висоти (QR CC-7, пропуск Konst: «Ще раз» 34 px ⟂ кошик 44 px): сусідні кнопки рядка flex — одна висота або одне тіло (перемикач)
   for (const row of [...document.querySelectorAll('body *')].filter(e => /flex/.test(getComputedStyle(e).display) && !/column/.test(getComputedStyle(e).flexDirection) && vis(e))) {
@@ -263,7 +261,7 @@ if (a[0] === 'selftest') {
     console.log((hit ? '✓' : '✗') + ` підкинуто «${k}» → спіймано`); bad += !hit; }
   console.log(`─── ui_lint selftest: ${Object.keys(DEFECTS).length + 1 - bad}/${Object.keys(DEFECTS).length + 1} ───`); process.exit(bad ? 1 : 0);
 }
-if (!a[0]) { console.log('node ui_lint.mjs <url|файл> [--state "<js>"]… [--repo <тека>] [--width 390] [--json] | selftest'); process.exit(2); }
+if (!a[0]) { console.log('node ui_lint.mjs <url|файл> [--state "<js>"]… [--repo <тека>] [--width 390] [--height 844] [--json] | selftest'); process.exit(2); }
 let target = a[0]; if (!/^\w+:\/\//.test(target)) target = 'file://' + resolve(target);
 const states = [], opt = {}; for (let i = 1; i < a.length; i++) { if (a[i] === '--state') states.push(a[++i]); else if (a[i] === '--repo') opt.repo = a[++i]; else if (a[i] === '--width') opt.width = +a[++i]; else if (a[i] === '--height') HEIGHT = +a[++i]; else if (a[i] === '--json') opt.json = true; }
 const r = await run(target, states, opt.width || 390);
