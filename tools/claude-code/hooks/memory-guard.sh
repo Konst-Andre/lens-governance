@@ -5,14 +5,36 @@
 # (git commit / gh_commit / push_files / create_or_update_file) → {"decision":"block"} з причиною: агент продовжує й записує або пояснює, чому нічого.
 # Один раз на хід: stop_hook_active = true (агент уже продовжує через гачок) → тиша. Помилка розбору → тиша (гачок не ламає роботу).
 # Формат — code.claude.com/docs/en/hooks «Stop» (stop_hook_active, transcript_path; decision/reason), 08.10.2026.
-# Зуби: bash memory-guard.sh selftest — 6 випадків (рішення без коміту → block; з комітом · без рішень · повтор · «так» усередині слова · сповіщення системи → тиша).
+# Зуби: bash memory-guard.sh selftest — 9 випадків (рішення без коміту → block; з комітом · без рішень · повтор · «так» усередині слова · сповіщення системи → тиша;
+# примірка: варіант названо, рядок «примірка» → block · рядок уже «обрано» · «беру в роботу» → тиша).
 mode="${1:-stop}"
 [ "$mode" = selftest ] && HOOK_IN="{}" || HOOK_IN="$(cat)"
 export HOOK_IN
 python3 - "$mode" <<'PY'
-import json, re, sys, os, tempfile
+import json, re, sys, os, tempfile, subprocess
 CUE = re.compile(r"(?<![\w'’])(так|ні|згоден|згодна|дозволяю|приймаю|делегую|вирішуй|вирішив|вирішила|рішення|давай|поїхали|не треба|не потрібно|бери|роби)(?![\w'’])", re.I)
 COMMIT = re.compile(r"\bgit\b[^\n;&|]*\bcommit\b|gh_commit|push_files|create_or_update_file")
+# Примірка (tools/claude-code/SHOTS.md §5, QR CC-9): Konst назвав варіант («обираю В», «варіант Б»), а рядок примірки досі «примірка» →
+# вибір не записано. Судимо за СТАНОМ README, не за транскриптом (він пишеться асинхронно — code.claude.com/docs/en/hooks, 11.10.2026).
+# Літера — лише велика й лише після слова вибору: «беру в роботу» не рахується.
+PICK = re.compile(r"(?<![\w'’])(?i:обираю|обрав|обрала|вибираю|вибрав|вибрала|беру|бери|варіант|вибір)\s*[:«\"]?\s*([АБВГД])(?![\w'’])")
+
+def pending_fittings(cwd):
+    roots = set()
+    top = subprocess.run(['git', '-C', cwd or '.', 'rev-parse', '--show-toplevel'], capture_output=True, text=True).stdout.strip()
+    base = os.path.dirname(top) if top else (cwd or '.')
+    for r in ([top] if top else []) + [os.path.join(base, x) for x in sorted(os.listdir(base))] if os.path.isdir(base) else []:
+        roots.add(r)
+    out = []
+    for r in sorted(roots):
+        for d in ('lens/shots', 'docs/shots'):
+            f = os.path.join(r, d, 'README.md')
+            if os.path.isfile(f):
+                for line in open(f, encoding='utf-8'):
+                    c = [x.strip() for x in line.strip().strip('|').split('|')]
+                    if line.startswith('|') and len(c) >= 7 and c[1].strip('*').strip().lower() == 'примірка':
+                        out.append(f"{os.path.basename(r)}:{d}/README.md {c[0].strip('`')}")
+    return out
 
 def real_user(x):
     if x.get('type') != 'user' or x.get('isMeta') or x.get('isCompactSummary'): return None
@@ -31,6 +53,13 @@ def verdict(d):
     idx = [i for i, x in enumerate(L) if real_user(x)]
     if not idx: return None
     u = real_user(L[idx[-1]])
+    pick = PICK.search(u)
+    if pick:
+        pend = pending_fittings(d.get('cwd'))
+        if pend:
+            return ("Гачок пам'яті (примірка, SHOTS.md §5): Konst назвав варіант «" + pick.group(1) + "», а примірка досі чекає вибору: " + '; '.join(pend[:3]) + ". "
+                    "У цьому ж ході: рядок → стан «обрано», вибір і **чому словами Konst**, куди йде код, дата — тоді коміт. "
+                    "Якщо Konst назвав варіант не цієї примірки чи ще думає — одним рядком поясни це й заверши хід.")
     cues = sorted({m.group(1).lower() for m in CUE.finditer(u)})
     if not cues: return None
     for x in L[idx[-1] + 1:]:
@@ -55,10 +84,17 @@ def selftest():
              ('без слів-рішень → тиша', [U('Що там зі збіркою?'), A('ls'), R], False, False),
              ('повтор (stop_hook_active) → тиша', [U('Так, згоден'), A('ls'), R], True, False),
              ('«так» усередині слова не рахується → тиша', [U('Таким чином дивлюсь'), A('ls')], False, False),
-             ('сповіщення системи не є повідомленням Konst → тиша', [U('Так'), A('git commit -m a'), R, U('<task-notification>done</task-notification>')], False, False)]
+             ('сповіщення системи не є повідомленням Konst → тиша', [U('Так'), A('git commit -m a'), R, U('<task-notification>done</task-notification>')], False, False),
+             ('примірка: Konst обрав В, рядок ще «примірка» → block', [U('Обираю В, чіпи у вставці'), A('git commit -m a'), R], False, True),
+             ('примірка: рядок уже «обрано» → тиша', [U('Обираю В'), A('git commit -m a'), R], False, False),
+             ('примірка: «беру в роботу» — не вибір → тиша', [U('беру в роботу, поїхали'), A('git commit -m a'), R], False, False)]
     bad = 0
+    T = tempfile.mkdtemp(); repo = os.path.join(T, 'prod'); os.makedirs(os.path.join(repo, 'lens', 'shots'))
+    subprocess.run(['git', 'init', '-q', repo]); RM = os.path.join(repo, 'lens', 'shots', 'README.md')
+    row = lambda st: '| id | стан | що | в | вибір | куди | дата |\n|---|---|---|---|---|---|---|\n| `QRL-1_x` | ' + st + ' | x | x | x | x | 11.10.2026 |\n'
     for name, msgs, active, want in cases:
-        got = verdict({'transcript_path': tr(msgs), 'stop_hook_active': active}) is not None
+        open(RM, 'w', encoding='utf-8').write(row('обрано' if 'уже' in name else 'примірка'))
+        got = verdict({'transcript_path': tr(msgs), 'stop_hook_active': active, 'cwd': repo}) is not None
         print(('✓ ' if got == want else '✗ ') + name); bad += got != want
     print(f"─── memory-guard selftest: {len(cases) - bad}/{len(cases)} ───"); return bad
 

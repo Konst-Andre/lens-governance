@@ -49,7 +49,15 @@ python3 kernel/Lens_validate.py --product ." "правка .md через python
 p='tools/qr_build.py'; open(p,'w').write(t)
 X" "правка .py через python без пошуку → стоп"
   t 0 /tmp/claude-0/x/scratchpad/probe.mjs "x = 1" "робочий файл у /tmp → тиша"
-  rm -f "/tmp/lens-ui-$S-step" "/tmp/lens-ui-$S-skips"
+  R="/tmp/lens-ui-$S-repo"; rm -rf "$R"; mkdir -p "$R/lens/shots" && git -C "$R" init -q
+  printf '| id | стан | що | в | вибір | куди | дата |\n|---|---|---|---|---|---|---|\n| `QRL-1_x` | обрано | x | x | x | x | 11.10.2026 |\n' > "$R/lens/shots/README.md"
+  touch "/tmp/lens-ui-$S-step"
+  echo "ui css pattern" >> "$Q"
+  t 1 "$R/site.html" "<b>x</b>" "UI-код, у репо обрана примірка, README не відкривали → стоп"
+  echo "{\"session_id\":\"$S\",\"tool_name\":\"Read\",\"tool_input\":{\"file_path\":\"$R/lens/shots/README.md\"}}" | bash "$0" mark
+  t 0 "$R/site.html" "<b>x</b>" "README примірок відкрито → тиша"
+  rm -rf "$R" "/tmp/lens-ui-$S-shots"
+  rm -f "/tmp/lens-ui-$S-step" "/tmp/lens-ui-$S-skips" "/tmp/lens-ui-$S-shots"
   rm -f "$Q" "/tmp/lens-ui-$S" "/tmp/lens-ui-$S-web"; echo "ui-guard selftest: $ok/$n"; [ "$ok" = "$n" ]; exit
 fi
 python3 -c '
@@ -65,6 +73,8 @@ web = mark + "-web"   # пошук практики ззовні (профіль
 if mode == "mark":
     if "Lens_cookbook_INDEX" in raw:
         open(mark, "w").close()
+    if "shots/README.md" in raw:
+        open(mark + "-shots", "w").close()   # примірки репо переглянуто (SHOTS.md §5 «у роботі»)
     if tool == "Bash" and re.search(r"\bgit\b[^;&|]*\bcommit\b", str(ti.get("command", ""))) and os.path.exists(mark + "-step"):
         os.remove(mark + "-step")   # коміт закрив крок — наступний починається зі звірки
     if tool in ("WebSearch", "WebFetch"):
@@ -102,8 +112,6 @@ if code:
             "як це роблять сьогодні, що в рецепті застаріло, чого ми не бачимо; зважити й скласти план — тоді код (тема → рецепт → інтернет → план; пошук про іншу тему цю не покриває)."}}, ensure_ascii=False))
         sys.exit(0)
 need = [x for x, f in (("кукбук", mark), ("пошук ззовні", web)) if not os.path.exists(f)]
-if not need:
-    sys.exit(0)
 ui = re.compile(r"\.(html?|css)\b", re.I)
 if tool in ("Write", "Edit"):
     hit = bool(ui.search(str(ti.get("file_path", ""))))
@@ -113,7 +121,25 @@ elif tool == "Bash":
     hit = bool(ui.search(cmd)) and bool(re.search(r"(>|\btee\b|\bcp\b|\bmv\b|sed\s+-i|\.write|open\()", w))
 else:
     hit = False
-if hit:
+if hit and not need and not os.path.exists(mark + "-shots"):
+    # примірка (tools/claude-code/SHOTS.md §5): у репо є обране, а README примірок у сесії не відкривали → спершу подивитись обране
+    import subprocess
+    fp = str(ti.get("file_path", "")) if tool in ("Write", "Edit") else ""
+    top = subprocess.run(["git", "-C", os.path.dirname(fp) if fp else (d.get("cwd") or "."), "rev-parse", "--show-toplevel"], capture_output=True, text=True).stdout.strip()
+    live = []
+    for dd in ("lens/shots", "docs/shots"):
+        f = os.path.join(top, dd, "README.md") if top else ""
+        if f and os.path.isfile(f):
+            for line in open(f, encoding="utf-8"):
+                c = [x.strip() for x in line.strip().strip("|").split("|")]
+                if line.startswith("|") and len(c) >= 7 and c[1].strip("*").strip().lower() in ("обрано", "у роботі"):
+                    live.append(dd + "/README.md " + c[0].strip("`"))
+    if live:
+        print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny",
+            "permissionDecisionReason": "UI-крок, а в репо є обрані примірки: " + "; ".join(live[:4]) + ". Спершу відкрий README примірок і знімки обраного варіанта (Read — картинку видно), "
+            "звір, чи цей крок їх стосується: так — код за обраним (накладка fit_* — чернетка), стан «у роботі»; ні — далі як є (tools/claude-code/SHOTS.md §5)."}}, ensure_ascii=False))
+    sys.exit(0)
+if hit and need:
     print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny",
         "permissionDecisionReason": "UI-крок (HTML/CSS) — бракує: " + " і ".join(need) + ". "
         + ("Кукбук: kernel/cookbook/Lens_cookbook_INDEX.md ядра (../lens-governance/ або /tmp/lens-governance/), §2 «задача → запис» → потрібні рецепти точково. " if "кукбук" in need else "")
