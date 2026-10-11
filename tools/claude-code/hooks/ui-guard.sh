@@ -36,6 +36,16 @@ if [ "$mode" = selftest ]; then
   t 1 tools/qr_build.py "x = 2" "коміт скинув крок → знову стоп"
   CLAUDE_CODE_SESSION_ID="$S" bash "$0" skip "опечатка в рядку, форма не змінюється" >/dev/null
   t 0 tools/qr_build.py "x = 2" "пропуск із причиною → тиша"
+  rm -f "/tmp/lens-ui-$S-step"
+  tb() { n=$((n+1)); got=$(python3 -c 'import json,sys; print(json.dumps({"session_id":sys.argv[1],"tool_name":"Bash","tool_input":{"command":sys.argv[2]}}))' "$S" "$2" | bash "$0" check | grep -c '"deny"'); [ "$got" = "$1" ] && ok=$((ok+1)) || echo "✗ $3 → $got, очікував $1"; }
+  tb 0 "python3 - <<X
+p='lens/QR_Lens_CHERGA.md'; open(p,'w').write(t)
+X
+python3 kernel/Lens_validate.py --product ." "правка .md через python (гейт .py лише запускається) → тиша"
+  tb 1 "python3 - <<X
+p='tools/qr_build.py'; open(p,'w').write(t)
+X" "правка .py через python без пошуку → стоп"
+  t 0 /tmp/claude-0/x/scratchpad/probe.mjs "x = 1" "робочий файл у /tmp → тиша"
   rm -f "/tmp/lens-ui-$S-step" "/tmp/lens-ui-$S-skips"
   rm -f "$Q" "/tmp/lens-ui-$S" "/tmp/lens-ui-$S-web"; echo "ui-guard selftest: $ok/$n"; [ "$ok" = "$n" ]; exit
 fi
@@ -68,10 +78,12 @@ TOPICS = [   # (назва, слова в коді, слова в запиті �
 code = ""
 if tool in ("Write", "Edit"):
     fp = str(ti.get("file_path", ""))
-    if re.search(r"\.(html?|m?js|ts|toml|py|sh)$", fp, re.I) and "tools/claude-code/hooks/" not in fp: code = str(ti.get("content") or ti.get("new_string") or "")
+    if re.search(r"\.(html?|m?js|ts|toml|py|sh)$", fp, re.I) and "tools/claude-code/hooks/" not in fp and not fp.startswith("/tmp/"): code = str(ti.get("content") or ti.get("new_string") or "")
 elif tool == "Bash":
     cmd = str(ti.get("command", ""))
-    if "tools/claude-code/hooks/" not in cmd and re.search(r"(>|\btee\b|sed\s+-i|\.write|open\()", re.sub(r"\d?>>?&?\s*/dev/null|\d>&\d", "", cmd)): code = cmd
+    # ціль запису — шлях після p='…' / open('…' / > / tee / sed -i; код — лише коли серед цілей є файл коду поза /tmp (правка .md через python — не код; хибне QR CC-8)
+    tg = re.findall(r"(?:\bp\s*=\s*|open\(\s*|>\s*|\btee\s+(?:-a\s+)?|sed\s+-i\S*\s+(?:\x27[^\x27]*\x27|\x22[^\x22]*\x22)\s+)[\x27\x22]?([\w./~-]+\.[A-Za-z]+)", re.sub(r"\d?>>?&?\s*/dev/null|\d>&\d", "", cmd))
+    if "tools/claude-code/hooks/" not in cmd and any(re.search(r"\.(html?|m?js|ts|toml|py|sh)$", x, re.I) and not x.startswith("/tmp/") for x in tg): code = cmd
 if code:
     qs = open(mark + "-q", encoding="utf-8").read() if os.path.exists(mark + "-q") else ""
     miss = [(nm, rc, qw) for nm, cw, qw, rc in TOPICS if re.search(cw, code, re.I) and not re.search(qw, qs, re.I)]
