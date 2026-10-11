@@ -14,7 +14,7 @@ set -u
 KDIR="$(cd "$(dirname "$0")/../../kernel" && pwd)"   # queue_open — одна мірка черги (CQ-1)
 LENS_PRODUCTS=" EquipLens stock-check QR-Lens Drive-Lens PharmaLens KPI-Lens "   # реєстр — kernel/Lens_INDEX.md §5
 
-SHARED_TOOLS="doc_health.py"   # спільні інструменти ядра для env_check кожного репо (DOC-1, 10.10.2026)
+SHARED_TOOLS="doc_health.py shots_check.py"   # спільні інструменти ядра для env_check кожного репо (DOC-1, 10.10.2026; примірка — SHOTS.md, QR CC-9 11.10.2026: інструмент, про який продукт не знає, не працює). Виклик, не копія — копії розходяться (практика reusable workflows, earthly.dev · GitHub Docs, 11.10.2026)
 
 check() {
   local d="${1%/}" n miss=() kind
@@ -59,11 +59,11 @@ if [ "${1:-}" = "--inject" ]; then
   echo x > "$t/repo/CLAUDE.md"; rm "$t/repo/docs/AUDIT.md"; part=$(check "$t/repo"); rc_part=$?
   : > "$t/repo/docs/AUDIT.md"; printf '1. пункт списком\n' > "$t/repo/docs/CHERGA.md"; qlist=$(check "$t/repo"); rc_q=$?
   printf '## Відкрите\n\n| id | предмет | дата |\n|---|---|---|\n| `Ч-1` | x | 05.10.2026 |\n\n-----\n' > "$t/repo/docs/CHERGA.md"; qok=$(check "$t/repo"); rc_qok=$?
-  echo 'echo база' > "$t/repo/tools/env_check.sh"; sh0=$(check "$t/repo"); rc_sh0=$?; echo 'python3 doc_health.py .' >> "$t/repo/tools/env_check.sh"; sh1=$(check "$t/repo"); rc_sh1=$?
+  echo 'echo база' > "$t/repo/tools/env_check.sh"; sh0=$(check "$t/repo"); rc_sh0=$?; echo 'python3 doc_health.py .' >> "$t/repo/tools/env_check.sh"; shd=$(check "$t/repo"); rc_shd=$?; echo 'python3 shots_check.py .' >> "$t/repo/tools/env_check.sh"; sh1=$(check "$t/repo"); rc_sh1=$?
   echo "# стара копія" >> "$t/repo/tools/audit_prompts.sh"; aud=$(check "$t/repo"); rc_aud=$?
   rm -rf "$t"
   ok=0; [ $rc_full -eq 0 ] || ok=1; [ $rc_gone -eq 1 ] || ok=1; [ $rc_part -eq 1 ] && [[ "$part" == *docs/AUDIT.md* ]] || ok=1; [ $rc_q -eq 1 ] && [[ "$qlist" == *CQ-1* ]] || ok=1; [ $rc_qok -eq 0 ] || ok=1; [ $rc_aud -eq 1 ] && [[ "$aud" == *AUD-2* ]] || ok=1
-  [ $rc_sh0 -eq 1 ] && [[ "$sh0" == *doc_health.py* ]] || ok=1; [ $rc_sh1 -eq 0 ] || ok=1
+  [ $rc_sh0 -eq 1 ] && [[ "$sh0" == *doc_health.py* ]] || ok=1; [ $rc_sh1 -eq 0 ] || ok=1; [ $rc_shd -eq 1 ] && [[ "$shd" == *shots_check.py* ]] && [[ "$shd" != *doc_health.py* ]] || ok=1   # примірка (CC-9): кличе doc_health, а shots_check ні → ⚠ саме з його назвою
   [ $ok -eq 0 ] && echo "✓ inject: повний — ✓, без CLAUDE.md — ⚠, без docs/AUDIT.md — ⚠ з назвою, черга списком — ⚠ CQ-1, черга таблицею — ✓, стара копія скрипта аудиту — ⚠ AUD-2, env_check без спільного інструмента — ⚠ з назвою, з ним — ✓" || echo "✗ inject: детектор сліпий ($full | $gone | $part)"
   exit $ok
 fi

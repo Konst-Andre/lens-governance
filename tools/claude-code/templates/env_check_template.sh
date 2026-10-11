@@ -37,6 +37,11 @@ echo "прод: — (додати: живий код ≡ репо; тека пу
 if dh=$(curl -sSf -m 20 https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/tools/claude-code/doc_health.py 2>/dev/null); then
   printf '%s\n' "$dh" | python3 - .; else echo "документи: — (doc_health не завантажено)"; fi
 
+# примірка — тека <документація>/shots/ (tools/claude-code/SHOTS.md): ✗ знімок без рядка · жива без знімків · файли після «прийнято»; ⚠ вік, вага, без накладки.
+# Теки нема — рядок «теки shots/ нема» (продукт без UI-рішень наперед — так і є). Свіжий з ядра щоразу — виклик, не копія.
+if sc=$(curl -sSf -m 20 https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/tools/claude-code/shots_check.py 2>/dev/null); then
+  printf '%s\n' "$sc" | python3 - . || fail=1; else echo "примірка: — (shots_check не завантажено)"; fi
+
 # Cloudflare — СПІЛЬНИЙ акаунт усіх проєктів: бюджет (запити · збірки · прогноз) і свіжість правил. Рядки «⚠» — читати й діяти
 # за lens-governance:tools/cloudflare/CLOUDFLARE.md. Скрипт лише читає й завжди exit 0. Репо без Cloudflare — рядок прибрати.
 # ⚠ не «curl | bash || echo»: bash на порожньому вході (404) виходить з 0, і збій мовчить
