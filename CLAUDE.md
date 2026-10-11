@@ -22,6 +22,7 @@
 | інтерфейс iOS / PWA, бот на Workers | `kernel/cookbook/Lens_cookbook_INDEX.md` → номер → том, точково |
 | будую чи правлю стенд, харнес, компер, важелі | `kernel/Lens_stagebench_manifest.md` за § (буфер — `kernel/Lens_stagebench_delta_running.md`) |
 | device-тест на синтетичних даних (пісочниця) | `kernel/Lens_sandbox_manifest.md` |
+| варіанти вигляду обрано зараз, код — пізніше (примірка, тека `shots/`) | `tools/claude-code/SHOTS.md` |
 | суджу рендер, стенд, прев'ю, вирок пристрою | `kernel/wsd/Lens_verdict_protocol.md` — номер з маршруту на початку `Work_Standard.md` |
 | пишу детектор, гейт, смоук; патч перед комітом; діагноз помилки | `kernel/wsd/Lens_patch_check_protocol.md` |
 | прев'ю для Konst | `tools/PREVIEW.md` — повний текст (у профілі — стиснення); крок «квиток / `gh_commit`» тут = `git push` у `Konst-Andre/sandbox` |

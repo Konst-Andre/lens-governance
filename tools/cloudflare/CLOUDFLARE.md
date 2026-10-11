@@ -37,12 +37,12 @@ fresh_days=30
 
 1. **Збірка лише з теки сайту.** Pages → Settings → Builds → *Build watch paths*: include = `<тека сайту>/*` (напр. `site/*`), а не `*`.
    Документи, самері, інструменти, тести збірку не будять. Виключення перевіряються першими; `*` ловить і вкладені теки.
-   *Форма «include `*` + перелік виключень» (Workers Builds, QR-Lens):* **кожен файл у git поза сайтом — у виключеннях**, і новий файл у корені теж (пропуск Konst 11.10.2026, QR CC-9: `.ui-lint-accept` у корені перезбирав воркер даремно — квота). Детектор — `git ls-files` поза текою сайту ⟂ виключення тригера (зразок — `QR-Lens:tools/env_check.sh` рядок «збірка зайва», зуби `ENV_INJECT`). Змінити виключення — `PATCH builds/triggers/<uuid>` з повним `path_excludes` (developers.cloudflare.com/workers/ci-cd/builds/api-reference, 22.09.2026). Порожній push і великий (3000+ файлів чи 20+ комітів) збирають завжди, хоч би що в фільтрі (developers.cloudflare.com/workers/ci-cd/builds/build-watch-paths, 11.10.2026).
    Пропущена фільтром збірка лишає в API запис із `is_skipped: true` і стадіями `idle` (заміряно 03.10.2026) — це не збірка;
    `cf_budget.sh` її не рахує. Чи рахує її ліміт Cloudflare — у документації не сказано (не перевірено).
-   Те саме є у Workers Builds (*Build watch paths*), але для воркера — **навпаки: include `*`, exclude документів** (`docs/*`, `tools/*`,
+   Те саме є у Workers Builds (*Build watch paths*), але для воркера — **навпаки: include `*`, exclude усього, що збірка не читає** (`docs/*`, `tools/*`,
    `.claude/*`, `CLAUDE.md`, `README.md`): збірка воркера читає й сусідні теки (`[assets]`, `../data`), і перелік, що забув одну, мовчки
-   не викладе зміну, а виключення, що забуло одну, дасть лише зайву збірку. Як і чим перевірити — кукбук том 6 · T13.
+   не викладе зміну, а виключення, що забуло одну, дасть зайву збірку (квота). Як і чим перевірити — кукбук том 6 · T13.
+   *Повнота виключень (Workers Builds):* **у виключеннях — кожен файл у git, якого збірка не читає**, і новий файл у корені теж: інакше кожна його правка даремно перезбирає воркер і зʼїдає квоту. Детектор — `git ls-files` поза текою сайту ⟂ виключення тригера (зразок — `QR-Lens:tools/env_check.sh` рядок «збірка зайва», зуби `ENV_INJECT`). Змінити виключення — `PATCH builds/triggers/<uuid>` з повним `path_excludes` (developers.cloudflare.com/workers/ci-cd/builds/api-reference, 22.09.2026). Порожній push і великий (3000+ файлів чи 20+ комітів) збирають завжди, хоч би що в фільтрі (developers.cloudflare.com/workers/ci-cd/builds/build-watch-paths, 11.10.2026). *(QR CC-9 · 11.10.2026, пропуск Konst: `.ui-lint-accept`.)*
 2. **Прев'ю лише для робочих гілок агента.** Pages → Settings → Builds → *Branch control*: preview = *Custom*, include `claude/*`.
    Інші гілки прев'ю не дають. Не потрібні прев'ю — *None*.
 3. **Тека виводу — лише те, що публікується** (`site/`, `public/`; у продуктах Lens сайт — `docs/`, Р-7), не корінь репо — інакше
