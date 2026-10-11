@@ -1,5 +1,5 @@
 #!/bin/bash
-# живе доки: UI-кроки (HTML/CSS) робить агент Claude Code. Дім — lens-governance:tools/claude-code/hooks/ (HOOK-1); копії в репо — як є.
+# живе доки: UI-кроки (HTML/CSS) робить агент Claude Code. Дім — lens-governance:tools/claude-code/hooks/ (HOOK-1); копій у репо продуктів не тримати — гачки діють з ядра через setup script v3 (стара копія QR дублювала ядро старою логікою, прибрано CC-9).
 # Гачок «UI без кукбука — не пиши»: правило «перед UI — індекс кукбука» тримає програма, не пам'ять моделі
 # (урок QR-Lens CC-2, 08.10.2026: сторінку звіту зробили без кукбука → «дешево»).
 #   mark  — PostToolUse (Read|Bash|Grep|WebSearch|WebFetch): згадано Lens_cookbook_INDEX → позначка «кукбук»; WebSearch/WebFetch → позначка «пошук ззовні»
