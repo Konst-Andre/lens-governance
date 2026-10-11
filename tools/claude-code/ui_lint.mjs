@@ -11,6 +11,7 @@
 // Перевірки 12–14 (QR CC-8, пропуск Konst «Історія читається злитно»): сирота — останній рядок 1–2 знаки · злито — дата + ≥ 2 речі через «·» · однакові заголовки рядків (усі ⚠).
 // Перевірки 15–16 (QR CC-8, пропуски Konst 11.10): дата й час одним шматком · верхній край картки зливається з тлом (A66) (⚠).
 // Перевірка 17 (QR CC-8, Konst 11.10 «покращили світлу — темна відстала»): паритет тем — поверхня обʼємна в одній темі й пласка в іншій (⚠).
+// Перевірка 18 (QR CC-8, A109): кромка прокрутки — блок прокрутки в шіті без маски (⚠).
 // Вивід: ✗ (ворота не пустять) · ⚠ (подивись очима) · ⓘ (не виміряно); exit 1 на ✗.
 // Пороги: контраст 4,5:1 (великий текст 3:1) — WCAG 2.x AA · ціль тапу 24 px ✗ (WCAG 2.2 2.5.8) / 44 px ⚠ (Apple HIG) · поле вводу < 16 px — iOS Safari збільшує сторінку ·
 // текст < 11 px ⚠ (HIG) · прилипання < 2 px до краю картки — наш поріг (QR CC-5 «капсула», CC-6 бейдж). Джерела й дати — бриф §HOOK-2.5.
@@ -146,6 +147,11 @@ function probe() {
     const cs = (s.backgroundImage.match(/rgba?\([^)]*\)|color\([^)]*\)/g) || []).map(rgba), grad = /gradient/.test(s.backgroundImage) && cs.length > 1 && cs.some(x => x && cs[0] && x.join() !== cs[0].join());
     const L = layers(s.boxShadow), v = [grad && 'градієнт', L.some(l => !l.inset && l.blur >= 14 && l.a >= 0.03) && 'тінь', L.some(l => l.inset && l.y !== 0 && l.a >= 0.06) && 'вставка'].filter(Boolean);   // вставка: світло зверху (темна) чи западина (світла) — обидва прийоми обʼєму (A65/A66); широка тінь навіть ледь помітна — свідомий обʼєм
     out.push({ lvl: 'vol', kind: 'обʼєм', where: path(el), msg: v.join('+') }); }
+  // 18. кромка прокрутки (A109, QR CC-8): блок прокрутки в шіті (предок position: fixed), вміст ховається ≥ 40 px, маски нема — людина не бачить, що нижче ще є
+  for (const sc of all.filter(e => /auto|scroll/.test(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + 40)) {
+    let fx = false; for (let e = sc.parentElement; e; e = e.parentElement) if (getComputedStyle(e).position === 'fixed') { fx = true; break; }
+    const m = getComputedStyle(sc).maskImage || getComputedStyle(sc).webkitMaskImage || 'none';
+    if (fx && m === 'none') add('⚠', 'кромка', sc, `прокрутка в шіті без кромки: схована частина ${sc.scrollHeight - sc.clientHeight} px, маски нема — підказати «нижче ще є» (кукбук A109)`); }
   // 14. однакові заголовки рядків: ≥ 3 сусіди-рядки з тим самим першим жирним текстом — різниця схована в сірому підписі
   for (const p of new Set(all.map(e => e.parentElement))) { if (!p) continue;
     const g = {}; for (const k of p.children) if (all.includes(k)) { const h = k.querySelector('b, strong, h1, h2, h3, h4'); if (h && h.textContent.trim()) (g[k.tagName + '.' + k.className + '|' + h.textContent.trim()] ||= []).push(k); }
@@ -181,6 +187,7 @@ const DEFECTS = {
   'сирота': `<div class=card><div style="width:126px;font:15px monospace">збірка-0000026 с</div></div>`,   // QR CC-8: «збірка 26 / с» на 375 px
   'злито': `<div class=card><small>10.10 22:46 · оновлення адмінки · успішно</small></div>`,   // QR CC-8: «Історія» — дата · чому · стан в одній сірій смузі
   'однакові заголовки': `<div class=card>${[1, 2, 3].map(i => `<div class=hr><b>Бот зібрав дані</b><br><small>10.10 1${i}:00</small></div>`).join('')}</div>`,   // QR CC-8: шість «Бот зібрав дані»
+  'кромка': `<div style="position:fixed;left:0;right:0;bottom:0;height:200px;background:#fff"><div style="height:180px;overflow-y:auto">${Array.from({length:12},(_, i)=>`<p style="margin:0;padding:10px">Рядок ${i}</p>`).join('')}</div></div>`,   // QR CC-8: шіт із прокруткою без кромки
   'паритет тем': `<style>.ph{border-radius:14px;padding:14px;background:linear-gradient(180deg,#fff,#e3ebe9)}@media(prefers-color-scheme:dark){.ph{background:#232a35}}</style><div class=card><div class=ph>Шапка</div></div>`,   // QR CC-8: шапка обʼємна у світлій, пласка в темній
   'дата й час': `<div class=card><small>09.10 18:53 · QR Admin</small></div>`,   // QR CC-8: «Історія»
   'зливається': `<div style="background:#eef3f2;padding:16px"><div style="border-radius:16px;background:#fff;border:1px solid rgba(211,222,219,.4);box-shadow:0 3px 8px rgba(0,0,0,.06)"><div style="background:rgba(227,235,233,.6);padding:12px">На сайті</div><div style="padding:12px">рядок</div></div></div>`,   // QR CC-8: шапка картки в шіті світлої теми

@@ -433,3 +433,29 @@ b.addEventListener('click',()=>{closeSheet('sh-menu');setTimeout(()=>menuAction(
 
 *Провенанс:* QR Lens CC-7 (`QR-Lens:tools/QR_Lens_zvit_template.html` — шіт «Сервер», перемикач `.zv-seg`), вирок телефона Konst 10.10.2026; журнал гачків `lens-governance:tools/claude-code/hooks/HOOK_JOURNAL.md` §1 рядок 10.10 «пропуск Konst ×4».
 
+## A109. Кромка прокрутки (scroll edge fade) — вміст тоне біля краю, коли далі ще є ✅
+
+**Тригер.** Шіт чи панель із прокруткою всередині (історія, список, довгий стан): людина не бачить, що нижче ще є рядки, і вважає видиме — усім (Konst 11.10.2026: «нативно підказати, що внизу є ще дані»).
+
+**Рішення.** Маска на самому блоці прокрутки (не на шіті й не на сторінці) — вміст біля краю плавно тоне в тло шіта; яка кромка — за станом прокрутки, класи ставить JS:
+```css
+.list.fade-b{-webkit-mask-image:linear-gradient(#000 calc(100% - 40px),transparent);mask-image:linear-gradient(#000 calc(100% - 40px),transparent)}
+.list.fade-t{-webkit-mask-image:linear-gradient(transparent,#000 28px);mask-image:linear-gradient(transparent,#000 28px)}
+.list.fade-t.fade-b{-webkit-mask-image:linear-gradient(transparent,#000 28px,#000 calc(100% - 40px),transparent);mask-image:linear-gradient(transparent,#000 28px,#000 calc(100% - 40px),transparent)}
+```
+```js
+function edgeFade(el){ if(el._edge)return; el._edge=true;
+  const f=()=>{ el.classList.toggle('fade-t',el.scrollTop>2); el.classList.toggle('fade-b',el.scrollTop+el.clientHeight<el.scrollHeight-2); };
+  el.addEventListener('scroll',f,{passive:true}); try{new ResizeObserver(f).observe(el)}catch{}; new MutationObserver(()=>requestAnimationFrame(f)).observe(el,{childList:true,subtree:true}); f(); }
+```
+Початок списку — лише нижня кромка; кінець — лише верхня (зникнення нижньої і є підказка «далі нічого»). Знизу ширше (40 px), зверху вужче (28 px): унизу — обіцянка, зверху — памʼять.
+
+**Чому не інакше.** (1) **Один** градієнт із кількома точками, не кілька масок через кому — кілька градієнтів у `mask-image` зламались у Safari 15.4 (bugs.webkit.org/show_bug.cgi?id=240324, станом на 11.10.2026); один — вирок телефона Konst ✅. (2) JS-класи, не `animation-timeline: scroll()` — підтримка в Safari різних версій розходиться (огляди 2026, не перевірено на пристрої). (3) «Тіні прокрутки» фоном (scroll shadows) — на iOS роками ламались (css-tricks, 2022).
+
+**Межа — НЕ на головному екрані зі скляними панелями.** Маска робить свій шар композиції: скло (`backdrop-filter`, A55) у ньому чи поверх нього може втратити розмиття (Framer, гайд Safari, 2026), а прокручується там уся сторінка; скляні app bar / tab bar і так кажуть «під ними є вміст». Кромка — для блоку прокрутки всередині шіта чи картки.
+
+**Анти:** маска на шіт цілком (тоне й шапка з «Закрити» — A108); кромка завжди, навіть коли все влазить (клас лише за станом); тінь-смужка замість кромки (читається бордером).
+
+**Машина:** `tools/claude-code/ui_lint.mjs` перевірка 18 «кромка» — блок прокрутки в шіті (предок `position: fixed`), вміст ховається ≥ 40 px, маски нема → ⚠.
+
+*Провенанс:* QR Lens CC-8 (`QR-Lens:tools/QR_Lens_zvit_template.html` — `edgeFade`, шіти адмінки «Історія», «Сервер»), вирок телефона Konst 11.10.2026 («прям чудово»).
