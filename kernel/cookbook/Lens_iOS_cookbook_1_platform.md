@@ -430,6 +430,7 @@ iOS не малює іконкам ані рамки, ані тіні під м�
 інтерфейсу, де людина його шукає. `appinstalled` прибирає кнопку після успіху.
 
 **Детект режиму — `display-mode:standalone`**, не `--sab` і не сам `navigator.standalone`
+*Уточнення iOS (QR CC-8, 11.10.2026, журнал воркера):* «застосунок з «Додому»» на iOS — `navigator.standalone === true`; `display-mode: standalone` істинний і у вікні посилання, відкритого із застосунку на «Додому» (WebKit bug 250651) → для вигляду (відступи, бари) `display-mode` годиться, для **підрахунку чи логіки «з Додому»** — `navigator.standalone` (A110).
 (A11/A12). `env(safe-area-inset-bottom)` дорівнює 0 у Safari і ~34px у PWA, але це **наслідок**
 режиму, а не його ознака: на пристрої без вирізу він 0 в обох.
 
@@ -620,3 +621,47 @@ manifest валідний · 7 іконок · cache-bust `?v=` синк HTML(5)
 -----
 
 **Кінець.** Будь-який пункт Частини A валідований на iPhone XS iOS 18 PWA через QR Lens production. Точний код — grep у `QR_Lens_preview_batch22.html` (стандарт) / `Drive_Lens_preview_batch10_2.html` (swipe-пігулка A22, sheet-анімація A18).
+
+## A110. Лічильник відвідувань PWA на iOS — свій, на воркері, з режимом відкриття ✅
+
+**Тригер.** Треба знати, чи відкривають застосунок (команда на iPhone), скільки разів і **як**: з «Додому», у Safari чи посиланням з іншого застосунку; або тривога «застосунок не відкривали N днів».
+
+**Чому не готова аналітика.** Маячок Cloudflare Web Analytics з iPhone **не дійшов жодного разу** (тест Konst 10.10.2026: Safari, приватна вкладка, застосунок з «Додому» — 0 подій; з Chromium контейнера — є). Правило й вікна GraphQL — `tools/cloudflare/CLOUDFLARE.md` §2 п.16. Сторонні лічильники — ще один домен, cookie, блокувальники; нам треба лише «скільки разів і як».
+
+**Рішення — три частини.**
+1. **Воркер відповідає лише на `POST /hit`**, файли сайту Cloudflare віддає сам, без коду (асети першими — developers.cloudflare.com/workers/static-assets, 10.10.2026). Лічильник = **кількість запусків скрипту** (Workers Analytics `workersInvocationsAdaptive`, `scriptName`): ні сховища, ні cookie, ні імен. Режим і привід — рядком у журнал (Workers Logs, 3 дні):
+```js
+export default { async fetch(req, env) {
+  const u = new URL(req.url);
+  if (u.pathname === '/hit' && req.method === 'POST') {
+    console.log(JSON.stringify({ hit: (u.searchParams.get('m') || '?').slice(0, 4), r: (u.searchParams.get('r') || '?').slice(0, 5) }));
+    return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } });
+  }
+  return env.ASSETS.fetch(req);
+} };
+```
+2. **Сторінка шле `/hit` на відкриття й на повернення** (`visibilitychange` → visible), не частіше раз на 10 хв **з кожного режиму** (`localStorage` за ключем режиму), `sendBeacon` (переживає перезавантаження), запасний — `fetch(…, {keepalive:true})`:
+```js
+var M = navigator.standalone === true ? 'home' : matchMedia('(display-mode: standalone)').matches ? 'view' : 'web';
+function hit(r){ try{ var k='hit-'+M, t=+localStorage.getItem(k)||0; if(Date.now()-t<6e5) return; localStorage.setItem(k,String(Date.now())); }catch(e){}
+  var u='/hit?m='+M+'&r='+r, ok=false; try{ ok=!!(navigator.sendBeacon&&navigator.sendBeacon(u)); }catch(e){}
+  if(!ok) try{ fetch(u,{method:'POST',keepalive:true,cache:'no-store'}).catch(function(){}); }catch(e){} }
+hit('load'); document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='visible') hit('back'); });
+```
+3. **Режим — за API, не за ознакою на око.** `home` — `navigator.standalone === true` (iOS, застосунок з «Додому»). `view` — `display-mode: standalone` істинний, а `navigator.standalone` ні: так поводиться **вікно посилання, відкритого із застосунку на «Додому»** (QR Admin → «Сайт»; WebKit bug 250651, 11.10.2026). `web` — решта (Safari, інші браузери).
+
+**Чому не інакше / підводні камені** (кожен — заміряний, QR CC-8 · CC-9):
+- **`display-mode: standalone` на iOS — не «з Додому»**: він істинний і у вікні посилання з застосунку → сам по собі дав би «з Додому» там, де людина в Safari-вікні. Тому A11 для **детекту «з Додому» на iOS** — `navigator.standalone` (див. уточнення в A11).
+- **Рядок браузера (`Safari/604.1`) — не ознака режиму**: він є і в `home`, і в `view` (журнал воркера 11.10 спростував гіпотезу агента за годину).
+- **10 відкриттів → 1 у лічильнику — так задумано** (не частіше раз на 10 хв з режиму); числа — «відкриття», не «люди». Плюс затримка Workers Analytics — кілька хвилин; майже наживо — лише журнал воркера.
+- **iOS тримає застосунок з «Додому» в памʼяті**: повернення не перезавантажує сторінку → `hit('back')` на `visibilitychange`, і окремо — самоперевірка версії (A79: HEAD без кешу, інший ETag → перезавантаження; HTML воркера — `max-age=0, must-revalidate`).
+- **Шум** — сканери на неіснуючі адреси теж запускають скрипт; прийнято (рахуємо відкриття; для точності — рахувати лише рядки `hit` з журналу).
+- **Старий ярлик «Додому»** з версією сторінки без лічильника не рахує, доки iOS не перевантажить сторінку — вирок після оновлення: повністю закрити застосунок або перевстановити ярлик.
+
+**Перевірка.** Скрипт сторінки — у браузері з підробленим сервером (зразок `QR-Lens:tools/qr_fresh_test.mjs`: відкриття · повернення · нова версія → перезавантаження · режим `home`; `--inject` → ✗). **Вирок — телефон:** з «Додому», у Safari, посиланням з іншого застосунку → у журналі воркера мають бути три різні `m=` (Workers Logs: фільтр `$metadata.service` = воркер сайту).
+
+**Розбивка за режимом** («з Додому N · посиланням M · Safari K»): Workers Analytics режиму не знає — лише журнал (`hit` у повідомленні, 3 дні); тиждень і більше — загальне число з Analytics (`CLOUDFLARE.md` п.16 — вікна ≤ 5 днів).
+
+**Анти:** Web Analytics для команди на iPhone · детект «з Додому» лише за `display-mode` · рахувати кожен `visibilitychange` без обмеження (злива від перемикань) · cookie чи імена людей заради лічильника · шукати режим у рядку браузера.
+
+*Провенанс:* QR Lens CC-8 (10–11.10.2026: маячок → свій лічильник, журнал воркера, режими home/view/web), CC-9 (рецепт). Зразок — `QR-Lens:worker/site.js` + `QR-Lens:tools/QR_Lens_template_v2.html` (скрипт «Свіжість і відвідування»), адмінка — `QR-Lens:admin/worker.js` «Сервер».
