@@ -8,7 +8,7 @@
 //          <repo>/.ui-lint-accept — відомі вади, прийняті Konst: рядок «вид | шматок адреси елемента | причина · дата» → ⓘ (не блокує, але друкується щоразу).
 //          node ui_lint.mjs selftest — зуби: сторінка з підкинутими вадами (кожна мусить дати свій рядок) і чиста (0).
 // Перевірки: 1 скрол убік · 2 обрізано · 3 прилипло / вилазить · 4 контраст · 5 шрифт · 6 тап, без назви, iOS-зум · 7 накладання · 8 ряд · 9 текст (сміття, жаргон) ·
-// 10 дія в прокрутці · 11 кнопки ряду · 12 сирота · 13 злито · 14 однакові заголовки · 15 дата й час · 16 зливається · 17 паритет тем · 18 кромка; поза probe — натискання (:active / JS pointerdown, touchstart).
+// 10 дія в прокрутці · 11 кнопки ряду · 12 сирота · 13 злито · 14 однакові заголовки · 15 дата й час · 16 зливається · 17 паритет тем · 18 кромка · 19 картка-список · 20 вкладена прокрутка; поза probe — натискання (:active / JS pointerdown, touchstart).
 // Звідки кожна (пропуск Konst, QR CC-N, рецепт кукбуку) — коментар біля неї.
 // Вивід: ✗ (ворота не пустять) · ⚠ (подивись очима) · ⓘ (не виміряно); exit 1 на ✗.
 // Пороги: контраст 4,5:1 (великий текст 3:1) — WCAG 2.x AA · ціль тапу 24 px ✗ (WCAG 2.2 2.5.8) / 44 px ⚠ (Apple HIG) · поле вводу < 16 px — iOS Safari збільшує сторінку ·
@@ -150,6 +150,19 @@ function probe() {
     let fx = false; for (let e = sc.parentElement; e; e = e.parentElement) if (getComputedStyle(e).position === 'fixed') { fx = true; break; }
     const m = getComputedStyle(sc).maskImage || getComputedStyle(sc).webkitMaskImage || 'none';
     if (fx && m === 'none') add('⚠', 'кромка', sc, `прокрутка в шіті без кромки: схована частина ${sc.scrollHeight - sc.clientHeight} px, маски нема — підказати «нижче ще є» (кукбук A109)`); }
+  // 19. картка-список у шіті (A109 «картка зі своєю прокруткою», пропуск Konst QR CC-11: Київ 10 людей розтягнув картку на 582 px — «Сповіщення» під нею недосяжні):
+  //     картка (радіус + тло) у прокрутці шіта, ≥ 6 однакових рядків, вища за половину видимої прокрутки, власної прокрутки нема
+  for (const c of all.filter(e => { const s = getComputedStyle(e); return parseFloat(s.borderTopLeftRadius) > 0 && ((rgba(s.backgroundColor) || [0, 0, 0, 0])[3] > 0.05 || s.backgroundImage !== 'none'); })) {
+    let sc = null, fx = false; for (let e = c.parentElement; e; e = e.parentElement) { const s = getComputedStyle(e); if (!sc && /auto|scroll/.test(s.overflowY) && e.scrollHeight > e.clientHeight) sc = e; if (s.position === 'fixed') { fx = true; break; } }
+    if (!fx || !sc) continue;
+    const host = c.children.length === 1 ? c.firstElementChild : c, g = {};
+    for (const k of host.children) { const key = k.tagName + '.' + [...k.classList].filter(x => !/^(sel|on|active|pressing|open)$/.test(x)).join('.'); (g[key] ||= []).push(k); }
+    const n = Math.max(0, ...Object.values(g).map(x => x.length)), own = /auto|scroll/.test(getComputedStyle(host).overflowY) && host.scrollHeight > host.clientHeight + 2, h = c.getBoundingClientRect().height;
+    if (n >= 6 && !own && h > sc.clientHeight * 0.5) add('⚠', 'картка-список', c, `список у картці шіта: ${n} рядків, ${Math.round(h)} px > половини прокрутки (${sc.clientHeight} px) — дай картці свою прокрутку з кромкою (кукбук A109 «картка зі своєю прокруткою»)`); }
+  // 20. вкладена прокрутка без overscroll-behavior: contain (A109, QR CC-11): доїхав до краю картки — жест перескакує на шіт
+  for (const sc of all.filter(e => /auto|scroll/.test(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + 8)) {
+    let outer = false; for (let e = sc.parentElement; e; e = e.parentElement) if (/auto|scroll/.test(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + 8) { outer = true; break; }
+    if (outer && !/contain|none/.test(getComputedStyle(sc).overscrollBehaviorY)) add('⚠', 'вкладена прокрутка', sc, 'прокрутка всередині прокрутки без overscroll-behavior: contain — доїхав до краю, і жест перескакує на зовнішню (кукбук A109)'); }
   // 14. однакові заголовки рядків: ≥ 3 сусіди-рядки з тим самим першим жирним текстом — різниця схована в сірому підписі
   for (const p of new Set(all.map(e => e.parentElement))) { if (!p) continue;
     const g = {}; for (const k of p.children) if (all.includes(k)) { const h = k.querySelector('b, strong, h1, h2, h3, h4'); if (h && h.textContent.trim()) (g[k.tagName + '.' + k.className + '|' + h.textContent.trim()] ||= []).push(k); }
@@ -186,6 +199,8 @@ const DEFECTS = {
   'злито': `<div class=card><small>10.10 22:46 · оновлення адмінки · успішно</small></div>`,   // QR CC-8: «Історія» — дата · чому · стан в одній сірій смузі
   'однакові заголовки': `<div class=card>${[1, 2, 3].map(i => `<div class=hr><b>Бот зібрав дані</b><br><small>10.10 1${i}:00</small></div>`).join('')}</div>`,   // QR CC-8: шість «Бот зібрав дані»
   'кромка': `<div style="position:fixed;left:0;right:0;bottom:0;height:200px;background:#fff"><div style="height:180px;overflow-y:auto">${Array.from({length:12},(_, i)=>`<p style="margin:0;padding:10px">Рядок ${i}</p>`).join('')}</div></div>`,   // QR CC-8: шіт із прокруткою без кромки
+  'картка-список': `<div style="position:fixed;left:0;right:0;bottom:0;height:300px;background:#fff"><div style="height:280px;overflow-y:auto;-webkit-mask-image:linear-gradient(#000 90%,transparent);mask-image:linear-gradient(#000 90%,transparent)"><div style="margin:8px;border-radius:14px;background:#f2f2f2">${Array.from({length:8},(_, i)=>`<div class=r style="padding:12px">Людина ${i}</div>`).join('')}</div><p style="height:200px;margin:0">Про застосунок</p></div></div>`,   // QR CC-11: Київ 10 людей
+  'вкладена прокрутка': `<div style="position:fixed;left:0;right:0;bottom:0;height:240px;background:#fff"><div style="height:220px;overflow-y:auto;-webkit-mask-image:linear-gradient(#000 90%,transparent);mask-image:linear-gradient(#000 90%,transparent)"><div style="height:120px;overflow-y:auto;-webkit-mask-image:linear-gradient(#000 80%,transparent);mask-image:linear-gradient(#000 80%,transparent)"><p style="height:300px;margin:0">Список</p></div><p style="height:300px;margin:0">Решта шіта</p></div></div>`,   // QR CC-11: картка в шіті без contain
   'паритет тем': `<style>.ph{border-radius:14px;padding:14px;background:linear-gradient(180deg,#fff,#e3ebe9)}@media(prefers-color-scheme:dark){.ph{background:#232a35}}</style><div class=card><div class=ph>Шапка</div></div>`,   // QR CC-8: шапка обʼємна у світлій, пласка в темній
   'дата й час': `<div class=card><small>09.10 18:53 · QR Admin</small></div>`,   // QR CC-8: «Історія»
   'зливається': `<div style="background:#eef3f2;padding:16px"><div style="border-radius:16px;background:#fff;border:1px solid rgba(211,222,219,.4);box-shadow:0 3px 8px rgba(0,0,0,.06)"><div style="background:rgba(227,235,233,.6);padding:12px">На сайті</div><div style="padding:12px">рядок</div></div></div>`,   // QR CC-8: шапка картки в шіті світлої теми
