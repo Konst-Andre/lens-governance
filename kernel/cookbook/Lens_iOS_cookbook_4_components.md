@@ -525,6 +525,33 @@ function confirmAction(title,desc,onOk){
 
 Клавіатура перекриває CTA «Зберегти». Listener `visualViewport.resize`: якщо `initialHeight-vv.height>100` → `sheetBox.style.maxHeight=calc(vv.height px - 20px)` + `paddingBottom=20px` (override env — клавіатура замість home indicator). **Реєструвати лише при відкритті sheet з формою** (resize спрацьовує і на Safari toolbar).
 
+## B2.1. Шіт, відкритий з поля пошуку, — клавіатура ховається ДО шіта ✅
+
+**Коли буває.** На екрані поле пошуку й поруч кнопка, що відкриває шіт («Фільтри», вибір людини, меню). Людина почала друкувати, передумала, тапнула кнопку — шіт виїхав, а **клавіатура лишилась над ним**. Закрити її можна лише тапом у шіт (QR Lens, iPhone, Konst 13.10.2026). Те саме з будь-яким шітом, відкритим, поки поле у фокусі.
+
+**Корінь.** Шіт — це не новий екран, а шар на тій самій сторінці: фокус лишається в полі під ним, і iOS тримає клавіатуру. Нативний модальний екран сам знімає фокус; веб — ні.
+
+**Ліки (одне місце — функція відкриття шіта, для ВСІХ шітів):**
+```js
+const SHEET_KB_WAIT=300;
+function openSheet(id,closeFn){
+  const ae=document.activeElement;
+  if(ae&&/^(INPUT|TEXTAREA)$/.test(ae.tagName)){
+    const vv=window.visualViewport,kb=vv&&vv.height<window.innerHeight-120;ae.blur();          // 1) фокус геть ДО шіта
+    if(kb){let done=false;const go=()=>{if(done)return;done=true;vv.removeEventListener('resize',go);openSheetNow(id,closeFn);};
+      vv.addEventListener('resize',go);setTimeout(go,SHEET_KB_WAIT);return;}                   // 2) клавіатура ховається не миттєво — шіт після неї
+  }
+  openSheetNow(id,closeFn);
+}
+```
+Чому чекати: ховання клавіатури — своя анімація; шіт, що виїжджає одночасно, б'ється з нею (стрибок висоти). `visualViewport.resize` — момент, коли клавіатура пішла; 300 мс — запасний вихід, якщо подія не прийшла.
+
+**Анти:** знімати фокус лише в обробнику однієї кнопки (наступний шіт повторить ваду) · відкривати шіт тим самим кадром, що `blur()` · автофокус поля всередині шіта до кінця його анімації.
+
+**Перевірка:** тест у браузері — фокус у полі → тап кнопки → `document.activeElement` ≠ поле, шіт відкрито; мутація без `blur()` → ✗ (`QR-Lens:tools/qr_sr_sheet_test.mjs`). Клавіатури в headless нема — гілку «чекати» перевіряє лише телефон.
+
+*Вирок пристрою:* Konst 13.10.2026, iPhone — «клавіатура тепер працює коректно». *Джерела:* Ionic forum (фокус геть до модалки), Titanium TIMOB-6060 (iOS-модалка тримає клавіатуру), DEV — standalone PWA і клавіатура (13.10.2026). *Провенанс:* QR Lens CC-11 — `QR-Lens:tools/QR_Lens_template_v2.html` `openSheet`. Межа з B2: B2 — клавіатура для поля **всередині** шіта; B2.1 — поле **під** шітом.
+
 ## B3. Input attributes — форми 🔧+🆕
 
 Базово (QR Lens, search): `type="search" autocomplete="off"`. Drive Lens числові форми:
