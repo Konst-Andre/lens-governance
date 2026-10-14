@@ -8,7 +8,7 @@
 //          <repo>/.ui-lint-accept — відомі вади, прийняті Konst: рядок «вид | шматок адреси елемента | причина · дата» → ⓘ (не блокує, але друкується щоразу).
 //          node ui_lint.mjs selftest — зуби: сторінка з підкинутими вадами (кожна мусить дати свій рядок) і чиста (0).
 // Перевірки: 1 скрол убік · 2 обрізано · 3 прилипло / вилазить · 4 контраст · 5 шрифт · 6 тап, без назви, iOS-зум · 7 накладання · 8 ряд · 9 текст (сміття, жаргон) ·
-// 10 дія в прокрутці · 11 кнопки ряду · 12 сирота · 13 злито · 14 однакові заголовки · 15 дата й час · 16 зливається · 17 паритет тем · 18 кромка · 19 картка-список · 20 вкладена прокрутка · 21 шапка в прокрутці; поза probe — натискання (:active / JS pointerdown, touchstart).
+// 10 дія в прокрутці · 11 кнопки ряду · 12 сирота · 13 злито · 14 однакові заголовки · 15 дата й час · 16 зливається · 17 паритет тем · 18 кромка · 19 картка-список · 20 вкладена прокрутка · 21 шапка в прокрутці · 22 емодзі в кнопці · 23 нативне вікно; поза probe — натискання (:active / JS pointerdown, touchstart).
 // Звідки кожна (пропуск Konst, QR CC-N, рецепт кукбуку) — коментар біля неї.
 // Вивід: ✗ (ворота не пустять) · ⚠ (подивись очима) · ⓘ (не виміряно); exit 1 на ✗.
 // Пороги: контраст 4,5:1 (великий текст 3:1) — WCAG 2.x AA · ціль тапу 24 px ✗ (WCAG 2.2 2.5.8) / 44 px ⚠ (Apple HIG) · поле вводу < 16 px — iOS Safari збільшує сторінку ·
@@ -150,6 +150,9 @@ function probe() {
     let fx = false; for (let e = sc.parentElement; e; e = e.parentElement) if (getComputedStyle(e).position === 'fixed') { fx = true; break; }
     const m = getComputedStyle(sc).maskImage || getComputedStyle(sc).webkitMaskImage || 'none';
     if (fx && m === 'none') add('⚠', 'кромка', sc, `прокрутка в шіті без кромки: схована частина ${sc.scrollHeight - sc.clientHeight} px, маски нема — підказати «нижче ще є» (кукбук A109)`); }
+  // 22. емодзі в кнопці (пропуск Konst QR CC-12, 14.10.2026: «▶ рух» на iPhone став кольоровою картинкою-емодзі серед SVG-іконок): символ з Extended_Pictographic у тексті кнопки чи посилання
+  for (const el of all.filter(e => /^(BUTTON|A)$/.test(e.tagName) || e.getAttribute('role') === 'button')) { const t = [...el.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join('');
+    const m = t.match(/\p{Extended_Pictographic}/u); if (m) add('⚠', 'емодзі', el, `символ «${m[0]}» у кнопці — iOS малює його кольоровою картинкою, не в мові іконок; іконка — SVG (currentColor)`); }
   // 21. шапка в прокрутці (A108 п.1; пропуск Konst QR CC-12, 14.10.2026: у колег більше мереж — шіт фільтрів гортався ВЕСЬ, шапка з ✕ їхала геть, протяг показував тло):
   //     прокрутка в нерухомому шарі (предок або сама position: fixed), серед перших трьох її дітей — шапка (header / h1–h3 / клас head|title) з кнопкою, не sticky
   for (const sc of all.filter(e => /auto|scroll/.test(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + 40)) {
@@ -208,6 +211,8 @@ const DEFECTS = {
   'картка-список': `<div style="position:fixed;left:0;right:0;bottom:0;height:300px;background:#fff"><div style="height:280px;overflow-y:auto;-webkit-mask-image:linear-gradient(#000 90%,transparent);mask-image:linear-gradient(#000 90%,transparent)"><div style="margin:8px;border-radius:14px;background:#f2f2f2">${Array.from({length:8},(_, i)=>`<div class=r style="padding:12px">Людина ${i}</div>`).join('')}</div><p style="height:200px;margin:0">Про застосунок</p></div></div>`,   // QR CC-11: Київ 10 людей
   'вкладена прокрутка': `<div style="position:fixed;left:0;right:0;bottom:0;height:240px;background:#fff"><div style="height:220px;overflow-y:auto;-webkit-mask-image:linear-gradient(#000 90%,transparent);mask-image:linear-gradient(#000 90%,transparent)"><div style="height:120px;overflow-y:auto;-webkit-mask-image:linear-gradient(#000 80%,transparent);mask-image:linear-gradient(#000 80%,transparent)"><p style="height:300px;margin:0">Список</p></div><p style="height:300px;margin:0">Решта шіта</p></div></div>`,   // QR CC-11: картка в шіті без contain
   'шапка в прокрутці': `<div style="position:fixed;left:0;right:0;bottom:0;height:220px;overflow-y:auto;background:#fff"><div class=sh-head style="display:flex;justify-content:space-between;padding:12px"><b>Фільтр аптек</b><button style="width:44px;height:44px">✕</button></div>${Array.from({length:12},(_, i)=>`<p style="margin:0;padding:10px">Мережа ${i}</p>`).join('')}</div>`,   // QR CC-12: шіт гортався з шапкою
+  'емодзі': `<div class=card><button style="min-height:44px;padding:0 14px">▶ рух</button></div>`,   // QR CC-12: «▶» став емодзі на iPhone
+  'нативне вікно': `<div class=card>.</div><script>setTimeout(() => prompt('Твій підпис'), 50)</script>`,   // QR CC-12: «свій підпис» → prompt
   'паритет тем': `<style>.ph{border-radius:14px;padding:14px;background:linear-gradient(180deg,#fff,#e3ebe9)}@media(prefers-color-scheme:dark){.ph{background:#232a35}}</style><div class=card><div class=ph>Шапка</div></div>`,   // QR CC-8: шапка обʼємна у світлій, пласка в темній
   'дата й час': `<div class=card><small>09.10 18:53 · QR Admin</small></div>`,   // QR CC-8: «Історія»
   'зливається': `<div style="background:#eef3f2;padding:16px"><div style="border-radius:16px;background:#fff;border:1px solid rgba(211,222,219,.4);box-shadow:0 3px 8px rgba(0,0,0,.06)"><div style="background:rgba(227,235,233,.6);padding:12px">На сайті</div><div style="padding:12px">рядок</div></div></div>`,   // QR CC-8: шапка картки в шіті світлої теми
@@ -216,7 +221,7 @@ const DEFECTS = {
 
 async function lint(target, states, width, theme, browser) {
   const ctx = await browser.newContext({ viewport: { width, height: HEIGHT }, deviceScaleFactor: 2, colorScheme: theme });
-  const p = await ctx.newPage(), errs = []; p.on('pageerror', e => errs.push(e.message)); p.on('console', m => m.type() === 'error' && !/Failed to load resource/.test(m.text()) && errs.push(m.text()));
+  const p = await ctx.newPage(), errs = [], dlg = []; p.on('pageerror', e => errs.push(e.message)); p.on('dialog', d => { dlg.push(d.type() + ': ' + d.message()); d.dismiss().catch(() => {}); });   // 23. нативне вікно (пропуск Konst QR CC-12: «свій підпис» відкрив prompt браузера) p.on('console', m => m.type() === 'error' && !/Failed to load resource/.test(m.text()) && errs.push(m.text()));
   const res = [];
   for (const [i, st] of [null, ...states].entries()) {   // початковий екран — завжди, далі кожен стан
     await p.goto(target, { waitUntil: 'load' }); await p.waitForTimeout(400);
@@ -255,6 +260,7 @@ async function lint(target, states, width, theme, browser) {
       res.push({ lvl: '⚠', kind: 'натискання', where: 'сторінка', msg: 'нема слухача touchstart — у Safari iOS :active на дотик не спрацює (додай document.addEventListener(\'touchstart\', () => {}, { passive: true }))', state: '' });
   }
   for (const e of errs) res.push({ lvl: '✗', kind: 'JS', where: 'консоль', msg: e.slice(0, 160), state: '' });
+  for (const e of [...new Set(dlg)]) res.push({ lvl: '✗', kind: 'нативне вікно', where: 'сторінка', msg: `${e.slice(0, 80)} — вікно браузера (prompt / alert / confirm) посеред застосунку: поле чи шіт у мові продукту`, state: '' });
   await ctx.close(); return res;
 }
 
