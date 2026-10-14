@@ -35,8 +35,13 @@ if [ "$mode" = selftest ]; then
   t 1 tools/qr_build.py "x = 1" "крок без пошуку з останнього коміту → стоп"
   echo "{\"session_id\":\"$S\",\"tool_name\":\"WebSearch\",\"tool_input\":{\"query\":\"python openpyxl read merged cells\"}}" | bash "$0" mark
   t 0 tools/qr_build.py "x = 1" "після пошуку в цьому кроці → тиша"
-  echo "{\"session_id\":\"$S\",\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"git commit -m x\"}}" | bash "$0" mark
-  t 1 tools/qr_build.py "x = 2" "коміт скинув крок → знову стоп"
+  G="/tmp/lens-ui-$S-git"; rm -rf "$G"; mkdir -p "$G" && git -C "$G" init -q && touch "$G/a" && git -C "$G" add a && GIT_COMMITTER_DATE="2020-01-01T00:00:00" git -C "$G" -c user.email=t@t -c user.name=t commit -qm old
+  echo "{\"session_id\":\"$S\",\"cwd\":\"$G\",\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"python3 t.py  # рядок тесту: git add -A && git commit -m x\"}}" | bash "$0" mark
+  t 0 tools/qr_build.py "x = 2" "текст «git … commit» без свіжого коміту (тест, причина skip) крок не скидає → тиша"
+  touch "$G/b" && git -C "$G" add b && git -C "$G" -c user.email=t@t -c user.name=t commit -qm new
+  echo "{\"session_id\":\"$S\",\"cwd\":\"/\",\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"cd $G && git commit -m x\"}}" | bash "$0" mark
+  t 1 tools/qr_build.py "x = 2" "справжній свіжий коміт (cd у репо) скинув крок → знову стоп"
+  rm -rf "$G"
   CLAUDE_CODE_SESSION_ID="$S" bash "$0" skip "опечатка в рядку, форма не змінюється" >/dev/null
   t 0 tools/qr_build.py "x = 2" "пропуск із причиною → тиша"
   rm -f "/tmp/lens-ui-$S-step"
@@ -76,7 +81,16 @@ if mode == "mark":
     if "shots/README.md" in raw:
         open(mark + "-shots", "w").close()   # примірки репо переглянуто (SHOTS.md §5 «у роботі»)
     if tool == "Bash" and re.search(r"\bgit\b[^;&|]*\bcommit\b", str(ti.get("command", ""))) and os.path.exists(mark + "-step"):
-        os.remove(mark + "-step")   # коміт закрив крок — наступний починається зі звірки
+        # коміт закрив крок — наступний починається зі звірки. Текст команди — лише фільтр: «git … commit» буває в тестових рядках і навіть
+        # у причині skip (хибне ×3, QR CC-12 14.10.2026) → скидаємо, лише коли в репо команди останній коміт свіжий (≤ 120 с)
+        import subprocess, time
+        c = str(ti.get("command", ""))
+        dd = [d.get("cwd") or os.getcwd()] + [x.strip("\"\x27") for x in re.findall(r"\bcd\s+(\S+)", c) + re.findall(r"\bgit\s+-C\s+(\S+)", c)]
+        fresh = False
+        for x in dd:
+            r = subprocess.run(["git", "-C", os.path.expanduser(x), "log", "-1", "--format=%ct"], capture_output=True, text=True)
+            if r.stdout.strip().isdigit() and time.time() - int(r.stdout.strip()) < 120: fresh = True; break
+        if fresh or os.environ.get("UIG_INJECT") == "1": os.remove(mark + "-step")
     if tool in ("WebSearch", "WebFetch"):
         open(web, "w").close(); open(mark + "-step", "w").close()
         with open(mark + "-q", "a", encoding="utf-8") as f: f.write(str(ti.get("query") or ti.get("url") or "") + " " + str(ti.get("prompt") or "")[:200] + "\n")
