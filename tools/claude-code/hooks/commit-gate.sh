@@ -4,7 +4,8 @@
 # ✗ → deny з рядками ✗ (урок QR-Lens CC-2, 08.10.2026: `| tail -1` сховав exit гейта → коміт з ✗).
 #   ядро (є kernel/Lens_validate.py) → --gov · продукт Lens (є lens/*_INDEX.md) → --product · інше репо → тиша.
 # Репо коміту: останній `cd <шлях>` перед `git commit` у тому ж ланцюжку, `git -C <шлях>` або cwd гачка. Гейт ~1 с.
-python3 -c '
+# + сторож файлів коміту (commit_files.py, HOOK-2 п.«нові файли», QR CC-12 14.10.2026) — у БУДЬ-ЯКОМУ репо: що коміт внесе, включно з `git add -A` тієї ж команди.
+H="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" python3 -c '
 import json, sys, re, os, glob, subprocess
 d = json.load(sys.stdin)
 if d.get("tool_name") != "Bash": sys.exit(0)
@@ -19,9 +20,20 @@ for seg in re.split(r"&&|\|\||;|\n", cmd):
         dirs.append(os.path.join(cwd, c.group(1)) if c else cwd)
 kern = next((k for k in ("/home/user/lens-governance", "/tmp/lens-governance") if os.path.exists(k + "/kernel/Lens_validate.py")), None)
 bad = []
+sys.path.insert(0, os.environ.get("H", ""))
+try:
+    import commit_files
+except Exception:
+    commit_files = None
 for dd in dict.fromkeys(dirs):
     top = subprocess.run(["git", "-C", dd, "rev-parse", "--show-toplevel"], capture_output=True, text=True).stdout.strip()
     if not top: continue
+    if commit_files:
+        try:
+            cf = commit_files.check(top, cmd)
+        except Exception:
+            cf = []
+        if cf: bad.append(os.path.basename(top) + " — файли коміту: " + " · ".join(cf[:6]))
     if os.path.exists(top + "/kernel/Lens_validate.py"):
         run = ["python3", top + "/kernel/Lens_validate.py", "--gov", top]
     elif glob.glob(top + "/lens/*_INDEX.md") and kern:
