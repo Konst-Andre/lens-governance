@@ -272,6 +272,8 @@ Theme dropdown: `aria-label/aria-haspopup/aria-expanded`, `role="menu"`+`role="m
 
 **Прецедент:** Drive Lens B19 — рядок Дата+Час у шітах «Заправка»/«Новий запис». batch18 50/50 = тісно; batch19 (date flex:1) = float +20px overflow; **batch19_1 Variant A** = зійшлось чисто, обидві теми, обидва шіти.
 
+**Поправка 15.10.2026 (QR CC-13, кандидат — вирок телефона чекає): «своя кнопка + невидиме поле».** Друга вада iOS — **вертикаль**: значення `input[type=date|time]` прилипає вгору, бокс вищий за текст (WebKit 139848: `display:block` на часових полях iOS; `::-webkit-datetime-edit`, `line-height` — працюють не завжди). Коли поле має виглядати як наша кнопка (сегменти, «Свій» день · час) — не стилізувати системне поле, а **накрити**: `<label class="pick zv-lift">іконка <span>чт 16.10</span><input type=date></label>`, де `input{position:absolute;inset:0;opacity:0;font-size:16px;appearance:none}` — тап іде в саме поле → iOS відкриває свій барабан; текст і вирівнювання — наші (обидві вади A40 знято разом); на ПК — `input.showPicker()` на клік. Після `change` оновлювати лише текст кнопки й залежні підписи, **без** перемальовування (інакше стрибок прокрутки). Фокус поля дати **не** вважати «редагуванням тексту» (стискання прев'ю / sticky на фокус дало стрибок сторінки — Konst, телефон 15.10). A41 (color-scheme барабана) — у силі. Зразок — `QR-Lens:lens/shots/QRL-14_pult/fit_pult.mjs` (`pick()` · `wirePick()`).
+
 -----
 
 ## A41. Native picker (date/time) у standalone-PWA — color-scheme заморожений ✅
