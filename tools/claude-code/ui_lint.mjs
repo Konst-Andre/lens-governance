@@ -9,7 +9,7 @@
 //          <repo>/.ui-lint-accept — відомі вади, прийняті Konst: рядок «вид | шматок адреси елемента | причина · дата» → ⓘ (не блокує, але друкується щоразу).
 //          node ui_lint.mjs selftest — зуби: сторінка з підкинутими вадами (кожна мусить дати свій рядок) і чиста (0).
 // Перевірки: 1 скрол убік · 2 обрізано · 3 прилипло / вилазить · 4 контраст · 5 шрифт · 6 тап, без назви, iOS-зум · 7 накладання · 8 ряд · 9 текст (сміття, жаргон) ·
-// 10 дія в прокрутці · 11 кнопки ряду · 12 сирота · 13 злито · 14 однакові заголовки · 15 дата й час · 16 зливається · 17 паритет тем · 18 кромка · 19 картка-список · 20 вкладена прокрутка · 21 шапка в прокрутці · 22 емодзі в кнопці · 23 нативне вікно; поза probe — натискання (:active / JS pointerdown, touchstart).
+// 10 дія в прокрутці · 11 кнопки ряду · 12 сирота · 13 злито · 14 однакові заголовки · 15 дата й час · 16 зливається (16-б край кнопки) · 17 паритет тем · 18 кромка · 19 картка-список · 20 вкладена прокрутка · 21 шапка в прокрутці · 22 емодзі в кнопці · 23 нативне вікно; поза probe — натискання (:active / JS pointerdown, touchstart).
 // Звідки кожна (пропуск Konst, QR CC-N, рецепт кукбуку) — коментар біля неї.
 // Вивід: ✗ (ворота не пустять) · ⚠ (подивись очима) · ⓘ (не виміряно); exit 1 на ✗.
 // Пороги: контраст 4,5:1 (великий текст 3:1) — WCAG 2.x AA · ціль тапу 24 px ✗ (WCAG 2.2 2.5.8) / 44 px ⚠ (Apple HIG) · поле вводу < 16 px — iOS Safari збільшує сторінку ·
@@ -140,6 +140,18 @@ function probe() {
     const bc = rgba(s.borderTopColor) || [0, 0, 0, 0], bw = parseFloat(s.borderTopWidth) || 0, bline = bw > 0 && bc[3] > 0 ? cr(blend(bc, ground), ground) : 1;
     const L = layers(s.boxShadow), halo = L.some(l => !l.inset && l.blur >= 14 && l.a >= 0.05), lit = L.some(l => l.inset && l.y > 0 && l.a >= 0.06);
     if (cr(edge, ground) < 1.06 && bline < 1.2 && !halo && !lit) add('⚠', 'зливається', c, `верхній край майже кольору тла (${cr(edge, ground).toFixed(2)}:1), рамка ${bline.toFixed(2)}:1, нема широкої тіні чи світла зверху — краю нічим триматись (A66: світла — blur ≥ 14, темна — inset зверху; не жирна рамка)`); }
+  // 16-б. край кнопки (QR CC-13, пропуск Konst 15.10: «Ні», «Закрити», «Змінити» на шіті — «ледь видно, де кнопка закінчується», обидві теми): кнопка майже кольору
+  //     підкладки (верх і низ градієнта), а лінії краю нема (рамка чи кант-кільце `0 0 0 .5px` ≥ 1.15:1). Широка мʼяка тінь картку тримає (A66), кнопку — ні: окреслює лише низ.
+  //     Поріг — не 3:1 WCAG 1.4.11 (там край обовʼязковий, лише коли він єдина ознака кнопки; у нас є текст), а «легкий кант» Konst (не жирна рамка) — тому ⚠, не ✗.
+  const stops = s => { const m = (s.backgroundImage.match(/rgba?\([^)]*\)|color\([^)]*\)/g) || []).map(rgba).filter(Boolean); const c = rgba(s.backgroundColor) || [0, 0, 0, 0]; return m.length ? m : c[3] > 0.05 ? [c] : []; };
+  for (const b of all) { if (!b.matches('button,[role=button],a[href]')) continue; const s = getComputedStyle(b), r = b.getBoundingClientRect();
+    if (r.width < 24 || r.height < 24 || r.top < 0 || r.bottom > innerHeight || s.visibility === 'hidden' || parseFloat(s.opacity) < 0.5) continue;
+    const st = stops(s); if (!st.length || st.some(x => x[3] < 0.9)) continue;   // прозора чи напівпрозора — це не тіло
+    const ground = b.parentElement && flatBg(b.parentElement); if (!ground) continue;
+    const fill = Math.min(...[st[0], st[st.length - 1]].map(x => cr(blend(x, ground), ground)));
+    const bw = parseFloat(s.borderTopWidth) || 0, bc = rgba(s.borderTopColor) || [0, 0, 0, 0], border = bw > 0 && bc[3] > 0 ? cr(blend(bc, ground), ground) : 1;
+    const ring = s.boxShadow === 'none' ? 1 : Math.max(1, ...s.boxShadow.split(/,(?![^(]*\))/).filter(x => !/inset/.test(x)).map(x => { const c = rgba(x), n = (x.replace(/rgba?\([^)]*\)|color\([^)]*\)/, '').match(/-?[\d.]+px/g) || []).map(parseFloat); return c && (n[2] || 0) === 0 && (n[3] || 0) > 0 ? cr(blend(c, ground), ground) : 1; }));
+    if (fill < 1.08 && Math.max(border, ring) < 1.15) add('⚠', 'край кнопки', b, `кнопка майже кольору підкладки (${fill.toFixed(2)}:1), лінії краю нема (рамка/кант ${Math.max(border, ring).toFixed(2)}:1) — тінь окреслює лише низ; кант 0,5 px + тінь, як у ✕ (A66)`); }
   // 17 (збір). обʼєм поверхні — для паритету тем (QR CC-8, пропуск Konst: «покращили світлу — темна відстала»): градієнт (не однотонний), широка мʼяка тінь, світло зверху
   for (const el of all) { const s = getComputedStyle(el), r = el.getBoundingClientRect(); if (r.width < 120 || r.height < 24) continue;
     const own = (rgba(s.backgroundColor) || [0, 0, 0, 0])[3] > 0.05 || s.backgroundImage !== 'none'; if (!own) continue;
@@ -217,6 +229,7 @@ const DEFECTS = {
   'паритет тем': `<style>.ph{border-radius:14px;padding:14px;background:linear-gradient(180deg,#fff,#e3ebe9)}@media(prefers-color-scheme:dark){.ph{background:#232a35}}</style><div class=card><div class=ph>Шапка</div></div>`,   // QR CC-8: шапка обʼємна у світлій, пласка в темній
   'дата й час': `<div class=card><small>09.10 18:53 · QR Admin</small></div>`,   // QR CC-8: «Історія»
   'зливається': `<div style="background:#eef3f2;padding:16px"><div style="border-radius:16px;background:#fff;border:1px solid rgba(211,222,219,.4);box-shadow:0 3px 8px rgba(0,0,0,.06)"><div style="background:rgba(227,235,233,.6);padding:12px">На сайті</div><div style="padding:12px">рядок</div></div></div>`,   // QR CC-8: шапка картки в шіті світлої теми
+  'край кнопки': `<div style="background:#fff;padding:16px"><button style="height:48px;width:160px;border:0;border-radius:14px;background:linear-gradient(180deg,#fff,#f0f0f0);box-shadow:0 1px 2px rgba(20,40,35,.06),0 4px 14px rgba(20,40,35,.09)">Ні</button></div>`,   // QR CC-13: «Ні» в підтвердженні пульта
   'натискання': `<div class=card><a href="#x" style="display:inline-block;padding:14px 18px">Відкрити звіт</a></div>`,
 };
 
