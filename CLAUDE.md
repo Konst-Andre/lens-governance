@@ -19,7 +19,7 @@
 
 | коли | звідки брати |
 |---|---|
-| інтерфейс iOS / PWA, бот на Workers | `kernel/cookbook/Lens_cookbook_INDEX.md` → номер → том, точково |
+| інтерфейс iOS / PWA, бот на Workers | `kernel/cookbook/Lens_cookbook_INDEX.md` → номер → том, точково. **Кукбук — довідник, як інтернет, не інструкція** (Konst 08.10 · 16.10.2026): рецепт — точка старту; рішення = рецепт ⟂ світ (пошук) ⟂ замір цього екрана — рядком у плані; знайшов краще — онови рецепт (гачок `plan-web`) |
 | будую чи правлю стенд, харнес, компер, важелі | `kernel/Lens_stagebench_manifest.md` за § (буфер — `kernel/Lens_stagebench_delta_running.md`) |
 | device-тест на синтетичних даних (пісочниця) | `kernel/Lens_sandbox_manifest.md` |
 | варіанти вигляду обрано зараз, код — пізніше (примірка, тека `shots/`) | `tools/claude-code/SHOTS.md` |
