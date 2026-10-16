@@ -583,19 +583,38 @@ function openSheet(id,closeFn){
 
 Джерело: Drive Lens `.sr-inp` (родоначальник). Двічі вкусило при перенесенні clear-× у QR (batch23.1) і KPI (batch14.2) — обидва мали `type="search"` без глушіння. Глушити в тій же сесії, що й додаєш свій clear-×.
 
-**B3.2. Поле пошуку = іконка · поле · хрест · фільтр у ОДНОМУ полі** 🆕 (QR Admin, шіт «Кандидати», 10.10.2026; ідея Konst — фільтр не окремою кнопкою поруч, а всередині поля).
-- **Поле — заглиблене (well), кнопка в ньому — піднята (lift)** (A65): гола іконка фільтра в полі губиться (Konst 10.10). Підкладка — `::before` 30 px (`inset:7px`, `background:var(--card)`, тонка рамка й тінь), **тап лишається 44 px** (A73). Увімкнений фільтр — `--accent-soft` + рамка `--accent-border`, іконка `--accent-text` (у темній — приглушено, без кислоти).
-- **Під час набору — хрест замість фільтра** (не дві кнопки поруч): `hidden` на фільтрі + clear-× (B3.1 — нативний хрест заглушити). Хрест — на круглій підкладці.
-- **Тап по всій висоті поля, не по рядку тексту:** `input{padding-block:9px;align-self:stretch}` + `padding-block:0` у поля — інакше тап вище/нижче тексту не відкриває клавіатуру (ui_lint 10.10: зона input 22 px при полі 40). Шрифт поля ≥ 16 px — інакше iOS збільшує сторінку.
-- **Натискання** — фільтр і хрест стискаються (A67, `.pressing` на підкладці `::before`, `.88`).
+**B3.2. Поле пошуку з фільтрами — фундамент** ✅ (QR Lens CC-14, прод rev 17–18, телефон Konst 16.10.2026: «набагато краще»; перша версія — QR Admin, шіт «Кандидати», 10.10.2026). Нове поле пошуку в продукті береться звідси цілком, не вигадується.
+
+1. **Будова — одне поле:** іконка · поле · слот справа (44 px тап, A73). Поле — заглиблене (well), кнопка в ньому — піднята (lift, A65). «Фільтри» — **пігулка з підписом** (іконка 11 px + «Фільтри» 12/600); гола іконка в полі губиться (Konst 10.10).
+2. **Морф на одному місці** (Konst 12.10): спокій — «Фільтри» · тап у поле — слот порожній · є текст — ✕ (і коли поле без фокусу: ✕ і фільтр разом не показуються — «вони заміняють одне одного», Konst 16.10; iOS `UISearchBar` так само ховає праву кнопку, щойно є текст). Стан рахує одна функція з поля (значення + фокус) — кличуть події поля **і** загальний `render()`, бо застосунок чистить поле з коду без події `input`. Сховане — `inert` + `opacity:0`, не `hidden` (інакше руху не видно).
+3. **✕ не забирає фокус:** `pointerdown → preventDefault` на ✕ — клавіатура не блимає; тику (`.hx`, A105) на ✕ поля **нема** (свіч забрав би фокус — ризик Konst 16.10).
+4. **Обраний фільтр — без заливки акцентом** (Konst 15.10: «не люблю заливку»), по темах окремо (дизайн-системи задають обраний стан на тему): світла — тон + кільце, як обраний чіп шіта (`#dcefed` · кільце `#33ccbd` 1,25 px · текст `#0e2f2c`); темна — тіло спокою + кільце `#8ae5dc` 1,5 px, іконка акцентом, текст звичайний. Спокій у світлій — тихо (тіло між карткою й полем, кант 0,5 px), щоб не перекрикував картки.
+5. **Прес — уся кнопка** (`.93`, A67), не лише підкладка: інакше іконка «торкається краю» (телефон Konst 15.10).
+6. **Тап по всій висоті поля:** `input{padding-block:9px;align-self:stretch}`, у поля `padding-block:0`; шрифт поля ≥ 16 px (iOS не збільшує сторінку). Нативний хрест `type=search` — заглушити (B3.1).
+7. **Лічильник — живий, без окремої смуги:** під фільтром число каже, скільки знайдено «з» скількох — у рядку статусу над полем (числа акцентом, крапки статусів — по знайденому) або в підказці поля («Адреса · 12 з 149 аптек»; повну фразу міряти на 375 px — вона мусить влазити). Рядок, що змінюється, — `aria-live="polite"` (+ `aria-atomic`); у поля — `aria-label` (підказка — не підпис).
+8. **Пошук кирилицею по латиниці** (назви брендів латиницею): запит кирилицею → регулярний вираз за постановою КМУ №55 (г→h, х→kh, и→y, ц→ts, ь — без знака) + прочитання брендів (г→g, к→c, кс→x, ф→ph) + подвоєні приголосні (Dettol). «нурофен» → Nurofen, «гавіскон» → Gaviscon, «солом'я» → Solomia.
+9. **Хрест шіта** поруч у тій самій мові: піднятий 32 px (тап 44 через `::after{inset:-6px}`), кант 0,5 px + тінь, прес `.86`, тик (`.hx`, A105) — Konst 16.10: «відчув тик — нехай лишається». Оберт хреста разом із закриттям шіта — **ні**: шіт забирає хрест раніше, ніж око побачить.
+
 ```css
-.f{position:relative;width:44px;height:44px;margin:-12px -12px -12px -8px;border:none;background:none}
-.f svg{position:relative;width:16px;height:16px}
-.f::before{content:"";position:absolute;inset:7px;border-radius:9px;background:var(--card);box-shadow:0 1px 2px rgba(20,40,35,.14),0 0 0 1px var(--border);transition:transform 280ms cubic-bezier(.34,1.5,.64,1)}
-.f.on::before{background:var(--accent-soft);box-shadow:0 0 0 1px var(--accent-border)}.f.on{color:var(--accent-text)}
-.f.pressing::before{transform:scale(.88);transition-duration:80ms}
+.mf{position:relative;flex:none;width:44px;height:44px;margin:-2px -10px -2px -4px;transition:width 300ms cubic-bezier(.34,1.3,.64,1)}
+.mf[data-st=idle]{width:var(--mf-w,88px)}                 /* ширина пігулки — справжня, з offsetWidth */
+.mf>button{position:absolute;top:0;right:0;height:44px;display:flex;align-items:center;justify-content:center;border:none;background:none;padding:0;transition:opacity 160ms,transform 300ms cubic-bezier(.34,1.5,.64,1)}
+.mf>button::before{content:"";position:absolute}
+.mf>button>svg,.mf>button>.lb{position:relative}          /* НЕ >*: тик .hx лишається absolute (A105) */
+.mf>.mf-f{width:max-content;padding:0 16px 0 11px;gap:4px;font-size:12px;font-weight:600}   /* .mf> — інакше padding:0 вище перебиває */
+.mf-f::before{inset:7px 6px 7px 4px;border-radius:999px;background:var(--mf-bg);box-shadow:var(--mf-sh)}
+.mf-f.on::before{background:var(--mf-on-bg);box-shadow:var(--mf-on-ring),var(--mf-on-sh)}
+.mf-f.pressing{transform:scale(.93)}
+.mf>button.off{opacity:0;pointer-events:none}.mf-f.off{transform:scale(.5)}.mf-x.off{transform:scale(.5) rotate(-90deg)}
 ```
-Джерело: `QR-Lens:tools/QR_Lens_zvit_template.html` (`.zv-sb .ph-srch`, `.zv-fin`).
+```js
+function srchSt(){ /* для кожного поля */ const st=inp.value?'typing':document.activeElement===inp?'focus':'idle';
+  slot.dataset.st=st; f.classList.toggle('off',st!=='idle'); x.classList.toggle('off',st!=='typing'); f.inert=st!=='idle'; x.inert=st!=='typing';
+  if(st==='idle'&&f.offsetWidth) slot.style.setProperty('--mf-w',f.offsetWidth+'px'); }
+// + inp: focus/blur → srchSt; render(){…; srchSt()}; x: pointerdown → preventDefault
+```
+**Пастки (усі — з телефона Konst або своїх ✗):** стиль на `>*` у кнопці ставить тик `.hx` у ряд — іконка з'їжджає, лише на iPhone · прибираючи старі класи кнопки, перевір, чи їх не бере інша сторінка зі стилю сайту (у QR — звіт адмінки: `selftest` «класи звіту є в стилі сайту») · тест, що клікає фільтр із фокусом у полі, після морфу бреше — шіт відкривати з іншої кнопки.
+*Зуби (QR):* `QR-Lens:tools/qr_sr_sheet_test.mjs` — морф 6 станів, тик у пігулці, рядок статусу = карткам, підказка влазить, кирилиця 9 випадків; `--inject` → ✗. *Джерела:* iOS `UISearchBar` (developer.aliyun.com), Ionic searchbar, M3 FilterChip, LogRocket / eBay Playbook / Kodeco (фільтри на мобільному), Front-End Checklist (підказка ≠ підпис), постанова КМУ №55 (kodeksy.com.ua) — 15–16.10.2026. *Провенанс:* `QR-Lens:tools/QR_Lens_template_v2.html` (`srchSt`, `.mf`, `cyrLat`, `renderCtxLayer`), бриф `QR-Lens:lens/QR_Lens_QRL11_brief.md` п.8-б, 10–13.
 
 ## B4. Numeric fuel gauge — 12 поділів 🆕 (Drive Lens)
 
