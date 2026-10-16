@@ -9,7 +9,7 @@
 //          <repo>/.ui-lint-accept — відомі вади, прийняті Konst: рядок «вид | шматок адреси елемента | причина · дата» → ⓘ (не блокує, але друкується щоразу).
 //          node ui_lint.mjs selftest — зуби: сторінка з підкинутими вадами (кожна мусить дати свій рядок) і чиста (0).
 // Перевірки: 1 скрол убік · 2 обрізано · 3 прилипло / вилазить · 4 контраст · 5 шрифт · 6 тап, без назви, iOS-зум · 7 накладання · 8 ряд · 9 текст (сміття, жаргон) ·
-// 10 дія в прокрутці · 11 кнопки ряду · 12 сирота · 13 злито · 14 однакові заголовки · 15 дата й час · 16 зливається (16-б край кнопки) · 17 паритет тем · 18 кромка · 19 картка-список · 20 вкладена прокрутка · 21 шапка в прокрутці · 22 емодзі в кнопці · 23 нативне вікно; поза probe — натискання (:active / JS pointerdown, touchstart).
+// 10 дія в прокрутці · 11 кнопки ряду · 12 сирота · 13 злито · 14 однакові заголовки · 15 дата й час · 16 зливається (16-б край кнопки) · 17 паритет тем · 18 кромка · 19 картка-список · 20 вкладена прокрутка · 21 шапка в прокрутці · 22 емодзі в кнопці · 23 нативне вікно · 24 фон у рамці · 25 кант рветься; поза probe — натискання (:active / JS pointerdown, touchstart).
 // Звідки кожна (пропуск Konst, QR CC-N, рецепт кукбуку) — коментар біля неї.
 // Вивід: ✗ (ворота не пустять) · ⚠ (подивись очима) · ⓘ (не виміряно); exit 1 на ✗.
 // Пороги: контраст 4,5:1 (великий текст 3:1) — WCAG 2.x AA · ціль тапу 24 px ✗ (WCAG 2.2 2.5.8) / 44 px ⚠ (Apple HIG) · поле вводу < 16 px — iOS Safari збільшує сторінку ·
@@ -166,6 +166,19 @@ function probe() {
   // 22. емодзі в кнопці (пропуск Konst QR CC-12, 14.10.2026: «▶ рух» на iPhone став кольоровою картинкою-емодзі серед SVG-іконок): символ з Extended_Pictographic у тексті кнопки чи посилання
   for (const el of all.filter(e => /^(BUTTON|A)$/.test(e.tagName) || e.getAttribute('role') === 'button')) { const t = [...el.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join('');
     const m = t.match(/\p{Extended_Pictographic}/u); if (m) add('⚠', 'емодзі', el, `символ «${m[0]}» у кнопці — iOS малює його кольоровою картинкою, не в мові іконок; іконка — SVG (currentColor)`); }
+  // 24. фон у рамці (пропуск Konst QR CC-15, 16.10.2026: «бліда смуга знизу» кнопки в темній): градієнт фону з початком від внутрішнього краю (background-origin: padding-box,
+  //     типово) і повтором малюється й під рамкою (background-clip: border-box) → у прозорій чи напівпрозорій рамці знизу видно смужку ВЕРХУ градієнта (MDN background-origin, 16.10.2026)
+  for (const el of all) { const s = getComputedStyle(el); if (!/gradient/.test(s.backgroundImage) || s.backgroundOrigin !== 'padding-box' || !/(^|\s)repeat/.test(s.backgroundRepeat) || s.backgroundClip !== 'border-box') continue;
+    const side = ['Top', 'Right', 'Bottom', 'Left'].find(k => parseFloat(s['border' + k + 'Width']) > 0 && s['border' + k + 'Style'] !== 'none' && (rgba(s['border' + k + 'Color']) || [0, 0, 0, 0])[3] < 0.99);
+    if (side) add('✗', 'фон у рамці', el, `фон-градієнт повторюється під прозорою рамкою (${side.toLowerCase()}) — смужка протилежного краю градієнта; фон \`<градієнт> border-box no-repeat\``); }
+  // 25. кант рветься (пропуск Konst QR CC-15, 16.10.2026: «коло, обрізане знизу»): різні кольори сусідніх сторін рамки на круглому куті сходяться по діагоналі (так малює WebKit —
+  //     w3.org/TR/css-borders-4; webkit different-color-borders) → кант «обривається». Світло згори й кромка знизу — тінями, що йдуть по дузі: inset 0 1px 0 · 0 1px 0
+  for (const el of all) { const s = getComputedStyle(el); if (!(parseFloat(s.borderTopLeftRadius) > 2 || parseFloat(s.borderBottomRightRadius) > 2)) continue;
+    const sd = ['Top', 'Right', 'Bottom', 'Left'].map(k => parseFloat(s['border' + k + 'Width']) > 0 && s['border' + k + 'Style'] !== 'none' ? rgba(s['border' + k + 'Color']) : null);
+    const g = [255, 255, 255, 1], k = [0, 0, 0, 1], seen = c => c && c[3] > 0.04 ? c : null;
+    const torn = [0, 1, 2, 3].some(i => { const a = sd[i], b = sd[(i + 1) % 4]; if (!a || !b || !(seen(a) || seen(b))) return false;
+      return Math.max(cr(blend(a, g), blend(b, g)), cr(blend(a, k), blend(b, k))) > 1.25; });
+    if (torn) add('⚠', 'кант рветься', el, 'різні кольори сторін рамки на круглому куті — шов по діагоналі, кант «обривається»; світло згори / кромка знизу — box-shadow (inset 0 1px 0 · 0 1px 0)'); }
   // 21. шапка в прокрутці (A108 п.1; пропуск Konst QR CC-12, 14.10.2026: у колег більше мереж — шіт фільтрів гортався ВЕСЬ, шапка з ✕ їхала геть, протяг показував тло):
   //     прокрутка в нерухомому шарі (предок або сама position: fixed), серед перших трьох її дітей — шапка (header / h1–h3 / клас head|title) з кнопкою, не sticky
   for (const sc of all.filter(e => /auto|scroll/.test(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + 40)) {
@@ -230,6 +243,8 @@ const DEFECTS = {
   'дата й час': `<div class=card><small>09.10 18:53 · QR Admin</small></div>`,   // QR CC-8: «Історія»
   'зливається': `<div style="background:#eef3f2;padding:16px"><div style="border-radius:16px;background:#fff;border:1px solid rgba(211,222,219,.4);box-shadow:0 3px 8px rgba(0,0,0,.06)"><div style="background:rgba(227,235,233,.6);padding:12px">На сайті</div><div style="padding:12px">рядок</div></div></div>`,   // QR CC-8: шапка картки в шіті світлої теми
   'край кнопки': `<div style="background:#fff;padding:16px"><button style="height:48px;width:160px;border:0;border-radius:14px;background:linear-gradient(180deg,#fff,#f0f0f0);box-shadow:0 1px 2px rgba(20,40,35,.06),0 4px 14px rgba(20,40,35,.09)">Ні</button></div>`,   // QR CC-13: «Ні» в підтвердженні пульта
+  'фон у рамці': `<div class=card><button style="min-height:48px;width:160px;border:1px solid transparent;border-radius:14px;background:linear-gradient(180deg,#fff,#555)">Закрити</button></div>`,   // QR CC-15: бліда смуга знизу
+  'кант рветься': `<div class=card><button style="min-height:48px;width:160px;border:1px solid;border-color:rgba(255,255,255,.5) rgba(255,255,255,.2) #000;border-radius:14px;background:#888">Закрити</button></div>`,   // QR CC-15: «коло, обрізане знизу»
   'натискання': `<div class=card><a href="#x" style="display:inline-block;padding:14px 18px">Відкрити звіт</a></div>`,
 };
 
