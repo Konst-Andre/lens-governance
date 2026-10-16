@@ -169,8 +169,10 @@ function probe() {
   // 24. фон у рамці (пропуск Konst QR CC-15, 16.10.2026: «бліда смуга знизу» кнопки в темній): градієнт фону з початком від внутрішнього краю (background-origin: padding-box,
   //     типово) і повтором малюється й під рамкою (background-clip: border-box) → у прозорій чи напівпрозорій рамці знизу видно смужку ВЕРХУ градієнта (MDN background-origin, 16.10.2026)
   for (const el of all) { const s = getComputedStyle(el); if (!/gradient/.test(s.backgroundImage) || s.backgroundOrigin !== 'padding-box' || !/(^|\s)repeat/.test(s.backgroundRepeat) || s.backgroundClip !== 'border-box') continue;
-    const side = ['Top', 'Right', 'Bottom', 'Left'].find(k => parseFloat(s['border' + k + 'Width']) > 0 && s['border' + k + 'Style'] !== 'none' && (rgba(s['border' + k + 'Color']) || [0, 0, 0, 0])[3] < 0.99);
-    if (side) add('✗', 'фон у рамці', el, `фон-градієнт повторюється під прозорою рамкою (${side.toLowerCase()}) — смужка протилежного краю градієнта; фон \`<градієнт> border-box no-repeat\``); }
+    const st = stops(s); if (st.length < 2) continue; const [g0, g1] = [st[0], st[st.length - 1]].map(x => blend(x, [128, 128, 128, 1]));
+    // видимість, не механізм (хибне на шапці QR CC-15: верх і низ градієнта шапки різняться на 1–2 рівні — під рамкою не видно): під верхньою рамкою мав би бути верх, а лягає низ, і навпаки
+    const side = ['Top', 'Bottom'].find(k => { const c = rgba(s['border' + k + 'Color']) || [0, 0, 0, 0]; return parseFloat(s['border' + k + 'Width']) > 0 && s['border' + k + 'Style'] !== 'none' && c[3] < 0.99 && cr(blend(c, g0), blend(c, g1)) > 1.05; });
+    if (side) add('✗', 'фон у рамці', el, `фон-градієнт повторюється під прозорою рамкою (${side === 'Top' ? 'згори' : 'знизу'}) — смужка протилежного краю градієнта; фон \`<градієнт> border-box no-repeat\``); }
   // 25. кант рветься (пропуск Konst QR CC-15, 16.10.2026: «коло, обрізане знизу»): різні кольори сусідніх сторін рамки на круглому куті сходяться по діагоналі (так малює WebKit —
   //     w3.org/TR/css-borders-4; webkit different-color-borders) → кант «обривається». Світло згори й кромка знизу — тінями, що йдуть по дузі: inset 0 1px 0 · 0 1px 0
   for (const el of all) { const s = getComputedStyle(el); if (!(parseFloat(s.borderTopLeftRadius) > 2 || parseFloat(s.borderBottomRightRadius) > 2)) continue;
