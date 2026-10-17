@@ -191,6 +191,29 @@ down скрізь **80ms** лінійно. **`.84` — свідомий виня
 **Анти:** чистий `:active{scale}` для швидкого тапу (непомітно); `transition:all` (тягне зайві проп); per-element listener на ре-рендер-контейнері (злітає); однаковий scale на чіп і велику капсулу (велика «плескає»).
 **Зв’язок:** A56 (`.nav-i:active{scale(.96)}` — там OK, бо nav-кнопки постійні в DOM, не ре-рендеряться), A54 (постійний DOM для анімованих елементів), A8 (`.pressing` не конфліктує — окрема проп). *Source-of-truth: `QR_Lens_preview_batch31_3.html` — `.qr-chip`/`.pressing р.470`, делегований IIFE `р.1775–1777` (`#qr-chips-row`). ✅ device-confirmed (B30). **Phase-3 — РЕАЛІЗОВАНО → A67.1** (card-select на `.ph-card`; реальна device-locked магнітуда `scale .96` + WAAPI-overshoot, а НЕ передбачені `.98`).*
 
+## A67.2. Кнопка меню (pull-down): дотик + стан «меню відкрите», натиснута = западина сусіда ✅ (QR CC-15, 17.10.2026)
+
+**Чому не A67.** A67 — стиск чіпа, що сам перемикає щось. Кнопка меню не перемикає — з неї **виростає меню** (Konst 17.10: «з чіпа не виходить список»). Тому в неї **два** стани, а не один: дотик і «меню відкрите», що тримається, доки меню не закрилось (W3C APG menu button: `aria-expanded` — окремий стан, 17.10).
+
+**Рецепт ⟂ світ ⟂ замір → рішення.** A67 (час: 80 мс вниз лінійно, 280 мс назад пружиною; сила ∝ 1/розмір) ⟂ світ (iOS 26 Liquid Glass — натиск піднімає й підсвічує; «фізична» кнопка втискається; Apple HIG pull-down — сторінку не отримано, «не перевірено») ⟂ примірка QR П4 «втиснути» ⟂ П5 «засвітитись» на телефоні → **втиснути**: наш матеріал «світло згори», натиснуте опускається.
+
+```css
+.icon-btn{transition:transform 280ms cubic-bezier(.34,1.5,.64,1),box-shadow 280ms ease,background 280ms ease}
+.icon-btn:active{transform:none}                       /* чистий :active на швидкий тап не видно (A67) */
+.icon-btn.pressing{transition-duration:80ms;transition-timing-function:linear}
+.icon-btn:is(.pressing,[aria-expanded="true"]){transform:scale(.92);background:var(--band);border-color:var(--border);box-shadow:var(--band-sh)}   /* = капсула поруч */
+```
+```js
+// делегація на document (A67): дотик → .pressing; стан «меню відкрите» тримає aria-expanded, який ставить код меню
+let c=null;const rel=()=>{if(c){c.classList.remove('pressing');c=null}};
+document.addEventListener('pointerdown',e=>{const b=e.target.closest('#btnTheme');if(b){c=b;b.classList.add('pressing')}},{passive:true});
+['pointerup','pointercancel'].forEach(t=>document.addEventListener(t,rel,{passive:true}));
+```
+**Натиснута = матеріал сусідньої западини** (A66.2): кнопка не вигадує новий вигляд. Меню виростає з кнопки (у QR — VT від прямокутника кнопки, B28).
+**Що бачить `ui_lint`:** при відкритому меню — ⚠ «натискання не змінює вигляд» (кнопка вже вдавлена) і ⚠ «ціль 33 px» (стиск .92) — задумано, не вада.
+**Анти:** рецепт чіпа без стану «відкрите»; ореол / світіння в мові «світло згори» (П5 — найгучніше в шапці, поки меню відкрите, 1,79); свій вигляд натиснутого, що не збігається з западиною поруч (QR v6: у світлій низ «зникав»).
+*Провенанс:* QR Lens CC-15, примірка `QRL-15_kant` v6–v7 (17.10.2026), прод rev 19 (`QR-Lens:tools/QR_Lens_template_v2.html` «CC-15»).
+
 ## A67.1. Card-select (велика картка): persistent-DOM + pseudo-opacity ring + WAAPI «один жест» ✅ (B32, device-locked)
 
 **Що це.** Анім-вибір картки аптеки на Tab-2. Розширення A67 на **великий** елемент: той самий press-фундамент, але інша моторика — велика картка має інерцію, тож «характер»-жест повільніший і пружніший за чіп.
