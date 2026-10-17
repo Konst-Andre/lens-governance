@@ -9,7 +9,7 @@
 //          <repo>/.ui-lint-accept — відомі вади, прийняті Konst: рядок «вид | шматок адреси елемента | причина · дата» → ⓘ (не блокує, але друкується щоразу).
 //          node ui_lint.mjs selftest — зуби: сторінка з підкинутими вадами (кожна мусить дати свій рядок) і чиста (0).
 // Перевірки: 1 скрол убік · 2 обрізано · 3 прилипло / вилазить · 4 контраст · 5 шрифт · 6 тап, без назви, iOS-зум · 7 накладання · 8 ряд · 9 текст (сміття, жаргон) ·
-// 10 дія в прокрутці · 11 кнопки ряду · 12 сирота · 13 злито · 14 однакові заголовки · 15 дата й час · 16 зливається (16-б край кнопки) · 17 паритет тем · 18 кромка · 19 картка-список · 20 вкладена прокрутка · 21 шапка в прокрутці · 22 емодзі в кнопці · 23 нативне вікно · 24 фон у рамці · 25 кант рветься; поза probe — натискання (:active / JS pointerdown, touchstart).
+// 10 дія в прокрутці · 11 кнопки ряду · 12 сирота · 13 злито · 14 однакові заголовки · 15 дата й час · 16 зливається (16-б край кнопки) · 17 паритет тем · 18 кромка · 19 картка-список · 20 вкладена прокрутка · 21 шапка в прокрутці · 22 емодзі в кнопці · 23 нативне вікно · 24 фон у рамці · 25 кант рветься · 26 поле губиться; поза probe — натискання (:active / JS pointerdown, touchstart).
 // Звідки кожна (пропуск Konst, QR CC-N, рецепт кукбуку) — коментар біля неї.
 // Вивід: ✗ (ворота не пустять) · ⚠ (подивись очима) · ⓘ (не виміряно); exit 1 на ✗.
 // Пороги: контраст 4,5:1 (великий текст 3:1) — WCAG 2.x AA · ціль тапу 24 px ✗ (WCAG 2.2 2.5.8) / 44 px ⚠ (Apple HIG) · поле вводу < 16 px — iOS Safari збільшує сторінку ·
@@ -181,6 +181,14 @@ function probe() {
     const torn = [0, 1, 2, 3].some(i => { const a = sd[i], b = sd[(i + 1) % 4]; if (!a || !b || !(seen(a) || seen(b))) return false;
       return Math.max(cr(blend(a, g), blend(b, g)), cr(blend(a, k), blend(b, k))) > 1.25; });
     if (torn) add('⚠', 'кант рветься', el, 'різні кольори сторін рамки на круглому куті — шов по діагоналі, кант «обривається»; світло згори / кромка знизу — box-shadow (inset 0 1px 0 · 0 1px 0)'); }
+  // 26. поле губиться (пропуск Konst QR CC-15, 17.10.2026: поле пошуку й GUID без кільця в темній — «верхній край ледь помітний, розчиняється з тлом»):
+  //     поле вводу (контейнер з input / textarea) — і тон, і рамка до ґрунту < 1.2:1 → межі поля не видно. Поріг — вирок Konst: 1,13 губиться, 1,37 тримається.
+  for (const el of all) { if (!el.querySelector(':scope > input:not([type=hidden]), :scope > textarea')) continue; const s = getComputedStyle(el), r = el.getBoundingClientRect(); if (r.width < 80) continue;
+    const ground = el.parentElement && flatBg(el.parentElement); if (!ground) continue;
+    const bgc = rgba(s.backgroundColor) || [0, 0, 0, 0]; if (bgc[3] < 0.05 && s.backgroundImage === 'none') continue;   // голе поле без тіла — не наш випадок
+    const fill = blend(bgc, ground), bc = rgba(s.borderTopColor) || [0, 0, 0, 0], bw = parseFloat(s.borderTopWidth) || 0;
+    const top = bw > 0 && s.borderTopStyle !== 'none' ? cr(blend(bc, fill), ground) : 1, tone = cr(fill, ground);
+    if (Math.max(top, tone) < 1.2) add('⚠', 'поле губиться', el, `межа поля до тла: тон ${tone.toFixed(2)}:1, верхній край ${top.toFixed(2)}:1 — поле розчиняється (поріг 1,2 — вирок Konst QR CC-15); тихе кільце 1 px (~1,35) або тон світліше`); }
   // 21. шапка в прокрутці (A108 п.1; пропуск Konst QR CC-12, 14.10.2026: у колег більше мереж — шіт фільтрів гортався ВЕСЬ, шапка з ✕ їхала геть, протяг показував тло):
   //     прокрутка в нерухомому шарі (предок або сама position: fixed), серед перших трьох її дітей — шапка (header / h1–h3 / клас head|title) з кнопкою, не sticky
   for (const sc of all.filter(e => /auto|scroll/.test(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + 40)) {
@@ -247,6 +255,7 @@ const DEFECTS = {
   'край кнопки': `<div style="background:#fff;padding:16px"><button style="height:48px;width:160px;border:0;border-radius:14px;background:linear-gradient(180deg,#fff,#f0f0f0);box-shadow:0 1px 2px rgba(20,40,35,.06),0 4px 14px rgba(20,40,35,.09)">Ні</button></div>`,   // QR CC-13: «Ні» в підтвердженні пульта
   'фон у рамці': `<div class=card><button style="min-height:48px;width:160px;border:1px solid transparent;border-radius:14px;background:linear-gradient(180deg,#fff,#555)">Закрити</button></div>`,   // QR CC-15: бліда смуга знизу
   'кант рветься': `<div class=card><button style="min-height:48px;width:160px;border:1px solid;border-color:rgba(255,255,255,.5) rgba(255,255,255,.2) #000;border-radius:14px;background:#888">Закрити</button></div>`,   // QR CC-15: «коло, обрізане знизу»
+  'поле губиться': `<div style="background:#0a0e14;padding:16px"><div style="background:#161c25;border:1px solid transparent;border-radius:10px;padding:8px"><input style="background:none;border:0;font-size:16px;color:#ccc;min-height:44px" value="пошук"></div></div>`,   // QR CC-15: поле без кільця на майже чорному
   'натискання': `<div class=card><a href="#x" style="display:inline-block;padding:14px 18px">Відкрити звіт</a></div>`,
 };
 
