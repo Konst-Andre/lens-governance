@@ -26,7 +26,7 @@ GitHub живе в секреті воркера, тож у тексті чат�
 
 | Імʼя | Тип | Що |
 |---|---|---|
-| `GH_TOKEN` | секрет | fine-grained PAT GitHub (Contents: write; для `.github/workflows/*` — ще Workflows: write; для Actions — Actions: write) |
+| `GH_TOKEN` | секрет | fine-grained PAT GitHub (Contents: write; для `.github/workflows/*` — ще Workflows: write; для Actions — Actions: write) · **без терміну дії** (Konst 17.10.2026 регенерував і вставив у воркер; перевірено того ж дня з QR CC-16: читання `gh_log`/`gh_read`/`gh_list`, запис — `gh_branch delete` ×10) |
 | `MCP_KEY` | секрет | випадковий ключ у шляху URL; хто не знає ключа — отримує 404 |
 | `TICKET_KEY` | секрет | ≥ 32 символи; HMAC-підпис квитків `gh_ticket`. Окремий від `MCP_KEY`: витік квитка не дає доступу до MCP. Коротший — `gh_ticket` відмовляє |
 | `OWNER` | змінна | `Konst-Andre` — запис лише в репо цього власника |
