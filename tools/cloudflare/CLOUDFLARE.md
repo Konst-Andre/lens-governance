@@ -61,6 +61,12 @@ fresh_days=30
    і Vodafone, `*.workers.dev` — відкривається (вирок пристрою Konst 05–06.10.2026; публічного джерела нема). Воркер без коду віддає лише
    теку сайту: `wrangler.toml` → `[assets] directory = "./docs"` (тека за правилом 3) і `not_found_handling = "single-page-application"` —
    як Pages без `404.html` (старі ярлики PWA лишаються робочими). Зразок — `QR-Lens:wrangler.toml`.
+   **Переїзд — що несе Pages, а що треба явно** (developers.cloudflare.com/workers/static-assets/migration-guides/migrate-from-pages, оновлено 12.10.2026):
+   `_headers` і `_redirects` у теці сайту працюють і на воркері (CSP через `_headers` переживає переїзд; але не діють на відповіді коду воркера);
+   поведінку SPA / 404 Pages вгадував — на воркері лише явно (`not_found_handling`); `pages.dev` → `<воркер>.<субдомен>.workers.dev`
+   (`workers_dev = true`); прев'ю гілок — Worker Previews (`preview_urls` + `previews`, адреса `<прев'ю>-<воркер>.<субдомен>.workers.dev`, `X-Robots-Tag: noindex`);
+   власний домен — лише в зоні Cloudflare. Перед переїздом — `migrate_pages_to_workers_guide` конектора Cloudflare (MCP) як чекліст.
+   Cloudflare радить прод на власному домені, `workers.dev` — «для хобі-проєктів» (…/routing/workers-dev, 22.09.2026) — прийнятий ризик, доки домену нема.
 10. **Воркер під'єднаний до гіта (Workers Builds) з першого дня.** Ручний `wrangler deploy` з сесії — лише перший раз: інакше файл,
    завантажений з телефона (GitHub web), до сайту не доходить (QR 06.10). Фільтр — правило 1 (include `*`, exclude документів).
    Під'єднати може й сесія через API: `builds/repos/connections` → `builds/triggers` (06.10, QR-Lens) — токеном з правом Workers Builds
@@ -109,9 +115,9 @@ fresh_days=30
 
 У `tools/env_check.sh` репо — рядок (див. `tools/claude-code/templates/env_check_template.sh`):
 ```bash
-if cfb=$(curl -sSf -m 20 https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/tools/cloudflare/cf_budget.sh 2>/dev/null); then
-  printf '%s\n' "$cfb" | bash; else echo "cloudflare: — (cf_budget не завантажено)"; fi
+if [ -f "$K/tools/cloudflare/cf_budget.sh" ]; then bash "$K/tools/cloudflare/cf_budget.sh"; else echo "cloudflare: — (ядра поруч нема: $K)"; fi
 ```
+(`K` — клон ядра поруч, як у шаблоні; не `curl | bash` з `main` — класифікатор auto-режиму Claude Code відмовляє, AE S90 18.10.2026.)
 ⚠ Не `curl … | bash || echo …`: на 404 `bash` отримує порожній вхід і виходить з 0 — збій мовчить.
 і абзац у `CLAUDE.md` репо (зразок — `tools/claude-code/templates/CLAUDE_template.md`): рядки `cloudflare:` і `⚠` в `env_check` —
 читати, тривога — у звіті одразу після «що ти побачиш»; зміна налаштувань Cloudflare — прод-крок, лише після «так» Konst. Потрібні змінні середовища `CLOUDFLARE_API_TOKEN` (права на читання: Pages,
@@ -134,6 +140,7 @@ Workers, Account Analytics) і `CLOUDFLARE_ACCOUNT_ID`. Скрипт лише ч
 
 | дата | хто (репо, сесія) | що звірено | що змінилось |
 |---|---|---|---|
+| 2026-10-18 | AE-Simulator S90 | developers.cloudflare.com/workers/static-assets/migration-guides/migrate-from-pages (12.10.2026) · …/static-assets/headers (22.09.2026) · …/previews (Worker Previews, 22.09.2026) · …/routing/workers-dev (22.09.2026) · конектор Cloudflare `migrate_pages_to_workers_guide` | §2 п.9: абзац «переїзд — що несе Pages, а що явно» (`_headers`/`_redirects` ✓, SPA явно, Previews, домен лише в зоні CF, `workers.dev` — хобі); §4: виклик `cf_budget` — з клону ядра, не `curl \| bash` |
 | 2026-10-03 | AirLens S12 | developers.cloudflare.com/workers/ci-cd/builds/build-watch-paths (29.05.2026) · …/builds/api-reference (22.09.2026); Builds API: тригер і список збірок воркера airlens | §2 п.1: для воркера — виключення, а не перелік тек (перелік мовчки пропускає `../data`, `[assets]`); watch paths airlens поставлено через API (`PATCH builds/triggers`), коміт лише з `docs/` — без збірки (до фільтра — збірка за ~3 с); шляхи фільтра — від кореня репо при корені збірки `/worker` |
 | 2026-10-03 | AirLens S11 | API акаунта: запити по днях 26.09–03.10 за скриптами; проєкт Pages airlens (домени, деплої); developers.cloudflare.com/workers/ci-cd/builds/api-reference (22.09.2026) · …/configuration (API token) | заміряно: ≤ 2 027 запитів/добу, бот 97 %; Pages airlens видалено (131 деплой + проєкт, `DELETE …?force=true` без збоїв); Builds API — лише токен користувача (права: Workers Builds Configuration Edit + Workers Scripts Read); build token Workers Builds — окремий, автостворений, не чіпати |
 | 2026-10-03 | AE-Simulator S89 | developers.cloudflare.com/pages/platform/known-issues (06.05.2026) | проєкт Pages із >100 деплоями дашборд не видаляє: спершу деплої (`wrangler pages deployment delete <id> --project-name <p> --force` у циклі, скрипт на тій сторінці; або API `DELETE …/pages/projects/<p>/deployments/<id>?force=true`), активний продакшн-деплой лишається — потім видалити проєкт |

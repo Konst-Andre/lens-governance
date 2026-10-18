@@ -42,6 +42,8 @@ check() {
   local tool; for tool in $SHARED_TOOLS; do
     [ -s "$d/tools/env_check.sh" ] && ! grep -q "$tool" "$d/tools/env_check.sh" && miss+=("tools/env_check.sh не кличе $tool — рядок із шаблону ядра (tools/claude-code/templates/env_check_template.sh)")
   done
+  # ENV-CLONE (Konst 18.10.2026, AE S90): інструменти ядра — з клону поруч, не curl з main (класифікатор auto-режиму відмовляє запускати; шаблон env_check)
+  [ -s "$d/tools/env_check.sh" ] && grep -q 'raw.githubusercontent.com/Konst-Andre/lens-governance/main/tools/' "$d/tools/env_check.sh" && miss+=("tools/env_check.sh тягне інструменти ядра curl з main — на клон ядра поруч (templates/env_check_template.sh)")
   # UI-1 (Konst 18.10.2026, QR CC-16): репо з інтерфейсом — рядок «Дизайн-основа:» у CLAUDE.md (токени · як бере друга поверхня · префікси класів, REPO_FRAME §3-б)
   if [ "$kind" != "ядро" ] && [ -n "$(find "$d" -name '*.html' -not -path '*/archive/*' -not -path '*/node_modules/*' -not -path '*/.git/*' -print -quit 2>/dev/null)" ] && ! grep -q 'Дизайн-основа' "$d/CLAUDE.md"; then
     miss+=("CLAUDE.md: рядок «Дизайн-основа:» — де токени, як їх бере друга поверхня, префікси класів (UI-1, lens-governance:tools/claude-code/REPO_FRAME.md §3-б)")
@@ -69,13 +71,16 @@ if [ "${1:-}" = "--inject" ]; then
   printf '## Відкрите\n\n| id | предмет | дата |\n|---|---|---|\n| `Ч-1` | x | 05.10.2026 |\n\n-----\n' > "$t/repo/docs/CHERGA.md"; qok=$(check "$t/repo"); rc_qok=$?
   echo 'echo база' > "$t/repo/tools/env_check.sh"; sh0=$(check "$t/repo"); rc_sh0=$?; echo 'python3 doc_health.py .' >> "$t/repo/tools/env_check.sh"; shd=$(check "$t/repo"); rc_shd=$?; echo 'python3 shots_check.py .' >> "$t/repo/tools/env_check.sh"; sh1=$(check "$t/repo"); rc_sh1=$?
   : > "$t/repo/docs/index.html"; ui0=$(check "$t/repo"); rc_ui0=$?; echo 'Дизайн-основа: :root у docs/index.html · префікс app-' > "$t/repo/CLAUDE.md"; ver0=$(check "$t/repo"); rc_ver0=$?; echo 'python3 version_check.py .' >> "$t/repo/tools/env_check.sh"; ui1=$(check "$t/repo"); rc_ui1=$?; rm "$t/repo/docs/index.html"; echo x > "$t/repo/CLAUDE.md"
+  echo 'curl -sSf https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/tools/cloudflare/cf_budget.sh | bash' >> "$t/repo/tools/env_check.sh"; cl1=$(check "$t/repo"); rc_cl1=$?
+  sed -i '$d' "$t/repo/tools/env_check.sh"
   echo "# стара копія" >> "$t/repo/tools/audit_prompts.sh"; aud=$(check "$t/repo"); rc_aud=$?
   rm -rf "$t"
-  ok=0; [ $rc_full -eq 0 ] || ok=1; [ $rc_gone -eq 1 ] || ok=1; [ $rc_part -eq 1 ] && [[ "$part" == *docs/AUDIT.md* ]] || ok=1; [ $rc_q -eq 1 ] && [[ "$qlist" == *CQ-1* ]] || ok=1; [ $rc_qok -eq 0 ] || ok=1; [ $rc_aud -eq 1 ] && [[ "$aud" == *AUD-2* ]] || ok=1
+  [ $rc_cl1 -eq 1 ] && [[ "$cl1" == *"curl з main"* ]] || ok_cl=1   # ENV-CLONE (AE S90): curl з main у env_check — ⚠
+  ok=${ok_cl:-0}; [ $rc_full -eq 0 ] || ok=1; [ $rc_gone -eq 1 ] || ok=1; [ $rc_part -eq 1 ] && [[ "$part" == *docs/AUDIT.md* ]] || ok=1; [ $rc_q -eq 1 ] && [[ "$qlist" == *CQ-1* ]] || ok=1; [ $rc_qok -eq 0 ] || ok=1; [ $rc_aud -eq 1 ] && [[ "$aud" == *AUD-2* ]] || ok=1
   [ $rc_ui0 -eq 1 ] && [[ "$ui0" == *UI-1* ]] || ok=1; [ $rc_ui1 -eq 0 ] || ok=1   # UI-1: інтерфейс без «Дизайн-основа» — ⚠, з рядком — ✓
   [ $rc_ver0 -eq 1 ] && [[ "$ver0" == *VER-1* ]] || ok=1   # VER-1 (QR CC-17): інтерфейс, env_check без version_check — ⚠
   [ $rc_sh0 -eq 1 ] && [[ "$sh0" == *doc_health.py* ]] || ok=1; [ $rc_sh1 -eq 0 ] || ok=1; [ $rc_shd -eq 1 ] && [[ "$shd" == *shots_check.py* ]] && [[ "$shd" != *doc_health.py* ]] || ok=1   # примірка (CC-9): кличе doc_health, а shots_check ні → ⚠ саме з його назвою
-  [ $ok -eq 0 ] && echo "✓ inject: повний — ✓, без CLAUDE.md — ⚠, без docs/AUDIT.md — ⚠ з назвою, черга списком — ⚠ CQ-1, черга таблицею — ✓, стара копія скрипта аудиту — ⚠ AUD-2, інтерфейс без «Дизайн-основа» — ⚠ UI-1, env_check без спільного інструмента — ⚠ з назвою, з ним — ✓" || echo "✗ inject: детектор сліпий ($full | $gone | $part)"
+  [ $ok -eq 0 ] && echo "✓ inject: повний — ✓, без CLAUDE.md — ⚠, без docs/AUDIT.md — ⚠ з назвою, черга списком — ⚠ CQ-1, черга таблицею — ✓, стара копія скрипта аудиту — ⚠ AUD-2, інтерфейс без «Дизайн-основа» — ⚠ UI-1, env_check без спільного інструмента — ⚠ з назвою, з ним — ✓, curl інструментів ядра з main — ⚠" || echo "✗ inject: детектор сліпий ($full | $gone | $part)"
   exit $ok
 fi
 

@@ -34,24 +34,24 @@ else n=$(git rev-list --count --grep='Claude-Session' "$sm"..HEAD 2>/dev/null); 
 # прод (лише читання): <живий код ≡ репо; тека публікації; службове не видно — судити за ВМІСТОМ, не за HTTP-кодом>
 echo "прод: — (додати: живий код ≡ репо; тека публікації; службове не видно — за ВМІСТОМ)"
 
+# Спільні інструменти ядра — з КЛОНУ ядра поруч ($K, як профіль вище), не «curl | python» з main: виклик, не копія (свіжість — git pull ядра на
+# старті), і виконується лише код, що лежить у сесії. Чому: класифікатор auto-режиму Claude Code відмовляє запускати віддалений скрипт з гілки
+# («Security Weaken», AE S90 18.10.2026); світ — mlab-sh postmortem wiki «GitHub Actions»: виконання скрипта з гілки — ризик ланцюга постачання.
+CC="$K/tools/claude-code"
 # документи — ціна читання в Claude Code (ядро DOC-1: щосесійні ≤ 200 рядків · старт ≤ 25 КБ · розділ ≤ 16 КБ · > 80 КБ з маршрутом); лише ⚠, exit 0
-if dh=$(curl -sSf -m 20 https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/tools/claude-code/doc_health.py 2>/dev/null); then
-  printf '%s\n' "$dh" | python3 - .; else echo "документи: — (doc_health не завантажено)"; fi
+if [ -f "$CC/doc_health.py" ]; then python3 "$CC/doc_health.py" .; else echo "документи: — (ядра поруч нема: $K)"; fi
 
 # примірка — тека <документація>/shots/ (tools/claude-code/SHOTS.md): ✗ знімок без рядка · жива без знімків · файли після «прийнято»; ⚠ вік, вага, без накладки.
-# Теки нема — рядок «теки shots/ нема» (продукт без UI-рішень наперед — так і є). Свіжий з ядра щоразу — виклик, не копія.
-if sc=$(curl -sSf -m 20 https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/tools/claude-code/shots_check.py 2>/dev/null); then
-  printf '%s\n' "$sc" | python3 - . || fail=1; else echo "примірка: — (shots_check не завантажено)"; fi
+# Теки нема — рядок «теки shots/ нема» (продукт без UI-рішень наперед — так і є).
+if [ -f "$CC/shots_check.py" ]; then python3 "$CC/shots_check.py" . || fail=1; else echo "примірка: — (ядра поруч нема: $K)"; fi
 # версія застосунку B · rev (VER-1, lens-governance:tools/claude-code/VERSIONS.md) — лише репо з інтерфейсом; параметри свого продукту:
 #   --code <файл коду застосунку> --re '<мітка: група B, група rev>' [--name '<шлях файлу білда з групою B>']
-# if vc=$(curl -sSf -m 20 https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/tools/claude-code/version_check.py 2>/dev/null); then
-#   printf '%s\n' "$vc" > /tmp/version_check.py; python3 /tmp/version_check.py . --code <файл> --re '<регулярка>' ${ENV_INJECT:+--inject} || fail=1; else echo "версія: — (version_check не завантажено)"; fi
+# if [ -f "$CC/version_check.py" ]; then python3 "$CC/version_check.py" . --code <файл> --re '<регулярка>' ${ENV_INJECT:+--inject} || fail=1; else echo "версія: — (ядра поруч нема: $K)"; fi
+# Мітки в коді ще нема (продукт заводить версію) — рядок «⚠ версія: мітки ще нема», не ✗ (зразок — AE-Simulator:tools/env_check.sh).
 
 # Cloudflare — СПІЛЬНИЙ акаунт усіх проєктів: бюджет (запити · збірки · прогноз) і свіжість правил. Рядки «⚠» — читати й діяти
 # за lens-governance:tools/cloudflare/CLOUDFLARE.md. Скрипт лише читає й завжди exit 0. Репо без Cloudflare — рядок прибрати.
-# ⚠ не «curl | bash || echo»: bash на порожньому вході (404) виходить з 0, і збій мовчить
-if cfb=$(curl -sSf -m 20 https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/tools/cloudflare/cf_budget.sh 2>/dev/null); then
-  printf '%s\n' "$cfb" | bash; else echo "cloudflare: — (cf_budget не завантажено)"; fi
+if [ -f "$K/tools/cloudflare/cf_budget.sh" ]; then bash "$K/tools/cloudflare/cf_budget.sh"; else echo "cloudflare: — (ядра поруч нема: $K)"; fi
 
 [ "${g:-000}" = "000" ] && exit 1
 exit 0
