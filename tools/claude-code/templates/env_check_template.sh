@@ -8,19 +8,20 @@ cd "$(dirname "$0")/.."
 
 # ── налаштувати під репо ──
 EXTRA_VARS=""                  # імена змінних середовища через пробіл (значення не друкуються), напр. "GROQ_KEY BOT_TOKEN"
-GATE_CMD="echo гейт не задано"
-SUMDIR="docs/summary"           # тека самері (продукт Lens — sessions)  # головний гейт; останній рядок виводу — підсумок, напр. "node tools/validate.js"
+GATE_CMD="echo гейт не задано"  # головний гейт; останній рядок виводу — підсумок, напр. "node tools/validate.js"
+SUMDIR="docs/summary"           # тека самері (продукт Lens — sessions)
+AUDITF="docs/AUDIT.md"          # журнал аудиту правил (продукт Lens — lens/<Продукт>_AUDIT.md)
 code() { curl -sS -m 10 -o /dev/null -w '%{http_code}' "$1" 2>/dev/null || true; }
 
 # база
 git fetch -q origin main 2>/dev/null || true
-echo "база: HEAD $(git rev-parse --short HEAD) · origin/main $(git rev-parse --short origin/main 2>/dev/null) (main попереду на $(git rev-list --count HEAD..origin/main 2>/dev/null))"
+echo "база: HEAD $(git rev-parse --short HEAD) · origin/main $(git rev-parse --short origin/main 2>/dev/null) (origin/main попереду на $(git rev-list --count HEAD..origin/main 2>/dev/null) — треба pull)"
 
 # мережа · змінні · гейти · аудит
 g=$(code https://api.github.com/); c=$(code https://api.cloudflare.com/client/v4/)
 vars=""; for v in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID GH_TOKEN $EXTRA_VARS; do [ -n "${!v:-}" ] && vars+="$v=так " || vars+="$v=ні "; done
 gate=$(bash -c "$GATE_CMD" 2>&1 | tail -1)
-last=$(grep -m1 -oE "^\| 20[0-9]{2}-[0-9]{2}-[0-9]{2}" docs/AUDIT.md 2>/dev/null | tr -d '| ')
+last=$(grep -m1 -oE "^\| 20[0-9]{2}-[0-9]{2}-[0-9]{2}" "$AUDITF" 2>/dev/null | tr -d '| ')
 if [ -n "$last" ]; then days=$(( ( $(date +%s) - $(date -d "$last" +%s) ) / 86400 )); [ "$days" -gt 30 ] && aud="аудит правил: $days дн. — ПОРА" || aud="аудит правил: $days дн. тому"; else aud="аудит правил: журналу нема"; fi
 echo "env: github=${g:-000} cloudflare=${c:-000} · ${vars% } · гейт: $gate · $aud"
 K=../lens-governance; [ -d "$K" ] || K=/tmp/lens-governance; [ -f "$K/tools/claude-code/profile_check.sh" ] && bash "$K/tools/claude-code/profile_check.sh"   # профіль (ACCOUNT_MOVE.md п.1-б)
@@ -36,8 +37,8 @@ echo "прод: — (додати: живий код ≡ репо; тека пу
 
 # Спільні інструменти ядра — з КЛОНУ ядра поруч ($K, як профіль вище): виклик, не копія. Клон є в кожній сесії — його кладе setup script v3
 # (lens-governance:tools/claude-code/CLAUDE_CODE.md «Гачки»: ядро серед репо сесії або /tmp/lens-governance), тож «curl | python» з main — зайвий шлях
-# виконання віддаленого коду (світ — mlab-sh postmortem wiki «GitHub Actions»: скрипт з гілки — ризик ланцюга постачання); в auto-режимі
-# Claude Code класифікатор такий рядок відхилив, коли агент його додавав (один випадок, AE S90 18.10.2026).
+# виконання віддаленого коду (світ — mlab-sh postmortem wiki «GitHub Actions»: скрипт з гілки — ризик ланцюга постачання; випадок —
+# lens-governance:tools/claude-code/ADOPTIONS.md, рядок AE 18.10.2026).
 CC="$K/tools/claude-code"
 # документи — ціна читання в Claude Code (ядро DOC-1: щосесійні ≤ 200 рядків · старт ≤ 25 КБ · розділ ≤ 16 КБ · > 80 КБ з маршрутом); лише ⚠, exit 0
 if [ -f "$CC/doc_health.py" ]; then python3 "$CC/doc_health.py" .; else echo "документи: — (ядра поруч нема: $K)"; fi
@@ -55,4 +56,5 @@ if [ -f "$CC/shots_check.py" ]; then python3 "$CC/shots_check.py" . || fail=1; e
 if [ -f "$K/tools/cloudflare/cf_budget.sh" ]; then bash "$K/tools/cloudflare/cf_budget.sh"; else echo "cloudflare: — (ядра поруч нема: $K)"; fi
 
 [ "${g:-000}" = "000" ] && exit 1
+[ "${fail:-0}" = 1 ] && exit 1   # ✗ спільного інструмента (примірка, версія) — «exit 1 — розібратись до роботи» (CLAUDE_template)
 exit 0

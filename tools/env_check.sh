@@ -11,7 +11,7 @@ rc=0
 
 # база
 git fetch -q origin main 2>/dev/null || true
-echo "база: $(git branch --show-current) HEAD $(git rev-parse --short HEAD) · origin/main $(git rev-parse --short origin/main 2>/dev/null) (main попереду на $(git rev-list --count HEAD..origin/main 2>/dev/null))"
+echo "база: $(git branch --show-current) HEAD $(git rev-parse --short HEAD) · origin/main $(git rev-parse --short origin/main 2>/dev/null) (origin/main попереду на $(git rev-list --count HEAD..origin/main 2>/dev/null))"
 
 # мережа · змінні · гейт · аудит
 g=$(code https://api.github.com/); c=$(code https://api.cloudflare.com/client/v4/)
