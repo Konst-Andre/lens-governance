@@ -17,7 +17,7 @@
 | 2 | **GitHub** — під'єднати акаунт і Claude GitHub App до репо `Konst-Andre/*` | claude.ai → Settings → Connectors → GitHub; встановлення App — github.com/apps/claude | список репо — `kernel/Lens_INDEX.md` §5 |
 | 3 | **Середовище Claude Code** (хмарне) — створити одне на всі проєкти | меню середовища в шапці сесії → New / Edit | — |
 | 3а | · setup script **v3** (гачки) | Edit → Setup script | `lens-governance:tools/claude-code/CLAUDE_CODE.md` розділ «Гачки», блок «Гачки Lens v3» |
-| 3б | · секрети: `CLOUDFLARE_API_TOKEN` · `CLOUDFLARE_ACCOUNT_ID` · `GH_TOKEN` | Edit → змінні / Network secrets | значення — у Konst (у репо їх нема і не буде) |
+| 3б | · змінні середовища — поле «Environment variables», **по одному рядку `НАЗВА=значення`**, без лапок і пробілів навколо `=`: `CLOUDFLARE_API_TOKEN=…` · `CLOUDFLARE_ACCOUNT_ID=…` · (спільний акаунт) `LENS_PROFILE=1`. **`GH_TOKEN` руками не ставити:** сесія отримує доступ до GitHub від під'єднаного GitHub (QR CC-18: у змінних Konst його нема, а `env_check` показує `GH_TOKEN=так`) | Edit → Environment variables (у новому інтерфейсі секрети — Network secrets) | значення — у Konst (у репо їх нема і не буде); нова сесія підхоплює змінні сама |
 | 3в | · мережа: доступ до GitHub, Cloudflare API, npm/PyPI | Edit → Network | як у середовищі старого акаунта |
 | 4 | **Конектори** (MCP): «Lens GitHub» — URL з ключем `https://lens-gh.konstandre.workers.dev/mcp/<ключ>`; Cloudflare Developer Platform | claude.ai → Settings → Connectors → Add custom connector | ключ — у налаштуваннях конектора старого акаунта; деталі — `tools/lens-gh/README.md` |
 | 5 | **Project «Lens PWA»** (якщо працюєш у чаті claude.ai, не лише в Claude Code) — створити й вставити інструкцію | claude.ai → Projects | `kernel/Lens_PROJECT_instruction.md` |
@@ -33,6 +33,10 @@
 ## Чому не вставляти профіль у перше повідомлення щоразу (питання Konst 18.10.2026)
 
 Токенів — стільки ж, але: (1) повідомлення можна забути або вставити старий текст; (2) довга розмова стискається — текст першого повідомлення стає переказом, а гачок старту кладе профіль заново і після стиснення; (3) профіль у репо — одна копія, правиться комітом. Що вантажить сесію Claude Code на старті: системна інструкція Claude Code → профіль з налаштувань акаунта (якщо є) → `CLAUDE.md` репо сесії → контекст гачків старту (`env_check`, профіль 1-б) → твоє перше повідомлення.
+
+## Повернення на свій акаунт (і назад) — швидко
+
+Усе в репо, тож повернення — просто нова сесія на своєму акаунті зі стартовим повідомленням з самері (§6). Різниця лише одна: **свій акаунт** — профіль у полі налаштувань, `LENS_PROFILE` **не** ставити; **спільний** — поле не чіпати, `LENS_PROFILE=1` у середовищі. Середовища обох акаунтів живуть паралельно, їх не треба видаляти — наступний переїзд займе хвилину.
 
 ## Чого НЕ робити
 
