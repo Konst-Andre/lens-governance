@@ -82,7 +82,7 @@
 ## FX-5 · GlassKit-Elements — розібраний репозиторій 🟡
 
 - **джерело:** https://github.com/JUNGHERZ/GlassKit-Elements · демо https://glasskit-elements.jungherz.com/showcase.html · MIT (Jungherz GmbH, 2026) — техніки запозичувати дозволено.
-- **розібрано:** 24.08.2026, EquipLens S15. Читався `dist/glasskit-elements.esm.js` грепом, не очима.
+- **розібрано:** 24.08.2026, EquipLens S15. Читався `GlassKit-Elements:dist/glasskit-elements.esm.js` грепом, не очима.
 - **стек:** 🔴 бібліотека — Web Components (30 `customElements.define`), Shadow DOM, Rollup, `dist` 132 KB. **Бібліотеку не беремо.** Наша архітектура — один файл. Беремо CSS-ідеї.
 - **вартість кадру:** ✅ **нуль дорогих технік.** Пошук по всьому коду на `feDisplacementMap` · `feTurbulence` · `feSpecularLighting` · WebGL · `getContext(` · `mask-image` · `@property` — **жодного збігу**. Три `requestAnimationFrame`, і ті на таймінгах тоста й модалки. Скло зібране з чотирьох речей: `backdrop-filter:blur()` + напівпрозора заливка + `border` + `box-shadow` з `inset`-шаром **останнім**.
 - **головний вирок:** вау-ефект досягається **без єдиної дорогої техніки**. Це найцінніше зі всього репо: те, що вражає, — статичний CSS, а не рантайм.
@@ -245,7 +245,7 @@ linear-gradient(170deg, BG-LIGHT 0, BG-DARK 100%)
 
 | # | джерело | стан | що обіцяє |
 |---|---|---|---|
-| 1 | `github.com/JUNGHERZ/GlassKit-Elements` · демо `glasskit-elements.jungherz.com/showcase.html` | ✅ **розібрано** → FX-5 | — |
+| 1 | `github.com/JUNGHERZ/GlassKit-Elements` · демо glasskit-elements.jungherz.com/showcase.html | ✅ **розібрано** → FX-5 | — |
 | 2 | `github.com/nikdelvin/liquid-glass` · демо `liquid-glass.web.app/rocks` | ⬜ не розібрано | оператор бачив на колі анімацію натискання, яка **не прес, а оберт** 🔄. Наш `A67` преса такого носія не має |
 | 3 | `github.com/ObaidQatan/liquid-glass-component-library` · демо `lgcl.netlify.app` | ⬜ не розібрано | — |
 | 4 | CodePen `codepen.io/daftplug/pen/QwbaYGO` | ⬜ не розібрано | — |

@@ -211,7 +211,7 @@ stage-bench — найближчий проксі до останнього бе
 
 *(влито з буфера `Д-Г`, G-B2 17.09.2026; адреси `wsd 2.4b/2.4d` переписано на §8.4-(b)/(d) — розділ перенесено сюди 13.08.2026)*
 
-**Еталон:** `archive/stands/QR_Lens/QR_Lens_brand_harness_v6.html` (v6, не v5).
+**Еталон:** `QR_Lens_brand_harness_v6.html` (v6, не v5) — у `QR-Lens:archive/stands/` (виїхав з ядра 05–06.10.2026, `kernel/Lens_ARCHIVE_INDEX.md` «Стенди — виїхали»).
 **Тригер.** Будується **harness** — стенд перцептивного суду одного об'єкта (бренд, гліф,
 матеріал), а не bench механіки. Межа bench ↔ harness — драбина §4.
 
@@ -551,7 +551,7 @@ Gate скасованих важелів будується як таблиця 
   `navigator.userAgent === ua`, яка **завалиться**, якщо підміна не спрацювала. Інакше стенд
   проходить дефолтну гілку й рапортує зелене там, де перевірки не було. *Прецедент:* матриця
   StockCheck Node 2.2 — 6 «провалів» у гілках iOS/Telegram, усі шість були дефектом стенда
-  (`archive/matrices/StockCheck/StockCheck_maint_jsdom_matrix.js`). **Перевіряти при
+  (`StockCheck_maint_jsdom_matrix.js` — виїхав з ядра 05–06.10.2026 у `stock-check:archive/`). **Перевіряти при
   мажорному оновленні jsdom.** *Джерела:* README jsdom `main` (§ Loading subresources) ·
   реліз `v28.0.0` (15.03.2026) · замір у пісочниці 17.09.2026: верхній рівень → дефолт,
   `resources:{userAgent}` → ✓, `beforeParse` → ✓, `ResourceLoader` → `undefined`.

@@ -24,7 +24,13 @@ last=$(grep -m1 -oE "^\| 20[0-9]{2}-[0-9]{2}-[0-9]{2}" kernel/Lens_AUDIT.md 2>/d
 if [ -n "$last" ]; then days=$(( ( $(date +%s) - $(date -d "$last" +%s) ) / 86400 )); [ "$days" -gt 30 ] && aud="аудит правил: $days дн. — ПОРА" || aud="аудит правил: $days дн. тому"; else aud="аудит правил: журналу нема"; fi
 # AUD-2 (05.10.2026): борг пакетного аудиту — коміти у файлах інструкцій після дати верхнього рядка журналу (той самий день не видно — прийнято)
 INSTR="CLAUDE.md tools/claude-code/PROFILE.md tools/claude-code/REPO_FRAME.md tools/claude-code/ADOPT.md tools/claude-code/CLAUDE_CODE.md tools/claude-code/templates tools/cloudflare/CLOUDFLARE.md kernel/wsd"
-[ -n "$last" ] && debt=$(git log --since="$last 23:59:59" --format=%s -- $INSTR 2>/dev/null | grep -vcE 'аудит: клас 0|за аудитом')
+# не борг: позначка «аудит: клас 0» / «за аудитом» у будь-якому рядку повідомлення, будь-який регістр · межа неглибокого клону —
+# $GIT_DIR/shallow, по одному коміту в рядку; без батька її дифф «додає» всі файли (git-scm.com/docs/shallow, 18.10.2026; AE S90 — хибні 22 файли)
+shallow="$(git rev-parse --git-path shallow)"; debt=0
+[ -n "$last" ] && for h in $(git log --since="$last 23:59:59" --format=%H -- $INSTR 2>/dev/null); do
+  grep -qx "$h" "$shallow" 2>/dev/null && continue
+  git show -s --format=%B "$h" | grep -qiE 'аудит: клас 0|за аудитом' || debt=$((debt+1))
+done
 [ "${debt:-0}" -gt 0 ] && aud="$aud · ⚠ борг аудиту: $debt коміт(ів) в інструкціях після $last — пакет за класом (tools/claude-code/templates/AUDIT_template.md)"
 echo "env: github=${g:-000} cloudflare=${c:-000} · ${vars% } · гейт --gov: $gate · $aud"
 bash tools/claude-code/profile_check.sh   # профіль: звідки в цій сесії (як git config --show-origin) — з репо (LENS_PROFILE=1) чи з налаштувань; ACC-1 (ACCOUNT_MOVE.md)

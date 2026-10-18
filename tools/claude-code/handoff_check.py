@@ -185,7 +185,8 @@ def check_repo(repo, now=None):
         cand = []
         for i in ids:
             n = sum(1 for p in sums if re.search(r'(?<![\w-])' + re.escape(i) + r'(?![\w.])', open(p, encoding='utf-8', errors='replace').read()))
-            if n >= 3 and not re.search(r'(?<![\w-])' + re.escape(i) + r'(?![\w.])', btxt): cand.append(f'{i} ({n} самері)')
+            row = next((l for l in qt.splitlines() if re.match(r'^\|\s*\*{0,2}`' + re.escape(i) + '`', l)), '')   # «бриф не треба: <чому>» у рядку черги — відповідь на цей ⚠ (18.10.2026: без неї ⚠ висів вічно)
+            if n >= 3 and 'бриф не треба' not in row.lower() and not re.search(r'(?<![\w-])' + re.escape(i) + r'(?![\w.])', btxt): cand.append(f'{i} ({n} самері)')
         if cand: L.append(('⚠', 'кандидат у бриф — пункт тягнеться ≥ 3 сесії, а брифу нема: ' + ' · '.join(cand[:5]) + ' → tools/claude-code/templates/BRIEF_template.md (з прополкою джерел) або рядок «чому не треба»'))
     # (7) незбережене: контейнер скинеться — пропаде
     dirty = [x for x in subprocess.run(['git', '-C', repo, 'status', '--porcelain'], capture_output=True, text=True).stdout.split('\n') if x.strip()]
@@ -308,6 +309,7 @@ def selftest():
         ('код змінено в сесії, опис, що його згадує, — ні → ⚠ «описи»', mk(good, {'lens/B.md': 'запуск — `tools/run_me.sh`\n'}, code_after=True), 'описи, що згадують'),
         ('вузловий файл (згадують 6 описів) → ⓘ, не ⚠ на кожен', mk(good, {**{f'lens/H{i}.md': 'див. `tools/run_me.sh`\n' for i in range(6)}}, code_after=True), 'вузлові файли'),
         ('id черги в самері 3 сесій без брифу → ⚠ «кандидат у бриф»', mk(good, {'lens/P_CHERGA.md': '## Відкрите\n| `PX-1` | довгий пункт | 01.10 | x |\n', 'sessions/P_session_summary_A.md': '§1 PX-1 зроблено частину', 'sessions/P_session_summary_B.md': '§1 PX-1 ще частина', 'sessions/P_session_summary_C.md': '§1 PX-1 і знову'}), 'кандидат у бриф'),
+        ('той самий пункт з «бриф не треба: …» у рядку черги → без «кандидат у бриф»', mk(good, {'lens/P_CHERGA.md': '## Відкрите\n| `PX-1` | довгий пункт; **бриф не треба:** два кроки без розвідки | 01.10 | x |\n', 'sessions/P_session_summary_A.md': '§1 PX-1 зроблено частину', 'sessions/P_session_summary_B.md': '§1 PX-1 ще частина', 'sessions/P_session_summary_C.md': '§1 PX-1 і знову'}), '!кандидат у бриф'),
         ('старе й нове в одному коміті → бере пізніше створене', mk(good, {'sessions/P_session_summary_Y.md': '## §0 В\n- `lens/A.md`\n'}, new_after=True, both=True), 'P_session_summary_Y'),
         ('не-Lens: самері в docs/summary/ (P_SUMMARY_…) → тиша', mk_nl(good_nl), None),
         ('не-Lens: самері без стартового → ✗', mk_nl(good_nl.split('## §6')[0]), 'стартове повідомлення нема'),
@@ -316,7 +318,7 @@ def selftest():
     for name, r, want in cases:
         _, L = check_repo(r)
         hit = [t for s, t in L if s in '✗⚠']
-        ok = (not hit) if want is None else any(want in t for t in (hit if 'summary' not in want and 'вузлові' not in want else [t for _, t in L])) and not ('вузлові' in want and any('описи, що згадують' in t for t in hit))
+        ok = (not hit) if want is None else not any(want[1:] in t for t in hit) if want.startswith('!') else any(want in t for t in (hit if 'summary' not in want and 'вузлові' not in want else [t for _, t in L])) and not ('вузлові' in want and any('описи, що згадують' in t for t in hit))
         if want is None and not ok: print('   ', hit)
         print(('✓' if ok else '✗') + ' ' + name); bad += not ok
     # журнал гачків: ядро поруч з продуктом (../lens-governance) — знаходить і бачить рядок сесії

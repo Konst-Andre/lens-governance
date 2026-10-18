@@ -25,7 +25,7 @@ M1_LINES, M2_KB, M3_KB, M4_KB = 200, 25, 16, 80
 
 def files(root):
     out = subprocess.run(['git', 'ls-files', '*.md'], cwd=root, capture_output=True, text=True).stdout.split()
-    return [f for f in out if not f.startswith('archive/')]
+    return [f for f in out if not f.startswith('archive/') and '/journal/' not in '/' + f]   # journal/ — архів ротації журналу гачків, читається грепом (18.10.2026: 73 КБ дало хибне M3)
 
 
 def scan(root):
@@ -130,6 +130,7 @@ def selftest():
              ('## з двома ### по 10 КБ → ✓ (точково береться ###)', {'lens/D.md': '## Великий\n' + sec(1) + '### А\n' + 'х' * 5120 + '\n### Б\n' + 'х' * 5120 + '\n'}, '✓', ''),
              ('профіль 18 КБ одним розділом (читається цілком) → ✓, не M3', {'tools/claude-code/PROFILE.md': sec(18)}, '✓', ''),
              ('архів не рахується → ✓', {'archive/X_CHERGA.md': sec(40)}, '✓', ''),
+             ('архів ротації journal/ не рахується → ✓', {'tools/claude-code/hooks/journal/HOOK_JOURNAL_2026-10.md': sec(40)}, '✓', ''),
              ('M5: мертвий шлях у живому .md → ⚠', {'README.md': 'див. `tools/gone_v1.py`\n'}, '⚠', 'мертвих шляхів 1'),
              ('M5: хвіст наявного шляху (`data/x.json` = `site/data/x.json`) → ✓', {'site/data/x.json': '{}', 'README.md': 'дані — `data/x.json`\n'}, '✓', ''),
              ('M5: шлях від теки документа → ✓', {'docs/a/b.md': 'поруч — `c/d.md`\n', 'docs/a/c/d.md': 'x'}, '✓', ''),

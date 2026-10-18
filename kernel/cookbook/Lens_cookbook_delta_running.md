@@ -281,4 +281,4 @@ function toggleInfo(btn) {               // el — бульбашка #info-<id>
 
 **Поріг входу (`12.11`).** Наше й device-locked: Konst перевірив на iPhone XS 01.10.2026 — «тепер це набагато краще».
 
-*(Народилось: AirLens, сесія 9, 01.10.2026 — `Konst-Andre/AirLens` `docs/DECISIONS.md` Р-66, код — `miniapp/app/index.html` `toggleInfo`.)*
+*(Народилось: AirLens, сесія 9, 01.10.2026 — `AirLens:docs/DECISIONS.md` Р-66, код — `AirLens:miniapp/app/index.html` `toggleInfo`.)*
