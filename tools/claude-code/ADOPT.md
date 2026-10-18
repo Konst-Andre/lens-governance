@@ -31,6 +31,7 @@
 | черга · рішення · архітектура · карта | `docs/CHERGA.md` · `docs/DECISIONS.md` · `docs/ARCHITECTURE.md` · `docs/REPO_LAYOUT.md` | `lens/<Продукт>_CHERGA.md` · LOCK-и / реєстри · `lens/<Продукт>_INDEX.md` |
 | самері | `docs/summary/` | `sessions/` |
 | журнал аудиту | `docs/AUDIT.md` | `lens/<Продукт>_AUDIT.md` |
+| дизайн-основа (є інтерфейс) — рядок «Дизайн-основа:» у `CLAUDE.md`: де токени, як їх бере друга поверхня, префікси класів (`UI-1`, `REPO_FRAME.md` §3-б; без рядка `frame_check` ⚠) | один файл змінних `:root` + префікс поверхні | як у QR: `:root` сайту → адмінка бере вставкою (`QR-Lens:tools/qr_kit.py`), адмінка `zv-` |
 
 ## Етапи
 
