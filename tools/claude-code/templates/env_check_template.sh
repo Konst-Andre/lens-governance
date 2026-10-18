@@ -15,7 +15,7 @@ code() { curl -sS -m 10 -o /dev/null -w '%{http_code}' "$1" 2>/dev/null || true;
 
 # база
 git fetch -q origin main 2>/dev/null || true
-echo "база: HEAD $(git rev-parse --short HEAD) · origin/main $(git rev-parse --short origin/main 2>/dev/null) (origin/main попереду на $(git rev-list --count HEAD..origin/main 2>/dev/null) — треба pull)"
+echo "база: HEAD $(git rev-parse --short HEAD) · origin/main $(git rev-parse --short origin/main 2>/dev/null) (origin/main попереду на $(n=$(git rev-list --count HEAD..origin/main 2>/dev/null); printf %s "${n:-?}"; [ "${n:-0}" != 0 ] && printf " — треба pull"))"
 
 # мережа · змінні · гейти · аудит
 g=$(code https://api.github.com/); c=$(code https://api.cloudflare.com/client/v4/)
