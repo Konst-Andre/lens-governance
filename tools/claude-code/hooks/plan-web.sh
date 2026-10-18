@@ -7,15 +7,29 @@
 # Формат — code.claude.com/docs/en/hooks «Stop» (last_assistant_message, stop_hook_active, transcript_path), 09.10.2026.
 # Друге правило (QR CC-15, Konst 16.10.2026: «кукбук — довідник, як інтернет, не інструкція»; агент читав рецепт як закон): план спирається на номер
 # рецепта (A66, B3.2 …), а рядка синтезу «рецепт ⟂ світ ⟂ замір → рішення» нема → block: рецепт — точка старту, рішення — з трьох джерел.
-# Зуби: bash plan-web.sh selftest — 9 випадків.
+# Рецептом вважається лише номер, що Є в індексі кукбуку (kernel/cookbook/Lens_cookbook_INDEX.md; A66.2 — бо є A66): номер версії застосунку
+# «B65.1» (батч QR) — не рецепт (хибне ×2, журнал гачків 18.10.2026, QR CC-17 · CC-18). Індексу нема → як раніше, будь-який A/B-номер.
+# Зуби: bash plan-web.sh selftest — 13 випадків.
 mode="${1:-stop}"
 [ "$mode" = selftest ] && HOOK_IN="{}" || HOOK_IN="$(cat)"
-export HOOK_IN
+export HOOK_IN PW_SELF="${BASH_SOURCE[0]}"
 python3 - "$mode" <<'PY'
 import json, re, sys, os, tempfile
 PLAN = re.compile(r"(^|\n)\s*(#+\s*)?(\*\*)?\s*(План\b|Мікроскоп\b)", re.I)
 SKIP = re.compile(r"практики не знайшов|крок не вирішує форму", re.I)
 RECIPE = re.compile(r"(?<![\w-])[AАBВ]\d{1,3}(\.\d+)?(?![\w])")
+KNOWN = set()
+try:
+    _ix = os.path.join(os.path.dirname(os.path.abspath(os.environ.get('PW_SELF', ''))), '..', '..', '..', 'kernel', 'cookbook', 'Lens_cookbook_INDEX.md')
+    KNOWN = set(re.findall(r"`([AB]\d+(?:\.\d+)?)`", open(_ix, encoding='utf-8').read()))
+except Exception: pass
+LAT = str.maketrans('АВ', 'AB')
+def recipes(msg):
+    out = []
+    for m in RECIPE.finditer(msg):
+        t = m.group(0).translate(LAT)
+        if not KNOWN or t in KNOWN or t.split('.')[0] in KNOWN: out.append(t)
+    return out
 SYNTH = re.compile(r"рецепт(\s+[AАBВ]?[\d.]+)?\s*[⟂+·]\s*світ|рецепт не стосується", re.I)
 
 def real_user(x):
@@ -29,9 +43,10 @@ def verdict(d):
     if d.get('stop_hook_active'): return None
     msg = d.get('last_assistant_message') or ''
     if not PLAN.search(msg): return None
-    if RECIPE.search(msg) and not SYNTH.search(msg):
+    rc = recipes(msg)
+    if rc and not SYNTH.search(msg):
         return ("Ворота «рецепт як закон» (Konst 16.10.2026: кукбук — довідник, як інтернет, не інструкція; HOOK-2.5): план спирається на рецепт "
-                f"({RECIPE.search(msg).group(0)}), а рядка синтезу нема. Допиши рядком: «рецепт ⟂ світ ⟂ замір → рішення» — що каже рецепт, що каже пошук, "
+                f"({rc[0]}), а рядка синтезу нема. Допиши рядком: «рецепт ⟂ світ ⟂ замір → рішення» — що каже рецепт, що каже пошук, "
                 "що показав замір цього екрана, і що беремо / де робимо краще за рецепт (тоді онови рецепт). Рецепт згаданий лише як довідка — «рецепт не стосується: …».")
     if SKIP.search(msg): return None
     L = [json.loads(l) for l in open(os.path.expanduser(d['transcript_path']), encoding='utf-8') if l.strip()]
@@ -62,7 +77,11 @@ def selftest():
              ('план на рецепті A66 з пошуком, без синтезу → block', D(plan + '\nЗа A66 — тінь знизу.', [U, T('WebSearch')]), True),
              ('план на рецепті з рядком «рецепт ⟂ світ ⟂ замір» → тиша', D(plan + '\nрецепт A66 ⟂ світ (Material) ⟂ замір 2,25 → беремо підпис', [U, T('WebSearch')]), False),
              ('«рецепт не стосується» → тиша', D(plan + '\nB3.2 — рецепт не стосується: інший екран', [U, T('WebSearch')]), False),
-             ('номер черги QRL-15 / коміт a66b — не рецепт → тиша', D(plan + '\nQRL-15, коміт a66b0f2', [U, T('WebSearch')]), False)]
+             ('номер черги QRL-15 / коміт a66b — не рецепт → тиша', D(plan + '\nQRL-15, коміт a66b0f2', [U, T('WebSearch')]), False),
+             ('версія застосунку B65.1 / B57 — не рецепт → тиша', D(plan + '\nВерсія: B65.1 — чому; задум B57', [U, T('WebSearch')]), False),
+             ('справжній рецепт серії B (B3.2) без синтезу → block', D(plan + '\nЗа B3.2 — так.', [U, T('WebSearch')]), True),
+             ('підрецепт A66.2 (є A66) без синтезу → block', D(plan + '\nЗа A66.2 — кант.', [U, T('WebSearch')]), True),
+             ('кирилична «А27» = A27 → block', D(plan + '\nЗа А27 — без руху.', [U, T('WebSearch')]), True)]
     bad = 0
     for name, d, want in cases:
         ok = (verdict(d) is not None) == want; bad += not ok; print(('✓ ' if ok else '✗ ') + name)
