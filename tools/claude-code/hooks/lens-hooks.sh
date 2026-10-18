@@ -23,7 +23,7 @@ if [ "$ev" = SessionStart ] || [ "$ev" = profile-test ]; then
     [ -z "$off" ] && echo "✓ без LENS_PROFILE → тиша (свій акаунт: профіль у налаштуваннях)" || { echo "✗ без LENS_PROFILE → профіль усе одно"; bad=1; }
     exit $bad
   fi
-  prof; exit 0
+  prof; [ "${LENS_PROFILE:-}" = 1 ] && date +%H:%M > /tmp/lens-profile-loaded 2>/dev/null; exit 0   # позначка для profile_check.sh (рядок «профіль» в env_check)
 fi
 case "$ev" in pre|PreToolUse) ev=pre;; post|PostToolUse) ev=post;; stop|Stop) ev=stop;; UserPromptSubmit) ev=prompt;; *) exit 0;; esac
 in="$(cat)"

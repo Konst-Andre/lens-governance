@@ -27,6 +27,7 @@ INSTR="CLAUDE.md tools/claude-code/PROFILE.md tools/claude-code/REPO_FRAME.md to
 [ -n "$last" ] && debt=$(git log --since="$last 23:59:59" --format=%s -- $INSTR 2>/dev/null | grep -vcE 'аудит: клас 0|за аудитом')
 [ "${debt:-0}" -gt 0 ] && aud="$aud · ⚠ борг аудиту: $debt коміт(ів) в інструкціях після $last — пакет за класом (tools/claude-code/templates/AUDIT_template.md)"
 echo "env: github=${g:-000} cloudflare=${c:-000} · ${vars% } · гейт --gov: $gate · $aud"
+bash tools/claude-code/profile_check.sh   # профіль: звідки в цій сесії (як git config --show-origin) — з репо (LENS_PROFILE=1) чи з налаштувань; ACC-1 (ACCOUNT_MOVE.md)
 
 # ручні завантаження (Konst 04.10: «рідко, але буває») — тіло-«404» замість файла (так зламався модуль, MOD-1) · ім'я з пробілом
 f404=$(git grep -l -E '^(404: Not Found|404 Not Found)$' -- . 2>/dev/null | tr '\n' ' ')

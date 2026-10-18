@@ -23,6 +23,7 @@ gate=$(bash -c "$GATE_CMD" 2>&1 | tail -1)
 last=$(grep -m1 -oE "^\| 20[0-9]{2}-[0-9]{2}-[0-9]{2}" docs/AUDIT.md 2>/dev/null | tr -d '| ')
 if [ -n "$last" ]; then days=$(( ( $(date +%s) - $(date -d "$last" +%s) ) / 86400 )); [ "$days" -gt 30 ] && aud="аудит правил: $days дн. — ПОРА" || aud="аудит правил: $days дн. тому"; else aud="аудит правил: журналу нема"; fi
 echo "env: github=${g:-000} cloudflare=${c:-000} · ${vars% } · гейт: $gate · $aud"
+K=../lens-governance; [ -d "$K" ] || K=/tmp/lens-governance; [ -f "$K/tools/claude-code/profile_check.sh" ] && bash "$K/tools/claude-code/profile_check.sh"   # профіль (ACCOUNT_MOVE.md п.1-б)
 
 # самері — живий журнал (профіль Konst, САМЕРІ): коміти агента (трейлер Claude-Session) після останнього оновлення самері.
 # >0 → попередня сесія комітила, не оновивши самері: звірити git log і дописати §0/§1 ДО роботи. Коміти Konst і ботів не рахуються.
