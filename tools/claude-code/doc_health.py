@@ -12,6 +12,9 @@
      голі назви (їх ловить handoff_check у самері), у ядрі — tools/claude-code/ (описує шляхи продуктів). Майбутній файл — у «лапках», не в бектиках.
      Чому (пропуск Konst 18.10.2026, AE S90): README і ARCHITECTURE протухли з 02.10, і жодна перевірка не бачила; практика — детермінована
      перевірка посилань у документах (hyperhive check-doc-refs; lychee: виключення за шляхом, блоки коду не перевіряються, 18.10.2026).
+  M6 черга відстала — пункт, який живе самері позначило закритим (`ID` ✅ · `ID` — закрито), у черзі досі відкритий (`queue_open`
+     ядра). Позначка — одразу після `id`, як ключове слово «closes #N» у GitHub/GitLab: «`ID`: підкрок ✅» — не закриття
+     (пропозиція агента, «так» Konst 18.10.2026, AE S90).
 Лише ⚠ (не блокує): один рядок для env_check; адреси — --list.
   python3 doc_health.py [<репо>] [--list] | selftest
 """
@@ -45,7 +48,28 @@ def scan(root):
         if kb > M4_KB and 'читається' not in '\n'.join(txt.splitlines()[:12]).lower():
             found.append(('M4', f, f'{kb:.0f} КБ без «читається коли» — одним Read не взяти'))
     found += dead_paths(root)
+    found += queue_behind(root)
     return found
+
+
+def queue_behind(root):
+    """M6: `ID` ✅ / закрито в живому самері, а в черзі пункт відкритий."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    try:
+        sys.path.insert(0, os.path.join(here, '..', '..', 'kernel')); sys.path.insert(0, here)
+        from Lens_validate import queue_open
+        from handoff_check import live_summary
+    except Exception:
+        return []
+    import glob
+    q = next((os.path.join(root, p) for p in ['docs/CHERGA.md', 'kernel/Lens_governance_CHERGA.md'] if os.path.isfile(os.path.join(root, p))), None) \
+        or next(iter(glob.glob(os.path.join(root, 'lens', '*_CHERGA.md'))), None)
+    sm = live_summary(root)
+    if not q or not sm: return []
+    ids = [i for i, _ in queue_open(open(q, encoding='utf-8').read())]
+    txt = open(os.path.join(root, sm), encoding='utf-8', errors='replace').read()
+    return [('M6', sm, f'`{i}` закрито в самері, у черзі ({os.path.relpath(q, root)}) — відкритий') for i in ids
+            if re.search(r'`' + re.escape(i) + r'`\**\s*[·—–-]?\s*(✅|закрит)', txt)]
 
 
 M5_HIST = re.compile(r'(^|/)(archive|sessions|summary|journal)/|DECISIONS|AUDIT|HOOK_JOURNAL|ADOPTIONS|FINDINGS|ARCHIVE_INDEX')
@@ -83,7 +107,7 @@ def line(root):
     if not f: return '✓', f'документи: ✓ щосесійні ≤ {M1_LINES} рядків · старт ≤ {M2_KB} КБ · розділи ≤ {M3_KB} КБ · великі з маршрутом'
     by = {}
     for m, *_ in f: by[m] = by.get(m, 0) + 1
-    name = {'M1': 'щосесійні задовгі', 'M2': 'файли старту завеликі', 'M3': f'розділів > {M3_KB} КБ', 'M4': f'> {M4_KB} КБ без маршруту', 'M5': 'мертвих шляхів'}
+    name = {'M1': 'щосесійні задовгі', 'M2': 'файли старту завеликі', 'M3': f'розділів > {M3_KB} КБ', 'M4': f'> {M4_KB} КБ без маршруту', 'M5': 'мертвих шляхів', 'M6': 'черга відстала від самері'}
     worst = max((x for x in f if x[0] == 'M3'), key=lambda x: float(re.search(r'(\d+) КБ', x[2])[1]), default=None)
     return '⚠', 'документи: ' + ' · '.join(f'{name[m]} {n}' for m, n in sorted(by.items())) + (f' (найбільший — {worst[1]} {worst[2]})' if worst else '') + ' — деталі: doc_health.py --list'
 
@@ -96,6 +120,7 @@ def selftest():
             os.makedirs(os.path.dirname(os.path.join(d, f)) or d, exist_ok=True); open(os.path.join(d, f), 'w').write(t)
         subprocess.run(['git', 'add', '-A'], cwd=d, check=True); return d
     sec = lambda kb: '## Розділ\n' + 'х' * (kb * 512) + '\n'   # кирилиця — 2 байти на знак
+    Q = '## Відкрите\n| id | предмет | відкрито | умова |\n|---|---|---|---|\n| `AE-X` | x | 18.10.2026 | y |\n| `AE-Y` | y | 18.10.2026 | z |\n\n-----\n'
     cases = [('чисте репо → ✓', {'CLAUDE.md': 'x\n' * 50, 'lens/A.md': sec(4)}, '✓', ''),
              ('CLAUDE.md 250 рядків → ⚠ M1', {'CLAUDE.md': 'x\n' * 250}, '⚠', 'щосесійні задовгі 1'),
              ('черга 30 КБ → ⚠ M2', {'lens/P_CHERGA.md': sec(30)}, '⚠', 'файли старту завеликі 1'),
@@ -108,7 +133,9 @@ def selftest():
              ('M5: мертвий шлях у живому .md → ⚠', {'README.md': 'див. `tools/gone_v1.py`\n'}, '⚠', 'мертвих шляхів 1'),
              ('M5: хвіст наявного шляху (`data/x.json` = `site/data/x.json`) → ✓', {'site/data/x.json': '{}', 'README.md': 'дані — `data/x.json`\n'}, '✓', ''),
              ('M5: шлях від теки документа → ✓', {'docs/a/b.md': 'поруч — `c/d.md`\n', 'docs/a/c/d.md': 'x'}, '✓', ''),
-             ('M5: блок коду, розділ історії, Репо:шлях, гола назва, DECISIONS → ✓', {'README.md': '```\n`tools/x/y.py`\n```\n## Переїзд — старий шлях\n`old/a.md`\n## Далі\n`QR-Lens:tools/q.py` · `gone.py`\n', 'docs/DECISIONS.md': '`tools/dead/z.py`\n'}, '✓', '')]
+             ('M5: блок коду, розділ історії, Репо:шлях, гола назва, DECISIONS → ✓', {'README.md': '```\n`tools/x/y.py`\n```\n## Переїзд — старий шлях\n`old/a.md`\n## Далі\n`QR-Lens:tools/q.py` · `gone.py`\n', 'docs/DECISIONS.md': '`tools/dead/z.py`\n'}, '✓', ''),
+             ('M6: `AE-X` ✅ у самері, у черзі відкритий → ⚠', {'docs/CHERGA.md': Q, 'docs/summary/P_SUMMARY_2026-10-18.md': '## §0\n- `AE-X` ✅ зроблено\n'}, '⚠', 'черга відстала від самері 1'),
+             ('M6: «`AE-X`: підкрок ✅» і закритий у черзі `AE-Y` → ✓', {'docs/CHERGA.md': Q.replace('| `AE-Y` | y | 18.10.2026 | z |', '| `AE-Y` | y | закрито | z |'), 'docs/summary/P_SUMMARY_2026-10-18.md': '## §0\n- `AE-X`: знімок ✅\n- `AE-Y` ✅\n'}, '✓', '')]
     for name, fs, want, part in cases:
         g, t = line(repo(fs)); ok = g == want and part in t
         print(('✓' if ok else '✗') + ' ' + name + ('' if ok else f' → {t}')); bad += not ok
