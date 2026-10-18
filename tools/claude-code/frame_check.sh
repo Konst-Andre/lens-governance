@@ -46,6 +46,10 @@ check() {
   if [ "$kind" != "ядро" ] && [ -n "$(find "$d" -name '*.html' -not -path '*/archive/*' -not -path '*/node_modules/*' -not -path '*/.git/*' -print -quit 2>/dev/null)" ] && ! grep -q 'Дизайн-основа' "$d/CLAUDE.md"; then
     miss+=("CLAUDE.md: рядок «Дизайн-основа:» — де токени, як їх бере друга поверхня, префікси класів (UI-1, lens-governance:tools/claude-code/REPO_FRAME.md §3-б)")
   fi
+  # VER-1 (Konst 18.10.2026, QR CC-17): репо з інтерфейсом — env_check кличе version_check.py (версія B · rev; tools/claude-code/VERSIONS.md)
+  if [ "$kind" != "ядро" ] && [ -s "$d/tools/env_check.sh" ] && [ -n "$(find "$d" -name '*.html' -not -path '*/archive/*' -not -path '*/node_modules/*' -not -path '*/.git/*' -print -quit 2>/dev/null)" ] && ! grep -q 'version_check' "$d/tools/env_check.sh"; then
+    miss+=("tools/env_check.sh не кличе version_check.py — версія застосунку B · rev без нагляду (VER-1, lens-governance:tools/claude-code/VERSIONS.md; рядок — templates/env_check_template.sh)")
+  fi
   # AUD-2 (05.10.2026): скрипт аудиту — копія зразка «як є»; стара копія жене дорогі паралельні проходи без класу
   [ -s "$d/tools/audit_prompts.sh" ] && ! cmp -s "$d/tools/audit_prompts.sh" "$KDIR/../tools/claude-code/audit_prompts.sh" && miss+=("tools/audit_prompts.sh ≠ зразок ядра — скопіювати (AUD-2)")
   if [ ${#miss[@]} -eq 0 ]; then echo "✓ $n — каркас на місці ($kind)"; return 0; fi
@@ -64,11 +68,12 @@ if [ "${1:-}" = "--inject" ]; then
   : > "$t/repo/docs/AUDIT.md"; printf '1. пункт списком\n' > "$t/repo/docs/CHERGA.md"; qlist=$(check "$t/repo"); rc_q=$?
   printf '## Відкрите\n\n| id | предмет | дата |\n|---|---|---|\n| `Ч-1` | x | 05.10.2026 |\n\n-----\n' > "$t/repo/docs/CHERGA.md"; qok=$(check "$t/repo"); rc_qok=$?
   echo 'echo база' > "$t/repo/tools/env_check.sh"; sh0=$(check "$t/repo"); rc_sh0=$?; echo 'python3 doc_health.py .' >> "$t/repo/tools/env_check.sh"; shd=$(check "$t/repo"); rc_shd=$?; echo 'python3 shots_check.py .' >> "$t/repo/tools/env_check.sh"; sh1=$(check "$t/repo"); rc_sh1=$?
-  : > "$t/repo/docs/index.html"; ui0=$(check "$t/repo"); rc_ui0=$?; echo 'Дизайн-основа: :root у docs/index.html · префікс app-' > "$t/repo/CLAUDE.md"; ui1=$(check "$t/repo"); rc_ui1=$?; rm "$t/repo/docs/index.html"; echo x > "$t/repo/CLAUDE.md"
+  : > "$t/repo/docs/index.html"; ui0=$(check "$t/repo"); rc_ui0=$?; echo 'Дизайн-основа: :root у docs/index.html · префікс app-' > "$t/repo/CLAUDE.md"; ver0=$(check "$t/repo"); rc_ver0=$?; echo 'python3 version_check.py .' >> "$t/repo/tools/env_check.sh"; ui1=$(check "$t/repo"); rc_ui1=$?; rm "$t/repo/docs/index.html"; echo x > "$t/repo/CLAUDE.md"
   echo "# стара копія" >> "$t/repo/tools/audit_prompts.sh"; aud=$(check "$t/repo"); rc_aud=$?
   rm -rf "$t"
   ok=0; [ $rc_full -eq 0 ] || ok=1; [ $rc_gone -eq 1 ] || ok=1; [ $rc_part -eq 1 ] && [[ "$part" == *docs/AUDIT.md* ]] || ok=1; [ $rc_q -eq 1 ] && [[ "$qlist" == *CQ-1* ]] || ok=1; [ $rc_qok -eq 0 ] || ok=1; [ $rc_aud -eq 1 ] && [[ "$aud" == *AUD-2* ]] || ok=1
   [ $rc_ui0 -eq 1 ] && [[ "$ui0" == *UI-1* ]] || ok=1; [ $rc_ui1 -eq 0 ] || ok=1   # UI-1: інтерфейс без «Дизайн-основа» — ⚠, з рядком — ✓
+  [ $rc_ver0 -eq 1 ] && [[ "$ver0" == *VER-1* ]] || ok=1   # VER-1 (QR CC-17): інтерфейс, env_check без version_check — ⚠
   [ $rc_sh0 -eq 1 ] && [[ "$sh0" == *doc_health.py* ]] || ok=1; [ $rc_sh1 -eq 0 ] || ok=1; [ $rc_shd -eq 1 ] && [[ "$shd" == *shots_check.py* ]] && [[ "$shd" != *doc_health.py* ]] || ok=1   # примірка (CC-9): кличе doc_health, а shots_check ні → ⚠ саме з його назвою
   [ $ok -eq 0 ] && echo "✓ inject: повний — ✓, без CLAUDE.md — ⚠, без docs/AUDIT.md — ⚠ з назвою, черга списком — ⚠ CQ-1, черга таблицею — ✓, стара копія скрипта аудиту — ⚠ AUD-2, інтерфейс без «Дизайн-основа» — ⚠ UI-1, env_check без спільного інструмента — ⚠ з назвою, з ним — ✓" || echo "✗ inject: детектор сліпий ($full | $gone | $part)"
   exit $ok

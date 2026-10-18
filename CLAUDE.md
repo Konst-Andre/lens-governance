@@ -33,6 +33,7 @@
 | Excel, Power Query, VBA (KPI · QR Lens) | `kernel/Lens_excel_protocol.md` |
 | порт блоку «Обслуговування» | `kernel/modules/Lens_module_1_maint_v1.md` (пара — кукбук A79) |
 | Cloudflare · каркас репо під Claude Code | `tools/cloudflare/CLOUDFLARE.md` · `tools/claude-code/CLAUDE_CODE.md` |
+| версія застосунку (B · rev): коли піднімати, хто вирішує, перевірка | `tools/claude-code/VERSIONS.md` — рядок «версія: …» у плані кроку; `version_check.py` у `env_check` продукту |
 | теки, імена, адресація `Репо:шлях` у ядрі | `kernel/Lens_REPO_LAYOUT.md` — формула ядра, **не** `docs/REPO_LAYOUT.md` продукту |
 | переїзд на інший акаунт Claude («новий / інший / резервний акаунт») — сам продиктуй Konst список | `tools/claude-code/ACCOUNT_MOVE.md` |
 | архівне джерело · рішення переїзду продуктів (`Р-N`) | греп по `archive/` (перейменування — `kernel/Lens_ARCHIVE_INDEX.md` §3-б) · `kernel/Lens_REPO_LAYOUT.md` §4-б |

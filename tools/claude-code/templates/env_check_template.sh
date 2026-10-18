@@ -41,6 +41,10 @@ if dh=$(curl -sSf -m 20 https://raw.githubusercontent.com/Konst-Andre/lens-gover
 # Теки нема — рядок «теки shots/ нема» (продукт без UI-рішень наперед — так і є). Свіжий з ядра щоразу — виклик, не копія.
 if sc=$(curl -sSf -m 20 https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/tools/claude-code/shots_check.py 2>/dev/null); then
   printf '%s\n' "$sc" | python3 - . || fail=1; else echo "примірка: — (shots_check не завантажено)"; fi
+# версія застосунку B · rev (VER-1, lens-governance:tools/claude-code/VERSIONS.md) — лише репо з інтерфейсом; параметри свого продукту:
+#   --code <файл коду застосунку> --re '<мітка: група B, група rev>' [--name '<шлях файлу білда з групою B>']
+# if vc=$(curl -sSf -m 20 https://raw.githubusercontent.com/Konst-Andre/lens-governance/main/tools/claude-code/version_check.py 2>/dev/null); then
+#   printf '%s\n' "$vc" > /tmp/version_check.py; python3 /tmp/version_check.py . --code <файл> --re '<регулярка>' ${ENV_INJECT:+--inject} || fail=1; else echo "версія: — (version_check не завантажено)"; fi
 
 # Cloudflare — СПІЛЬНИЙ акаунт усіх проєктів: бюджет (запити · збірки · прогноз) і свіжість правил. Рядки «⚠» — читати й діяти
 # за lens-governance:tools/cloudflare/CLOUDFLARE.md. Скрипт лише читає й завжди exit 0. Репо без Cloudflare — рядок прибрати.
