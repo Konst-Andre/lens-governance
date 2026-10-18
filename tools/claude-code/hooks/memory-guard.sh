@@ -5,8 +5,8 @@
 # (git commit / gh_commit / push_files / create_or_update_file) → {"decision":"block"} з причиною: агент продовжує й записує або пояснює, чому нічого.
 # Один раз на хід: stop_hook_active = true (агент уже продовжує через гачок) → тиша. Помилка розбору → тиша (гачок не ламає роботу).
 # Формат — code.claude.com/docs/en/hooks «Stop» (stop_hook_active, transcript_path; decision/reason), 08.10.2026.
-# Зуби: bash memory-guard.sh selftest — 11 випадків (рішення без коміту → block; з комітом · без рішень · повтор · «так» усередині слова · сповіщення системи → тиша;
-# примірка: варіант названо, рядок «примірка» → block · рядок уже «обрано» · «беру в роботу» → тиша).
+# Зуби: bash memory-guard.sh selftest — 13 випадків (рішення без коміту → block; з комітом · без рішень · повтор · «так» усередині слова · сповіщення системи → тиша;
+# примірка: варіант названо, рядок «примірка» → block · рядок уже «обрано» · «беру в роботу» · «варіант А …» описом → тиша · «Варіант Б» коротко → block).
 mode="${1:-stop}"
 [ "$mode" = selftest ] && HOOK_IN="{}" || HOOK_IN="$(cat)"
 export HOOK_IN
@@ -54,6 +54,9 @@ def verdict(d):
     if not idx: return None
     u = real_user(L[idx[-1]])
     pick = PICK.search(u)
+    # «варіант А …» без дієслова вибору в довгому тексті — опис варіанта, не вибір («варіант А обрізане знизу, а в Б смуга» — хибне QR CC-15, 16.10);
+    # коротка відповідь («Варіант Б») — вибір. Межа 40 знаків — як «…» у лапках нижче.
+    if pick and pick.group(0).lower().startswith('варіант') and len(u) > 40 and not re.search(r"(?i)(?<![\w'’])(обираю|обрав|обрала|вибираю|беру|бери|беремо|лишаємо|залишаємо)(?![\w'’])", u): pick = None
     if pick:
         pend = pending_fittings(d.get('cwd'))
         if pend:
@@ -90,7 +93,9 @@ def selftest():
              ('сповіщення системи не є повідомленням Konst → тиша', [U('Так'), A('git commit -m a'), R, U('<task-notification>done</task-notification>')], False, False),
              ('примірка: Konst обрав В, рядок ще «примірка» → block', [U('Обираю В, чіпи у вставці'), A('git commit -m a'), R], False, True),
              ('примірка: рядок уже «обрано» → тиша', [U('Обираю В'), A('git commit -m a'), R], False, False),
-             ('примірка: «беру в роботу» — не вибір → тиша', [U('беру в роботу, поїхали'), A('git commit -m a'), R], False, False)]
+             ('примірка: «беру в роботу» — не вибір → тиша', [U('беру в роботу, поїхали'), A('git commit -m a'), R], False, False),
+             ('примірка: «варіант А обрізане…» — опис, не вибір → тиша', [U('варіант А саме більше критично: коло обрізане знизу, а в Б смуга'), A('git commit -m a'), R], False, False),
+             ('примірка: коротке «Варіант Б» — вибір → block', [U('Варіант Б'), A('git commit -m a'), R], False, True)]
     bad = 0
     T = tempfile.mkdtemp(); repo = os.path.join(T, 'prod'); os.makedirs(os.path.join(repo, 'lens', 'shots'))
     subprocess.run(['git', 'init', '-q', repo]); RM = os.path.join(repo, 'lens', 'shots', 'README.md')

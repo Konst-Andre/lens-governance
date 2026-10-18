@@ -241,7 +241,7 @@ def journal_health(k, today=None):
 
 # Лічильники §0 журналу (18.10.2026, AE S91): з УСІХ рядків — живий §1 + journal/*.md, а не руками.
 # Вердикт = слово + число: «хибне 2» · «хибне ×3» → 2 · 3; без числа — 1. «еволюція 14» — порядковий номер → 1 (лише «×N» — кількість).
-# Не рахуються: «виправлено хибне ×3» (це виправлення), «(не хибне)», число одиниці виміру («хибні 22 файли»).
+# Не рахуються: «виправлено хибне ×3» (це виправлення), «(не хибне)», число одиниці виміру («хибні 22 файли»), дата («хибне 16.10» → 1), «справжніх нема / 0» → 0.
 T_CHECKS = [('ui-guard', 'ui-guard'), ('commit-gate', 'commit-gate'), ('commit_files', 'commit-gate'), ('ui-review-gate', 'ui-review-gate'),
             ('чек-лист очей', 'ui-review-gate'), ('огляд', 'ui-review-gate'), ('review-remind', 'review-remind'), ('memory-guard', 'memory-guard'),
             ('handoff-remind', 'handoff-remind'), ('plan-web', 'plan-web'), ('рецепт як закон', 'plan-web'), ('план без світу', 'plan-web'),
@@ -261,7 +261,8 @@ def journal_tally(paths):
                 for m in re.finditer(rx, vl):
                     if re.search(r'(виправлено|не)\s*$', vl[max(0, m.start() - 12):m.start()]): continue
                     t = vl[m.end():m.end() + 12]
-                    x = re.match(r'[\s*:]*×\s*(\d+)', t) or (None if ordinal else re.match(r'[\s*]*(\d+)(?![\d–-]|\s*(?:файл|рядк|самері|кб|дн))', t))
+                    if re.match(r'[\s*:]*(нема|немає|0\b)', t): continue   # «справжніх нема» · «справжніх 0»
+                    x = re.match(r'[\s*:]*×\s*(\d+)', t) or (None if ordinal else re.match(r'[\s*]*(\d+)(?![\d–-]|\.\d|\s*(?:файл|рядк|самері|кб|дн))', t))   # «16.10» — дата
                     out[key][col] += int(x.group(1)) if x else 1
     return out
 
@@ -370,9 +371,9 @@ def selftest():
     # лічильники журналу: число після слова, «×N», порядковий номер еволюції, «виправлено хибне» не рахується
     tf = tempfile.mkdtemp(prefix='jt-'); tp = os.path.join(tf, 'J.md')
     open(tp, 'w', encoding='utf-8').write('| 10.10 | s | `ui-guard` | **хибне 2** · справжнє 1 | x |\n| 11.10 | s | `ui-guard` | **виправлено хибне ×3** | x |\n'
-                                          '| 11.10 | s | `ui_lint` | **еволюція 14** · пропуск Konst ×2 | x |\n| 12.10 | s | `env_check` | хибне 1: хибні 22 файли | x |\n| 13.10 | s | `ui_lint` + чек-лист очей | пропуск Konst | x |\n')
-    tg = journal_tally([tp]); want = {'ui-guard': {'хибних': 2, 'справжніх': 1}, 'ui_lint': {'еволюцій': 1, 'пропусків Konst': 3}, 'env_check': {'хибних': 2}}
-    tcases = [('лічильники журналу: «хибне 2», «×N», «еволюція 14» = 1, «виправлено» — ні, перевірка — перша в комірці', all(dict(tg[k]) == v for k, v in want.items()))]
+                                          '| 11.10 | s | `ui_lint` | **еволюція 14** · пропуск Konst ×2 | x |\n| 12.10 | s | `env_check` | хибне 1: хибні 22 файли | x |\n| 13.10 | s | `ui_lint` + чек-лист очей | пропуск Konst | x |\n| 14.10 | s | `ui-guard` | вада: хибне 16.10 · справжніх нема | x |\n')
+    tg = journal_tally([tp]); want = {'ui-guard': {'хибних': 3, 'справжніх': 1}, 'ui_lint': {'еволюцій': 1, 'пропусків Konst': 3}, 'env_check': {'хибних': 2}}
+    tcases = [('лічильники журналу: «хибне 2», «×N», «еволюція 14» = 1, «виправлено» — ні, перевірка — перша в комірці, дата не число, «нема» = 0', all(dict(tg[k]) == v for k, v in want.items()))]
     for name, ok in tcases:
         print(('✓' if ok else '✗') + ' ' + name); bad += not ok
     total = len(cases) + len(jcases) + len(hcases) + len(tcases)
