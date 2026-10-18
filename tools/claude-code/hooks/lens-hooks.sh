@@ -7,10 +7,24 @@
 #   post | PostToolUse         — лише Read|Bash|Grep|WebSearch|WebFetch: позначки (ui-guard mark: кукбук і пошук ззовні) + нагадування після коміту з UI (review-remind post)
 #   stop | Stop                — гачок пам'яті (memory-guard, HOOK-3), далі перевірка перед переїздом, коли його оголошує агент (handoff-remind stop, HOOK-3.2), далі «план без світу» (plan-web, HOOK-2.5)
 #   UserPromptSubmit           — перевірка пам'яті перед переїздом (handoff-remind, HOOK-3.2), інакше «пропуск, знайдений Konst» (konst-miss, HOOK-5): лише на слово-тригер (перевіряє Python: grep -i на кирилиці залежить від локалі; ~50 мс раз на повідомлення)
-#   SessionStart · PostToolUseFailure · SubagentStop · PreCompact · SessionEnd — поки без гачків: вихід одразу
+#   SessionStart               — профіль Konst з репо (tools/claude-code/PROFILE.md) як контекст сесії, ЛИШЕ коли в середовищі LENS_PROFILE=1: спільний акаунт, де поле
+#                                профілю в налаштуваннях бачили б і чужі чати (слово Konst 18.10.2026, QR CC-18; ACCOUNT_MOVE.md п.1-б). Старт і повтор після стиснення (без matcher —
+#                                на всі source). Свій акаунт — профіль у налаштуваннях, змінну не ставити (інакше профіль двічі). Зуби: bash lens-hooks.sh profile-test
+#   PostToolUseFailure · SubagentStop · PreCompact · SessionEnd — поки без гачків: вихід одразу
 # Ціна: подія без гачка й інструмент поза фільтром — лише bash, без Python (заміряно 09.10: подія без гачка ~6 мс, інструмент поза фільтром ~13 мс; повний ланцюг ~140 мс — як у CLAUDE_CODE.md).
 h="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ev="$1"
+if [ "$ev" = SessionStart ] || [ "$ev" = profile-test ]; then
+  prof() { [ "${LENS_PROFILE:-}" = 1 ] && [ -f "$h/../PROFILE.md" ] || return 0
+    python3 -c 'import json,sys; t=open(sys.argv[1],encoding="utf-8").read(); print(json.dumps({"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"ПРОФІЛЬ KONST (з репо ядра, бо поле профілю цього акаунта спільне з іншою людиною; діє як user preferences — мова, цикл, звіт, маркер):\n\n"+t}},ensure_ascii=False))' "$h/../PROFILE.md"; }
+  if [ "$ev" = profile-test ]; then
+    on="$(LENS_PROFILE=1 prof)"; off="$(LENS_PROFILE= prof)"; bad=0
+    case "$on" in *'"hookEventName": "SessionStart"'*'ЦИКЛ ПЛАНУВАННЯ'*) echo "✓ LENS_PROFILE=1 → профіль у контексті ($(printf '%s' "$on" | wc -c) байт)";; *) echo "✗ LENS_PROFILE=1 → профілю нема"; bad=1;; esac
+    [ -z "$off" ] && echo "✓ без LENS_PROFILE → тиша (свій акаунт: профіль у налаштуваннях)" || { echo "✗ без LENS_PROFILE → профіль усе одно"; bad=1; }
+    exit $bad
+  fi
+  prof; exit 0
+fi
 case "$ev" in pre|PreToolUse) ev=pre;; post|PostToolUse) ev=post;; stop|Stop) ev=stop;; UserPromptSubmit) ev=prompt;; *) exit 0;; esac
 in="$(cat)"
 tool="$(printf '%s' "$in" | grep -o '"tool_name" *: *"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/')"
