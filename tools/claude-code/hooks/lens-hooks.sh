@@ -14,7 +14,27 @@
 # Ціна: подія без гачка й інструмент поза фільтром — лише bash, без Python (заміряно 09.10: подія без гачка ~6 мс, інструмент поза фільтром ~13 мс; повний ланцюг ~140 мс — як у CLAUDE_CODE.md).
 h="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ev="$1"
+# Хуки старту репо сесії (AE S90 18.10.2026): у сесії з кількома репо Claude Code бере налаштування лише з кореня (/home/user), і
+# <репо>/.claude/hooks/session-start.sh не запускається — інструменти гейтів (Playwright, валідатор) тихо відсутні. Диспетчер кличе їх
+# сам: кожен репо, крім свого репо сесії (його кличе Claude Code) і ядра; вивід — у журнал (SessionStart чекає JSON), змінні — через
+# CLAUDE_ENV_FILE, як у самих хуків. Зуби — `lens-hooks.sh repo-hooks-test`.
+repo_hooks() {
+  local root="${LENS_REPOS_ROOT:-/home/user}" k f r; k="$(cd "$h/../../.." && pwd)"
+  for f in "$root"/*/.claude/hooks/session-start.sh; do
+    [ -f "$f" ] || continue; r="${f%/.claude/hooks/session-start.sh}"
+    [ "$r" = "${CLAUDE_PROJECT_DIR:-}" ] || [ "$r" = "$k" ] && continue
+    ( cd "$r" && timeout 300 bash "$f" ) >> "${LENS_REPO_HOOKS_LOG:-/tmp/lens-repo-hooks.log}" 2>&1 || echo "$(date +%T) ✗ $f" >> "${LENS_REPO_HOOKS_LOG:-/tmp/lens-repo-hooks.log}"
+  done
+}
+if [ "$ev" = repo-hooks-test ]; then
+  t=$(mktemp -d); mkdir -p "$t/a/.claude/hooks" "$t/b/.claude/hooks"
+  printf 'echo a >> %s/ran\n' "$t" > "$t/a/.claude/hooks/session-start.sh"; printf 'echo b >> %s/ran\n' "$t" > "$t/b/.claude/hooks/session-start.sh"
+  LENS_REPOS_ROOT="$t" CLAUDE_PROJECT_DIR="$t/b" LENS_REPO_HOOKS_LOG="$t/log" repo_hooks
+  got="$(cat "$t/ran" 2>/dev/null | tr '\n' ' ')"; rm -rf "$t"
+  [ "$got" = "a " ] && { echo "✓ хук репо поза сесією запущено, свій репо сесії — ні"; exit 0; } || { echo "✗ repo_hooks: запущено «$got», чекали «a »"; exit 1; }
+fi
 if [ "$ev" = SessionStart ] || [ "$ev" = profile-test ]; then
+  [ "$ev" = SessionStart ] && repo_hooks
   prof() { [ "${LENS_PROFILE:-}" = 1 ] && [ -f "$h/../PROFILE.md" ] || return 0
     python3 -c 'import json,sys; t=open(sys.argv[1],encoding="utf-8").read(); print(json.dumps({"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"ПРОФІЛЬ KONST (з репо ядра, бо поле профілю цього акаунта спільне з іншою людиною; діє як user preferences — мова, цикл, звіт, маркер):\n\n"+t}},ensure_ascii=False))' "$h/../PROFILE.md"; }
   if [ "$ev" = profile-test ]; then
