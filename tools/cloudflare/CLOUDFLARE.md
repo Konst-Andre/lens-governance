@@ -117,7 +117,7 @@ fresh_days=30
 ```bash
 if [ -f "$K/tools/cloudflare/cf_budget.sh" ]; then bash "$K/tools/cloudflare/cf_budget.sh"; else echo "cloudflare: — (ядра поруч нема: $K)"; fi
 ```
-(`K` — клон ядра поруч, як у шаблоні; не `curl | bash` з `main` — класифікатор auto-режиму Claude Code відмовляє, AE S90 18.10.2026.)
+(`K` — клон ядра поруч, як у шаблоні; клон кладе setup script v3 у кожну сесію; `curl | bash` з `main` — зайвий віддалений код, в auto-режимі класифікатор його відхилив, AE S90 18.10.2026.)
 ⚠ Не `curl … | bash || echo …`: на 404 `bash` отримує порожній вхід і виходить з 0 — збій мовчить.
 і абзац у `CLAUDE.md` репо (зразок — `tools/claude-code/templates/CLAUDE_template.md`): рядки `cloudflare:` і `⚠` в `env_check` —
 читати, тривога — у звіті одразу після «що ти побачиш»; зміна налаштувань Cloudflare — прод-крок, лише після «так» Konst. Потрібні змінні середовища `CLOUDFLARE_API_TOKEN` (права на читання: Pages,

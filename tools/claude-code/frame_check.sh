@@ -42,7 +42,7 @@ check() {
   local tool; for tool in $SHARED_TOOLS; do
     [ -s "$d/tools/env_check.sh" ] && ! grep -q "$tool" "$d/tools/env_check.sh" && miss+=("tools/env_check.sh не кличе $tool — рядок із шаблону ядра (tools/claude-code/templates/env_check_template.sh)")
   done
-  # ENV-CLONE (Konst 18.10.2026, AE S90): інструменти ядра — з клону поруч, не curl з main (класифікатор auto-режиму відмовляє запускати; шаблон env_check)
+  # ENV-CLONE (Konst 18.10.2026, AE S90): інструменти ядра — з клону поруч, не curl з main (клон кладе setup script v3; віддалений скрипт з гілки — зайвий ризик; шаблон env_check)
   [ -s "$d/tools/env_check.sh" ] && grep -q 'raw.githubusercontent.com/Konst-Andre/lens-governance/main/tools/' "$d/tools/env_check.sh" && miss+=("tools/env_check.sh тягне інструменти ядра curl з main — на клон ядра поруч (templates/env_check_template.sh)")
   # UI-1 (Konst 18.10.2026, QR CC-16): репо з інтерфейсом — рядок «Дизайн-основа:» у CLAUDE.md (токени · як бере друга поверхня · префікси класів, REPO_FRAME §3-б)
   if [ "$kind" != "ядро" ] && [ -n "$(find "$d" -name '*.html' -not -path '*/archive/*' -not -path '*/node_modules/*' -not -path '*/.git/*' -print -quit 2>/dev/null)" ] && ! grep -q 'Дизайн-основа' "$d/CLAUDE.md"; then
