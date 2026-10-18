@@ -239,6 +239,32 @@ def journal_health(k, today=None):
                           (kb > J_KB, f'файл > {J_KB} КБ → ротація (те саме)'), (long, f'довгих рядків (> {J_ROW} знаків) {long} → деталь у коміт, у рядку — суть')] if c]
     return ('⚠', s + ' — ' + ' · '.join(why)) if why else ('✓', s)
 
+# Лічильники §0 журналу (18.10.2026, AE S91): з УСІХ рядків — живий §1 + journal/*.md, а не руками.
+# Вердикт = слово + число: «хибне 2» · «хибне ×3» → 2 · 3; без числа — 1. «еволюція 14» — порядковий номер → 1 (лише «×N» — кількість).
+# Не рахуються: «виправлено хибне ×3» (це виправлення), «(не хибне)», число одиниці виміру («хибні 22 файли»).
+T_CHECKS = [('ui-guard', 'ui-guard'), ('commit-gate', 'commit-gate'), ('commit_files', 'commit-gate'), ('ui-review-gate', 'ui-review-gate'),
+            ('чек-лист очей', 'ui-review-gate'), ('огляд', 'ui-review-gate'), ('review-remind', 'review-remind'), ('memory-guard', 'memory-guard'),
+            ('handoff-remind', 'handoff-remind'), ('plan-web', 'plan-web'), ('рецепт як закон', 'plan-web'), ('план без світу', 'plan-web'),
+            ('konst-miss', 'konst-miss'), ('ui_lint', 'ui_lint'), ('handoff_check', 'handoff_check'), ('Lens_validate', 'Lens_validate'),
+            ('гейт `--', 'Lens_validate'), ('doc_health', 'doc_health'), ('env_check', 'env_check'), ('frame_check', 'frame_check')]
+T_COLS = [('справжніх', r'справжн\w*|влучне', False), ('хибних', r'хибн\w*', False), ('пропусків агента', r'пропуск\w*\s+(?:агента|очей\s*\(мій)', False),
+          ('пропусків Konst', r'пропуск\w*(?:\s+очей)?\s+konst', False), ('еволюцій', r'еволюці\w*', True)]
+def journal_tally(paths):
+    import collections
+    out = collections.defaultdict(collections.Counter)
+    for p in paths:
+        for l in open(p, encoding='utf-8'):
+            if not re.match(r'^\| \d\d\.\d\d \|', l): continue
+            c = l.split('|'); vl = c[4].lower() if len(c) > 4 else ''
+            hits = [(c[3].find(s), k) for s, k in T_CHECKS if s in c[3]]; key = min(hits)[1] if hits else 'інше'   # перша названа в комірці
+            for col, rx, ordinal in T_COLS:
+                for m in re.finditer(rx, vl):
+                    if re.search(r'(виправлено|не)\s*$', vl[max(0, m.start() - 12):m.start()]): continue
+                    t = vl[m.end():m.end() + 12]
+                    x = re.match(r'[\s*:]*×\s*(\d+)', t) or (None if ordinal else re.match(r'[\s*]*(\d+)(?![\d–-]|\s*(?:файл|рядк|самері|кб|дн))', t))
+                    out[key][col] += int(x.group(1)) if x else 1
+    return out
+
 def report(repos):
     bad = False
     for r in repos:
@@ -341,7 +367,15 @@ def selftest():
     for name, body, want, part in hcases:
         open(jf, 'w').write(body); g, t = journal_health(jf, T0); ok = g == want and part in t
         print(('✓' if ok else '✗') + ' ' + name); bad += not ok
-    total = len(cases) + len(jcases) + len(hcases)
+    # лічильники журналу: число після слова, «×N», порядковий номер еволюції, «виправлено хибне» не рахується
+    tf = tempfile.mkdtemp(prefix='jt-'); tp = os.path.join(tf, 'J.md')
+    open(tp, 'w', encoding='utf-8').write('| 10.10 | s | `ui-guard` | **хибне 2** · справжнє 1 | x |\n| 11.10 | s | `ui-guard` | **виправлено хибне ×3** | x |\n'
+                                          '| 11.10 | s | `ui_lint` | **еволюція 14** · пропуск Konst ×2 | x |\n| 12.10 | s | `env_check` | хибне 1: хибні 22 файли | x |\n| 13.10 | s | `ui_lint` + чек-лист очей | пропуск Konst | x |\n')
+    tg = journal_tally([tp]); want = {'ui-guard': {'хибних': 2, 'справжніх': 1}, 'ui_lint': {'еволюцій': 1, 'пропусків Konst': 3}, 'env_check': {'хибних': 2}}
+    tcases = [('лічильники журналу: «хибне 2», «×N», «еволюція 14» = 1, «виправлено» — ні, перевірка — перша в комірці', all(dict(tg[k]) == v for k, v in want.items()))]
+    for name, ok in tcases:
+        print(('✓' if ok else '✗') + ' ' + name); bad += not ok
+    total = len(cases) + len(jcases) + len(hcases) + len(tcases)
     print(f'selftest: {total - bad}/{total}')
     return 1 if bad else 0
 
@@ -351,4 +385,10 @@ if __name__ == '__main__':
     if not a: print(__doc__ or 'handoff_check.py <тека репо> … | selftest'); sys.exit(2)
     if a[0] == 'journal':   # рядок для env_check ядра: ріст журналу гачків щостарту
         g, t = journal_health(JPATH if len(a) < 2 else a[1]); print((g + ' ' if g == '⚠' else '') + t); sys.exit(0)
+    if a[0] == 'tally':   # лічильники §0 журналу гачків з усіх рядків (живий §1 + journal/)
+        jp = JPATH if len(a) < 2 else a[1]; ps = [jp] + sorted(glob.glob(os.path.join(os.path.dirname(jp), 'journal', '*.md')))
+        t = journal_tally(ps); print('| перевірка | ' + ' | '.join(c for c, _, _ in T_COLS) + ' | точність |')
+        prec = lambda r: f"{100 * r['справжніх'] // (r['справжніх'] + r['хибних'])} %" if r['справжніх'] + r['хибних'] else '—'   # справжні / (справжні + хибні) — на правило
+        for k in sorted(t, key=lambda k: (k == 'інше', k)): print(f'| `{k}` | ' + ' | '.join(str(t[k][c]) for c, _, _ in T_COLS) + f' | {prec(t[k])} |')
+        sys.exit(0)
     sys.exit(selftest() if a[0] == 'selftest' else report(a))
