@@ -63,6 +63,12 @@ X" "запис .md, що лише згадує .html → тиша (хибне S9
 p='site/index.html'; open(p,'w').write(t)
 X" "запис .html через python без кукбука й пошуку → стоп"
   tb 1 "echo '<b>x</b>' > site/index.html" "запис .html перенаправленням у чистій сесії → стоп"
+  tb 0 "python3 - <<X
+repo=open('worker/ae-proxy.js',encoding='utf-8').read()
+X" "читання .js через open() без режиму запису → тиша (хибне S90 AE, правило «крок»)"
+  tb 1 "python3 - <<X
+open('tools/qr_build.py','w').write(t)
+X" "open(…, 'w') у .py без пошуку → стоп"
   S=$S0
   R="/tmp/lens-ui-$S-repo"; rm -rf "$R"; mkdir -p "$R/lens/shots" && git -C "$R" init -q
   printf '| id | стан | що | в | вибір | куди | дата |\n|---|---|---|---|---|---|---|\n| `QRL-1_x` | обрано | x | x | x | x | 11.10.2026 |\n' > "$R/lens/shots/README.md"
@@ -119,7 +125,8 @@ if tool in ("Write", "Edit"):
 elif tool == "Bash":
     cmd = str(ti.get("command", ""))
     # ціль запису — шлях після p='…' / open('…' / > / tee / sed -i; код — лише коли серед цілей є файл коду поза /tmp (правка .md через python — не код; хибне QR CC-8)
-    tg = re.findall(r"(?:\bp\s*=\s*|open\(\s*|>\s*|\btee\s+(?:-a\s+)?|sed\s+-i\S*\s+(?:\x27[^\x27]*\x27|\x22[^\x22]*\x22)\s+)[\x27\x22]?([\w./~-]+\.[A-Za-z]+)", re.sub(r"\d?>>?&?\s*/dev/null|\d>&\d", "", cmd))
+    # open: лише з режимом запису w/a/x (читання open без режиму — не запис; хибне S90 AE). Тут без апострофів: код у bash-лапках
+    tg = re.findall(r"(?:\bp\s*=\s*|open\(\s*(?=[\x27\x22][^\x27\x22]+[\x27\x22]\s*,\s*(?:mode\s*=\s*)?[\x27\x22][wax])|>\s*|\btee\s+(?:-a\s+)?|sed\s+-i\S*\s+(?:\x27[^\x27]*\x27|\x22[^\x22]*\x22)\s+)[\x27\x22]?([\w./~-]+\.[A-Za-z]+)", re.sub(r"\d?>>?&?\s*/dev/null|\d>&\d", "", cmd))
     if "tools/claude-code/hooks/" not in cmd and any(re.search(r"\.(html?|m?js|ts|toml|py|sh)$", x, re.I) and not x.startswith("/tmp/") for x in tg): code = cmd
 if code:
     qs = open(mark + "-q", encoding="utf-8").read() if os.path.exists(mark + "-q") else ""
@@ -144,7 +151,7 @@ elif tool == "Bash":
     w = re.sub(r"\d?>>?&?\s*/dev/null|\d>&\d", "", cmd)   # 2>/dev/null, >/dev/null, 2>&1 — не запис (хибна відмова на «grep … 2>/dev/null», аудит 09.10)
     # UI — коли ЦІЛЬ запису .html/.css (ті самі цілі, що в «Крок» вище, + Path(…)), або cp/mv із .html у команді.
     # Було: .html будь-де + ознака запису будь-де → хибне S90 AE 18.10: grep site/index.html поруч із json.load(open('settings.json')) · правка env_check.sh, що лише згадує index.html
-    tgw = re.findall(r"(?:\bp\s*=\s*|open\(\s*|Path\(\s*|>\s*|\btee\s+(?:-a\s+)?|sed\s+-i\S*\s+(?:\x27[^\x27]*\x27|\x22[^\x22]*\x22)\s+)[\x27\x22]?([\w./~-]+\.[A-Za-z]+)", w)
+    tgw = re.findall(r"(?:\bp\s*=\s*|open\(\s*(?=[\x27\x22][^\x27\x22]+[\x27\x22]\s*,\s*(?:mode\s*=\s*)?[\x27\x22][wax])|Path\(\s*(?=[\x27\x22][^\x27\x22]+[\x27\x22]\s*\)\s*\.write)|>\s*|\btee\s+(?:-a\s+)?|sed\s+-i\S*\s+(?:\x27[^\x27]*\x27|\x22[^\x22]*\x22)\s+)[\x27\x22]?([\w./~-]+\.[A-Za-z]+)", w)
     hit = any(ui.search(x) for x in tgw) or (bool(re.search(r"\b(cp|mv)\b", w)) and bool(ui.search(cmd)))
 else:
     hit = False
