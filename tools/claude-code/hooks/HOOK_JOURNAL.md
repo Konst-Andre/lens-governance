@@ -77,6 +77,7 @@
 | 18.10 | `session_018myh9Y` · AE S90 | `review-remind` (stand) | **хибне 1:** heredoc у `docs/CHERGA.md` згадував `…standalone_v1.html` — «stand» у «standalone», файл не ціль запису | лише цілі запису (`>` · tee · cp/mv); selftest 5/5 (стара — ✗) |
 | 18.10 | `session_018myh9Y` · AE S90 | `handoff_check` | **пропуск агента:** не бачив самері не-Lens (`docs/summary/`) — AE без перевірки переїзду з 02.10; після виправлення одразу знайшов у AE мертвий шлях і голу назву в §0 | `SUM_DIRS` (sessions · docs/summary); selftest 22/22 |
 | 18.10 | `session_018myh9Y` · AE S90 | `ui-guard` (крок) | **хибне 2:** читання `open('worker/ae-proxy.js')` у python-heredoc — правило «крок» брало будь-який `open(` за запис коду. Попутно: апостроф із `\|` у коментарі Python розрізав `python3 -c '…'` (самотест 13/22) — коментарі там без апострофів | `open` — лише з режимом w/a/x, `Path(…).write`; selftest 22/22 (стара — 1 ✗) |
+| 18.10 | `session_018myh9Y` · AE S90 | `doc_health` · `handoff_check` | **пропуск Konst:** «я думав, перед закриттям сесії перевіряється кожен шлях у документах» — ні: `handoff_check` бачить шляхи лише в самері §0 і стартовому, `doc_health` міряв лише розмір; README і ARCHITECTURE AE протухли з 02.10 непоміченими | `doc_health` M5 «мертві шляхи» (старт через `env_check` + переїзд через `handoff_check`); selftest 13/13; ядро — 14 знахідок, розібрати в сесії ядра |
 
 ## §2 Винятки — переглядати на кожному переїзді (проти «храповика»)
 
