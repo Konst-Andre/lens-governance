@@ -8,7 +8,7 @@
 //          Обидві теми (prefers-color-scheme light/dark) завжди. --repo: ✗ 0 → позначка для воріт (той самий хеш диффу, що в ui-review-gate).
 //          <repo>/.ui-lint-accept — відомі вади, прийняті Konst: рядок «вид | шматок адреси елемента | причина · дата» → ⓘ (не блокує, але друкується щоразу).
 //          node ui_lint.mjs selftest — зуби: сторінка з підкинутими вадами (кожна мусить дати свій рядок) і чиста (0).
-// Перевірки: 1 скрол убік · 2 обрізано · 3 прилипло / вилазить · 4 контраст · 5 шрифт · 6 тап, без назви, iOS-зум · 7 накладання · 8 ряд · 9 текст (сміття, жаргон) ·
+// Перевірки: 1 скрол убік · 2 обрізано · 3 прилипло / вилазить · 4 контраст (4-б — на градієнті пікселем знімка) · 5 шрифт · 6 тап, без назви, iOS-зум · 7 накладання · 8 ряд · 9 текст (сміття, жаргон) ·
 // 10 дія в прокрутці · 11 кнопки ряду · 12 сирота · 13 злито · 14 однакові заголовки · 15 дата й час · 16 зливається (16-б край кнопки) · 17 паритет тем · 18 кромка · 19 картка-список · 20 вкладена прокрутка · 21 шапка в прокрутці · 22 емодзі в кнопці · 23 нативне вікно · 24 фон у рамці · 25 кант рветься · 26 поле губиться; поза probe — натискання (:active / JS pointerdown, touchstart).
 // Звідки кожна (пропуск Konst, QR CC-N, рецепт кукбуку) — коментар біля неї.
 // Вивід: ✗ (ворота не пустять) · ⚠ (подивись очима) · ⓘ (не виміряно); exit 1 на ✗.
@@ -18,6 +18,7 @@ import { execFileSync } from 'node:child_process';
 import { writeFileSync, mkdtempSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
+import { inflateSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 
 const PW = ['/opt/node-tools/node_modules/playwright/index.mjs', 'playwright'];
@@ -58,10 +59,12 @@ function probe() {
       if (!full && d.some(x => x < -1) && getComputedStyle(c).overflow === 'visible') add('✗', 'вилазить', el, `виходить за межі «${path(c)}» на ${Math.round(-Math.min(...d))} px`);
       else if (!full && d.some(x => x >= -1 && x < 2) && !(r.height >= q.height - 2)) add('✗', 'прилипло', el, `майже торкається краю «${path(c)}» (${d.map(x => Math.round(x)).join('/')} px) — «приклеєна капсула»`); }
     // 4. контраст тексту
-    if (own && el.textContent.trim().length > 1) { const fg = rgba(s.color), bg = bgOf(el), px = parseFloat(s.fontSize), big = px >= 24 || (px >= 18.66 && +s.fontWeight >= 700);
-      if (fg && bg) { const f = fg[3] < 1 ? blend(fg, bg) : fg, a = lum(f), b = lum(bg), cr = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05), need = big ? 3 : 4.5;
+    if (own && el.textContent.trim().length > 1) { const fg = rgba(s.color), bg = bgOf(el), px = parseFloat(s.fontSize), big = px >= 24 || (px >= 18.66 && +s.fontWeight >= 700), need = big ? 3 : 4.5;
+      if (fg && bg) { const f = fg[3] < 1 ? blend(fg, bg) : fg, a = lum(f), b = lum(bg), cr = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
         if (cr < need) add('✗', 'контраст', el, `контраст ${cr.toFixed(2)}:1 < ${need}:1 — погано читається`); }
-      else if (fg) out.push({ lvl: 'ⓘ', kind: 'контраст', where: path(el), msg: 'фон — градієнт чи картинка: контраст не виміряно, глянь очима' });
+      else if (fg && !el.closest('[class*="brand"],[data-logo]')) { const cx = r.left + r.width / 2, cy = r.top + r.height / 2, hit = cx >= 0 && cy >= 0 && cx < innerWidth && cy < innerHeight && (t => t && (t === el || el.contains(t)))(document.elementFromPoint(cx, cy));
+        // 4-б. фон — градієнт / картинка: міряє Node пікселем знімка (кільце довкола тексту); текст поза екраном чи під шаром — «не виміряно»; логотип (клас *brand*, data-logo) — виняток WCAG 1.4.3
+        out.push({ lvl: hit ? 'px' : 'ⓘ', kind: 'контраст', where: path(el), msg: 'фон — градієнт чи картинка: контраст не виміряно, глянь очима', rect: [r.left, r.top, r.width, r.height], fg, need }); }
       // 5. дрібний текст
       if (px < 11) add('⚠', 'шрифт', el, `текст ${px}px < 11 — на телефоні дрібно`); }
     // 6. цілі тапу; поле вводу < 16 px
@@ -232,6 +235,7 @@ const DEFECTS = {
   'прилипло': `<div class=card><span class=pill style="position:absolute;top:1px;right:30px">прилипла</span>.</div>`,
   'обрізано': `<div class=card><div class=clip>Дуже довгий підпис</div></div>`,
   'контраст': `<div class=card><span class=grey>сірий на сірому</span></div>`,
+  'контраст ': `<div style="margin:16px;padding:14px;border-radius:14px;background:linear-gradient(180deg,#f6f6f6,#e9e9e9)"><span style="color:#b0b0b0">сірий на градієнті</span></div>`,   // 4-б: пікселем (QR CC-17)
   'тап': `<div class=card><button style="width:20px;height:20px;padding:0">x</button></div>`,
   'iOS-зум': `<div class=card><input value="пошук" style="font-size:14px;min-height:44px"></div>`,
   'скрол': `<div style="width:600px;height:4px"></div>`,
@@ -259,6 +263,34 @@ const DEFECTS = {
   'натискання': `<div class=card><a href="#x" style="display:inline-block;padding:14px 18px">Відкрити звіт</a></div>`,
 };
 
+// 4-б. контраст на градієнті — пікселем (пропуск Konst QR CC-17, 18.10.2026: підвал героблока 2,55 / 2,97, а ui_lint писав «не виміряно»;
+//     axe-core теж лишає такі випадки на ручну перевірку — docs.deque.com devtools-color-contrast-resolver, 18.10.2026).
+//     Знімок екрана ×2 (PNG 8 біт, без чергування) → фон = медіана пікселів кільця на 2 px довкола рамки тексту;
+//     кільце строкате (менше 60 % пікселів у межах 40 від медіани — картинка, сусідній предмет) → «не виміряно», як і раніше.
+function png(buf) {
+  let o = 8, w = 0, h = 0, ct = 0; const idat = [];
+  while (o < buf.length) { const n = buf.readUInt32BE(o), t = buf.toString('ascii', o + 4, o + 8), d = buf.subarray(o + 8, o + 8 + n);
+    if (t === 'IHDR') { w = d.readUInt32BE(0); h = d.readUInt32BE(4); ct = d[9]; } else if (t === 'IDAT') idat.push(d); else if (t === 'IEND') break; o += 12 + n; }
+  const bpp = ct === 6 ? 4 : 3, raw = inflateSync(Buffer.concat(idat)), stride = w * bpp, px = Buffer.alloc(h * stride);
+  for (let y = 0; y < h; y++) { const f = raw[y * (stride + 1)], src = y * (stride + 1) + 1, dst = y * stride;
+    for (let x = 0; x < stride; x++) { const a = x >= bpp ? px[dst + x - bpp] : 0, b = y ? px[dst - stride + x] : 0, c = x >= bpp && y ? px[dst - stride + x - bpp] : 0, v = raw[src + x];
+      const p = a + b - c, pa = Math.abs(p - a), pb = Math.abs(p - b), pc = Math.abs(p - c);
+      px[dst + x] = (f === 0 ? v : f === 1 ? v + a : f === 2 ? v + b : f === 3 ? v + ((a + b) >> 1) : v + (pa <= pb && pa <= pc ? a : pb <= pc ? b : c)) & 255; } }
+  return { w, h, bpp, px };
+}
+function ringContrast(img, f) {
+  const [x, y, w, h] = f.rect.map(v => Math.round(v * 2)), pts = [];   // знімок ×2 (deviceScaleFactor контексту)
+  const at = (X, Y) => { if (X < 0 || Y < 0 || X >= img.w || Y >= img.h) return; const i = (Y * img.w + X) * img.bpp; pts.push([img.px[i], img.px[i + 1], img.px[i + 2]]); };
+  for (let X = x - 4; X <= x + w + 4; X += 2) { at(X, y - 4); at(X, y + h + 4); }
+  for (let Y = y - 4; Y <= y + h + 4; Y += 2) { at(x - 4, Y); at(x + w + 4, Y); }
+  if (pts.length < 8) return null;
+  const med = c => { const v = pts.map(p => p[c]).sort((a, b) => a - b); return v[v.length >> 1]; }, bg = [med(0), med(1), med(2)];
+  if (pts.filter(p => Math.max(...p.map((v, c) => Math.abs(v - bg[c]))) <= 40).length < pts.length * 0.6) return null;   // строкате кільце — чесно не міряємо
+  const L = ([r, g, b]) => { const q = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * q(r) + 0.7152 * q(g) + 0.0722 * q(b); };
+  const a = f.fg[3] ?? 1, t = [0, 1, 2].map(c => f.fg[c] * a + bg[c] * (1 - a)), A = L(t), B = L(bg);
+  return (Math.max(A, B) + 0.05) / (Math.min(A, B) + 0.05);
+}
+
 async function lint(target, states, width, theme, browser) {
   const ctx = await browser.newContext({ viewport: { width, height: HEIGHT }, deviceScaleFactor: 2, colorScheme: theme });
   const p = await ctx.newPage(), errs = [], dlg = []; p.on('pageerror', e => errs.push(e.message)); p.on('dialog', d => { dlg.push(d.type() + ': ' + d.message()); d.dismiss().catch(() => {}); });   // 23. нативне вікно (пропуск Konst QR CC-12: «свій підпис» відкрив prompt браузера) p.on('console', m => m.type() === 'error' && !/Failed to load resource/.test(m.text()) && errs.push(m.text()));
@@ -266,7 +298,12 @@ async function lint(target, states, width, theme, browser) {
   for (const [i, st] of [null, ...states].entries()) {   // початковий екран — завжди, далі кожен стан
     await p.goto(target, { waitUntil: 'load' }); await p.waitForTimeout(400);
     if (st) { try { await p.evaluate(st); } catch (e) { res.push({ lvl: '✗', kind: 'стан', where: `стан ${i}`, msg: 'JS стану впав: ' + e.message.split('\n')[0] }); } await p.waitForTimeout(700); }
-    for (const f of await p.evaluate(probe)) res.push({ ...f, state: st ? `стан ${i}` : 'початковий' });
+    const found = await p.evaluate(probe), pxs = found.filter(f => f.lvl === 'px');
+    if (pxs.length) { const img = png(await p.screenshot({ type: 'png' })); for (const f of pxs) { const m = ringContrast(img, f); if (m == null) { f.lvl = 'ⓘ'; continue; }
+      // допуск 0,15 — похибка кільця (згладжування, сусідні пікселі): ✗ лише явно нижче порогу, «на межі» — ⚠ (замір QR CC-17: 4,33–4,39 на межі, 4,07 і 2,52 — вади)
+      if (m < f.need - 0.15) { f.lvl = '✗'; f.msg = `контраст ${m.toFixed(2)}:1 < ${f.need}:1 — погано читається (фон — градієнт, заміряно пікселем)`; }
+      else if (m < f.need) { f.lvl = '⚠'; f.msg = `контраст ${m.toFixed(2)}:1 — на межі ${f.need}:1 (фон — градієнт, пікселем ± 0,15) — глянь очима`; } else f.lvl = 'ok'; } }
+    for (const f of found.filter(f => f.lvl !== 'ok')) { delete f.rect; delete f.fg; delete f.need; res.push({ ...f, state: st ? `стан ${i}` : 'початковий' }); }
     // натискання: притиснути, виміряти, відпустити ПОЗА елементом (клік не спрацює). Однаковий вигляд → ⚠ «нема відгуку» (Konst 10.10: анімація пресу)
     const sig = await p.evaluate(() => { const seen = new Set(), out = [];
       for (const e of document.querySelectorAll('a[href],button,[role=button],summary,label[for]')) { const s = getComputedStyle(e); if (s.display === 'none' || !e.getClientRects().length) continue; e.scrollIntoView({ block: 'center', behavior: 'instant' }); const r = e.getBoundingClientRect();
