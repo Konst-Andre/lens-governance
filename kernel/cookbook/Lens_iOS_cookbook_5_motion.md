@@ -614,7 +614,7 @@ iPad тику не має · iOS 17.4–17.x: switch є, тику нема (мо
 Поріг `12.11` пройдено → мерджити в том 5 найближчим проходом.
 
 **Провенанс.** QR Lens B62 rev1/rev2, 16.09.2026 (research WebKit/GitHub + device Konst).
-Файли: `QR_Lens_preview_batch62_haptic_v2.html`, `b62_haptic_apply_v2.py`.
+Файли — у репо QR Lens (виїхали з ядра 05–06.10.2026): «QR_Lens_preview_batch62_haptic_v2.html», «b62_haptic_apply_v2.py».
 
 ---
 

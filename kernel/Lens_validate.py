@@ -336,6 +336,9 @@ def gov(root):
         # маршруту або точка під'єднання, не власна ціль буфера (Д-1 · сесія E).
         if 'session_summary' in f or f.startswith('Lens_module_'):
             continue
+        # Буфер уже в archive/ — «→ архів» виконано; судити його далі = вічне ⚠ (A45, 18.10.2026)
+        if os.path.relpath(R(root, f), root).replace('\\', '/').startswith('archive/'):
+            continue
         body = open(R(root, f), encoding='utf-8').read()
         lines = [l for l in body.splitlines() if re.search(r'Куди (канонити|мерджити)', l)]
         # секційний заголовок «## Куди канонити» → брати абзац під ним
@@ -439,7 +442,13 @@ def gov(root):
                 fail(f'`{ref}` — ОГОЛОШЕНИЙ ЖИВИМ у Lens_INDEX §5, файлу в теці немає. '
                      f'Це втрата, не архівація (wsd 1.10)'); lost += 1
             elif ref in arch:
-                warn(f'`{ref}` — в архіві за Lens_ARCHIVE_INDEX (норма); згадка: {where}')
+                # Згадка лише в самому покажчику (рядок перенаправлення) чи в історії wsd — так і задумано, ⓘ;
+                # згадка в живому файлі — ⚠: там варто чинне ім'я (18.10.2026, AE S91: ⚠ «норма» стояв на рядку §3-б)
+                live_src = [x for x in src if x != 'Lens_ARCHIVE_INDEX.md' and not x.endswith('_HISTORY.md')]
+                if live_src:
+                    warn(f'`{ref}` — в архіві за Lens_ARCHIVE_INDEX (норма), але згадка в живому: {", ".join(live_src)} — чинне ім\'я')
+                else:
+                    print(f'  ⓘ `{ref}` — в архіві за Lens_ARCHIVE_INDEX; згадка лише там чи в історії: {where}')
                 named += 1
             else:
                 warn(f'`{ref}` — не названий ні в §5, ні в ARCHIVE_INDEX; згадка: {where}')
