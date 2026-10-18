@@ -11,7 +11,10 @@ mode="$1"
 if [ "$mode" = selftest ]; then   # stand: адреса з «stand» усередині слова — тиша; .html стенда чи компера — нагадування (хибне QR CC-8)
   ok=0; n=0
   for c in "0|curl -s https://qr-lens.konstandre.workers.dev/ | grep -o 'x[^>]*'; grep a tools/QR_Lens_zvit_template.html" \
-           "1|cat a > kernel/stage/AE_stand_v3.html" "1|cp x tools/compare_v2.htm" "0|echo hi > notes.md"; do
+           "1|cat a > kernel/stage/AE_stand_v3.html" "1|cp x tools/compare_v2.htm" "0|echo hi > notes.md" \
+           "0|cat > docs/CHERGA.md <<X
+джерело — ANC_island_animations_standalone_v1.html
+X"; do
     n=$((n+1)); want="${c%%|*}"; cmd="${c#*|}"
     got=$(python3 -c 'import json,sys; print(json.dumps({"session_id":"selftest%s" % sys.argv[2],"tool_name":"Bash","tool_input":{"command":sys.argv[1]}}))' "$cmd" "$n$$" | bash "$0" stand | grep -c 'Стенди')
     [ "$got" = "$want" ] && ok=$((ok+1)) || echo "✗ stand: «$cmd» → $got, очікував $want"
@@ -68,7 +71,10 @@ elif mode == "stand":
     path = str(ti.get("file_path", "")) if tool in ("Write", "Edit") else str(ti.get("command", ""))
     if tool == "Bash" and not re.search(r"(>|\btee\b|\bcp\b|\bmv\b)", path): sys.exit(0)
     # лише в імені .html-файлу, не в усій команді: «konstandre» в адресі давало хибне (QR CC-8, 10.10)
-    if any(re.search(r"(stand|stend|bench|harness|compar|стенд|компер)", f, re.I) for f in re.findall(r"[^\s\x27\x22|;&<>]+\.html?\b", path, re.I)):
+    # і лише ЦІЛЬ запису (> · tee · аргументи cp/mv), не згадка в тексті: «…standalone_v1.html» у heredoc для .md давало хибне (S90 AE, 18.10)
+    names = ([f for f in re.findall(r"(?:>\s*|\btee\s+(?:-a\s+)?)([^\s\x27\x22|;&<>]+)", path) + [w for s in re.findall(r"\b(?:cp|mv)\b[^|;&\n]*", path) for w in s.split()]]
+             if tool == "Bash" else [path])
+    if any(re.search(r"(stand|stend|bench|harness|compar|стенд|компер)", f, re.I) for f in names if re.search(r"\.html?$", f, re.I)):
         open(seen, "w").close()
         say("PreToolUse", "Стенди, харнеси й компери Lens описує маніфест ядра lens-governance:kernel/Lens_stagebench_manifest.md (буфер — lens-governance:kernel/Lens_stagebench_delta_running.md); "
             "у цій сесії його ще не відкривали (lens-governance:CLAUDE.md «Звідки брати»: «будую чи правлю стенд, харнес, компер, важелі»).")

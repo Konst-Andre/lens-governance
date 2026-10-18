@@ -39,13 +39,20 @@ def starter(text):
     return m.group(1) if m else None
 
 
+SUM_DIRS = ('sessions', 'docs/summary')   # продукт Lens (Р-7) · не-Lens каркас (AE, AirLens; ADOPT.md «три шляхи»); перша наявна — як pytest rootdir (S90 AE 18.10.2026: бачило лише sessions/)
+
+
+def sum_dir(repo):
+    return next((d for d in SUM_DIRS if os.path.isdir(os.path.join(repo, d))), SUM_DIRS[0])
+
+
 def live_summary(repo):
-    """Живе самері в sessions/ (і sessions/*/): ще не в коміті → найновіше; інакше — останній коміт, при рівному — пізніше створене
+    """Живе самері в sessions/ або docs/summary/ (і підтеках): ще не в коміті → найновіше; інакше — останній коміт, при рівному — пізніше створене
     (заморожене попереднє й нове міняються одним комітом)."""
     best, bt = None, None
-    for root, _, files in os.walk(os.path.join(repo, 'sessions')):
+    for root, _, files in os.walk(os.path.join(repo, sum_dir(repo))):
         for f in files:
-            if not (f.endswith('.md') and 'summary' in f): continue
+            if not (f.endswith('.md') and 'summary' in f.lower()): continue
             p = os.path.join(root, f); rel = os.path.relpath(p, repo)
             last = int(git(repo, 'log', '-1', '--format=%ct', '--', rel) or 0)
             born = git(repo, 'log', '--diff-filter=A', '--format=%ct', '--', rel).split()
@@ -101,7 +108,7 @@ def check_repo(repo, now=None):
     L = []
     sm = live_summary(repo)
     if not sm:
-        L.append(('✗', 'самері в sessions/ не знайдено')); return name, L
+        L.append(('✗', 'самері не знайдено (sessions/ або docs/summary/)')); return name, L
     text = open(os.path.join(repo, sm), encoding='utf-8').read()
     s0, st = section(text, r'^## §0'), starter(text)
     L.append(('✓' if s0 else '✗', f'{sm}: §0 ' + ('є' if s0 else 'нема (заголовок «## §0 …»)')))
@@ -112,7 +119,7 @@ def check_repo(repo, now=None):
     grep = f'session_{tail}' if tail else 'Claude-Session'
     after = git(repo, 'log', '--format=%h', f'--grep={grep}', f'{last}..HEAD') if last else ''
     n = len(after.split()) if after else 0
-    owns = (not tail) or bool(git(repo, 'log', '--format=%h', f'--grep=session_{tail}', '--', 'sessions/'))
+    owns = (not tail) or bool(git(repo, 'log', '--format=%h', f'--grep=session_{tail}', '--', sum_dir(repo) + '/'))
     if n and is_kernel and not owns:
         L.append(('ⓘ', f'самері ядра веде сесія ядра; коміти цієї сесії тут — {n}: вони мають бути в самері репо продукту (Lens_governance_protocol.md:139)'))
     elif n:
@@ -124,7 +131,7 @@ def check_repo(repo, now=None):
     if st: check_paths(repo, st, 'стартове', L)
     for m in PATH_RE.finditer(s0 or ''):
         rp, p = m.group(1), m.group(2)
-        if rp or not p.endswith('.md') or 'sessions/' in p: continue
+        if rp or not p.endswith('.md') or 'sessions/' in p or 'docs/summary/' in p: continue
         f = os.path.join(repo, p)
         if not os.path.isfile(f): continue
         k = section(open(f, encoding='utf-8').read(), r'Коротко')
@@ -145,9 +152,9 @@ def check_repo(repo, now=None):
     # код, змінений комітами цієї сесії → усі .md, що його згадують (README · ARCHITECTURE · план · INDEX · CLAUDE.md …), а сесія їх не міняла → ⚠ перевір
     if tail:
         ch = [x for x in git(repo, 'log', f'--grep=session_{tail}', '--name-only', '--format=').split('\n') if x]
-        code = sorted({x for x in ch if not x.endswith('.md') and not x.startswith(('sessions/', 'archive/')) and os.path.isfile(os.path.join(repo, x))})
+        code = sorted({x for x in ch if not x.endswith('.md') and not x.startswith(('sessions/', 'docs/summary/', 'archive/')) and os.path.isfile(os.path.join(repo, x))})
         touched = {x for x in ch if x.endswith('.md')}
-        docs = [d for d in git(repo, 'ls-files', '*.md').split('\n') if d and not d.startswith(('sessions/', 'archive/'))]
+        docs = [d for d in git(repo, 'ls-files', '*.md').split('\n') if d and not d.startswith(('sessions/', 'docs/summary/', 'archive/'))]
         stale = {}
         for d in docs:
             if d in touched: continue
@@ -168,11 +175,11 @@ def check_repo(repo, now=None):
                       (f' (+{len(stale) - 6})' if len(stale) > 6 else '') + ' — перевір, чи новий агент не піде за протухлим описом'))
         elif code: L.append(('✓', f'описи змін сесії оновлено (код: {len(code)} файлів)'))
     # (8) кандидат у бриф (BRIEF-1, розширення 10.10): id відкритої черги згадано в самері ≥ 3 різних сесій, а брифу / плану з цим id нема
-    qf = [f for f in (glob.glob(os.path.join(repo, 'lens', '*_CHERGA.md')) + glob.glob(os.path.join(repo, 'kernel', '*_CHERGA.md')))]
+    qf = [f for f in (glob.glob(os.path.join(repo, 'lens', '*_CHERGA.md')) + glob.glob(os.path.join(repo, 'kernel', '*_CHERGA.md')) + glob.glob(os.path.join(repo, 'docs', 'CHERGA.md')))]
     if qf:
         qt = open(qf[0], encoding='utf-8').read(); qt = qt[qt.find('## Відкрите'):] if '## Відкрите' in qt else qt
         ids = sorted(set(re.findall(r'^\|\s*\*{0,2}`([A-Z]+-\d+(?:\.\d+)?)`', qt, re.M)))
-        sums = [p for p in glob.glob(os.path.join(repo, 'sessions', '**', '*summary*.md'), recursive=True) + glob.glob(os.path.join(repo, 'archive', 'summaries', '**', '*summary*.md'), recursive=True)]
+        sums = [p for p in glob.glob(os.path.join(repo, 'sessions', '**', '*summary*.md'), recursive=True) + glob.glob(os.path.join(repo, 'docs', 'summary', '**', '*.md'), recursive=True) + glob.glob(os.path.join(repo, 'archive', 'summaries', '**', '*summary*.md'), recursive=True)]
         briefs = [p for p in glob.glob(os.path.join(repo, '**', '*.md'), recursive=True) if re.search(r'brief|BRIEF|PLAN|_plan', os.path.basename(p)) and '/archive/' not in p]
         btxt = ' '.join(open(p, encoding='utf-8', errors='replace').read() for p in briefs)
         cand = []
@@ -277,6 +284,14 @@ def selftest():
         if commit_after:
             open(os.path.join(r, 'lens/A.md'), 'a').write('y'); sh(r, 'git', 'commit', '-qam', 'код\n\nClaude-Session: https://claude.ai/code/session_T')
         return r
+    def mk_nl(summary):   # не-Lens каркас (AE): самері docs/summary/<P>_SUMMARY_<дата>.md, черга docs/CHERGA.md
+        d = tempfile.mkdtemp(prefix='hc-'); r = os.path.join(d, 'Prod'); os.makedirs(os.path.join(r, 'docs/summary'))
+        sh(r, 'git', 'init', '-q'); sh(r, 'git', 'config', 'user.email', 't@t'); sh(r, 'git', 'config', 'user.name', 't')
+        open(os.path.join(r, 'docs/CHERGA.md'), 'w').write('## Відкрите\n| `AE-W` | x | 18.10.2026 | y |\n'); open(os.path.join(r, 'CLAUDE.md'), 'w').write('x')
+        open(os.path.join(r, 'docs/summary/P_SUMMARY_2026-10-18.md'), 'w').write(summary)
+        sh(r, 'git', 'add', '-A'); sh(r, 'git', 'commit', '-qm', 'самері\n\nClaude-Session: https://claude.ai/code/session_T')
+        return r
+    good_nl = '# S\n## §0 ВІДКРИТЕ\n- далі `docs/CHERGA.md`; правила — CLAUDE.md\n## §6 Стартове\n```text\nСтарт: docs/CHERGA.md → docs/summary/P_SUMMARY_2026-10-18.md\n```\n'
     good = '# S\n## §0 ВІДКРИТЕ\n- далі `lens/A.md` §0 «Коротко»; правила — CLAUDE.md\n## §6 Стартове\n```text\nСтарт: lens/A.md → sessions/P_session_summary_X.md\n```\n'
     os.environ['CLAUDE_CODE_REMOTE_SESSION_ID'] = 'cse_T'
     cases = [
@@ -294,6 +309,8 @@ def selftest():
         ('вузловий файл (згадують 6 описів) → ⓘ, не ⚠ на кожен', mk(good, {**{f'lens/H{i}.md': 'див. `tools/run_me.sh`\n' for i in range(6)}}, code_after=True), 'вузлові файли'),
         ('id черги в самері 3 сесій без брифу → ⚠ «кандидат у бриф»', mk(good, {'lens/P_CHERGA.md': '## Відкрите\n| `PX-1` | довгий пункт | 01.10 | x |\n', 'sessions/P_session_summary_A.md': '§1 PX-1 зроблено частину', 'sessions/P_session_summary_B.md': '§1 PX-1 ще частина', 'sessions/P_session_summary_C.md': '§1 PX-1 і знову'}), 'кандидат у бриф'),
         ('старе й нове в одному коміті → бере пізніше створене', mk(good, {'sessions/P_session_summary_Y.md': '## §0 В\n- `lens/A.md`\n'}, new_after=True, both=True), 'P_session_summary_Y'),
+        ('не-Lens: самері в docs/summary/ (P_SUMMARY_…) → тиша', mk_nl(good_nl), None),
+        ('не-Lens: самері без стартового → ✗', mk_nl(good_nl.split('## §6')[0]), 'стартове повідомлення нема'),
     ]
     bad = 0
     for name, r, want in cases:

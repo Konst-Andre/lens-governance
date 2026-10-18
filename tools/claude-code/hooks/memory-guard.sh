@@ -5,7 +5,7 @@
 # (git commit / gh_commit / push_files / create_or_update_file) → {"decision":"block"} з причиною: агент продовжує й записує або пояснює, чому нічого.
 # Один раз на хід: stop_hook_active = true (агент уже продовжує через гачок) → тиша. Помилка розбору → тиша (гачок не ламає роботу).
 # Формат — code.claude.com/docs/en/hooks «Stop» (stop_hook_active, transcript_path; decision/reason), 08.10.2026.
-# Зуби: bash memory-guard.sh selftest — 9 випадків (рішення без коміту → block; з комітом · без рішень · повтор · «так» усередині слова · сповіщення системи → тиша;
+# Зуби: bash memory-guard.sh selftest — 11 випадків (рішення без коміту → block; з комітом · без рішень · повтор · «так» усередині слова · сповіщення системи → тиша;
 # примірка: варіант названо, рядок «примірка» → block · рядок уже «обрано» · «беру в роботу» → тиша).
 mode="${1:-stop}"
 [ "$mode" = selftest ] && HOOK_IN="{}" || HOOK_IN="$(cat)"
@@ -60,7 +60,8 @@ def verdict(d):
             return ("Гачок пам'яті (примірка, SHOTS.md §5): Konst назвав варіант «" + pick.group(1) + "», а примірка досі чекає вибору: " + '; '.join(pend[:3]) + ". "
                     "У цьому ж ході: рядок → стан «обрано», вибір і **чому словами Konst**, куди йде код, дата — тоді коміт. "
                     "Якщо Konst назвав варіант не цієї примірки чи ще думає — одним рядком поясни це й заверши хід.")
-    cues = sorted({m.group(1).lower() for m in CUE.finditer(u)})
+    # слово в «…» (до 40 знаків) — згадка терміна, не рішення: «цикл: план → «так» Konst → код» (хибне S90 AE 18.10, стартове повідомлення)
+    cues = sorted({m.group(1).lower() for m in CUE.finditer(re.sub(r"«[^»\n]{0,40}»", " ", u))})
     if not cues: return None
     for x in L[idx[-1] + 1:]:
         if x.get('type') != 'assistant': continue
@@ -84,6 +85,8 @@ def selftest():
              ('без слів-рішень → тиша', [U('Що там зі збіркою?'), A('ls'), R], False, False),
              ('повтор (stop_hook_active) → тиша', [U('Так, згоден'), A('ls'), R], True, False),
              ('«так» усередині слова не рахується → тиша', [U('Таким чином дивлюсь'), A('ls')], False, False),
+             ('«так» у лапках — згадка терміна → тиша', [U('Цикл: план → мікроскоп → «так» Konst → код. Прод — лише з «так» на крок.'), A('ls'), R], False, False),
+             ('рішення поза лапками поруч із терміном у лапках → block', [U('Так, кажу тобі «так»'), A('ls'), R], False, True),
              ('сповіщення системи не є повідомленням Konst → тиша', [U('Так'), A('git commit -m a'), R, U('<task-notification>done</task-notification>')], False, False),
              ('примірка: Konst обрав В, рядок ще «примірка» → block', [U('Обираю В, чіпи у вставці'), A('git commit -m a'), R], False, True),
              ('примірка: рядок уже «обрано» → тиша', [U('Обираю В'), A('git commit -m a'), R], False, False),

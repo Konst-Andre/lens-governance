@@ -22,7 +22,7 @@ def repos(roots):
     for root in roots:
         for d in sorted(glob.glob(os.path.join(root, '*', '.git'))):
             r = os.path.dirname(d)
-            if os.path.isdir(os.path.join(r, 'sessions')): out.append(r)
+            if any(os.path.isdir(os.path.join(r, s)) for s in ('sessions', 'docs/summary')): out.append(r)   # Lens · не-Lens каркас (S90 AE)
     return out
 
 def heads(rs):
