@@ -110,6 +110,7 @@ elif mode == "stand":
     if any(re.search(r"(stand|stend|bench|harness|compar|стенд|компер)", f, re.I) for f in names if re.search(r"\.html?$", f, re.I)):
         open(seen, "w").close()
         say("PreToolUse", "Стенди, харнеси й компери Lens описує маніфест ядра lens-governance:kernel/Lens_stagebench_manifest.md (буфер — lens-governance:kernel/Lens_stagebench_delta_running.md); "
-            "у цій сесії його ще не відкривали (lens-governance:CLAUDE.md «Звідки брати»: «будую чи правлю стенд, харнес, компер, важелі»).")
+            "у цій сесії його ще не відкривали (lens-governance:CLAUDE.md «Звідки брати»: «будую чи правлю стенд, харнес, компер, важелі»). "
+            "Перед посиланням Konst (push у sandbox) стенд звіряють з розділом маніфесту «Перед видачею» — з доказом кожного пункту.")
 ' "$mode"
 exit 0
