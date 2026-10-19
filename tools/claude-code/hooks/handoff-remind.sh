@@ -1,6 +1,6 @@
 #!/bin/bash
 # живе доки: сесії переїжджають у нові чати, а пам'ять — лише репо (профіль Konst «САМЕРІ»).
-# Дім — lens-governance:tools/claude-code/hooks/ (HOOK-3.2, бриф — kernel/Lens_kernel_BRIEFS.md §HOOK-3.2; «так» Konst 09.10.2026).
+# Дім — lens-governance:tools/claude-code/hooks/ (HOOK-3.2, бриф — archive/summaries/Lens_gov/Lens_kernel_BRIEF_HOOK-3.2_closed.md; «так» Konst 09.10.2026).
 # Подія UserPromptSubmit: у повідомленні Konst — «переїжджаємо» · «переїзд» · «нова сесія» · «стартове повідомлення» →
 # tools/claude-code/handoff_check.py на кожне репо сесії (/home/user/*, де є sessions/) → additionalContext: рядки ✓/⚠/✗ + чек-лист
 # «очима нового агента». Повідомлення Konst не блокує. Тиша: перше повідомлення сесії (стартове саме містить «переїзд» — переїжджати

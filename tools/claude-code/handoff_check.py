@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # живе доки: пам'ять сесії — лише репо, і сесії переїжджають у нові чати (профіль Konst «САМЕРІ»).
-# Перевірка пам'яті перед переїздом (HOOK-3.2, бриф — kernel/Lens_kernel_BRIEFS.md §HOOK-3.2; «так» Konst 09.10.2026, QR-Lens CC-5).
+# Перевірка пам'яті перед переїздом (HOOK-3.2, бриф — archive/summaries/Lens_gov/Lens_kernel_BRIEF_HOOK-3.2_closed.md; «так» Konst 09.10.2026, QR-Lens CC-5).
 # Ловить машинно те, що новий агент не зможе знайти чи зрозуміти: самері без §0 / стартового, самері відстає від комітів,
 # мертві й голі шляхи в §0 · стартовому · «Коротко» плану, історія в §0, гейт черги, README старіший за правила.
 # Якість тексту НЕ судить — це робить агент за чек-листом гачка hooks/handoff-remind.sh.
@@ -190,7 +190,7 @@ def check_repo(repo, now=None):
         if cand: L.append(('⚠', 'кандидат у бриф — пункт тягнеться ≥ 3 сесії, а брифу нема: ' + ' · '.join(cand[:5]) + ' → tools/claude-code/templates/BRIEF_template.md (з прополкою джерел) або рядок «чому не треба»'))
     # (9) бриф за шаблоном і свіжий (BRIEF-2, «так» Konst 19.10.2026, AE S93): бриф AE-PORT народився повз шаблон, а (3) мовчки пропускав
     #     бриф без «Коротко» — відсутність стандарту виглядала як «усе гаразд». Тепер: живий бриф без §0 «Коротко» зі Стан · Далі · Чекає — ✗
-    #     (`kernel/Lens_kernel_BRIEFS.md` — ⚠, доки його не зведено до шаблону); свіжість — після останньої правки брифу є коміти, що змінили
+    #     (і в `kernel/`: до 19.10 там був виняток ⚠ для спільного файла брифів — розпилено, AE S94); свіжість — після останньої правки брифу є коміти, що змінили
     #     не лише .md, — ⚠ «відстає на N» (світ: stale-cli, Doc Drift Detector — історія git документа ⟂ коду, 19.10.2026; нагадування на коміт —
     #     hooks/brief-guard.sh). Сліпа пляма (та сама у світі): будь-яка правка брифу робить його «свіжим», навіть не в «Коротко».
     for p in sorted(glob.glob(os.path.join(repo, '**', '*.md'), recursive=True)):
@@ -198,7 +198,7 @@ def check_repo(repo, now=None):
         if not re.search(r'(^|/)briefs/[^/]+\.md$|_brief\.md$|BRIEF[^/]*\.md$', rel) or rel.startswith('archive/') or '/archive/' in rel or 'templates/' in rel: continue
         k = section(open(p, encoding='utf-8', errors='replace').read(), r'Коротко')
         if k is None or not all(re.search(w, k) for w in ('Стан', 'Далі', 'Чекає')):
-            L.append(('⚠' if rel.startswith('kernel/') else '✗', f'бриф {rel} не за шаблоном: нема §0 «Коротко» зі Стан · Далі · Чекає → tools/claude-code/templates/BRIEF_template.md')); continue
+            L.append(('✗', f'бриф {rel} не за шаблоном: нема §0 «Коротко» зі Стан · Далі · Чекає → tools/claude-code/templates/BRIEF_template.md')); continue
         last = git(repo, 'log', '-1', '--format=%H', '--', rel)
         if last:
             n = sum(1 for c in git(repo, 'log', '--format=%H', f'{last}..HEAD').split() if any(f and not f.endswith('.md') for f in git(repo, 'show', '--name-only', '--format=', c).split('\n')))
@@ -310,7 +310,7 @@ def selftest():
         open(os.path.join(r, 'CLAUDE.md'), 'w').write('x')
         later = extra if new_after else {}
         for p, t in (extra or {}).items():
-            if p not in later: open(os.path.join(r, p), 'w').write(t)
+            if p not in later: os.makedirs(os.path.dirname(os.path.join(r, p)), exist_ok=True); open(os.path.join(r, p), 'w').write(t)
         open(os.path.join(r, 'sessions/P_session_summary_X.md'), 'w').write(summary)
         sh(r, 'git', 'add', '-A'); sh(r, 'git', 'commit', '-qm', 'самері\n\nClaude-Session: https://claude.ai/code/session_' + ('OLD' if code_after else 'T'))   # опис — від попередньої сесії
         if later:
@@ -355,13 +355,15 @@ def selftest():
         ('старе й нове в одному коміті → бере пізніше створене', mk(good, {'sessions/P_session_summary_Y.md': '## §0 В\n- `lens/A.md`\n'}, new_after=True, both=True), 'P_session_summary_Y'),
         ('не-Lens: самері в docs/summary/ (P_SUMMARY_…) → тиша', mk_nl(good_nl), None),
         ('бриф без «§0 Коротко» → ✗ «не за шаблоном» (BRIEF-2)', mk(good, {'lens/X_brief.md': '# X\n## §0 Курс\n- щось\n'}), 'не за шаблоном'),
+        ('бриф ядра без «§0 Коротко» → ✗, винятку kernel/ нема (BRIEF-2 крок 4)', mk(good, {'kernel/Lens_X_brief.md': '# X\n## §1 Навіщо\n'}), '✗:не за шаблоном'),
         ('бриф за шаблоном, код після нього → ⚠ «відстає» (BRIEF-2)', mk(good, {'lens/X_brief.md': '# X\n## §0 Коротко\n- **Стан:** a\n- **Далі:** b\n- **Чекає Konst:** c\n'}, code_after=True), 'відстає'),
         ('не-Lens: самері без стартового → ✗', mk_nl(good_nl.split('## §6')[0]), 'стартове повідомлення нема'),
     ]
     bad = 0
     for name, r, want in cases:
         _, L = check_repo(r)
-        hit = [t for s, t in L if s in '✗⚠']
+        strict = bool(want) and want.startswith('✗:'); want = want[2:] if strict else want   # «✗:…» — лише ✗, ⚠ не зараховується
+        hit = [t for s, t in L if s in ('✗' if strict else '✗⚠')]
         ok = (not hit) if want is None else not any(want[1:] in t for t in hit) if want.startswith('!') else any(want in t for t in (hit if 'summary' not in want and 'вузлові' not in want else [t for _, t in L])) and not ('вузлові' in want and any('описи, що згадують' in t for t in hit))
         if want is None and not ok: print('   ', hit)
         print(('✓' if ok else '✗') + ' ' + name); bad += not ok

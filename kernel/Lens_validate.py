@@ -1155,7 +1155,7 @@ def g17(root, qpath):
              f'({" ".join(old)}) — спершу виконати, розрізати або відкласти з датою (CQ-1)')
     else:
         ok(f'відкритих {len(q)} (стеля {Q_MAX}), старших за {Q_AGE} дн. нема')
-    q_long(txt)   # (ґ) рядок > Q_ROW → бриф (BRIEF-1 (в); ARCH-1 і BRIEF-1 винесено в kernel/Lens_kernel_BRIEFS.md 09.10)
+    q_long(txt)   # (ґ) рядок > Q_ROW → бриф (BRIEF-1 (в); брифи ядра — kernel/Lens_<id>_brief.md, з 19.10)
     ids = _q_ids(txt)
     dup = sorted({i for i in ids if ids.count(i) > 1})
     for d in dup:
