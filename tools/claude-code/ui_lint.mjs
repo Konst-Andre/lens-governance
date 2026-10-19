@@ -2,7 +2,7 @@
 // ui_lint — машинна частина огляду UI: те, що видно програмі, ловить програма, а не Konst («капсула прилипла», «текст обрізаний», «іконка вище»).
 // Очі агента лишаються: машина бачить ~третину вад (розвідка 10.10: axe/WCAG-огляди), решта — чек-лист воріт ui-review-gate.
 //
-// Запуск:  node ui_lint.mjs <url|файл.html> [--state "<js>"]… [--repo <тека>] [--width 390] [--height 844] [--json] [--baseline <файл>]   (низький екран Safari: --width 375 --height 634)
+// Запуск:  node ui_lint.mjs <url|файл.html> [--state "<js>"]… [--scope <корінь острова>] [--repo <тека>] [--width 390] [--height 844] [--json] [--baseline <файл>]   (низький екран Safari: --width 375 --height 634)
 //          кожен --state — окремий стан (JS виконується на сторінці; між станами сторінка перезавантажується); без --state — лише початковий.
 //          --state — ВИРАЗ, не модуль: `await` верхнього рівня → ✗ «JS стану впав»; чекати — `new Promise(r=>setTimeout(()=>{…;r()},1800))` (QR CC-13, 15.10.2026: шіт відкривається з затримкою).
 //          Обидві теми (prefers-color-scheme light/dark) завжди. --repo: ✗ 0 → позначка для воріт (той самий хеш диффу, що в ui-review-gate).
@@ -10,6 +10,7 @@
 //          node ui_lint.mjs selftest — зуби: сторінка з підкинутими вадами (кожна мусить дати свій рядок) і чиста (0).
 // Перевірки: 1 скрол убік · 2 обрізано · 3 прилипло / вилазить · 4 контраст (4-б — на градієнті пікселем знімка) · 5 шрифт · 6 тап, без назви, iOS-зум · 7 накладання · 8 ряд · 9 текст (сміття, жаргон) ·
 // 10 дія в прокрутці · 11 кнопки ряду · 12 сирота · 13 злито · 14 однакові заголовки · 15 дата й час · 16 зливається (16-б край кнопки) · 17 паритет тем · 18 кромка · 19 картка-список · 20 вкладена прокрутка · 21 шапка в прокрутці · 22 емодзі в кнопці · 23 нативне вікно · 24 фон у рамці · 25 кант рветься · 26 поле губиться; поза probe — натискання (:active / JS pointerdown, touchstart).
+// 27 плашка в тон тла · 28 панелі зливаються · 29 список-таблиця · 30 чуже правило (--scope <корінь острова>) — AE S93, 19.10.2026.
 // Звідки кожна (пропуск Konst, QR CC-N, рецепт кукбуку) — коментар біля неї.
 // Вивід: ✗ (ворота не пустять) · ⚠ (подивись очима) · ⓘ (не виміряно); exit 1 на ✗.
 // Пороги: контраст 4,5:1 (великий текст 3:1) — WCAG 2.x AA · ціль тапу 24 px ✗ (WCAG 2.2 2.5.8) / 44 px ⚠ (Apple HIG) · поле вводу < 16 px — iOS Safari збільшує сторінку ·
@@ -221,6 +222,36 @@ function probe() {
   for (const p of new Set(all.map(e => e.parentElement))) { if (!p) continue;
     const g = {}; for (const k of p.children) if (all.includes(k)) { const h = k.querySelector('b, strong, h1, h2, h3, h4'); if (h && h.textContent.trim()) (g[k.tagName + '.' + k.className + '|' + h.textContent.trim()] ||= []).push(k); }
     for (const [key, ks] of Object.entries(g)) if (ks.length >= 3) add('⚠', 'однакові заголовки', ks[0], `${ks.length} рядки з однаковим заголовком «${key.split('|')[1].slice(0, 30)}» — у заголовок те, чим рядки відрізняються`); }
+  // ── міра відтінку: CIELAB (D65). Яскравість WCAG тону не бачить: жовте на кремовому 1,06:1 ⟂ на білому 1,07:1 — однаково, а око бачить різне (AE S93, ΔE 16,6 ⟂ 20,7)
+  const lab = ([r, g, b]) => { const f = x => { x /= 255; return x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; }; const R = f(r), G = f(g), B = f(b);
+    const X = (0.4124 * R + 0.3576 * G + 0.1805 * B) / 0.95047, Y = 0.2126 * R + 0.7152 * G + 0.0722 * B, Z = (0.0193 * R + 0.1192 * G + 0.9505 * B) / 1.08883;
+    const t = v => v > 0.008856 ? Math.cbrt(v) : 7.787 * v + 16 / 116; return [116 * t(Y) - 16, 500 * (t(X) - t(Y)), 200 * (t(Y) - t(Z))]; };
+  const chroma = l => Math.hypot(l[1], l[2]), hueOf = l => (Math.atan2(l[2], l[1]) * 180 / Math.PI + 360) % 360, dE = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
+  // 27. плашка в тон тла (пропуск Konst AE S93, 19.10.2026: жовтий рядок товару на кремовому тлі «змазується по кольорах, по мітці», на білій картці — виділявся):
+  //     бліда кольорова заливка (хрома ≥ 8, ΔE до ґрунту 3–25) на ґрунті ТОГО САМОГО відтінку (хрома ґрунту ≥ 2,5, тон ближче 35°) — мітка кольором не працює. Кольорова мітка — на нейтральному ґрунті
+  //     (біла / сіра поверхня), або плашка іншого тону. Сама плашка без власної різниці з ґрунтом (ΔE < 3) — не плашка, пропуск.
+  { const seen = new Set();
+    for (const el of all) { const s = getComputedStyle(el), c = rgba(s.backgroundColor); if (!c || c[3] < 0.3 || s.backgroundImage !== 'none') continue;
+      const r = el.getBoundingClientRect(); if (r.width < 60 || r.height < 20 || r.height > 120) continue;   // > 120 px — поверхня, не плашка: тон одного відтінку різної глибини — задумана ієрархія (M3 surface container)
+      const ground = el.parentElement && flatBg(el.parentElement); if (!ground) continue;
+      const fl = lab(blend(c, ground)), gl = lab(ground), fc = chroma(fl), gc = chroma(gl); const de = dE(fl, gl); if (fc < 8 || gc < 2.5 || de < 3 || de >= 25) continue;   // ΔE ≥ 25 — насичена плашка (жовта кнопка на кремі ~70) видна й так; біда — бліда (рядок 16,6)
+      const dh = Math.abs(hueOf(fl) - hueOf(gl)), d = Math.min(dh, 360 - dh); if (d >= 35) continue;
+      const key = el.tagName + '.' + [...el.classList].sort().join('.'); if (seen.has(key)) continue; seen.add(key);
+      add('⚠', 'плашка в тон тла', el, `заливка (хрома ${fc.toFixed(0)}) на ґрунті того самого відтінку (хрома ${gc.toFixed(1)}, тон ближче ${d.toFixed(0)}°) — мітка кольором змазується; поклади на нейтральну поверхню (біла картка) або зміни тон плашки`); } }
+  // 28. панелі зливаються (пропуск Konst AE S93: рейка меню й список сценаріїв — одне тло, межа лише рискою; «все пласке, наче 2D»): дві сусідні високі панелі (≥ 50 % висоти вікна) впритул,
+  //     тло однакове (ΔE < 2), тіні нема — ієрархію тримає лише лінія. Поверхні розводять тоном (Material 3 surface container: тло → контейнер → вищий контейнер) чи тінню, не рискою.
+  { const tall = all.filter(e => { const r = e.getBoundingClientRect(); return r.height >= innerHeight * 0.5 && r.width >= 56 && r.width < innerWidth * 0.6; }), seen = new Set();
+    for (const a of tall) for (const b of tall) { if (a === b || a.contains(b) || b.contains(a)) continue; const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
+      if (Math.abs(rb.left - ra.right) > 2 || Math.min(ra.bottom, rb.bottom) - Math.max(ra.top, rb.top) < innerHeight * 0.4) continue;
+      const fa = flatBg(a), fb = flatBg(b); if (!fa || !fb) continue; const d = dE(lab(fa), lab(fb)); if (d >= 2) continue;
+      if (getComputedStyle(a).boxShadow !== 'none' || getComputedStyle(b).boxShadow !== 'none') continue;
+      const k = Math.round(ra.right); if (seen.has(k)) continue; seen.add(k);
+      add('⚠', 'панелі зливаються', a, `панель праворуч (${path(b)}) того самого тла (ΔE ${d.toFixed(1)}), тіні нема — межу тримає лише риска; дай поверхням різний тон чи тінь`); } }
+  // 29. список-таблиця (пропуск Konst AE S93: «купа рисок… щоб це не була наче таблиця»): ≥ 6 рядків одного батька, ≥ 80 % з нижньою лінією на всю ширину — список вибору читається
+  //     як таблиця. Для списку — лінія з відступом від тексту (inset) або проміжок + підсвітка рядка; суцільні лінії — для справжньої таблиці.
+  for (const p of new Set(all.map(e => e.parentElement))) { if (!p || p.tagName === 'TBODY' || p.tagName === 'TABLE') continue; const kids = [...p.children].filter(k => all.includes(k)); if (kids.length < 6) continue;
+    const pw = p.getBoundingClientRect().width, lined = kids.filter(k => { const s = getComputedStyle(k); return parseFloat(s.borderBottomWidth) >= 1 && s.borderBottomStyle !== 'none' && (rgba(s.borderBottomColor) || [0, 0, 0, 0])[3] > 0.1 && k.getBoundingClientRect().width >= pw - 2; });
+    if (lined.length >= 6 && lined.length >= kids.length * 0.8) add('⚠', 'список-таблиця', p, `${lined.length} рядків з лінією на всю ширину — список читається як таблиця; лінія з відступом від тексту (inset) або проміжок і підсвітка рядка`); }
   // 9. текст для людини: сміття з коду — ✗; жаргон — ⚠
   const txt = document.body.innerText;
   for (const bad of ['undefined', 'NaN', '[object', 'null']) if (new RegExp(`(^|[^\\w])${bad.replace('[', '\\[')}($|[^\\w])`).test(txt)) add('✗', 'текст', document.body, `на екрані «${bad}» — дані не підставились`);
@@ -228,6 +259,24 @@ function probe() {
   if (jar.length) add('⚠', 'текст', document.body, `технічні слова в тексті для людини: ${[...new Set(jar)].slice(0, 6).join(', ')} — простіше можна?`);
   return out;
 }
+
+// 30. чуже правило (лише з --scope <селектор кореня острова>; пропуск Konst AE S93: прес, червона пляма, список на 11 рядків, поля по боках — одна причина: правила тренажера
+//     з тими самими іменами класів доходили до редактора-острова). @scope / префікс не рятують ЗОВНІ ВСЕРЕДИНУ (глобальне правило однаково досягає — blog.openreplay.com
+//     «native css scope», 2026), тому — замір: правило, чий селектор не згадує корінь острова, але влучає в його елементи й ставить коробку (відступи, розмір, рамка, прокрутка,
+//     положення, курсор, трансформація, тло). Базові скидання (лише теги / *) — пропуск. ⚠ — ліки: префікс у чужого правила (його екран) або перекриття в острові.
+function leaks(scope) {
+  const roots = [...document.querySelectorAll(scope)]; if (!roots.length) return [{ lvl: '⚠', kind: 'чуже правило', where: scope, msg: `корінь острова «${scope}» не знайдено — перевірку витоків не виміряно` }];
+  const els = roots.flatMap(r => [r, ...r.querySelectorAll('*')]), tok = scope.replace(/^[.#]/, ''), out = [], seen = new Set();
+  const BOX = /^(padding|margin|width|height|min-|max-|border(?!-collapse)|overflow|position|top|right|bottom|left|inset|display|transform|cursor|background|box-shadow|grid|flex|gap|z-index|outline)/;
+  const walk = list => { for (const r of list) { if (r.cssRules && !r.selectorText) { walk(r.cssRules); continue; } if (!r.selectorText || r.selectorText.includes(tok)) continue;
+    const props = [...r.style].filter(x => BOX.test(x)); if (!props.length) continue;
+    for (const sel of r.selectorText.split(',').map(x => x.trim())) { if (!/[.#\[]/.test(sel.replace(/:[a-z-]+(\([^)]*\))?/g, ''))) continue;   // лише теги / * — скидання
+      let n = 0; try { n = els.filter(e => e.matches(sel)).length; } catch { continue; } if (!n || seen.has(sel)) continue; seen.add(sel);
+      out.push({ lvl: '⚠', kind: 'чуже правило', where: sel, msg: `правило поза «${scope}» влучає в ${n} ел. острова: ${[...new Set(props.map(x => x.replace(/-(top|right|bottom|left|block|inline).*$/, '')))].slice(0, 5).join(', ')} — префікс у чужого правила або перекриття в острові` }); } } };
+  for (const sh of document.styleSheets) { let rs; try { rs = sh.cssRules; } catch { continue; } walk(rs); }
+  return out;
+}
+let SCOPE = '';   // --scope
 
 const SELF = `<!doctype html><html><head><meta name=viewport content="width=device-width,initial-scale=1"><style>
 body{margin:0;font:15px/1.4 sans-serif;background:#fff;color:#111}@media(prefers-color-scheme:dark){body{background:#111;color:#eee}}
@@ -267,6 +316,10 @@ const DEFECTS = {
   'кант рветься': `<div class=card><button style="min-height:48px;width:160px;border:1px solid;border-color:rgba(255,255,255,.5) rgba(255,255,255,.2) #000;border-radius:14px;background:#888">Закрити</button></div>`,   // QR CC-15: «коло, обрізане знизу»
   'поле губиться': `<div style="background:#0a0e14;padding:16px"><div style="background:#161c25;border:1px solid transparent;border-radius:10px;padding:8px"><input style="background:none;border:0;font-size:16px;color:#ccc;min-height:44px" value="пошук"></div></div>`,   // QR CC-15: поле без кільця на майже чорному
   'натискання': `<div class=card><a href="#x" style="display:inline-block;padding:14px 18px">Відкрити звіт</a></div>`,
+  'плашка в тон тла': `<div style="background:#FFFEF6;padding:16px"><div style="background:#FFF8D0;padding:10px;width:220px">Нурофен форте №12</div></div>`,   // AE S93: жовтий рядок на кремовому
+  'панелі зливаються': `<div style="display:flex;height:100vh"><nav style="width:72px;background:#fff;border-right:1px solid #e7e7e7"></nav><section style="width:200px;background:#fff">Сценарії</section></div>`,   // AE S93: рейка й список
+  'список-таблиця': `<div class=card><div>${Array.from({length: 7}, (_, i) => `<div style="padding:10px 0;border-bottom:1px solid #ccc">Сценарій ${i}</div>`).join('')}</div></div>`,   // AE S93: «купа рисок»
+  'чуже правило': `<style>.err{padding:10px 14px;border:1px solid #c00}</style><div class=isl><span class="dot err" style="display:inline-block;width:8px;height:8px;background:#c00"></span></div>`,   // AE S93: .err тренажера → крапка редактора; selftest з --scope .isl
 };
 
 // 4-б. контраст на градієнті — пікселем (пропуск Konst QR CC-17, 18.10.2026: підвал героблока 2,55 / 2,97, а ui_lint писав «не виміряно»;
@@ -310,6 +363,7 @@ async function lint(target, states, width, theme, browser) {
       if (m < f.need - 0.15) { f.lvl = '✗'; f.msg = `контраст ${m.toFixed(2)}:1 < ${f.need}:1 — погано читається (фон — градієнт, заміряно пікселем)`; }
       else if (m < f.need) { f.lvl = '⚠'; f.msg = `контраст ${m.toFixed(2)}:1 — на межі ${f.need}:1 (фон — градієнт, пікселем ± 0,15) — глянь очима`; } else f.lvl = 'ok'; } }
     for (const f of found.filter(f => f.lvl !== 'ok')) { delete f.rect; delete f.fg; delete f.need; res.push({ ...f, state: st ? `стан ${i}` : 'початковий' }); }
+    if (SCOPE) for (const f of await p.evaluate(leaks, SCOPE)) res.push({ ...f, state: st ? `стан ${i}` : 'початковий' });   // 30. чуже правило
     // натискання: притиснути, виміряти, відпустити ПОЗА елементом (клік не спрацює). Однаковий вигляд → ⚠ «нема відгуку» (Konst 10.10: анімація пресу)
     const sig = await p.evaluate(() => { const seen = new Set(), out = [];
       for (const e of document.querySelectorAll('a[href],button,[role=button],summary,label[for]')) { const s = getComputedStyle(e); if (s.display === 'none' || !e.getClientRects().length) continue; e.scrollIntoView({ block: 'center', behavior: 'instant' }); const r = e.getBoundingClientRect();
@@ -368,13 +422,13 @@ if (a[0] === 'selftest') {
   const page = (x, n) => { const f = join(d, n + '.html'); writeFileSync(f, SELF.replace('BAD', x)); return 'file://' + f; };
   const clean = await run(page('', 'clean'), [], 390); const cl = [...clean.light, ...clean.dark].filter(x => x.lvl !== 'ⓘ');
   console.log((cl.length ? '✗' : '✓') + ` чиста сторінка → тиша (${cl.length ? cl.map(x => x.kind + ': ' + x.msg).join(' | ') : '0'})`); bad += !!cl.length;
-  for (const [k, html] of Object.entries(DEFECTS)) { const r = await run(page(html, k), [], 390); const hit = [...r.light, ...r.dark].some(x => x.kind === k.trim() && x.lvl !== 'ⓘ');
+  for (const [k, html] of Object.entries(DEFECTS)) { SCOPE = k === 'чуже правило' ? '.isl' : ''; const r = await run(page(html, k), [], 390); const hit = [...r.light, ...r.dark].some(x => x.kind === k.trim() && x.lvl !== 'ⓘ');
     console.log((hit ? '✓' : '✗') + ` підкинуто «${k}» → спіймано`); bad += !hit; }
   console.log(`─── ui_lint selftest: ${Object.keys(DEFECTS).length + 1 - bad}/${Object.keys(DEFECTS).length + 1} ───`); process.exit(bad ? 1 : 0);
 }
 if (!a[0]) { console.log('node ui_lint.mjs <url|файл> [--state "<js>"]… [--repo <тека>] [--width 390] [--height 844] [--json] | selftest'); process.exit(2); }
 let target = a[0]; if (!/^\w+:\/\//.test(target)) target = 'file://' + resolve(target);
-const states = [], opt = {}; for (let i = 1; i < a.length; i++) { if (a[i] === '--state') states.push(a[++i]); else if (a[i] === '--repo') opt.repo = a[++i]; else if (a[i] === '--width') opt.width = +a[++i]; else if (a[i] === '--height') HEIGHT = +a[++i]; else if (a[i] === '--json') opt.json = true; else if (a[i] === '--baseline') opt.base = a[++i]; }
+const states = [], opt = {}; for (let i = 1; i < a.length; i++) { if (a[i] === '--state') states.push(a[++i]); else if (a[i] === '--repo') opt.repo = a[++i]; else if (a[i] === '--width') opt.width = +a[++i]; else if (a[i] === '--height') HEIGHT = +a[++i]; else if (a[i] === '--scope') SCOPE = a[++i]; else if (a[i] === '--json') opt.json = true; else if (a[i] === '--baseline') opt.base = a[++i]; }
 const r = await run(target, states, opt.width || 390);
 const acc = []; const af = opt.repo && join(resolve(opt.repo), '.ui-lint-accept');
 if (af && existsSync(af)) for (const l of (await import('node:fs')).readFileSync(af, 'utf8').split('\n')) { const [k, w, why] = l.split('|').map(x => (x || '').trim()); if (k && w && !k.startsWith('#')) acc.push({ k, w, why }); }
