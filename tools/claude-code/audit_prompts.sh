@@ -23,15 +23,24 @@ case "$cls" in 1) models="opus";; 2) models="opus sonnet";; *) echo "перши�
 [ $# -ge 1 ] || { echo "вкажіть файл(и)"; exit 2; }
 for f in "$@"; do [ -f "$f" ] || { echo "нема файла: $f"; exit 2; }; done
 OUT="${AUDIT_OUT:-/tmp/audit}"; mkdir -p "$OUT"
-# AUDIT_WORLD=1 — аудит зі світом і з руками (AUD-5, проба AE S94): лише читання (Read · Grep · Glob · git log/blame/show · grep · ls · wc) + WebSearch · WebFetch,
-# решта — тиха відмова (dontAsk), стеля витрат на прохід, правила — templates/AUDIT_world_prompt.md; після проходу — машинна перевірка доказів `файл:рядок`.
-# Чому: прогони S94 — без мережі й з 3–5 відмовами shell на прохід (permission_denials); практика 2026 — знахідка з доказом + детермінована перевірка доказу.
+# Аудит зі світом і з руками — типовий з 19.10.2026 (AUD-5, A/B AE S94 на AE CLAUDE.md, opus high: старий $1.47 — 0 знахідок, 2 докази, 0 джерел;
+# зі світом $1.56 — 4 знахідки (хибних 0), 15 доказів `файл:рядок`, 8 зовнішніх тверджень звірено з документацією). Аудитор: лише читання
+# (Read · Grep · Glob · git log/blame/show/ls-files/diff · grep · ls · wc) + WebSearch · WebFetch; решта — тиха відмова (dontAsk); стеля $ на прохід;
+# ядро поруч — доступ на читання (--add-dir); правила — lens-governance:tools/claude-code/templates/AUDIT_world_prompt.md. AUDIT_WORLD=0 — старий режим.
+# Після проходу — машинна перевірка доказів `файл:рядок` (практика 2026: знахідка з доказом + детермінована перевірка доказу).
 world=()
-if [ -n "${AUDIT_WORLD:-}" ]; then
-  wp="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/templates/AUDIT_world_prompt.md"
-  world=(--tools "Read,Grep,Glob,Bash,WebSearch,WebFetch" --permission-mode dontAsk --max-budget-usd "${AUDIT_BUDGET:-4}"
-         --allowedTools "Read" "Grep" "Glob" "WebSearch" "WebFetch" "Bash(git log:*)" "Bash(git blame:*)" "Bash(git show:*)" "Bash(grep:*)" "Bash(ls:*)" "Bash(wc:*)"
-         --append-system-prompt "$(cat "$wp")")
+if [ "${AUDIT_WORLD:-1}" != 0 ]; then
+  sd="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  wp=$(for c in "$sd/templates" "$sd/../../lens-governance/tools/claude-code/templates" "$PWD/../lens-governance/tools/claude-code/templates" /tmp/lens-governance/tools/claude-code/templates; do
+         [ -f "$c/AUDIT_world_prompt.md" ] && { echo "$c/AUDIT_world_prompt.md"; break; }; done)
+  if [ -z "$wp" ]; then echo "⚠ правил аудитора (AUDIT_world_prompt.md) не знайдено — ядро не поруч; аудит у старому режимі"
+  else
+    kd="$(cd "$(dirname "$wp")/../../.." && pwd)"
+    world=(--tools "Read,Grep,Glob,Bash,WebSearch,WebFetch" --permission-mode dontAsk --max-budget-usd "${AUDIT_BUDGET:-4}"
+           --allowedTools "Read" "Grep" "Glob" "WebSearch" "WebFetch" "Bash(git log:*)" "Bash(git blame:*)" "Bash(git show:*)" "Bash(git ls-files:*)" "Bash(git diff:*)" "Bash(grep:*)" "Bash(ls:*)" "Bash(wc:*)"
+           --append-system-prompt "$(cat "$wp")")
+    [ "$kd" != "$(pwd -P)" ] && world+=(--add-dir "$kd")
+  fi
 fi
 total=0
 for f in "$@"; do
