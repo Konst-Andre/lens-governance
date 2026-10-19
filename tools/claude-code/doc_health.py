@@ -3,8 +3,10 @@
 """Здоров'я документів — скільки коштує їх ЧИТАТИ в Claude Code (не цілісність канону: її тримає гейт kernel/Lens_validate.py).
 Мірки (замінили G6 «120 / 200 КБ» Project-епохи, взяті без заміру):
   M1 щосесійне — CLAUDE.md кореня і профіль (tools/claude-code/PROFILE.md) ≤ 200 рядків (code.claude.com/docs/en/memory, 10.10.2026)
-  M2 старт цілком — черга (*_CHERGA.md) і живі самері (sessions/*summary*.md) ≤ 25 КБ           (число агента — звірити на 2–3 сесіях)
-  M3 розділ (# / ## / ###) ≤ 16 КБ ≈ 5 тис. токенів — точкове читання платить за розділ               (число агента — звірити на 2–3 сесіях)
+  M2 старт цілком — черга (*_CHERGA.md), живі самері (sessions/*summary*.md) і найновіше самері не-Lens (docs/summary/) ≤ 25 КБ
+  M3 розділ (# / ## / ###) ≤ 16 КБ ≈ 5 тис. токенів — точкове читання платить за розділ
+     (M2 · M3 — числа агента 10.10; звірено 10–18.10: 8+ сесій QR · AE · ядра, точність doc_health 84 % — журнал гачків §0;
+     ліміт Read CLI 25 тис. токенів, застосунок ПК — 10 тис.: github.com/anthropics/claude-code/issues/40357, 19.10.2026 — звіт користувачів)
   M4 файл > 80 КБ — лише з «читається коли» в шапці: одним Read його не взяти (ліміт 25 тис. токенів ≈ 80–100 КБ укр. тексту, замір 10.10)
   M5 мертві шляхи — `шлях/зі/слешем.розш` у живому .md, якого нема в репо (ні від кореня, ні від теки документа, ні як хвіст
      наявного шляху: `data/x.json` = `site/data/x.json`). Не перевіряє: історію (archive/ · sessions/ · summary/ · journal/ · DECISIONS ·
@@ -30,6 +32,8 @@ def files(root):
 
 def scan(root):
     found = []   # (мірка, файл, що)
+    nl = sorted(f for f in files(root) if f.startswith('docs/summary/') and f.endswith('.md'))
+    newest_nl = max(nl, key=lambda f: (re.findall(r'\d{4}-\d{2}-\d{2}', f) or [''])[0] + (re.findall(r'_s(\d+)\.md$', f) or ['0'])[0].zfill(3)) if nl else None
     for f in files(root):
         p = os.path.join(root, f)
         if not os.path.isfile(p): continue
@@ -37,7 +41,7 @@ def scan(root):
         if f in ('CLAUDE.md', 'tools/claude-code/PROFILE.md'):
             n = txt.count('\n') + 1
             if n > M1_LINES: found.append(('M1', f, f'{n} рядків > {M1_LINES}'))
-        whole = f in ('CLAUDE.md', 'tools/claude-code/PROFILE.md') or bool(re.search(r'_CHERGA\.md$', f)) or (f.startswith('sessions/') and 'summary' in f)
+        whole = f in ('CLAUDE.md', 'tools/claude-code/PROFILE.md') or bool(re.search(r'_CHERGA\.md$', f)) or (f.startswith('sessions/') and 'summary' in f) or f == newest_nl   # не-Lens: лише найновіше самері читається на старті (AE S91)
         if whole and f not in ('CLAUDE.md', 'tools/claude-code/PROFILE.md') and kb > M2_KB:
             found.append(('M2', f, f'{kb:.0f} КБ > {M2_KB} — читається цілком на старті'))
         if whole: continue   # читається цілком за задумом — розмір розділу не важить, стережуть M1/M2 (перший прогін 10.10: профіль і черга — 2 хибних M3)
@@ -130,6 +134,8 @@ def selftest():
              ('## з двома ### по 10 КБ → ✓ (точково береться ###)', {'lens/D.md': '## Великий\n' + sec(1) + '### А\n' + 'х' * 5120 + '\n### Б\n' + 'х' * 5120 + '\n'}, '✓', ''),
              ('профіль 18 КБ одним розділом (читається цілком) → ✓, не M3', {'tools/claude-code/PROFILE.md': sec(18)}, '✓', ''),
              ('архів не рахується → ✓', {'archive/X_CHERGA.md': sec(40)}, '✓', ''),
+             ('не-Lens: найновіше самері 30 КБ → ⚠ M2', {'docs/summary/P_SUMMARY_2026-10-01.md': sec(3), 'docs/summary/P_SUMMARY_2026-10-18_s2.md': sec(30)}, '⚠', 'файли старту завеликі 1'),
+             ('не-Lens: старе самері 30 КБ, найновіше мале → ✓', {'docs/summary/P_SUMMARY_2026-10-01.md': sec(10) * 3, 'docs/summary/P_SUMMARY_2026-10-18_s2.md': sec(3)}, '✓', ''),
              ('архів ротації journal/ не рахується → ✓', {'tools/claude-code/hooks/journal/HOOK_JOURNAL_2026-10.md': sec(40)}, '✓', ''),
              ('M5: мертвий шлях у живому .md → ⚠', {'README.md': 'див. `tools/gone_v1.py`\n'}, '⚠', 'мертвих шляхів 1'),
              ('M5: хвіст наявного шляху (`data/x.json` = `site/data/x.json`) → ✓', {'site/data/x.json': '{}', 'README.md': 'дані — `data/x.json`\n'}, '✓', ''),
