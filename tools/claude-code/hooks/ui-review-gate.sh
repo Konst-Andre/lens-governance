@@ -6,7 +6,7 @@
 #           огляду САМЕ ЦЬОГО диффу нема → deny з чек-листом. Будь-яка нова правка UI після позначки міняє дифф → знову deny.
 #   done  — `bash ui-review-gate.sh done "<що переглянуто>" [тека репо]` (відмова gate дає готову команду з текою репо коміту) → позначка /tmp/lens-uireview-<хеш диффу> (рядок ≥ 40 знаків:
 #           які стани, які теми, що бачить людина після дії). Самоствердження, але в потрібну мить і по конкретному диффу.
-#   selftest — 13 випадків (з них 2 — сітка review-remind post, 4 — done ⟂ ui_lint) у тимчасовому репо (зуби: UI без позначки → deny; позначка → тиша; правка після позначки → deny; done без ui_lint → ✗).
+#   selftest — 15 випадків (з них 2 — сітка review-remind post, 4 — done ⟂ ui_lint) у тимчасовому репо (зуби: UI без позначки → deny; позначка → тиша; правка після позначки → deny; done без ui_lint → ✗).
 #   hash  — хеш диффу UI репо (для ui_lint: позначка /tmp/lens-uilint-<хеш> — машинна частина огляду, бриф §HOOK-2.5).
 #   done вимагає позначку ui_lint САМЕ ЦЬОГО диффу (✗ 0 в обох темах) або --no-lint "<причина ≥ 30 знаків>" (сторінку не запустити) — причина пишеться в позначку.
 # Діє в усіх репо, де підключено гачки ядра (tools/claude-code/CLAUDE_CODE.md «Гачки»), — не лише в QR.
@@ -38,11 +38,14 @@ def git(top, *a, raw=False):
     return r.stdout if raw else r.stdout.decode("utf-8", "replace").strip()
 
 def ui_state(top):   # (файли UI, хеш диффу) — дифф проти HEAD + нові неігноровані файли
-    files = sorted(set(git(top, "diff", "HEAD", "--name-only", "--", *UI).splitlines()) |
+    # видалення в теці примірки (shots/ — SHOTS.md: прийнята примірка прибирається) — не UI-правка: нічого переглядати (хибне QR 18.10, журнал гачків)
+    drop = {l.split("\t", 1)[1] for l in git(top, "diff", "HEAD", "--name-status", "--", *UI).splitlines()
+            if l.startswith("D\t") and re.search(r"(^|/)shots/", l.split("\t", 1)[1])}
+    files = sorted((set(git(top, "diff", "HEAD", "--name-only", "--", *UI).splitlines()) - drop) |
                    set(git(top, "ls-files", "--others", "--exclude-standard", "--", *UI).splitlines()))
     files = [f for f in files if f]
     if not files: return [], None
-    h = hashlib.sha1(git(top, "diff", "HEAD", "--", *UI, raw=True))
+    h = hashlib.sha1(git(top, "diff", "HEAD", "--", *files, raw=True))   # лише ці файли: видалення примірки не міняє хеш
     for f in git(top, "ls-files", "--others", "--exclude-standard", "--", *UI).splitlines():
         p = os.path.join(top, f)
         if os.path.isfile(p): h.update(f.encode()); h.update(open(p, "rb").read())
@@ -99,7 +102,7 @@ if mode == "done":
     lint = os.path.exists(lint_mark(hx))
     if not lint and not (nolint and len(nolint) >= 30):
         ul = os.path.join(os.path.dirname(os.path.dirname(os.environ.get("UI_GATE_SELF", "x/x"))), "ui_lint.mjs")
-        print(f"✗ ui_lint цього диффу ({hx[:8]}) не пройдено: node {ul} <url|файл> [--state \"<js>\"]… --repo {top} → ✗ 0 в обох темах; "
+        print(f"✗ ui_lint цього диффу ({hx[:8]}) не пройдено: node {ul} <url|файл> [--state \"<js>\"]… --repo {top} → ✗ 0 в обох темах (старі ✗, що були до правки, — `--baseline <файл>`: перший прогін ДО правки записує базу, блокує лише нове); "
               f"сторінку не запустити — done \"<огляд>\" {top} --no-lint \"<чому, ≥ 30 знаків>\""); sys.exit(1)
     open(mark(hx), "w").write(note + ("" if lint else f"\n[без ui_lint: {nolint}]") + "\n" + "\n".join(files) + "\n")
     print(f"✓ позначка огляду {hx[:8]} · {os.path.basename(top)}: {', '.join(files)}" + ("" if lint else " · ⚠ без ui_lint — причина записана")); sys.exit(0)
@@ -118,6 +121,13 @@ if mode == "selftest":
         open(f"{tmp}/a.html", "w").write("<p>2</p>")
         say(gate(ev("git add -A && git commit -m x")) is not None, "зуби: .html змінено, позначки нема → deny")
         say(gate(ev("git status")) is None, "не коміт → тиша")
+        subprocess.run(["git", "-C", tmp, "stash", "-q"], check=True); os.makedirs(f"{tmp}/shots/P1", exist_ok=True)
+        open(f"{tmp}/shots/P1/fit.css", "w").write("p{}"); subprocess.run(["git", "-C", tmp, "add", "-A"], check=True); subprocess.run(["git", "-C", tmp, "commit", "-qm", "fit"], check=True)
+        os.remove(f"{tmp}/shots/P1/fit.css")
+        say(gate(ev("git add -A && git commit -m x")) is None, "лише видалення файлів примірки (shots/) → тиша")
+        open(f"{tmp}/a.html", "w").write("<p>9</p>")
+        say(gate(ev("git add -A && git commit -m x")) is not None, "зуби: видалення в shots/ + правка .html → deny")
+        subprocess.run(["git", "-C", tmp, "checkout", "-q", "--", "."], check=True); subprocess.run(["git", "-C", tmp, "stash", "pop", "-q"], check=True)
         files, hx = ui_state(tmp); open(mark(hx), "w").write("огляд: світла й темна, стан після дії, перезавантаження\n")
         say(gate(ev(f"cd {tmp} && git commit -am x")) is None, "позначка цього диффу → тиша")
         open(f"{tmp}/a.html", "w").write("<p>3</p>")

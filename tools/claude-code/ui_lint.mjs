@@ -2,7 +2,7 @@
 // ui_lint — машинна частина огляду UI: те, що видно програмі, ловить програма, а не Konst («капсула прилипла», «текст обрізаний», «іконка вище»).
 // Очі агента лишаються: машина бачить ~третину вад (розвідка 10.10: axe/WCAG-огляди), решта — чек-лист воріт ui-review-gate.
 //
-// Запуск:  node ui_lint.mjs <url|файл.html> [--state "<js>"]… [--repo <тека>] [--width 390] [--height 844] [--json]   (низький екран Safari: --width 375 --height 634)
+// Запуск:  node ui_lint.mjs <url|файл.html> [--state "<js>"]… [--repo <тека>] [--width 390] [--height 844] [--json] [--baseline <файл>]   (низький екран Safari: --width 375 --height 634)
 //          кожен --state — окремий стан (JS виконується на сторінці; між станами сторінка перезавантажується); без --state — лише початковий.
 //          --state — ВИРАЗ, не модуль: `await` верхнього рівня → ✗ «JS стану впав»; чекати — `new Promise(r=>setTimeout(()=>{…;r()},1800))` (QR CC-13, 15.10.2026: шіт відкривається з затримкою).
 //          Обидві теми (prefers-color-scheme light/dark) завжди. --repo: ✗ 0 → позначка для воріт (той самий хеш диффу, що в ui-review-gate).
@@ -70,8 +70,14 @@ function probe() {
     // 6. цілі тапу; поле вводу < 16 px
     if (el.matches('a[href],button,[role=button],input:not([type=hidden]),select,textarea,summary')) {
       const lbl = (el.innerText || el.value || el.getAttribute('aria-label') || el.title || '').trim();
-      if (r.width < 24 || r.height < 24) add('✗', 'тап', el, `ціль ${Math.round(r.width)}×${Math.round(r.height)} px < 24 — важко влучити (WCAG 2.2)`);
-      else if (r.width < 44 || r.height < 44) add('⚠', 'тап', el, `ціль ${Math.round(r.width)}×${Math.round(r.height)} px < 44 (Apple)`);
+      // ціль = площа, що ловить дотик (з розширенням ::before/::after — modern-css.com «larger touch targets», 19.10.2026): зонд elementFromPoint від центру
+      // в обидва боки по кожній осі; коробку лише коли зонд не дістає (поза екраном, під шаром). Хибне QR 18.10: ✕ 25×25 з ::after 44 → «25 < 44».
+      let tw = r.width, th = r.height;
+      if (tw < 44 || th < 44) { const cx = r.left + r.width / 2, cy = r.top + r.height / 2, on = (x, y) => x >= 0 && y >= 0 && x < innerWidth && y < innerHeight && (t => t && (t === el || el.contains(t)))(document.elementFromPoint(x, y));
+        if (on(cx, cy)) { const span = (dx, dy) => { let a = 0, b = 0; while (a < 40 && on(cx - dx * (a + 1), cy - dy * (a + 1))) a++; while (b < 40 && on(cx + dx * (b + 1), cy + dy * (b + 1))) b++; return a + b + 1; };
+          tw = Math.max(tw, span(1, 0)); th = Math.max(th, span(0, 1)); } }
+      if (tw < 24 || th < 24) add('✗', 'тап', el, `ціль ${Math.round(tw)}×${Math.round(th)} px < 24 — важко влучити (WCAG 2.2)`);
+      else if (tw < 44 || th < 44) add('⚠', 'тап', el, `ціль ${Math.round(tw)}×${Math.round(th)} px < 44 (Apple)`);
       if (!lbl && !el.matches('input,select,textarea')) add('⚠', 'без назви', el, 'кнопка без тексту й без aria-label — що вона робить?');
       if (el.matches('input:not([type=checkbox]):not([type=radio]):not([type=file]),select,textarea') && parseFloat(s.fontSize) < 16) add('✗', 'iOS-зум', el, `поле ${s.fontSize} < 16px — iPhone збільшить сторінку при тапі й не поверне`); }
   }
@@ -227,8 +233,8 @@ const SELF = `<!doctype html><html><head><meta name=viewport content="width=devi
 body{margin:0;font:15px/1.4 sans-serif;background:#fff;color:#111}@media(prefers-color-scheme:dark){body{background:#111;color:#eee}}
 .card{margin:16px;padding:14px;border-radius:14px;background:#f2f2f2;position:relative}@media(prefers-color-scheme:dark){.card{background:#222}}
 .pill{display:inline-block;padding:2px 8px;border-radius:99px;background:#237770;color:#fff}.tl{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px}.ic{width:30px;height:30px;border-radius:50%;background:#bbb}.row{display:flex;gap:8px}.tile{flex:1;border-radius:10px;background:#ddd;padding:8px}
-.grey{color:#aaa}.clip{width:60px;overflow:hidden;white-space:nowrap}button:active{transform:scale(.97)}.jsp{color:inherit}.jsp.pressing{transform:scale(.9)}</style><script>document.addEventListener('touchstart',()=>{},{passive:true});document.addEventListener('pointerdown',e=>{const c=e.target.closest('.jsp');if(c)c.classList.add('pressing')});document.addEventListener('pointercancel',()=>document.querySelectorAll('.pressing').forEach(x=>x.classList.remove('pressing')))</script></head><body>
-<div class=card id=ok><button style="min-height:48px;padding:0 16px">Завантажити KPI</button> <span class=pill>6 дн.</span> <a class=jsp href="#j" style="display:inline-block;padding:14px 18px">Відкрити (A67)</a></div>
+.x44{position:relative;width:26px;height:26px;padding:0}.x44::after{content:'';position:absolute;inset:-12px}.grey{color:#aaa}.clip{width:60px;overflow:hidden;white-space:nowrap}button:active{transform:scale(.97)}.jsp{color:inherit}.jsp.pressing{transform:scale(.9)}</style><script>document.addEventListener('touchstart',()=>{},{passive:true});document.addEventListener('pointerdown',e=>{const c=e.target.closest('.jsp');if(c)c.classList.add('pressing')});document.addEventListener('pointercancel',()=>document.querySelectorAll('.pressing').forEach(x=>x.classList.remove('pressing')))</script></head><body>
+<div class=card id=ok><button class=x44 aria-label="Закрити">✕</button> <button style="min-height:48px;padding:0 16px">Завантажити KPI</button> <span class=pill>6 дн.</span> <a class=jsp href="#j" style="display:inline-block;padding:14px 18px">Відкрити (A67)</a></div>
 <div class=card><div style="height:96px;overflow-y:auto">${[1, 2, 3, 4].map(i => `<div class=li style="padding:4px 0">Рядок ${i} <button style="min-height:44px">Повернути</button></div>`).join('')}</div></div>
 ${'BAD'}</body></html>`;
 const DEFECTS = {
@@ -368,12 +374,19 @@ if (a[0] === 'selftest') {
 }
 if (!a[0]) { console.log('node ui_lint.mjs <url|файл> [--state "<js>"]… [--repo <тека>] [--width 390] [--height 844] [--json] | selftest'); process.exit(2); }
 let target = a[0]; if (!/^\w+:\/\//.test(target)) target = 'file://' + resolve(target);
-const states = [], opt = {}; for (let i = 1; i < a.length; i++) { if (a[i] === '--state') states.push(a[++i]); else if (a[i] === '--repo') opt.repo = a[++i]; else if (a[i] === '--width') opt.width = +a[++i]; else if (a[i] === '--height') HEIGHT = +a[++i]; else if (a[i] === '--json') opt.json = true; }
+const states = [], opt = {}; for (let i = 1; i < a.length; i++) { if (a[i] === '--state') states.push(a[++i]); else if (a[i] === '--repo') opt.repo = a[++i]; else if (a[i] === '--width') opt.width = +a[++i]; else if (a[i] === '--height') HEIGHT = +a[++i]; else if (a[i] === '--json') opt.json = true; else if (a[i] === '--baseline') opt.base = a[++i]; }
 const r = await run(target, states, opt.width || 390);
 const acc = []; const af = opt.repo && join(resolve(opt.repo), '.ui-lint-accept');
 if (af && existsSync(af)) for (const l of (await import('node:fs')).readFileSync(af, 'utf8').split('\n')) { const [k, w, why] = l.split('|').map(x => (x || '').trim()); if (k && w && !k.startsWith('#')) acc.push({ k, w, why }); }
 for (const t of ['light', 'dark']) for (const f of r[t]) { const m = acc.find(a => a.k === f.kind && f.where.includes(a.w)); if (m && f.lvl !== 'ⓘ') { f.msg += ` — прийнято: ${m.why}`; f.lvl = 'ⓘ'; f.acc = true; } }
 if (opt.json) { console.log(JSON.stringify(r, null, 1)); }
+// --baseline <файл>: база відомих ✗ (Android Lint · SwiftLint --use-baseline; ключ — вид + елемент, не рядок: вставка рядків вище не робить старе «новим» —
+// claudeissues 82589, 07.2026). Файлу нема → записати поточні ✗ і вийти; є → блокує лише ✗ поза базою, виправлене з бази — назвати. Перезапис — лише руками (rm).
+if (opt.base) { const key = f => `${f.kind}|${f.where}`, cur = [...new Set(['light', 'dark'].flatMap(t => r[t].filter(f => f.lvl === '✗').map(key)))];
+  if (!existsSync(opt.base)) { writeFileSync(opt.base, JSON.stringify(cur, null, 1)); console.log(`✓ база ui_lint записана: ${cur.length} ✗ → ${opt.base} (до правки; після — той самий --baseline)`); process.exit(0); }
+  const base = new Set(JSON.parse((await import('node:fs')).readFileSync(opt.base, 'utf8'))), gone = [...base].filter(k => !cur.includes(k));
+  for (const t of ['light', 'dark']) for (const f of r[t]) if (f.lvl === '✗' && base.has(key(f))) { f.lvl = 'ⓘ'; f.acc = true; f.msg += ' — з бази (було до правки)'; }
+  if (gone.length) console.log(`ⓘ виправлено з бази: ${gone.length} (${gone.slice(0, 3).join(' · ')}${gone.length > 3 ? ' …' : ''})`); }
 let x = 0, w = 0;
 for (const t of ['light', 'dark']) {
   const seen = new Set(); const rows = r[t].filter(f => { const k = f.lvl + f.kind + f.where + f.msg; if (seen.has(k)) return false; seen.add(k); return true; });

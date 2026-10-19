@@ -5,7 +5,7 @@
 # (git commit / gh_commit / push_files / create_or_update_file) → {"decision":"block"} з причиною: агент продовжує й записує або пояснює, чому нічого.
 # Один раз на хід: stop_hook_active = true (агент уже продовжує через гачок) → тиша. Помилка розбору → тиша (гачок не ламає роботу).
 # Формат — code.claude.com/docs/en/hooks «Stop» (stop_hook_active, transcript_path; decision/reason), 08.10.2026.
-# Зуби: bash memory-guard.sh selftest — 13 випадків (рішення без коміту → block; з комітом · без рішень · повтор · «так» усередині слова · сповіщення системи → тиша;
+# Зуби: bash memory-guard.sh selftest — 15 випадків (рішення без коміту → block; з комітом · без рішень · повтор · «так» усередині слова · сповіщення системи → тиша;
 # примірка: варіант названо, рядок «примірка» → block · рядок уже «обрано» · «беру в роботу» · «варіант А …» описом → тиша · «Варіант Б» коротко → block).
 mode="${1:-stop}"
 [ "$mode" = selftest ] && HOOK_IN="{}" || HOOK_IN="$(cat)"
@@ -34,7 +34,9 @@ def pending_fittings(cwd):
                     c = [x.strip() for x in line.strip().strip('|').split('|')]
                     if line.startswith('|') and len(c) >= 7 and c[1].strip('*').strip().lower() == 'примірка':
                         out.append(f"{os.path.basename(r)}:{d}/README.md {c[0].strip('`')}")
+                    elif line.startswith('| `') and len(c) >= 7: ALL_FITS.add(c[0].strip('`'))
     return out
+ALL_FITS = set()   # id примірок не в стані «примірка» (обрано, відкладено…) — щоб упізнати, що Konst назвав ІНШУ примірку
 
 def real_user(x):
     if x.get('type') != 'user' or x.get('isMeta') or x.get('isCompactSummary'): return None
@@ -59,6 +61,12 @@ def verdict(d):
     if pick and pick.group(0).lower().startswith('варіант') and len(u) > 40 and not re.search(r"(?i)(?<![\w'’])(обираю|обрав|обрала|вибираю|беру|бери|беремо|лишаємо|залишаємо)(?![\w'’])", u): pick = None
     if pick:
         pend = pending_fittings(d.get('cwd'))
+        # Konst назвав примірку — вибір лише до неї (хибне QR CC-12, 13.10: «Б» табло `QRL-12_vitannya` прив'язано до `QRL-13_sr_card`);
+        # ідентифікатор — повний `QRL-12_vitannya` або його номер `QRL-12`
+        ids = lambda x: {x, x.split('_')[0]}
+        named = {p for p in pend if any(re.search(r'(?<![\w-])' + re.escape(i) + r'(?![\w-])', u) for i in ids(p.split(' ')[-1]))}
+        other = any(re.search(r'(?<![\w-])' + re.escape(i) + r'(?![\w-])', u) for x in ALL_FITS for i in ids(x))
+        pend = sorted(named) if named else ([] if other else pend)
         if pend:
             return ("Гачок пам'яті (примірка, SHOTS.md §5): Konst назвав варіант «" + pick.group(1) + "», а примірка досі чекає вибору: " + '; '.join(pend[:3]) + ". "
                     "У цьому ж ході: рядок → стан «обрано», вибір і **чому словами Konst**, куди йде код, дата — тоді коміт. "
@@ -95,11 +103,13 @@ def selftest():
              ('примірка: рядок уже «обрано» → тиша', [U('Обираю В'), A('git commit -m a'), R], False, False),
              ('примірка: «беру в роботу» — не вибір → тиша', [U('беру в роботу, поїхали'), A('git commit -m a'), R], False, False),
              ('примірка: «варіант А обрізане…» — опис, не вибір → тиша', [U('варіант А саме більше критично: коло обрізане знизу, а в Б смуга'), A('git commit -m a'), R], False, False),
-             ('примірка: коротке «Варіант Б» — вибір → block', [U('Варіант Б'), A('git commit -m a'), R], False, True)]
+             ('примірка: коротке «Варіант Б» — вибір → block', [U('Варіант Б'), A('git commit -m a'), R], False, True),
+             ('примірка: «Б» названої ІНШОЇ (обраної раніше) примірки → тиша', [U('Обираю Б для QRL-2_tablo'), A('git commit -m a'), R], False, False),
+             ('примірка: «В» названої примірки, що чекає → block', [U('Обираю В для QRL-1'), A('git commit -m a'), R], False, True)]
     bad = 0
     T = tempfile.mkdtemp(); repo = os.path.join(T, 'prod'); os.makedirs(os.path.join(repo, 'lens', 'shots'))
     subprocess.run(['git', 'init', '-q', repo]); RM = os.path.join(repo, 'lens', 'shots', 'README.md')
-    row = lambda st: '| id | стан | що | в | вибір | куди | дата |\n|---|---|---|---|---|---|---|\n| `QRL-1_x` | ' + st + ' | x | x | x | x | 11.10.2026 |\n'
+    row = lambda st: '| id | стан | що | в | вибір | куди | дата |\n|---|---|---|---|---|---|---|\n| `QRL-1_x` | ' + st + ' | x | x | x | x | 11.10.2026 |\n| `QRL-2_tablo` | обрано | x | x | Б | x | 12.10.2026 |\n'
     for name, msgs, active, want in cases:
         open(RM, 'w', encoding='utf-8').write(row('обрано' if 'уже' in name else 'примірка'))
         got = verdict({'transcript_path': tr(msgs), 'stop_hook_active': active, 'cwd': repo}) is not None
