@@ -29,6 +29,7 @@
 | прев'ю для Konst | `tools/PREVIEW.md` — повний текст (у профілі — стиснення); крок «квиток / `gh_commit`» тут = `git push` у `Konst-Andre/sandbox` |
 | правило wsd за номером (`1.x`, `12.x`) | `kernel/wsd/Work_Standard.md` — «Зміст» і маршрут |
 | веду канон: куди записати, правка вічного файла | `kernel/wsd/Lens_governance_protocol.md` («Зміст» · К1/К2 і INTAKE · 12.11 · 12.15–12.20) |
+| **час для брифу** — пункт черги тягнеться 2+ сесії · рядок черги > 2000 знаків · рішення одного пункту в ≥ 3 місцях (черга · самері · план · чат) | бриф `<id>_brief.md` з `tools/claude-code/templates/BRIEF_template.md` (з прополкою джерел; ядро — `kernel/Lens_<id>_brief.md`); агент створює сам, не чекаючи Konst. Машина нагадує: `handoff_check` (8)/(9) на переїзді, гачок `brief-guard` на запис і коміт |
 | питання з варіантами, форма 💡, двійне пояснення | `kernel/Lens_PROFILE.md` §7 (`13.1`–`13.3`) |
 | зовнішній візуальний ефект · скло й острівець | `kernel/Lens_fx_candidates.md` · `kernel/Lens_glass_FINDINGS.md` |
 | Excel, Power Query, VBA (KPI · QR Lens) | `kernel/Lens_excel_protocol.md` |
