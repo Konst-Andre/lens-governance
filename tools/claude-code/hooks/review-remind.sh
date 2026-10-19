@@ -6,6 +6,8 @@
 #           (HOOK-2 п.4, 09.10.2026); тут лишилась страхувальна сітка — гачок-ворота впав, вимкнений чи коміт пройшов повз нього
 #           + позначка «маніфест стендів прочитано», якщо виклик згадав Lens_stagebench_manifest
 #   stand — PreToolUse (Write|Edit|Bash): запис .html зі «стенд / bench / harness / компер» у шляху, а маніфест у цій сесії не читано → нагадування
+#           + ВИДАЧА: `git push` у репо з origin `…/sandbox` (прев'ю для Konst) → пункти чек-листа «Перед видачею» маніфесту, прочитані з самого маніфесту
+#           (не копія: копія тухне), раз на коміт. Тригер — подія видачі, не ім'я файла (бриф SB-1 «Х7»: «stand» у konstandre/standalone — 2 хибних)
 # Формат — hookSpecificOutput.additionalContext (code.claude.com/docs/en/hooks, 08.10.2026): текст — фактами, не наказами.
 mode="$1"
 if [ "$mode" = selftest ]; then   # stand: адреса з «stand» усередині слова — тиша; .html стенда чи компера — нагадування (хибне QR CC-8)
@@ -19,6 +21,17 @@ X"; do
     got=$(python3 -c 'import json,sys; print(json.dumps({"session_id":"selftest%s" % sys.argv[2],"tool_name":"Bash","tool_input":{"command":sys.argv[1]}}))' "$cmd" "$n$$" | bash "$0" stand | grep -c 'Стенди')
     [ "$got" = "$want" ] && ok=$((ok+1)) || echo "✗ stand: «$cmd» → $got, очікував $want"
   done
+  # видача: push у sandbox → нагадування; push в інше репо і коміт у sandbox → тиша
+  sb=$(mktemp -d); ot=$(mktemp -d)
+  for r in "$sb|https://github.com/Konst-Andre/sandbox.git" "$ot|https://github.com/Konst-Andre/QR-Lens.git"; do
+    d="${r%%|*}"; git -C "$d" init -q; git -C "$d" remote add origin "${r#*|}"; git -C "$d" -c user.name=t -c user.email=t@t commit -q --allow-empty -m x
+  done
+  for c in "1|cd $sb && git push -u origin main" "1|git -C $sb push origin main" "0|cd $ot && git push origin main" "0|cd $sb && git commit -m x"; do
+    n=$((n+1)); want="${c%%|*}"; cmd="${c#*|}"
+    got=$(python3 -c 'import json,sys; print(json.dumps({"session_id":"selftest%s" % sys.argv[2],"tool_name":"Bash","tool_input":{"command":sys.argv[1]}}))' "$cmd" "$n$$" | bash "$0" stand | grep -c 'Пункти: 1)')
+    [ "$got" = "$want" ] && ok=$((ok+1)) || echo "✗ видача: «$cmd» → $got, очікував $want"
+  done
+  rm -rf "$sb" "$ot"
   echo "review-remind selftest: $ok/$n"; [ "$ok" = "$n" ]; exit
 fi
 export RR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -66,8 +79,28 @@ if mode == "post":
             "(гачок упав, вимкнений чи коміт пройшов повз). Наступний крок — сказати Konst і зробити огляд, "
             f"окремим проходом, {check}; знахідки → правки → ще прохід → лише тоді прев\u2019ю Konst.")
 elif mode == "stand":
-    if os.path.exists(seen): sys.exit(0)
     tool = d.get("tool_name", "")
+    cmd = str(ti.get("command", "")) if tool == "Bash" else ""
+    for m in re.finditer(r"\bgit\b((?:\s+-C\s+\S+)?)[^;&|]*?\bpush\b", cmd):   # видача стенда Konst = push у sandbox
+        cds = re.findall(r"(?:^|&&|;)\s*cd\s+([^\s;&|]+)", cmd[:m.start()])
+        repo = m.group(1).split()[-1] if m.group(1).strip() else (os.path.expanduser(cds[-1]) if cds else d.get("cwd") or ".")
+        url = subprocess.run(["git", "-C", repo, "remote", "get-url", "origin"], capture_output=True, text=True).stdout.strip()
+        if not re.search(r"/sandbox(\.git)?$", url): continue
+        sha = subprocess.run(["git", "-C", repo, "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
+        mark = f"/tmp/lens-issue-{sid}-{sha}"
+        if os.path.exists(mark): sys.exit(0)
+        open(mark, "w").close()
+        man = os.path.join(os.environ.get("RR_DIR", "."), "..", "..", "..", "kernel", "Lens_stagebench_manifest.md")
+        try:
+            sec = open(man, encoding="utf-8").read().split("## Перед видачею", 1)[1].split("\n## ", 1)[0]
+            items = [f"{n}) {t}" for n, t in re.findall(r"(?m)^\| (\d) \| \*\*(.+?)\*\*", sec)]
+        except Exception:
+            items = []
+        say("PreToolUse", "Перед видачею стенда Konst (push у sandbox — далі посилання): чек-лист «Перед видачею» маніфесту lens-governance:kernel/Lens_stagebench_manifest.md, "
+            "доказ кожного пункту одним блоком у повідомленні Konst (рядок паспорта · вивід смоуку · число · знімок) або «н/з, бо …». "
+            + ("Пункти: " + " · ".join(items) + "." if items else "Розділ «Перед видачею» в маніфесті не знайдено — гачок відстав від маніфесту, скажи Konst."))
+        sys.exit(0)
+    if os.path.exists(seen): sys.exit(0)
     path = str(ti.get("file_path", "")) if tool in ("Write", "Edit") else str(ti.get("command", ""))
     if tool == "Bash" and not re.search(r"(>|\btee\b|\bcp\b|\bmv\b)", path): sys.exit(0)
     # лише в імені .html-файлу, не в усій команді: «konstandre» в адресі давало хибне (QR CC-8, 10.10)
