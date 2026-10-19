@@ -27,6 +27,7 @@ GitHub живе в секреті воркера, тож у тексті чат�
 | Імʼя | Тип | Що |
 |---|---|---|
 | `GH_TOKEN` | секрет | fine-grained PAT GitHub (Contents: write; для `.github/workflows/*` — ще Workflows: write; для Actions — Actions: write) · **без терміну дії** (Konst 17.10.2026 регенерував і вставив у воркер; перевірено того ж дня з QR CC-16: читання `gh_log`/`gh_read`/`gh_list`, запис — `gh_branch delete` ×10) |
+| ↳ *створення workflow* | | (Konst 19.10.2026: агент в іншій сесії не зміг створити workflow через конектор.) Код воркера шляхів не обмежує — причина в токені: **(1)** у fine-grained PAT список репо задається вручну («Only select repositories») — **нове репо треба додати в токен**; **(2)** дозволи на цьому репо: **Contents: Read and write** · **Workflows: Read and write** (без нього push у `.github/workflows/*` → «refusing to allow a Personal Access Token to create or update workflow») · **Actions: Read and write** (запуск і перезапуск, `gh_actions dispatch/rerun`) · **Metadata: Read** (обовʼязковий). Запасний шлях, якщо fine-grained і далі відмовляє, — classic PAT зі scope `repo` + `workflow` (звіти користувачів, 2023–2025). Після зміни — новий токен у секрет `GH_TOKEN` воркера (лише Konst, дашборд) |
 | `MCP_KEY` | секрет | випадковий ключ у шляху URL; хто не знає ключа — отримує 404 |
 | `TICKET_KEY` | секрет | ≥ 32 символи; HMAC-підпис квитків `gh_ticket`. Окремий від `MCP_KEY`: витік квитка не дає доступу до MCP. Коротший — `gh_ticket` відмовляє |
 | `OWNER` | змінна | `Konst-Andre` — запис лише в репо цього власника |
