@@ -17,6 +17,9 @@
   M6 черга відстала — пункт, який живе самері позначило закритим (`ID` ✅ · `ID` — закрито), у черзі досі відкритий (`queue_open`
      ядра). Позначка — одразу після `id`, як ключове слово «closes #N» у GitHub/GitLab: «`ID`: підкрок ✅» — не закриття
      (пропозиція агента, «так» Konst 18.10.2026, AE S90).
+  M7 мертва адреса в межах файла — складена `§N-x` / `§N.M` / `§N(…)` у живому .md з ≥ 3 заголовками «§N», а заголовка §N нема і поруч не названо
+     чужого документа (ім'я файла, wsd, самері, «Бібліотека §…»). Чому (аудит маніфесту стендів 19.10.2026): п'ять `§13-*` вели в нікуди — M5 бачить шляхи,
+     не адреси; практика — звірка адреси з заголовками того ж файла, блоки коду — геть (lychee «anchors», 19.10.2026; наші § — текст, не посилання).
 Лише ⚠ (не блокує): один рядок для env_check; адреси — --list.
   python3 doc_health.py [<репо>] [--list] | selftest
 """
@@ -53,6 +56,7 @@ def scan(root):
             found.append(('M4', f, f'{kb:.0f} КБ без «читається коли» — одним Read не взяти'))
     found += dead_paths(root)
     found += queue_behind(root)
+    found += dead_sections(root)
     return found
 
 
@@ -106,12 +110,33 @@ def dead_paths(root):
     return out
 
 
+M7_OTHER = re.compile(r'(\.md|\.py|\.sh|\.mjs|\.js|wsd|gov|INDEX|самері|CLAUDE|ядра|профіл|PROFILE|бриф|том|кукбук|Cookbook|REPO_FRAME|ADOPT|SHOTS|PREVIEW|ADAPT|CHAT_TOOLS|CLOUDFLARE|HOOK_JOURNAL|`[A-Za-z-]+:|\bS\d+|\bCC-\d+)', re.I)
+def dead_sections(root):
+    """M7: складена адреса `§N-x` / `§N.M` / `§N(…)` без заголовка §N у тому ж файлі (правила — шапка файла)."""
+    out = []
+    for f in files(root):
+        if re.search(r'(^|/)(sessions|summary|journal)/|DECISIONS|AUDIT|HOOK_JOURNAL|ADOPTIONS|_HISTORY|CHERGA|delta_running|INDEX', f): continue
+        p_ = os.path.join(root, f)
+        if not os.path.isfile(p_): continue
+        t = re.sub(r'(?ms)^```.*?^```', '', open(p_, encoding='utf-8', errors='replace').read())
+        heads = {m.group(1) for m in re.finditer(r'(?m)^#{1,4}\s+.*?§\s?(\d+)', t)}
+        if len(heads) < 3: continue
+        for m in re.finditer(r'(?<![\w`])§\s?(\d+)(?=[-.(])(?!\.\d{2,})', t):
+            if m.group(1) == '0' or m.group(1) in heads: continue
+            ls = t.rfind('\n', 0, m.start()) + 1
+            if t[ls:].lstrip().startswith('#'): continue
+            pre = t[max(ls, m.start() - 70):m.start()]
+            if M7_OTHER.search(pre) or re.search(r"[А-ЯҐЄІЇA-Z][\w’'-]{2,}\s+$", pre): continue   # «Бібліотека §7.1» — чужий документ
+            out.append(('M7', f, t[m.start():m.start() + 12].split()[0].rstrip(').,;:')))
+    return out
+
+
 def line(root):
     f = scan(root)
     if not f: return '✓', f'документи: ✓ щосесійні ≤ {M1_LINES} рядків · старт ≤ {M2_KB} КБ · розділи ≤ {M3_KB} КБ · великі з маршрутом'
     by = {}
     for m, *_ in f: by[m] = by.get(m, 0) + 1
-    name = {'M1': 'щосесійні задовгі', 'M2': 'файли старту завеликі', 'M3': f'розділів > {M3_KB} КБ', 'M4': f'> {M4_KB} КБ без маршруту', 'M5': 'мертвих шляхів', 'M6': 'черга відстала від самері'}
+    name = {'M1': 'щосесійні задовгі', 'M2': 'файли старту завеликі', 'M3': f'розділів > {M3_KB} КБ', 'M4': f'> {M4_KB} КБ без маршруту', 'M5': 'мертвих шляхів', 'M6': 'черга відстала від самері', 'M7': 'мертвих адрес §'}
     worst = max((x for x in f if x[0] == 'M3'), key=lambda x: float(re.search(r'(\d+) КБ', x[2])[1]), default=None)
     return '⚠', 'документи: ' + ' · '.join(f'{name[m]} {n}' for m, n in sorted(by.items())) + (f' (найбільший — {worst[1]} {worst[2]})' if worst else '') + ' — деталі: doc_health.py --list'
 
@@ -143,6 +168,8 @@ def selftest():
              ('M5: блок коду, розділ історії, Репо:шлях, гола назва, DECISIONS → ✓', {'README.md': '```\n`tools/x/y.py`\n```\n## Переїзд — старий шлях\n`old/a.md`\n## Далі\n`QR-Lens:tools/q.py` · `gone.py`\n', 'docs/DECISIONS.md': '`tools/dead/z.py`\n'}, '✓', ''),
              ('M6: `AE-X` ✅ у самері, у черзі відкритий → ⚠', {'docs/CHERGA.md': Q, 'docs/summary/P_SUMMARY_2026-10-18.md': '## §0\n- `AE-X` ✅ зроблено\n'}, '⚠', 'черга відстала від самері 1'),
              ('M6: «`AE-X`: підкрок ✅» і закритий у черзі `AE-Y` → ✓', {'docs/CHERGA.md': Q.replace('| `AE-Y` | y | 18.10.2026 | z |', '| `AE-Y` | y | закрито | z |'), 'docs/summary/P_SUMMARY_2026-10-18.md': '## §0\n- `AE-X`: знімок ✅\n- `AE-Y` ✅\n'}, '✓', '')]
+    cases += [('M7: «§13-д» без заголовка §13 → ⚠', {'lens/S.md': '## §1 А\nx\n## §2 Б\nx\n## §3 В\nдив. §13-д\n'}, '⚠', 'мертвих адрес § 1'),
+              ('M7: «§3-п.2» є заголовок · «gov §12.4» · «Бібліотека §7.1» → ✓', {'lens/S.md': '## §1 А\nx\n## §2 Б\nx\n## §3 В\nдив. §3-п.2 · gov §12.4 · Бібліотека §7.1\n'}, '✓', '')]
     for name, fs, want, part in cases:
         g, t = line(repo(fs)); ok = g == want and part in t
         print(('✓' if ok else '✗') + ' ' + name + ('' if ok else f' → {t}')); bad += not ok
