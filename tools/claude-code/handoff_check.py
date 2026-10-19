@@ -15,6 +15,7 @@ EXT = r'(?:md|sh|py|mjs|js|json|toml|ya?ml|html|htm|css|xlsx|txt|csv)'
 # шлях: [Репо:]тека/…/файл.розш · тека/ · або гола назва файл.розш (без теки)
 PATH_RE = re.compile(r'(?<![\w/.:<>*-])(?:([A-Za-z][\w.-]*):)?((?:[\w.-]+/)+(?:[\w.-]+\.' + EXT + r')?|[\w.-]+\.' + EXT + r')(?![\w/<>*-])')
 STALE_RE = re.compile(r'цей коміт|чекає вироку', re.I)
+N_BRIEF, Q_ROW = 2, 2000   # (8): «пункт розтягнувся на 2+ сесії» — той самий поріг, що в шаблоні брифу; Q_ROW — як `q_long` гейта ядра (BRIEF-2 5б–5в)
 
 
 def git(repo, *a):
@@ -174,20 +175,26 @@ def check_repo(repo, now=None):
             L.append(('⚠', 'описи, що згадують змінений у сесії код, але не мінялись: ' + ' · '.join(f"{d} ({', '.join(os.path.basename(c) for c in stale[d][:3])})" for d in top) +
                       (f' (+{len(stale) - 6})' if len(stale) > 6 else '') + ' — перевір, чи новий агент не піде за протухлим описом'))
         elif code: L.append(('✓', f'описи змін сесії оновлено (код: {len(code)} файлів)'))
-    # (8) кандидат у бриф (BRIEF-1, розширення 10.10): id відкритої черги згадано в самері ≥ 3 різних сесій, а брифу / плану з цим id нема
+    # (8) кандидат у бриф (BRIEF-1, розширення 10.10): id відкритої черги згадано в самері ≥ N_BRIEF різних сесій, а брифу / плану з цим id нема.
+    #     BRIEF-2 5б–5в (AE S94, заміри на AE): поріг 3 → 2 (= шаблон); id з літерами (`AE-PORT`) раніше були невидимі; «бриф є» = id у назві
+    #     файлу брифу / плану або в його шапці (до першого `## `), а не будь-яка згадка — бриф AE-PORT згадував AE-T · D3 · E2 · POL і глушив усі.
+    #     Не-Lens репо: рядок черги > Q_ROW → ⚠ «час для брифу» (у Lens це ✗ гейта `q_long`).
     qf = [f for f in (glob.glob(os.path.join(repo, 'lens', '*_CHERGA.md')) + glob.glob(os.path.join(repo, 'kernel', '*_CHERGA.md')) + glob.glob(os.path.join(repo, 'docs', 'CHERGA.md')))]
     if qf:
         qt = open(qf[0], encoding='utf-8').read(); qt = qt[qt.find('## Відкрите'):] if '## Відкрите' in qt else qt
-        ids = sorted(set(re.findall(r'^\|\s*\*{0,2}`([A-Z]+-\d+(?:\.\d+)?)`', qt, re.M)))
+        ids = sorted(set(re.findall(r'^\|\s*\*{0,2}`([A-Z]+-[A-Z0-9]+(?:\.\d+)?)`', qt, re.M)))
         sums = [p for p in glob.glob(os.path.join(repo, 'sessions', '**', '*summary*.md'), recursive=True) + glob.glob(os.path.join(repo, 'docs', 'summary', '**', '*.md'), recursive=True) + glob.glob(os.path.join(repo, 'archive', 'summaries', '**', '*summary*.md'), recursive=True)]
         briefs = [p for p in glob.glob(os.path.join(repo, '**', '*.md'), recursive=True) if re.search(r'brief|BRIEF|PLAN|_plan', os.path.basename(p)) and '/archive/' not in p]
-        btxt = ' '.join(open(p, encoding='utf-8', errors='replace').read() for p in briefs)
+        btxt = ' '.join(os.path.basename(p) + ' ' + open(p, encoding='utf-8', errors='replace').read().split('\n## ', 1)[0] for p in briefs)   # назва + шапка
         cand = []
         for i in ids:
             n = sum(1 for p in sums if re.search(r'(?<![\w-])' + re.escape(i) + r'(?![\w.])', open(p, encoding='utf-8', errors='replace').read()))
             row = next((l for l in qt.splitlines() if re.match(r'^\|\s*\*{0,2}`' + re.escape(i) + '`', l)), '')   # «бриф не треба: <чому>» у рядку черги — відповідь на цей ⚠ (18.10.2026: без неї ⚠ висів вічно)
-            if n >= 3 and 'бриф не треба' not in row.lower() and not re.search(r'(?<![\w-])' + re.escape(i) + r'(?![\w.])', btxt): cand.append(f'{i} ({n} самері)')
-        if cand: L.append(('⚠', 'кандидат у бриф — пункт тягнеться ≥ 3 сесії, а брифу нема: ' + ' · '.join(cand[:5]) + ' → tools/claude-code/templates/BRIEF_template.md (з прополкою джерел) або рядок «чому не треба»'))
+            if n >= N_BRIEF and 'бриф не треба' not in row.lower() and not re.search(r'(?<![A-Za-z0-9-])' + re.escape(i) + r'(?![A-Za-z0-9]|\.\d)', btxt): cand.append(f'{i} ({n} самері)')
+        if cand: L.append(('⚠', f'кандидат у бриф — пункт тягнеться ≥ {N_BRIEF} сесії, а брифу нема: ' + ' · '.join(cand[:5]) + ' → tools/claude-code/templates/BRIEF_template.md (з прополкою джерел) або рядок «чому не треба»'))
+        if not os.path.isdir(os.path.join(repo, 'kernel')) and not glob.glob(os.path.join(repo, 'lens', '*_INDEX.md')):
+            lng = [f"{m.group(1)} ({len(l)})" for l in qt.splitlines() for m in [re.match(r'^\|\s*\*{0,2}`([^`]+)`', l)] if m and len(l) > Q_ROW]
+            if lng: L.append(('⚠', f'час для брифу — рядок черги > {Q_ROW} знаків (наріс шарами): ' + ' · '.join(lng[:5]) + ' → tools/claude-code/templates/BRIEF_template.md, у черзі — стан і вказівник'))
     # (9) бриф за шаблоном і свіжий (BRIEF-2, «так» Konst 19.10.2026, AE S93): бриф AE-PORT народився повз шаблон, а (3) мовчки пропускав
     #     бриф без «Коротко» — відсутність стандарту виглядала як «усе гаразд». Тепер: живий бриф без §0 «Коротко» зі Стан · Далі · Чекає — ✗
     #     (і в `kernel/`: до 19.10 там був виняток ⚠ для спільного файла брифів — розпилено, AE S94); свіжість — після останньої правки брифу є коміти, що змінили
@@ -327,10 +334,10 @@ def selftest():
         if commit_after:
             open(os.path.join(r, 'lens/A.md'), 'a').write('y'); sh(r, 'git', 'commit', '-qam', 'код\n\nClaude-Session: https://claude.ai/code/session_T')
         return r
-    def mk_nl(summary):   # не-Lens каркас (AE): самері docs/summary/<P>_SUMMARY_<дата>.md, черга docs/CHERGA.md
+    def mk_nl(summary, q='## Відкрите\n| `AE-W` | x | 18.10.2026 | y |\n'):   # не-Lens каркас (AE): самері docs/summary/<P>_SUMMARY_<дата>.md, черга docs/CHERGA.md
         d = tempfile.mkdtemp(prefix='hc-'); r = os.path.join(d, 'Prod'); os.makedirs(os.path.join(r, 'docs/summary'))
         sh(r, 'git', 'init', '-q'); sh(r, 'git', 'config', 'user.email', 't@t'); sh(r, 'git', 'config', 'user.name', 't')
-        open(os.path.join(r, 'docs/CHERGA.md'), 'w').write('## Відкрите\n| `AE-W` | x | 18.10.2026 | y |\n'); open(os.path.join(r, 'CLAUDE.md'), 'w').write('x')
+        open(os.path.join(r, 'docs/CHERGA.md'), 'w').write(q); open(os.path.join(r, 'CLAUDE.md'), 'w').write('x')
         open(os.path.join(r, 'docs/summary/P_SUMMARY_2026-10-18.md'), 'w').write(summary)
         sh(r, 'git', 'add', '-A'); sh(r, 'git', 'commit', '-qm', 'самері\n\nClaude-Session: https://claude.ai/code/session_T')
         return r
@@ -352,6 +359,11 @@ def selftest():
         ('вузловий файл (згадують 6 описів) → ⓘ, не ⚠ на кожен', mk(good, {**{f'lens/H{i}.md': 'див. `tools/run_me.sh`\n' for i in range(6)}}, code_after=True), 'вузлові файли'),
         ('id черги в самері 3 сесій без брифу → ⚠ «кандидат у бриф»', mk(good, {'lens/P_CHERGA.md': '## Відкрите\n| `PX-1` | довгий пункт | 01.10 | x |\n', 'sessions/P_session_summary_A.md': '§1 PX-1 зроблено частину', 'sessions/P_session_summary_B.md': '§1 PX-1 ще частина', 'sessions/P_session_summary_C.md': '§1 PX-1 і знову'}), 'кандидат у бриф'),
         ('той самий пункт з «бриф не треба: …» у рядку черги → без «кандидат у бриф»', mk(good, {'lens/P_CHERGA.md': '## Відкрите\n| `PX-1` | довгий пункт; **бриф не треба:** два кроки без розвідки | 01.10 | x |\n', 'sessions/P_session_summary_A.md': '§1 PX-1 зроблено частину', 'sessions/P_session_summary_B.md': '§1 PX-1 ще частина', 'sessions/P_session_summary_C.md': '§1 PX-1 і знову'}), '!кандидат у бриф'),
+        ('id з літерами (`AE-X`) у самері 2 сесій без брифу → ⚠ «кандидат» (BRIEF-2 5б)', mk(good, {'lens/P_CHERGA.md': '## Відкрите\n| `AE-X` | пункт | 01.10 | x |\n', 'sessions/P_session_summary_A.md': '§1 AE-X частина', 'sessions/P_session_summary_B.md': '§1 AE-X ще'}), 'кандидат у бриф'),
+        ('чужий бриф лише згадує id у тілі → ⚠ «кандидат» усе одно', mk(good, {'lens/P_CHERGA.md': '## Відкрите\n| `AE-X` | пункт | 01.10 | x |\n', 'sessions/P_session_summary_A.md': '§1 AE-X частина', 'sessions/P_session_summary_B.md': '§1 AE-X ще', 'lens/AE-Y_brief.md': '# Y\n## §0 Коротко\n- **Стан:** a\n- **Далі:** b\n- **Чекає Konst:** c\n- далі AE-X\n'}), 'кандидат у бриф'),
+        ('бриф з id у назві → без «кандидат»', mk(good, {'lens/P_CHERGA.md': '## Відкрите\n| `AE-X` | пункт | 01.10 | x |\n', 'sessions/P_session_summary_A.md': '§1 AE-X частина', 'sessions/P_session_summary_B.md': '§1 AE-X ще', 'lens/AE-X_brief.md': '# X\n## §0 Коротко\n- **Стан:** a\n- **Далі:** b\n- **Чекає Konst:** c\n'}), '!кандидат у бриф'),
+        ('не-Lens: рядок черги > 2000 → ⚠ «час для брифу» (BRIEF-2 5в)', mk_nl(good_nl, '## Відкрите\n| `AE-W` | ' + 'x' * 2001 + ' | 18.10.2026 | y |\n'), 'час для брифу'),
+        ('не-Lens: рядок черги ≤ 2000 → без «час для брифу»', mk_nl(good_nl), '!час для брифу'),
         ('старе й нове в одному коміті → бере пізніше створене', mk(good, {'sessions/P_session_summary_Y.md': '## §0 В\n- `lens/A.md`\n'}, new_after=True, both=True), 'P_session_summary_Y'),
         ('не-Lens: самері в docs/summary/ (P_SUMMARY_…) → тиша', mk_nl(good_nl), None),
         ('бриф без «§0 Коротко» → ✗ «не за шаблоном» (BRIEF-2)', mk(good, {'lens/X_brief.md': '# X\n## §0 Курс\n- щось\n'}), 'не за шаблоном'),
