@@ -208,7 +208,8 @@ def check_repo(repo, now=None):
             L.append(('✗', f'бриф {rel} не за шаблоном: нема §0 «Коротко» зі Стан · Далі · Чекає → tools/claude-code/templates/BRIEF_template.md')); continue
         last = git(repo, 'log', '-1', '--format=%H', '--', rel)
         if last:
-            n = sum(1 for c in git(repo, 'log', '--format=%H', f'{last}..HEAD').split() if any(f and not f.endswith('.md') for f in git(repo, 'show', '--name-only', '--format=', c).split('\n')))
+            n = sum(1 for c in git(repo, 'log', '--format=%H', f'{last}..HEAD').split() if any(f and not f.endswith('.md') for f in git(repo, 'show', '--name-only', '--format=', c).split('\n'))
+                    and not re.search(r'бриф\s*:', git(repo, 'log', '-1', '--format=%B', c), re.I))   # «бриф: …» у коміті — брифи розглянуто свідомо (як brief-guard); AE S94: код BRIEF-2 робив «відсталим» бриф ARCH-1
             if n: L.append(('⚠', f'бриф {rel} відстає: {n} коміт(ів) коду після його останньої правки — §0 «Коротко» і «Кроки» ще «як є»?'))
     # (7) незбережене: контейнер скинеться — пропаде
     dirty = [x for x in subprocess.run(['git', '-C', repo, 'status', '--porcelain'], capture_output=True, text=True).stdout.split('\n') if x.strip()]
@@ -328,7 +329,7 @@ def selftest():
                 sh(r, 'git', 'add', '-A'); sh(r, 'git', 'commit', '-qm', 'нове самері\n\nClaude-Session: https://claude.ai/code/session_T')
         if code_after:
             os.makedirs(os.path.join(r, 'tools')); open(os.path.join(r, 'tools/run_me.sh'), 'w').write('echo')
-            sh(r, 'git', 'add', '-A'); sh(r, 'git', 'commit', '-qm', 'код\n\nClaude-Session: https://claude.ai/code/session_T')
+            sh(r, 'git', 'add', '-A'); sh(r, 'git', 'commit', '-qm', 'код\n' + (code_after if isinstance(code_after, str) else '') + '\nClaude-Session: https://claude.ai/code/session_T')
             open(os.path.join(r, 'sessions/P_session_summary_X.md'), 'a').write('\n'); sh(r, 'git', 'commit', '-qam', 'самері\n\nClaude-Session: https://claude.ai/code/session_T')
         if dirty: open(os.path.join(r, 'lens/A.md'), 'a').write('z')
         if commit_after:
@@ -368,6 +369,7 @@ def selftest():
         ('не-Lens: самері в docs/summary/ (P_SUMMARY_…) → тиша', mk_nl(good_nl), None),
         ('бриф без «§0 Коротко» → ✗ «не за шаблоном» (BRIEF-2)', mk(good, {'lens/X_brief.md': '# X\n## §0 Курс\n- щось\n'}), 'не за шаблоном'),
         ('бриф ядра без «§0 Коротко» → ✗, винятку kernel/ нема (BRIEF-2 крок 4)', mk(good, {'kernel/Lens_X_brief.md': '# X\n## §1 Навіщо\n'}), '✗:не за шаблоном'),
+        ('бриф за шаблоном, код після нього з «бриф: без змін — …» → без «відстає»', mk(good, {'lens/X_brief.md': '# X\n## §0 Коротко\n- **Стан:** a\n- **Далі:** b\n- **Чекає Konst:** c\n'}, code_after='бриф: без змін — інший пункт'), '!відстає'),
         ('бриф за шаблоном, код після нього → ⚠ «відстає» (BRIEF-2)', mk(good, {'lens/X_brief.md': '# X\n## §0 Коротко\n- **Стан:** a\n- **Далі:** b\n- **Чекає Konst:** c\n'}, code_after=True), 'відстає'),
         ('не-Lens: самері без стартового → ✗', mk_nl(good_nl.split('## §6')[0]), 'стартове повідомлення нема'),
     ]

@@ -246,6 +246,8 @@ archive/
 - `Lens_kernel_BRIEF_SB-1_closed.md` · 19.10.2026 · Lens governance · закритий бриф `SB-1` (перепис маніфесту стендів Х0–Х7, практика N1–N8, Pareto пропусків, «Як спрацював»)
 - `Lens_kernel_BRIEF_HOOK-3.2_closed.md` · 19.10.2026 · Lens governance · закритий бриф `HOOK-3.2` (задум `handoff_check` + `handoff-remind`, зроблено 09.10) — розпил `Lens_kernel_BRIEFS.md`, AE S94
 - `Lens_kernel_BRIEF_HOOK-2.5_closed.md` · 19.10.2026 · Lens governance · закритий бриф `HOOK-2.5` (огляд UI: `ui_lint` + ворота, зроблено 10.10) — розпил `Lens_kernel_BRIEFS.md`, AE S94
+- `Lens_kernel_BRIEF_BRIEF-1_closed.md` · 19.10.2026 · Lens governance · закритий бриф `BRIEF-1` (бриф — коли і який: звідки шаблон, польова перевірка) — AE S94
+- `Lens_kernel_BRIEF_BRIEF-2_closed.md` · 19.10.2026 · Lens governance · закритий бриф `BRIEF-2` (бриф не протухає: `brief-guard`, `handoff_check` (8)/(9), розпил брифів ядра) — AE S94
 - `Lens_kernel_BRIEF_DOC-1_closed.md` · 19.10.2026 · Lens governance · закритий бриф `DOC-1` (здоров'я документів під Claude Code: `doc_health`, G6 знято, зроблено 10.10) — розпил `Lens_kernel_BRIEFS.md`, AE S94
 
 ### Стенди — виїхали з ядра

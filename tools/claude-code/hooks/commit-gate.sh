@@ -4,18 +4,21 @@
 # ✗ → deny з рядками ✗ (урок QR-Lens CC-2, 08.10.2026: `| tail -1` сховав exit гейта → коміт з ✗).
 #   ядро (є kernel/Lens_validate.py) → --gov · продукт Lens (є lens/*_INDEX.md) → --product · інше репо → тиша.
 # Репо коміту: останній `cd <шлях>` перед `git commit` у тому ж ланцюжку, `git -C <шлях>` або cwd гачка. Гейт ~1 с.
+# + база (AE S94, аудит 19.10 A1): при ✗ — той самий гейт на HEAD (тимчасовий worktree, ~1 с, лише коли коміт уже зупинено);
+#   ✗, що є й на HEAD, позначено «(було до правки)» — агент одразу бачить, що ✗ не його, і називає його Konst.
 # + сторож файлів коміту (commit_files.py, HOOK-2 п.«нові файли», QR CC-12 14.10.2026) — у БУДЬ-ЯКОМУ репо: що коміт внесе, включно з `git add -A` тієї ж команди.
 H="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" python3 -c '
 import json, sys, re, os, glob, subprocess
 d = json.load(sys.stdin)
 if d.get("tool_name") != "Bash": sys.exit(0)
 cmd = str((d.get("tool_input") or {}).get("command", ""))
-if not re.search(r"\bgit\b[^\n;&|]*\bcommit\b", cmd): sys.exit(0)
+GITC = r"^\s*(?:\w+=\S*\s+)*git\b(?:\s+-[cC]\s+\S+)*\s+commit\b"   # git … commit на початку команди; у тексті рядка (Python, heredoc) — ні (хибне 08.10 QR CC-4 · 19.10 AE S94)
+if not any(re.match(GITC, s) for s in re.split(r"&&|\|\||;|\||\n", cmd)): sys.exit(0)
 cwd, dirs = d.get("cwd") or os.getcwd(), []
 for seg in re.split(r"&&|\|\||;|\n", cmd):
     m = re.match(r"\s*cd\s+(\"[^\"]+\"|\x27[^\x27]+\x27|\S+)", seg)
     if m: cwd = os.path.expanduser(m.group(1).strip("\"\x27")) if os.path.isabs(os.path.expanduser(m.group(1).strip("\"\x27"))) else os.path.join(cwd, m.group(1).strip("\"\x27"))
-    if re.search(r"\bgit\b[^\n]*\bcommit\b", seg):
+    if re.match(GITC, seg):
         c = re.search(r"\bgit\s+-C\s+(\S+)", seg)
         dirs.append(os.path.join(cwd, c.group(1)) if c else cwd)
 kern = next((k for k in ("/home/user/lens-governance", "/tmp/lens-governance") if os.path.exists(k + "/kernel/Lens_validate.py")), None)
@@ -45,11 +48,23 @@ for dd in dict.fromkeys(dirs):
     except subprocess.TimeoutExpired:   # без цього Python падає з 1 → Claude Code вважає помилку гачка незначною і пропускає коміт без гейта
         bad.append(f"{os.path.basename(top)}: гейт не встиг за 60 с — запусти руками"); continue
     if r.returncode != 0:
-        lines = [l.strip() for l in r.stdout.splitlines() if "✗" in l][:8]
-        bad.append(f"{os.path.basename(top)}: " + " · ".join(lines))
+        lines = [l.strip() for l in r.stdout.splitlines() if "✗" in l and "ПІДСУМОК" not in l][:8]
+        base = set()
+        wt = subprocess.run(["mktemp", "-d"], capture_output=True, text=True).stdout.strip()
+        try:   # база — той самий гейт на HEAD; збій бази не блокує відповідь гачка
+            if wt and subprocess.run(["git", "-C", top, "worktree", "add", "-q", "--detach", wt + "/b", "HEAD"], capture_output=True).returncode == 0:
+                rb = [x.replace(top, wt + "/b") if x.startswith(top) else x for x in run]
+                if os.path.exists(top + "/kernel/Lens_validate.py"): rb[1] = wt + "/b/kernel/Lens_validate.py"
+                ob = subprocess.run(rb, capture_output=True, text=True, cwd=wt + "/b", timeout=60).stdout.replace(wt + "/b", top)
+                base = {l.strip() for l in ob.splitlines() if "✗" in l}
+        except Exception:
+            pass
+        finally:
+            subprocess.run(["git", "-C", top, "worktree", "remove", "--force", wt + "/b"], capture_output=True); subprocess.run(["rm", "-rf", wt])
+        bad.append(f"{os.path.basename(top)}: " + " · ".join(l + (" (було до правки)" if l in base else "") for l in lines))
 if bad:
     print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny",
         "permissionDecisionReason": "Гейт ✗ — коміт зупинено (HOOK-2 п.1). " + " | ".join(bad) +
-        " → виправ ✗ і коміть знову; гачок пропускає лише ✗ 0 (до/після не порівнює) — ✗, що був і до правки, назви Konst. Гейт бачить стан ДО всієї команди: правки — однією командою, коміт — наступною."}}, ensure_ascii=False))
+        " → виправ ✗ і коміть знову; гачок пропускає лише ✗ 0; ✗ з позначкою «(було до правки)» є й на HEAD — не твій: назви його Konst. Гейт бачить стан ДО всієї команди: правки — однією командою, коміт — наступною."}}, ensure_ascii=False))
 sys.exit(0)
 '
