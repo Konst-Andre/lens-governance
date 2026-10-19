@@ -8,7 +8,7 @@
 > **Маршрутизатор — `Lens_cookbook_INDEX.md`**: задача → запис → том, і мапа номер → том.
 > Загальний контекст (джерело коду, тестова база, маркування ✅ / 🔧 / 🆕🔒) живе там і **тут не дублюється**.
 >
-> **Записи тому (9):** A44, A54, A57, A67, A67.1, A70, A71, A72, A73
+> **Записи тому (17):** A44, A54, A57, A67, A67.2, A67.1, A70, A71, A72, A73, A82, A83, A105, A106, A107, A114, A116
 >
 > **Зовнішні залежності.** A57 — звід над **A18** (том 2), **A27** (том 1), A54/A56 · A67.1 = база **A67** + **A54** (тут же) · A72 = база **A70** (тут же) + **A45** (том 3)
 >
@@ -678,3 +678,47 @@ iPad тику не має · iOS 17.4–17.x: switch є, тику нема (мо
 
 **Зв'язок:** `A93` (де показати статус) · `A57` (драбина тривалостей) · `A71` (каскад) · `A82` (прохід світла) · `A59` (пульс лише для «йде») · `A35.1` (статусні кольори).
 **Провенанс.** QR Lens CC-17, 18.10.2026: примірка `QRL-11_fresh` v1–v3 (П1–П5 → 6а «підвал» + «понад тиждень» → рух: весь ряд · зі змійкою · один промінь · рулон).
+
+---
+
+## A116. «i»-пояснення як підказка поверх вмісту (tip-popover), а не розгортання ✅
+
+**Проблема.** Кнопка «i» біля заголовка секції розгортає пояснення під собою. Анімація `height` (WAAPI чи `grid-template-rows 0fr→1fr`) на iPhone
+дає ривки: сторінка перераховує розкладку на кожному кадрі, текст усередині обрізається, поки блок росте, — «дьоргається, наче фріз» (Konst, AirLens, 01.10.2026).
+
+**Замір (Chromium, CPU ×6, 375 px, DPR 3, 6 прогонів, AirLens Р-66):**
+
+| варіант | показ | найдовший кадр анімації | перерахунків сторінки |
+|---|---|---|---|
+| розгортання (`height` 0 → h) | 33 мс | 33 мс | 16 |
+| підказка поверх вмісту (`opacity` + `transform`, свій шар) | 26 мс | **≤ 17 мс** (60 к/с) | 5 |
+
+**Рішення — патерн «tip-popover»** (Apple TipKit, iOS 17 / WWDC 2023 «Make features discoverable with TipKit»):
+- бульбашка `position:absolute` під заголовком, **поверх** вмісту — нічого не зсуває; стрілка (`::before`, повернутий квадрат) — на «i» через `--ax`;
+- поява 220 мс `cubic-bezier(.2,.9,.25,1)`: `opacity 0→1`, `translateY(-6px) scale(.96) → none`, `transform-origin` — від стрілки; зникнення 140 мс `ease-in`;
+- `will-change: transform, opacity; contain: layout paint`; тінь — помірна (велике розмиття на DPR 3 дороге);
+- одна відкрита; дотик будь-де (`pointerdown`, capture) — закрити; повторний дотик «i» — закрити;
+- `prefers-reduced-motion: reduce` — без анімації (показ / сховати).
+
+```js
+function toggleInfo(btn) {               // el — бульбашка #info-<id>, sh — заголовок секції з кнопкою «i»
+  const el = $(`#info-${btn.dataset.info}`), was = tip && tip.el === el; closeTip(!was); if (was) return;
+  const sh = btn.closest(".shead"); el.hidden = false;
+  el.style.top = `${sh.offsetTop + sh.offsetHeight + 4}px`; el.style.left = `${sh.offsetLeft - 4}px`; el.style.width = `${sh.offsetWidth + 8}px`;
+  el.style.setProperty("--ax", `${btn.offsetLeft + btn.offsetWidth / 2 - sh.offsetLeft + 4}px`);
+  tip = { el, btn }; btn.setAttribute("aria-expanded", "true");
+  if (!CALM.matches) el.animate([{ opacity: 0, transform: "translateY(-6px) scale(.96)" }, { opacity: 1, transform: "none" }], { duration: 220, easing: "cubic-bezier(.2,.9,.25,1)" });
+}
+```
+
+**Не беремо:** кнопку «✕» і лічильники показів TipKit — пояснення відкривають за бажанням; спливне вікно по центру екрана — відриває пояснення від того, що пояснює.
+
+**Правило, що з цього випливає:** анімувати лише `opacity` і `transform`; скаргу «дьоргається» — міряти в браузері з уповільненим CPU, а не гадати.
+
+**Світ** (19.10.2026): нативний `popover` (`popover="auto"`) закривається дотиком поза ним на iOS лише з Safari 18.3 — до того ігнорував дотик зовні (web.dev «The Popover API is now Baseline Newly available»); тому закриття — своїм `pointerdown` (capture), як тут, доки ціль — iOS < 18.3.
+
+**Поріг входу (`12.11`).** Наше й device-locked: Konst перевірив на iPhone XS 01.10.2026 — «тепер це набагато краще».
+
+*(Народилось: AirLens, сесія 9, 01.10.2026 — `AirLens:docs/DECISIONS.md` Р-66, код — `AirLens:miniapp/app/index.html` `toggleInfo`.)*
+
+*Змерджено з буфера 19.10.2026 (`CB-1`, AE S92); покажчик для тому 4 (компоненти) — рядок індексу §2.*
