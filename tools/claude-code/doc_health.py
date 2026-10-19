@@ -112,7 +112,7 @@ def dead_paths(root):
     return out
 
 
-M7_OTHER = re.compile(r'(\.md|\.py|\.sh|\.mjs|\.js|wsd|gov|INDEX|самері|CLAUDE|ядра|профіл|PROFILE|бриф|том|кукбук|Cookbook|REPO_FRAME|ADOPT|SHOTS|PREVIEW|ADAPT|CHAT_TOOLS|CLOUDFLARE|HOOK_JOURNAL|`[A-Za-z-]+:|\bS\d+|\bCC-\d+)', re.I)
+M7_OTHER = re.compile(r'(\.md|\.py|\.sh|\.mjs|\.js|wsd|gov|INDEX|самері|CLAUDE|ядра|профіл|PROFILE|бриф|том|кукбук|Cookbook|REPO_FRAME|ADOPT|SHOTS|PREVIEW|ADAPT|CHAT_TOOLS|CLOUDFLARE|HOOK_JOURNAL|маніфест|manifest|`[A-Za-z-]+:|\bS\d+|\bCC-\d+)', re.I)
 def dead_sections(root):
     """M7: складена адреса `§N-x` / `§N.M` / `§N(…)` без заголовка §N у тому ж файлі (правила — шапка файла)."""
     out = []
