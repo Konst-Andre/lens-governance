@@ -23,6 +23,20 @@ vars=""; for v in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID GH_TOKEN $EXTRA_VAR
 gate=$(bash -c "$GATE_CMD" 2>&1 | tail -1)
 last=$(grep -m1 -oE "^\| 20[0-9]{2}-[0-9]{2}-[0-9]{2}" "$AUDITF" 2>/dev/null | tr -d '| ')
 if [ -n "$last" ]; then days=$(( ( $(date +%s) - $(date -d "$last" +%s) ) / 86400 )); [ "$days" -gt 30 ] && aud="аудит правил: $days дн. — ПОРА" || aud="аудит правил: $days дн. тому"; else aud="аудит правил: журналу нема"; fi
+INSTR="CLAUDE.md"                # файли інструкцій репо (skills, профіль у репо — дописати)
+# AUD-2 · AUD-4 (19.10.2026): борг пакетного аудиту — коміти в інструкціях ПІСЛЯ останнього коміту журналу аудиту (той самий день теж видно).
+# Не борг: позначка «аудит: клас 0» / «за аудитом» у будь-якому рядку повідомлення (будь-який регістр) · межа неглибокого клону — $GIT_DIR/shallow,
+# по одному коміту в рядку; без батька її дифф «додає» всі файли (git-scm.com/docs/shallow, 18.10.2026; AE S90 — хибні 22 файли).
+# «ПОРА» — ≥ 5 файлів у борзі або найстаріший коміт боргу ≥ 7 дн. (числа — пропозиція AUD-4 08.10, «так» Konst 19.10; переглянути після 2–3 пакетів).
+shallow="$(git rev-parse --git-path shallow)"; jc=$(git log -1 --format=%H -- "$AUDITF" 2>/dev/null); debt=0; dfiles=""; oldest=""
+[ -n "$jc" ] && for h in $(git rev-list "$jc"..HEAD -- $INSTR 2>/dev/null); do
+  grep -qx "$h" "$shallow" 2>/dev/null && continue
+  git show -s --format=%B "$h" | grep -qiE 'аудит: клас 0|за аудитом' && continue
+  debt=$((debt+1)); dfiles="$dfiles $(git show --name-only --format= "$h" -- $INSTR | tr '\n' ' ')"; oldest=$(git show -s --format=%ct "$h")
+done
+if [ "$debt" -gt 0 ]; then nf=$(printf '%s\n' $dfiles | sort -u | grep -c .); age=$(( ( $(date +%s) - oldest ) / 86400 ))
+  aud="$aud · ⚠ борг аудиту: $debt коміт(ів), $nf файл(ів), найстаріший $age дн."
+  { [ "$nf" -ge 5 ] || [ "$age" -ge 7 ]; } && aud="$aud — ПОРА пакет за класом (lens-governance:tools/claude-code/templates/AUDIT_template.md)"; fi
 echo "env: github=${g:-000} cloudflare=${c:-000} · ${vars% } · гейт: $gate · $aud"
 K=../lens-governance; [ -d "$K" ] || K=/tmp/lens-governance; [ -f "$K/tools/claude-code/profile_check.sh" ] && bash "$K/tools/claude-code/profile_check.sh"   # профіль (ACCOUNT_MOVE.md п.1-б)
 

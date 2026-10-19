@@ -22,16 +22,21 @@ gw=$(echo "$gout" | awk '/^\[G[0-9]+\]/{g=$1} /^  ⚠/{c[g]++} END{for(k in c) p
 x=$(echo "$gate" | grep -oE '✗ [0-9]+' | grep -oE '[0-9]+'); [ "${x:-1}" -gt 0 ] && { gate="$gate ← ✗ > 0, розібратись"; rc=1; }
 last=$(grep -m1 -oE "^\| 20[0-9]{2}-[0-9]{2}-[0-9]{2}" kernel/Lens_AUDIT.md 2>/dev/null | tr -d '| ')
 if [ -n "$last" ]; then days=$(( ( $(date +%s) - $(date -d "$last" +%s) ) / 86400 )); [ "$days" -gt 30 ] && aud="аудит правил: $days дн. — ПОРА" || aud="аудит правил: $days дн. тому"; else aud="аудит правил: журналу нема"; fi
-# AUD-2 (05.10.2026): борг пакетного аудиту — коміти у файлах інструкцій після дати верхнього рядка журналу (той самий день не видно — прийнято)
-INSTR="CLAUDE.md tools/claude-code/PROFILE.md tools/claude-code/REPO_FRAME.md tools/claude-code/ADOPT.md tools/claude-code/CLAUDE_CODE.md tools/claude-code/templates tools/cloudflare/CLOUDFLARE.md kernel/wsd"
-# не борг: позначка «аудит: клас 0» / «за аудитом» у будь-якому рядку повідомлення, будь-який регістр · межа неглибокого клону —
-# $GIT_DIR/shallow, по одному коміту в рядку; без батька її дифф «додає» всі файли (git-scm.com/docs/shallow, 18.10.2026; AE S90 — хибні 22 файли)
-shallow="$(git rev-parse --git-path shallow)"; debt=0
-[ -n "$last" ] && for h in $(git log --since="$last 23:59:59" --format=%H -- $INSTR 2>/dev/null); do
+AUDITF="kernel/Lens_AUDIT.md"
+INSTR="CLAUDE.md tools/claude-code/PROFILE.md tools/claude-code/REPO_FRAME.md tools/claude-code/ADOPT.md tools/claude-code/CLAUDE_CODE.md tools/claude-code/templates tools/cloudflare/CLOUDFLARE.md kernel/wsd tools/PREVIEW.md tools/claude-code/SHOTS.md tools/claude-code/VERSIONS.md tools/claude-code/ACCOUNT_MOVE.md kernel/Lens_stagebench_manifest.md"
+# AUD-2 · AUD-4 (19.10.2026): борг пакетного аудиту — коміти в інструкціях ПІСЛЯ останнього коміту журналу аудиту (той самий день теж видно).
+# Не борг: позначка «аудит: клас 0» / «за аудитом» у будь-якому рядку повідомлення (будь-який регістр) · межа неглибокого клону — $GIT_DIR/shallow,
+# по одному коміту в рядку; без батька її дифф «додає» всі файли (git-scm.com/docs/shallow, 18.10.2026; AE S90 — хибні 22 файли).
+# «ПОРА» — ≥ 5 файлів у борзі або найстаріший коміт боргу ≥ 7 дн. (числа — пропозиція AUD-4 08.10, «так» Konst 19.10; переглянути після 2–3 пакетів).
+shallow="$(git rev-parse --git-path shallow)"; jc=$(git log -1 --format=%H -- "$AUDITF" 2>/dev/null); debt=0; dfiles=""; oldest=""
+[ -n "$jc" ] && for h in $(git rev-list "$jc"..HEAD -- $INSTR 2>/dev/null); do
   grep -qx "$h" "$shallow" 2>/dev/null && continue
-  git show -s --format=%B "$h" | grep -qiE 'аудит: клас 0|за аудитом' || debt=$((debt+1))
+  git show -s --format=%B "$h" | grep -qiE 'аудит: клас 0|за аудитом' && continue
+  debt=$((debt+1)); dfiles="$dfiles $(git show --name-only --format= "$h" -- $INSTR | tr '\n' ' ')"; oldest=$(git show -s --format=%ct "$h")
 done
-[ "${debt:-0}" -gt 0 ] && aud="$aud · ⚠ борг аудиту: $debt коміт(ів) в інструкціях після $last — пакет за класом (tools/claude-code/templates/AUDIT_template.md)"
+if [ "$debt" -gt 0 ]; then nf=$(printf '%s\n' $dfiles | sort -u | grep -c .); age=$(( ( $(date +%s) - oldest ) / 86400 ))
+  aud="$aud · ⚠ борг аудиту: $debt коміт(ів), $nf файл(ів), найстаріший $age дн."
+  { [ "$nf" -ge 5 ] || [ "$age" -ge 7 ]; } && aud="$aud — ПОРА пакет за класом (lens-governance:tools/claude-code/templates/AUDIT_template.md)"; fi
 echo "env: github=${g:-000} cloudflare=${c:-000} · ${vars% } · гейт --gov: $gate · $aud"
 bash tools/claude-code/profile_check.sh   # профіль: звідки в цій сесії (як git config --show-origin) — з репо (LENS_PROFILE=1) чи з налаштувань; ACC-1 (ACCOUNT_MOVE.md)
 
