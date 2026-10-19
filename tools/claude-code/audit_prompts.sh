@@ -36,7 +36,9 @@ if [ "${AUDIT_WORLD:-1}" != 0 ]; then
   if [ -z "$wp" ]; then echo "⚠ правил аудитора (AUDIT_world_prompt.md) не знайдено — ядро не поруч; аудит у старому режимі"
   else
     kd="$(cd "$(dirname "$wp")/../../.." && pwd)"
-    world=(--tools "Read,Grep,Glob,Bash,WebSearch,WebFetch" --permission-mode dontAsk --max-budget-usd "${AUDIT_BUDGET:-4}"
+    # --setting-sources "": без наших налаштувань — гачки (профіль, env_check, ui-guard, Stop) аудиторові не потрібні й заважають; вхід (OAuth) не чіпає,
+    # на відміну від --bare (лише ANTHROPIC_API_KEY — у контейнері нема). Замір haiku 19.10: запис у кеш на старті 17.9 → 6.9 тис. ток., профілю в контексті нема.
+    world=(--setting-sources "" --tools "Read,Grep,Glob,Bash,WebSearch,WebFetch" --permission-mode dontAsk --max-budget-usd "${AUDIT_BUDGET:-4}"
            --allowedTools "Read" "Grep" "Glob" "WebSearch" "WebFetch" "Bash(git log:*)" "Bash(git blame:*)" "Bash(git show:*)" "Bash(git ls-files:*)" "Bash(git diff:*)" "Bash(grep:*)" "Bash(ls:*)" "Bash(wc:*)"
            --append-system-prompt "$(cat "$wp")")
     [ "$kd" != "$(pwd -P)" ] && world+=(--add-dir "$kd")
