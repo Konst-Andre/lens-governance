@@ -23,12 +23,22 @@ case "$cls" in 1) models="opus";; 2) models="opus sonnet";; *) echo "перши�
 [ $# -ge 1 ] || { echo "вкажіть файл(и)"; exit 2; }
 for f in "$@"; do [ -f "$f" ] || { echo "нема файла: $f"; exit 2; }; done
 OUT="${AUDIT_OUT:-/tmp/audit}"; mkdir -p "$OUT"
+# AUDIT_WORLD=1 — аудит зі світом і з руками (AUD-5, проба AE S94): лише читання (Read · Grep · Glob · git log/blame/show · grep · ls · wc) + WebSearch · WebFetch,
+# решта — тиха відмова (dontAsk), стеля витрат на прохід, правила — templates/AUDIT_world_prompt.md; після проходу — машинна перевірка доказів `файл:рядок`.
+# Чому: прогони S94 — без мережі й з 3–5 відмовами shell на прохід (permission_denials); практика 2026 — знахідка з доказом + детермінована перевірка доказу.
+world=()
+if [ -n "${AUDIT_WORLD:-}" ]; then
+  wp="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/templates/AUDIT_world_prompt.md"
+  world=(--tools "Read,Grep,Glob,Bash,WebSearch,WebFetch" --permission-mode dontAsk --max-budget-usd "${AUDIT_BUDGET:-4}"
+         --allowedTools "Read" "Grep" "Glob" "WebSearch" "WebFetch" "Bash(git log:*)" "Bash(git blame:*)" "Bash(git show:*)" "Bash(grep:*)" "Bash(ls:*)" "Bash(wc:*)"
+         --append-system-prompt "$(cat "$wp")")
+fi
 total=0
 for f in "$@"; do
   n=$(echo "$f" | tr '/' '_')
   for m in $models; do
     eff="--effort high"   # sonnet теж high: 06.10 на wsd знайшов ядро знахідок opus за пів ціни; без --effort думав у 7 разів менше
-    timeout 1500 claude -p --model "$m" $eff --output-format json "/doctor prompt-audit $f" > "$OUT/$n.$m.json" 2> "$OUT/$n.$m.err"   # stderr окремо: попередження CLI (06.10: «Ignoring … permissions») ламали JSON
+    timeout 1500 claude -p --model "$m" $eff "${world[@]}" --output-format json "/doctor prompt-audit $f" > "$OUT/$n.$m.json" 2> "$OUT/$n.$m.err"   # stderr окремо: попередження CLI (06.10: «Ignoring … permissions») ламали JSON
     line=$(python3 - "$OUT/$n.$m.json" "$OUT/$n.$m.txt" <<'PY'
 import json, sys
 raw = open(sys.argv[1], encoding='utf-8', errors='replace').read()
@@ -45,6 +55,23 @@ print(('ERR ' if bad else 'OK ') + f"${d.get('total_cost_usd', 0):.2f} · вхі
 PY
 )
     echo "$f · $m → $OUT/$n.$m.txt · ${line#* }"
+    # докази: кожне `файл:рядок` у звіті — файл є, рядок існує (детермінована перевірка; пошук роздуває хибні — HALLMARK 2026)
+    python3 - "$OUT/$n.$m.txt" "$OUT/$n.$m.json" <<'PY'
+import re, sys, os, json, collections
+txt = open(sys.argv[1], encoding='utf-8', errors='replace').read()
+refs = set(re.findall(r'`([\w./-]+\.\w+):(\d+)(?:[–-]\d+)?`', txt)); bad = []
+for f, n in refs:
+    p = f if os.path.isfile(f) else next((x for x in (os.path.join(r, f) for r in ('.', '..')) if os.path.isfile(x)), None)
+    if not p:   # коротке ім'я без теки — шукаємо серед файлів репо (лише однозначне)
+        c = [x for x in os.popen('git ls-files').read().split('\n') if x == f or x.endswith('/' + f)]; p = c[0] if len(c) == 1 else None
+    if not p or int(n) > sum(1 for _ in open(p, encoding='utf-8', errors='replace')): bad.append(f'{f}:{n}')
+try:
+    d = json.load(open(sys.argv[2], encoding='utf-8')); den = collections.Counter(x['tool_name'] for x in d.get('permission_denials') or [])
+except Exception:
+    den = {}
+print(f'   докази: посилань `файл:рядок` {len(refs)}, зламаних {len(bad)}' + (' — ' + ' · '.join(sorted(bad)[:6]) if bad else '') +
+      f' · вебадрес {len(set(re.findall(r"https?://[^\s)`|>]+", txt)))} · відмов інструментів {sum(den.values())}' + (f' ({dict(den)})' if den else ''))
+PY
     c=$(echo "$line" | grep -oE '\$[0-9.]+' | tr -d '$'); total=$(python3 -c "print(round($total + ${c:-0}, 2))")
     case "$line" in ERR*) echo "СТОП: помилка або ліміт — решту проходів не запущено (сумарно \$$total)"; exit 1;; esac
   done
