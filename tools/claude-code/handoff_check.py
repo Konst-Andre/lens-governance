@@ -188,6 +188,21 @@ def check_repo(repo, now=None):
             row = next((l for l in qt.splitlines() if re.match(r'^\|\s*\*{0,2}`' + re.escape(i) + '`', l)), '')   # «бриф не треба: <чому>» у рядку черги — відповідь на цей ⚠ (18.10.2026: без неї ⚠ висів вічно)
             if n >= 3 and 'бриф не треба' not in row.lower() and not re.search(r'(?<![\w-])' + re.escape(i) + r'(?![\w.])', btxt): cand.append(f'{i} ({n} самері)')
         if cand: L.append(('⚠', 'кандидат у бриф — пункт тягнеться ≥ 3 сесії, а брифу нема: ' + ' · '.join(cand[:5]) + ' → tools/claude-code/templates/BRIEF_template.md (з прополкою джерел) або рядок «чому не треба»'))
+    # (9) бриф за шаблоном і свіжий (BRIEF-2, «так» Konst 19.10.2026, AE S93): бриф AE-PORT народився повз шаблон, а (3) мовчки пропускав
+    #     бриф без «Коротко» — відсутність стандарту виглядала як «усе гаразд». Тепер: живий бриф без §0 «Коротко» зі Стан · Далі · Чекає — ✗
+    #     (`kernel/Lens_kernel_BRIEFS.md` — ⚠, доки його не зведено до шаблону); свіжість — після останньої правки брифу є коміти, що змінили
+    #     не лише .md, — ⚠ «відстає на N» (світ: stale-cli, Doc Drift Detector — історія git документа ⟂ коду, 19.10.2026; нагадування на коміт —
+    #     hooks/brief-guard.sh). Сліпа пляма (та сама у світі): будь-яка правка брифу робить його «свіжим», навіть не в «Коротко».
+    for p in sorted(glob.glob(os.path.join(repo, '**', '*.md'), recursive=True)):
+        rel = os.path.relpath(p, repo).replace(os.sep, '/')
+        if not re.search(r'(^|/)briefs/[^/]+\.md$|_brief\.md$|BRIEF[^/]*\.md$', rel) or rel.startswith('archive/') or '/archive/' in rel or 'templates/' in rel: continue
+        k = section(open(p, encoding='utf-8', errors='replace').read(), r'Коротко')
+        if k is None or not all(re.search(w, k) for w in ('Стан', 'Далі', 'Чекає')):
+            L.append(('⚠' if rel.startswith('kernel/') else '✗', f'бриф {rel} не за шаблоном: нема §0 «Коротко» зі Стан · Далі · Чекає → tools/claude-code/templates/BRIEF_template.md')); continue
+        last = git(repo, 'log', '-1', '--format=%H', '--', rel)
+        if last:
+            n = sum(1 for c in git(repo, 'log', '--format=%H', f'{last}..HEAD').split() if any(f and not f.endswith('.md') for f in git(repo, 'show', '--name-only', '--format=', c).split('\n')))
+            if n: L.append(('⚠', f'бриф {rel} відстає: {n} коміт(ів) коду після його останньої правки — §0 «Коротко» і «Кроки» ще «як є»?'))
     # (7) незбережене: контейнер скинеться — пропаде
     dirty = [x for x in subprocess.run(['git', '-C', repo, 'status', '--porcelain'], capture_output=True, text=True).stdout.split('\n') if x.strip()]
     if dirty: L.append(('✗', f'незакомічене: {len(dirty)} ({", ".join(x[3:] for x in dirty[:4])}) — коміт і push до переїзду'))
@@ -339,6 +354,8 @@ def selftest():
         ('той самий пункт з «бриф не треба: …» у рядку черги → без «кандидат у бриф»', mk(good, {'lens/P_CHERGA.md': '## Відкрите\n| `PX-1` | довгий пункт; **бриф не треба:** два кроки без розвідки | 01.10 | x |\n', 'sessions/P_session_summary_A.md': '§1 PX-1 зроблено частину', 'sessions/P_session_summary_B.md': '§1 PX-1 ще частина', 'sessions/P_session_summary_C.md': '§1 PX-1 і знову'}), '!кандидат у бриф'),
         ('старе й нове в одному коміті → бере пізніше створене', mk(good, {'sessions/P_session_summary_Y.md': '## §0 В\n- `lens/A.md`\n'}, new_after=True, both=True), 'P_session_summary_Y'),
         ('не-Lens: самері в docs/summary/ (P_SUMMARY_…) → тиша', mk_nl(good_nl), None),
+        ('бриф без «§0 Коротко» → ✗ «не за шаблоном» (BRIEF-2)', mk(good, {'lens/X_brief.md': '# X\n## §0 Курс\n- щось\n'}), 'не за шаблоном'),
+        ('бриф за шаблоном, код після нього → ⚠ «відстає» (BRIEF-2)', mk(good, {'lens/X_brief.md': '# X\n## §0 Коротко\n- **Стан:** a\n- **Далі:** b\n- **Чекає Konst:** c\n'}, code_after=True), 'відстає'),
         ('не-Lens: самері без стартового → ✗', mk_nl(good_nl.split('## §6')[0]), 'стартове повідомлення нема'),
     ]
     bad = 0
