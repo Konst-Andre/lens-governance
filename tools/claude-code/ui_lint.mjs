@@ -10,7 +10,7 @@
 //          node ui_lint.mjs selftest — зуби: сторінка з підкинутими вадами (кожна мусить дати свій рядок) і чиста (0).
 // Перевірки: 1 скрол убік · 2 обрізано · 3 прилипло / вилазить · 4 контраст (4-б — на градієнті пікселем знімка) · 5 шрифт · 6 тап, без назви, iOS-зум · 7 накладання · 8 ряд · 9 текст (сміття, жаргон) ·
 // 10 дія в прокрутці · 11 кнопки ряду · 12 сирота · 13 злито · 14 однакові заголовки · 15 дата й час · 16 зливається (16-б край кнопки) · 17 паритет тем · 18 кромка · 19 картка-список · 20 вкладена прокрутка · 21 шапка в прокрутці · 22 емодзі в кнопці · 23 нативне вікно · 24 фон у рамці · 25 кант рветься · 26 поле губиться; поза probe — натискання (:active / JS pointerdown, touchstart).
-// 31 форма виділення · 32 пунктир < 3:1 · 22 емодзі-значок без підпису → ✗ — AE S94, 20.10.2026.
+// 31 форма виділення · 32 пунктир < 3:1 · 22 емодзі-значок без підпису → ✗ · 33 різнобій списків — AE S94, 20.10.2026.
 // 27 плашка в тон тла · 28 панелі зливаються · 29 список-таблиця · 30 чуже правило (--scope <корінь острова>) — AE S93, 19.10.2026.
 // Звідки кожна (пропуск Konst, QR CC-N, рецепт кукбуку) — коментар біля неї.
 // Вивід: ✗ (ворота не пустять) · ⚠ (подивись очима) · ⓘ (не виміряно); exit 1 на ✗.
@@ -272,6 +272,12 @@ function probe() {
     const ground = el.parentElement && flatBg(el.parentElement); if (!ground) continue;
     const c = rgba(s['border' + k + 'Color']) || [0, 0, 0, 0], ratio = cr(blend(c, ground), ground);
     if (ratio < 3) add('✗', 'пунктир', el, `пунктирна межа керуючого ${ratio.toFixed(2)}:1 до тла (< 3:1) — ледь видно, що тут дія; темніший пунктир або суцільна межа`); }
+  // 33. різнобій списків (пропуск агента AE S94, 20.10.2026 — Konst: «ти зробив власні випадайки для характеру й груп, а для “Додати” — ні; я ж не буду перечисляти всі пункти»):
+  //     видимі select екрана з різним appearance (base-select ⟂ none ⟂ auto) — однорідне виглядає по-різному; меншість — ⚠. Рецепт — кукбук A117.
+  { const sel = all.filter(e => e.tagName === 'SELECT' && e.getBoundingClientRect().width > 0), g = {};
+    for (const e of sel) (g[getComputedStyle(e).appearance] ||= []).push(e);
+    const ks = Object.keys(g).sort((a, b) => g[b].length - g[a].length);
+    if (ks.length > 1) for (const k of ks.slice(1)) for (const e of g[k]) add('⚠', 'різнобій списків', e, `${g[k].length} з ${sel.length} списків екрана мають інший вигляд (appearance: ${k} ⟂ ${ks[0]} у решти) — однорідне має виглядати однаково (кукбук A117)`); }
   // 9. текст для людини: сміття з коду — ✗; жаргон — ⚠
   const txt = document.body.innerText;
   for (const bad of ['undefined', 'NaN', '[object', 'null']) if (new RegExp(`(^|[^\\w])${bad.replace('[', '\\[')}($|[^\\w])`).test(txt)) add('✗', 'текст', document.body, `на екрані «${bad}» — дані не підставились`);
@@ -341,6 +347,8 @@ const DEFECTS = {
   'список-таблиця': `<div class=card><div>${Array.from({length: 7}, (_, i) => `<div style="padding:10px 0;border-bottom:1px solid #ccc">Сценарій ${i}</div>`).join('')}</div></div>`,   // AE S93: «купа рисок»
   'форма виділення': `<div class=card><a href="#x" class=active style="display:inline-block;padding:10px 16px;background:#ffe241;border-radius:0 10px 10px 0">Сценарії</a></div>`,   // AE S94: капсула 0 8 8 0
   'пунктир': `<div class=card><button style="min-height:44px;padding:0 16px;border:1px dashed #e7e7e7;background:transparent;border-radius:999px;color:#00658f">+ Додати</button></div>`,   // AE S94: пунктир 1,2:1
+  'різнобій списків': `<div class=card><select><option>А</option></select> <select><option>Б</option></select> <select style="appearance:none;-webkit-appearance:none;border:1px solid #999;padding:8px">
+<option>+ Додати</option></select></div>`,   // AE S94: 3 з 7 списків на base-select, решта — ні
   'емодзі ': `<div class=card><button aria-label="Рейка" style="min-width:44px;min-height:44px">☀</button></div>`,   // AE S94: значок-емодзі без підпису → ✗
   'чуже правило': `<style>.err{padding:10px 14px;border:1px solid #c00}</style><div class=isl><span class="dot err" style="display:inline-block;width:8px;height:8px;background:#c00"></span></div>`,   // AE S93: .err тренажера → крапка редактора; selftest з --scope .isl
 };
