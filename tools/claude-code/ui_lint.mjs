@@ -10,6 +10,7 @@
 //          node ui_lint.mjs selftest — зуби: сторінка з підкинутими вадами (кожна мусить дати свій рядок) і чиста (0).
 // Перевірки: 1 скрол убік · 2 обрізано · 3 прилипло / вилазить · 4 контраст (4-б — на градієнті пікселем знімка) · 5 шрифт · 6 тап, без назви, iOS-зум · 7 накладання · 8 ряд · 9 текст (сміття, жаргон) ·
 // 10 дія в прокрутці · 11 кнопки ряду · 12 сирота · 13 злито · 14 однакові заголовки · 15 дата й час · 16 зливається (16-б край кнопки) · 17 паритет тем · 18 кромка · 19 картка-список · 20 вкладена прокрутка · 21 шапка в прокрутці · 22 емодзі в кнопці · 23 нативне вікно · 24 фон у рамці · 25 кант рветься · 26 поле губиться; поза probe — натискання (:active / JS pointerdown, touchstart).
+// 31 форма виділення · 32 пунктир < 3:1 · 22 емодзі-значок без підпису → ✗ — AE S94, 20.10.2026.
 // 27 плашка в тон тла · 28 панелі зливаються · 29 список-таблиця · 30 чуже правило (--scope <корінь острова>) — AE S93, 19.10.2026.
 // Звідки кожна (пропуск Konst, QR CC-N, рецепт кукбуку) — коментар біля неї.
 // Вивід: ✗ (ворота не пустять) · ⚠ (подивись очима) · ⓘ (не виміряно); exit 1 на ✗.
@@ -175,7 +176,10 @@ function probe() {
     if (fx && m === 'none') add('⚠', 'кромка', sc, `прокрутка в шіті без кромки: схована частина ${sc.scrollHeight - sc.clientHeight} px, маски нема — підказати «нижче ще є» (кукбук A109)`); }
   // 22. емодзі в кнопці (пропуск Konst QR CC-12, 14.10.2026: «▶ рух» на iPhone став кольоровою картинкою-емодзі серед SVG-іконок): символ з Extended_Pictographic у тексті кнопки чи посилання
   for (const el of all.filter(e => /^(BUTTON|A)$/.test(e.tagName) || e.getAttribute('role') === 'button')) { const t = [...el.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join('');
-    const m = t.match(/\p{Extended_Pictographic}/u); if (m) add('⚠', 'емодзі', el, `символ «${m[0]}» у кнопці — iOS малює його кольоровою картинкою, не в мові іконок; іконка — SVG (currentColor)`); }
+    const m = t.match(/\p{Extended_Pictographic}/u); if (!m) continue;
+    // AE S94 (пропуск Konst: «☀» перемикача рейки — емодзі замість SVG; ⚠ було, агент пройшов повз): значок без підпису — ✗; емодзі поруч зі словом — ⚠
+    const only = !el.innerText.replace(/[\p{Extended_Pictographic}\uFE0F\u200D\s\p{P}]/gu, '').trim();
+    add(only ? '✗' : '⚠', 'емодзі', el, `символ «${m[0]}» у кнопці${only ? ' — єдиний її вміст (значок без підпису)' : ''} — iOS малює його кольоровою картинкою, не в мові іконок; іконка — SVG (currentColor)`); }
   // 24. фон у рамці (пропуск Konst QR CC-15, 16.10.2026: «бліда смуга знизу» кнопки в темній): градієнт фону з початком від внутрішнього краю (background-origin: padding-box,
   //     типово) і повтором малюється й під рамкою (background-clip: border-box) → у прозорій чи напівпрозорій рамці знизу видно смужку ВЕРХУ градієнта (MDN background-origin, 16.10.2026)
   for (const el of all) { const s = getComputedStyle(el); if (!/gradient/.test(s.backgroundImage) || s.backgroundOrigin !== 'padding-box' || !/(^|\s)repeat/.test(s.backgroundRepeat) || s.backgroundClip !== 'border-box') continue;
@@ -252,6 +256,22 @@ function probe() {
   for (const p of new Set(all.map(e => e.parentElement))) { if (!p || p.tagName === 'TBODY' || p.tagName === 'TABLE') continue; const kids = [...p.children].filter(k => all.includes(k)); if (kids.length < 6) continue;
     const pw = p.getBoundingClientRect().width, lined = kids.filter(k => { const s = getComputedStyle(k); return parseFloat(s.borderBottomWidth) >= 1 && s.borderBottomStyle !== 'none' && (rgba(s.borderBottomColor) || [0, 0, 0, 0])[3] > 0.1 && k.getBoundingClientRect().width >= pw - 2; });
     if (lined.length >= 6 && lined.length >= kids.length * 0.8) add('⚠', 'список-таблиця', p, `${lined.length} рядків з лінією на всю ширину — список читається як таблиця; лінія з відступом від тексту (inset) або проміжок і підсвітка рядка`); }
+  // 31. форма виділення (пропуск Konst AE S94, 20.10.2026: капсула активного пункту рейки — «зліва прямий край, справа скруглений»): вибраний елемент
+  //     (aria-current · aria-selected · клас active / on / selected) з різними радіусами кутів (одні ≈ 0, інші > 4), а смужки збоку, під яку така форма робилась, нема →
+  //     обрубана капсула. Форма виділення — симетрична (Material 3 rail: індикатор — окрема форма за значком; developer.android.com NavigationRailView, 20.10.2026).
+  for (const el of all) { if (!el.matches('[aria-current]:not([aria-current=false]),[aria-selected=true],.active,.on,.selected,.is-active')) continue;
+    const s = getComputedStyle(el), rad = ['TopLeft', 'TopRight', 'BottomRight', 'BottomLeft'].map(k => parseFloat(s['border' + k + 'Radius']) || 0);
+    if (!(Math.max(...rad) > 4 && Math.min(...rad) < 1)) continue;
+    const side = ['Left', 'Right'].some(k => parseFloat(s['border' + k + 'Width']) >= 2 && s['border' + k + 'Style'] !== 'none' && (rgba(s['border' + k + 'Color']) || [0, 0, 0, 0])[3] > 0.1);
+    const pseudo = ['::before', '::after'].some(ps => { const q = getComputedStyle(el, ps); return q.content !== 'none' && q.display !== 'none' && parseFloat(q.width) <= 4 && (rgba(q.backgroundColor) || [0, 0, 0, 0])[3] > 0.1; });
+    if (!side && !pseudo) add('⚠', 'форма виділення', el, `радіуси кутів ${rad.join(' ')} — одні прямі, інші круглі, а смужки збоку нема: виділення читається обрубаним; симетрична форма (однакові радіуси)`); }
+  // 32. пунктир (пропуск Konst AE S94, 20.10.2026: «+ Додати» поруч з категоріями — «штрих-пунктир ледь помітний»): керуючий елемент з пунктирною
+  //     чи крапковою межею, яка до тла < 3:1 — межа тут і є ознака керуючого (WCAG 1.4.11 «non-text contrast», w3.org/WAI/WCAG21/Understanding/non-text-contrast, 20.10.2026)
+  for (const el of all) { if (!el.matches('button,select,a[href],input,textarea,[role=button]')) continue; const s = getComputedStyle(el);
+    const k = ['Top', 'Right', 'Bottom', 'Left'].find(x => /dashed|dotted/.test(s['border' + x + 'Style']) && parseFloat(s['border' + x + 'Width']) > 0); if (!k) continue;
+    const ground = el.parentElement && flatBg(el.parentElement); if (!ground) continue;
+    const c = rgba(s['border' + k + 'Color']) || [0, 0, 0, 0], ratio = cr(blend(c, ground), ground);
+    if (ratio < 3) add('✗', 'пунктир', el, `пунктирна межа керуючого ${ratio.toFixed(2)}:1 до тла (< 3:1) — ледь видно, що тут дія; темніший пунктир або суцільна межа`); }
   // 9. текст для людини: сміття з коду — ✗; жаргон — ⚠
   const txt = document.body.innerText;
   for (const bad of ['undefined', 'NaN', '[object', 'null']) if (new RegExp(`(^|[^\\w])${bad.replace('[', '\\[')}($|[^\\w])`).test(txt)) add('✗', 'текст', document.body, `на екрані «${bad}» — дані не підставились`);
@@ -319,6 +339,9 @@ const DEFECTS = {
   'плашка в тон тла': `<div style="background:#FFFEF6;padding:16px"><div style="background:#FFF8D0;padding:10px;width:220px">Нурофен форте №12</div></div>`,   // AE S93: жовтий рядок на кремовому
   'панелі зливаються': `<div style="display:flex;height:100vh"><nav style="width:72px;background:#fff;border-right:1px solid #e7e7e7"></nav><section style="width:200px;background:#fff">Сценарії</section></div>`,   // AE S93: рейка й список
   'список-таблиця': `<div class=card><div>${Array.from({length: 7}, (_, i) => `<div style="padding:10px 0;border-bottom:1px solid #ccc">Сценарій ${i}</div>`).join('')}</div></div>`,   // AE S93: «купа рисок»
+  'форма виділення': `<div class=card><a href="#x" class=active style="display:inline-block;padding:10px 16px;background:#ffe241;border-radius:0 10px 10px 0">Сценарії</a></div>`,   // AE S94: капсула 0 8 8 0
+  'пунктир': `<div class=card><button style="min-height:44px;padding:0 16px;border:1px dashed #e7e7e7;background:transparent;border-radius:999px;color:#00658f">+ Додати</button></div>`,   // AE S94: пунктир 1,2:1
+  'емодзі ': `<div class=card><button aria-label="Рейка" style="min-width:44px;min-height:44px">☀</button></div>`,   // AE S94: значок-емодзі без підпису → ✗
   'чуже правило': `<style>.err{padding:10px 14px;border:1px solid #c00}</style><div class=isl><span class="dot err" style="display:inline-block;width:8px;height:8px;background:#c00"></span></div>`,   // AE S93: .err тренажера → крапка редактора; selftest з --scope .isl
 };
 
