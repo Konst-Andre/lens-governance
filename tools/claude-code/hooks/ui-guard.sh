@@ -2,7 +2,7 @@
 # живе доки: UI-кроки (HTML/CSS) робить агент Claude Code. Дім — lens-governance:tools/claude-code/hooks/ (HOOK-1); копій у репо продуктів не тримати — гачки діють з ядра через setup script v3 (стара копія QR дублювала ядро старою логікою, прибрано CC-9).
 # Гачок «UI без кукбука — не пиши»: правило «перед UI — індекс кукбука» тримає програма, не пам'ять моделі
 # (урок QR-Lens CC-2, 08.10.2026: сторінку звіту зробили без кукбука → «дешево»).
-#   mark  — PostToolUse (Read|Bash|Grep|WebSearch|WebFetch): згадано Lens_cookbook_INDEX → позначка «кукбук»; WebSearch/WebFetch → позначка «пошук ззовні»
+#   mark  — PostToolUse (Read|Bash|Grep|WebSearch|WebFetch): згадано Lens_cookbook_INDEX або сам том кукбуку (AE S95) → позначка «кукбук»; WebSearch/WebFetch → позначка «пошук ззовні»
 #   check — PreToolUse (Write|Edit|Bash), по черзі: (1) крок — код без пошуку ззовні з останнього коміту → deny (нижче «Крок»);
 #     (2) теми — код теми без пошуку саме про неї → deny (нижче «Теми»); (3) UI — запис .html/.css (Write/Edit або Bash із записом) без обох позначок сесії → deny з причиною, що саме бракує
 #   (пошук ззовні — з 10.10.2026, слово Konst: правило профілю «ПІДСИЛЕННЯ ІНТЕРНЕТОМ» модель пропускала)
@@ -63,6 +63,11 @@ X" "запис .md, що лише згадує .html → тиша (хибне S9
 p='site/index.html'; open(p,'w').write(t)
 X" "запис .html через python без кукбука й пошуку → стоп"
   tb 1 "echo '<b>x</b>' > site/index.html" "запис .html перенаправленням у чистій сесії → стоп"
+  touch "/tmp/lens-ui-$S-web" "/tmp/lens-ui-$S-step"
+  tb 1 "echo '<b>x</b>' > site/index.html" "пошук є, кукбука нема → стоп"
+  echo "{\"session_id\":\"$S\",\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"sed -n 864,889p kernel/cookbook/Lens_iOS_cookbook_3_material.md\"}}" | bash "$0" mark
+  tb 0 "echo '<b>x</b>' > site/index.html" "прочитано том кукбуку (не індекс) → тиша (дубль AE S95)"
+  rm -f "/tmp/lens-ui-$S" "/tmp/lens-ui-$S-web" "/tmp/lens-ui-$S-step"
   tb 0 "python3 - <<X
 repo=open('worker/ae-proxy.js',encoding='utf-8').read()
 X" "читання .js через open() без режиму запису → тиша (хибне S90 AE, правило «крок»)"
@@ -92,7 +97,8 @@ tool = d.get("tool_name", "")
 raw = json.dumps(ti, ensure_ascii=False)
 web = mark + "-web"   # пошук практики ззовні (профіль ЦИКЛ п.4; слово Konst 10.10: правило, що не виконується, — програмою)
 if mode == "mark":
-    if "Lens_cookbook_INDEX" in raw:
+    # «кукбук» — індекс АБО сам том (AE S95: том A117 прочитано цілком, а гачок бачив лише індекс → дубль-стоп; рецепт — у томі, індекс — лише маршрут)
+    if "Lens_cookbook_INDEX" in raw or re.search(r"cookbook/Lens_\w*cookbook\w*\.md", raw):
         open(mark, "w").close()
     if "shots/README.md" in raw:
         open(mark + "-shots", "w").close()   # примірки репо переглянуто (SHOTS.md §5 «у роботі»)
