@@ -60,7 +60,10 @@ if mode == "post":
         if not sha or not when or time.time() - int(when) > 120: continue          # коміту не було («nothing to commit») — HEAD старий
         mark = f"/tmp/lens-review-{sid}-{sha}"
         if os.path.exists(mark): continue
-        ui = [f for f in g("show", "--name-only", "--format=", sha).splitlines() if re.search(r"\.(html?|css)$", f, re.I)]
+        # видалення в shots/ (прийнята примірка прибирається, SHOTS.md) — не UI-правка, як і у воротах ui-review-gate (хибне AE S95: 12 файлів fit_*.css);
+        # статус розбирається в коді з --name-status (практика libcamera checkstyle), не --diff-filter
+        ui = [l.split("\t")[-1] for l in g("show", "--name-status", "--format=", sha).splitlines()
+              if "\t" in l and re.search(r"\.(html?|css)$", l, re.I) and not (l.startswith("D\t") and re.search(r"(^|/)shots/", l.split("\t")[-1]))]
         if not ui: continue
         open(mark, "w").close()
         import glob

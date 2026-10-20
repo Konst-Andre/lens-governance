@@ -6,7 +6,7 @@
 #           огляду САМЕ ЦЬОГО диффу нема → deny з чек-листом. Будь-яка нова правка UI після позначки міняє дифф → знову deny.
 #   done  — `bash ui-review-gate.sh done "<що переглянуто>" [тека репо]` (відмова gate дає готову команду з текою репо коміту) → позначка /tmp/lens-uireview-<хеш диффу> (рядок ≥ 40 знаків:
 #           які стани, які теми, що бачить людина після дії). Самоствердження, але в потрібну мить і по конкретному диффу.
-#   selftest — 15 випадків (з них 2 — сітка review-remind post, 4 — done ⟂ ui_lint) у тимчасовому репо (зуби: UI без позначки → deny; позначка → тиша; правка після позначки → deny; done без ui_lint → ✗).
+#   selftest — 16 випадків (з них 3 — сітка review-remind post, 4 — done ⟂ ui_lint) у тимчасовому репо (зуби: UI без позначки → deny; позначка → тиша; правка після позначки → deny; done без ui_lint → ✗).
 #   hash  — хеш диффу UI репо (для ui_lint: позначка /tmp/lens-uilint-<хеш> — машинна частина огляду, бриф §HOOK-2.5).
 #   done вимагає позначку ui_lint САМЕ ЦЬОГО диффу (✗ 0 в обох темах) або --no-lint "<причина ≥ 30 знаків>" (сторінку не запустити) — причина пишеться в позначку.
 # Діє в усіх репо, де підключено гачки ядра (tools/claude-code/CLAUDE_CODE.md «Гачки»), — не лише в QR.
@@ -155,6 +155,10 @@ if mode == "selftest":
         open(mark(hx), "w").write("огляд: світла й темна\n" + "\n".join(files) + "\n")
         subprocess.run(["git", "-C", tmp, "commit", "-qam", "2"], check=True)
         say(not post(f"st{os.getpid()}b"), "сітка: UI-коміт з позначкою → тиша (без дубля з воротами)")
+        os.makedirs(f"{tmp}/shots/P2", exist_ok=True); open(f"{tmp}/shots/P2/fit.css", "w").write("p{}")
+        subprocess.run(["git", "-C", tmp, "add", "-A"], check=True); subprocess.run(["git", "-C", tmp, "commit", "-qm", "fit2"], check=True)
+        subprocess.run(["git", "-C", tmp, "rm", "-q", "-r", "shots/P2"], check=True); subprocess.run(["git", "-C", tmp, "commit", "-qm", "3"], check=True)
+        say(not post(f"st{os.getpid()}c"), "сітка: коміт лише з видаленням примірки (shots/) → тиша (хибне AE S95)")
         os.remove(mark(hx))
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
