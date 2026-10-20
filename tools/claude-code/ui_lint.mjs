@@ -11,7 +11,7 @@
 // Перевірки: 1 скрол убік · 2 обрізано · 3 прилипло / вилазить · 4 контраст (4-б — на градієнті пікселем знімка) · 5 шрифт · 6 тап, без назви, iOS-зум · 7 накладання · 8 ряд · 9 текст (сміття, жаргон) ·
 // 10 дія в прокрутці · 11 кнопки ряду · 12 сирота · 13 злито · 14 однакові заголовки · 15 дата й час · 16 зливається (16-б край кнопки) · 17 паритет тем · 18 кромка · 19 картка-список · 20 вкладена прокрутка · 21 шапка в прокрутці · 22 емодзі в кнопці · 23 нативне вікно · 24 фон у рамці · 25 кант рветься · 26 поле губиться; поза probe — натискання (:active / JS pointerdown, touchstart).
 // 31 форма виділення · 32 пунктир < 3:1 · 22 емодзі-значок без підпису → ✗ · 33 різнобій списків — AE S94, 20.10.2026.
-// 34 пояснення під кнопкою (→ «i») — AE S96, 20.10.2026.
+// 34 пояснення під кнопкою (→ «i») · 35 наведення (ПК, ≥ 1024: нема або ледь видно) — AE S96, 20.10.2026.
 // 27 плашка в тон тла · 28 панелі зливаються · 29 список-таблиця · 30 чуже правило (--scope <корінь острова>) — AE S93, 19.10.2026.
 // Звідки кожна (пропуск Konst, QR CC-N, рецепт кукбуку) — коментар біля неї.
 // Вивід: ✗ (ворота не пустять) · ⚠ (подивись очима) · ⓘ (не виміряно); exit 1 на ✗.
@@ -359,6 +359,7 @@ const DEFECTS = {
 <option>+ Додати</option></select></div>`,   // AE S94: 3 з 7 списків на base-select, решта — ні
   'емодзі ': `<div class=card><button aria-label="Рейка" style="min-width:44px;min-height:44px">☀</button></div>`,   // AE S94: значок-емодзі без підпису → ✗
   'пояснення під кнопкою': `<div class=card><div><button style="min-height:44px;padding:0 14px">Пробна розмова</button><small style="font-size:11.5px;display:block">Модель зіграє клієнта за цим сценарієм, як для фармацевта.</small></div></div>`,   // AE S96: підпис під «Пробна розмова»
+  'наведення': `<style>.hv{min-height:44px;padding:0 14px;border:0;background:#fff}.hv:hover{background:#FFFEF6}</style><div class=card><button class=hv>Рядок списку</button></div>`,   // AE S96: наведення кремовим на білому — 1,01:1
   'чуже правило': `<style>.err{padding:10px 14px;border:1px solid #c00}</style><div class=isl><span class="dot err" style="display:inline-block;width:8px;height:8px;background:#c00"></span></div>`,   // AE S93: .err тренажера → крапка редактора; selftest з --scope .isl
 };
 
@@ -432,6 +433,39 @@ async function lint(target, states, width, theme, browser) {
       await el.evaluate(e => e.dispatchEvent(new PointerEvent('pointercancel', { bubbles: true, pointerType: 'touch', isPrimary: true }))); await p.waitForTimeout(350);
       if (before === css && before === js) res.push({ lvl: '⚠', kind: 'натискання', where: sig[j].toLowerCase(), msg: 'на натискання вигляд не змінюється (ні :active, ні JS pointerdown) — палець не відчуває кнопку; рецепт — кукбук A67', state: st ? `стан ${i}` : 'початковий' });
     }
+    // 35. наведення (пропуск Konst AE S96, 20.10.2026 з ПК: «рядок під курсором ледь помітний… кнопки не мають ховера взагалі») — лише ПК (ширина ≥ 1024: миша).
+    //     :hover примусово (CSS.forcePseudoState, як :active вище); вигляд = тло · межа · тінь · колір · підкреслення · обведення. Не змінився → ⚠ «без наведення»;
+    //     змінилось лише тло, і нове до старого < 1,12:1 (на тлі батька) → ⚠ «ледь видно». Поріг — замір AE: #FFFEF6 на білому 1,01 (Konst: «ледь помітно»), #EFEEE8 — 1,16 (видно).
+    //     WCAG наведення сам не нормує (1.4.11 — фокус і стан; accessibleweb.com «hover state contrast», 20.10.2026: для наведення радять виразне тло або межу).
+    //     Примусовий стан ≠ справжня миша (WebKit 199165: правила з :not(:hover)) — тому лише ⚠, не ✗.
+    if (width >= 1024) {
+      const hv = await p.evaluate(() => { const seen = new Set(), out = [];
+        for (const e of document.querySelectorAll('a[href],button,[role=button],select,input:not([type=hidden]):not([type=checkbox]):not([type=radio]),textarea')) { const s = getComputedStyle(e); if (s.display === 'none' || !e.getClientRects().length) continue;
+          e.scrollIntoView({ block: 'center', behavior: 'instant' }); const r = e.getBoundingClientRect();
+          if (!r.width || !r.height || s.visibility === 'hidden' || e.disabled || e.closest('[hidden]')) continue;
+          const k = e.tagName + '.' + [...e.classList].sort().join('.'); if (seen.has(k)) continue;
+          const c = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); if (!c || !(c === e || e.contains(c))) continue;
+          seen.add(k); e.dataset.uilHover = out.length; out.push(k); }
+        return out; });
+      const lumN = c => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); };
+      const crN = (x, y) => { const a = lumN(x), b = lumN(y); return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05); };
+      for (let j = 0; j < Math.min(hv.length, 40); j++) {
+        const el = p.locator(`[data-uil-hover="${j}"]`);
+        const look = () => el.evaluate(e => { const rg = c => { const m = c.match(/rgba?\(([^)]+)\)/); if (!m) return [0, 0, 0, 0]; const v = m[1].split(/[ ,/]+/).filter(Boolean).map(Number); return [v[0], v[1], v[2], v[3] ?? 1]; };
+          let g = e.parentElement, gc = [255, 255, 255, 1]; while (g) { const x = rg(getComputedStyle(g).backgroundColor); if (x[3] > 0.5) { gc = x; break; } g = g.parentElement; }
+          const s = getComputedStyle(e); return { bg: rg(s.backgroundColor), ground: gc, rest: [s.borderTopColor, s.borderBottomColor, s.boxShadow, s.color, s.textDecorationLine, s.outlineStyle, s.backgroundImage, s.filter].join('|') }; });
+        let nodeId; try { ({ nodeId } = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector: `[data-uil-hover="${j}"]` })); } catch { continue; }
+        if (!nodeId) continue;
+        const before = await look();
+        await cdp.send('CSS.forcePseudoState', { nodeId, forcedPseudoClasses: ['hover'] }); await p.waitForTimeout(300);
+        const after = await look();
+        await cdp.send('CSS.forcePseudoState', { nodeId, forcedPseudoClasses: [] });
+        const on = (c, g) => { const a = c[3]; return [c[0] * a + g[0] * (1 - a), c[1] * a + g[1] * (1 - a), c[2] * a + g[2] * (1 - a)]; };
+        const b0 = on(before.bg, before.ground), b1 = on(after.bg, after.ground), same = before.rest === after.rest, bgSame = b0.every((v, q) => Math.abs(v - b1[q]) < 1);
+        if (same && bgSame) res.push({ lvl: '⚠', kind: 'наведення', where: hv[j].toLowerCase(), state: st ? `стан ${i}` : 'початковий', msg: 'на наведення мишею вигляд не змінюється — на ПК не видно, що це можна натиснути (тло на тон темніше, межа або підкреслення)' });
+        else if (same && crN(b0, b1) < 1.12) res.push({ lvl: '⚠', kind: 'наведення', where: hv[j].toLowerCase(), state: st ? `стан ${i}` : 'початковий', msg: `наведення ледь видно: тло змінюється лише на ${crN(b0, b1).toFixed(2)}:1 (< 1,12) — помітніше тло або межа` });
+      }
+    }
     await cdp.detach();
     if (i === 0 && !(await p.evaluate(() => /touchstart/.test([...document.scripts].map(x => x.textContent).join(' ')) || document.body.hasAttribute('ontouchstart'))))
       res.push({ lvl: '⚠', kind: 'натискання', where: 'сторінка', msg: 'нема слухача touchstart — у Safari iOS :active на дотик не спрацює (додай document.addEventListener(\'touchstart\', () => {}, { passive: true }))', state: '' });
@@ -462,7 +496,7 @@ if (a[0] === 'selftest') {
   const page = (x, n) => { const f = join(d, n + '.html'); writeFileSync(f, SELF.replace('BAD', x)); return 'file://' + f; };
   const clean = await run(page('', 'clean'), [], 390); const cl = [...clean.light, ...clean.dark].filter(x => x.lvl !== 'ⓘ');
   console.log((cl.length ? '✗' : '✓') + ` чиста сторінка → тиша (${cl.length ? cl.map(x => x.kind + ': ' + x.msg).join(' | ') : '0'})`); bad += !!cl.length;
-  for (const [k, html] of Object.entries(DEFECTS)) { SCOPE = k === 'чуже правило' ? '.isl' : ''; const r = await run(page(html, k), [], 390); const hit = [...r.light, ...r.dark].some(x => x.kind === k.trim() && x.lvl !== 'ⓘ');
+  for (const [k, html] of Object.entries(DEFECTS)) { SCOPE = k === 'чуже правило' ? '.isl' : ''; const r = await run(page(html, k), [], k === 'наведення' ? 1280 : 390); const hit = [...r.light, ...r.dark].some(x => x.kind === k.trim() && x.lvl !== 'ⓘ');
     console.log((hit ? '✓' : '✗') + ` підкинуто «${k}» → спіймано`); bad += !hit; }
   console.log(`─── ui_lint selftest: ${Object.keys(DEFECTS).length + 1 - bad}/${Object.keys(DEFECTS).length + 1} ───`); process.exit(bad ? 1 : 0);
 }
