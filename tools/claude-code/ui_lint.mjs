@@ -11,6 +11,7 @@
 // Перевірки: 1 скрол убік · 2 обрізано · 3 прилипло / вилазить · 4 контраст (4-б — на градієнті пікселем знімка) · 5 шрифт · 6 тап, без назви, iOS-зум · 7 накладання · 8 ряд · 9 текст (сміття, жаргон) ·
 // 10 дія в прокрутці · 11 кнопки ряду · 12 сирота · 13 злито · 14 однакові заголовки · 15 дата й час · 16 зливається (16-б край кнопки) · 17 паритет тем · 18 кромка · 19 картка-список · 20 вкладена прокрутка · 21 шапка в прокрутці · 22 емодзі в кнопці · 23 нативне вікно · 24 фон у рамці · 25 кант рветься · 26 поле губиться; поза probe — натискання (:active / JS pointerdown, touchstart).
 // 31 форма виділення · 32 пунктир < 3:1 · 22 емодзі-значок без підпису → ✗ · 33 різнобій списків — AE S94, 20.10.2026.
+// 34 пояснення під кнопкою (→ «i») — AE S96, 20.10.2026.
 // 27 плашка в тон тла · 28 панелі зливаються · 29 список-таблиця · 30 чуже правило (--scope <корінь острова>) — AE S93, 19.10.2026.
 // Звідки кожна (пропуск Konst, QR CC-N, рецепт кукбуку) — коментар біля неї.
 // Вивід: ✗ (ворота не пустять) · ⚠ (подивись очима) · ⓘ (не виміряно); exit 1 на ✗.
@@ -278,6 +279,13 @@ function probe() {
     for (const e of sel) (g[getComputedStyle(e).appearance] ||= []).push(e);
     const ks = Object.keys(g).sort((a, b) => g[b].length - g[a].length);
     if (ks.length > 1) for (const k of ks.slice(1)) for (const e of g[k]) add('⚠', 'різнобій списків', e, `${g[k].length} з ${sel.length} списків екрана мають інший вигляд (appearance: ${k} ⟂ ${ks[0]} у решти) — однорідне має виглядати однаково (кукбук A117)`); }
+  // 34. пояснення під кнопкою (пропуск Konst AE S96, 20.10.2026: «Модель зіграє клієнта за цим сценарієм… — зайвий шум; пояснення — у букву «i», що розгортається»):
+  //     дрібний (≤ 12,5 px) текст-речення (≥ 6 слів) одразу після керуючого (сам або в невеликій обгортці, ≤ 3 дітей) — ⚠; ліки — кнопка «i» з popover поруч (кукбук A117).
+  //     Кнопка-«i» (popovertarget) — не керуючий тут: підпис біля неї — інша розмова.
+  { const ctl = e => e && (e.matches('button:not([popovertarget]),[role=button]') || (e.children.length <= 3 && [...e.children].some(c => c.matches('button:not([popovertarget]),[role=button]'))));
+    for (const el of all) { if (!/^(SMALL|P|SPAN|DIV)$/.test(el.tagName) || el.children.length || !el.getBoundingClientRect().width) continue;
+      const t = (el.textContent || '').trim(); if (t.split(/\s+/).length < 6 || parseFloat(getComputedStyle(el).fontSize) > 12.5) continue;
+      if (ctl(el.previousElementSibling)) add('⚠', 'пояснення під кнопкою', el, `«${t.slice(0, 40)}…» — підпис-пояснення під кнопкою; на робочому екрані це шум — перенести в «i» поруч з кнопкою (кукбук A117)`); } }
   // 9. текст для людини: сміття з коду — ✗; жаргон — ⚠
   const txt = document.body.innerText;
   for (const bad of ['undefined', 'NaN', '[object', 'null']) if (new RegExp(`(^|[^\\w])${bad.replace('[', '\\[')}($|[^\\w])`).test(txt)) add('✗', 'текст', document.body, `на екрані «${bad}» — дані не підставились`);
@@ -350,6 +358,7 @@ const DEFECTS = {
   'різнобій списків': `<div class=card><select><option>А</option></select> <select><option>Б</option></select> <select style="appearance:none;-webkit-appearance:none;border:1px solid #999;padding:8px">
 <option>+ Додати</option></select></div>`,   // AE S94: 3 з 7 списків на base-select, решта — ні
   'емодзі ': `<div class=card><button aria-label="Рейка" style="min-width:44px;min-height:44px">☀</button></div>`,   // AE S94: значок-емодзі без підпису → ✗
+  'пояснення під кнопкою': `<div class=card><div><button style="min-height:44px;padding:0 14px">Пробна розмова</button><small style="font-size:11.5px;display:block">Модель зіграє клієнта за цим сценарієм, як для фармацевта.</small></div></div>`,   // AE S96: підпис під «Пробна розмова»
   'чуже правило': `<style>.err{padding:10px 14px;border:1px solid #c00}</style><div class=isl><span class="dot err" style="display:inline-block;width:8px;height:8px;background:#c00"></span></div>`,   // AE S93: .err тренажера → крапка редактора; selftest з --scope .isl
 };
 
