@@ -28,7 +28,7 @@ CONTROLS_JS = r"""() => {
     const r = e.getBoundingClientRect(), c = document.elementFromPoint(Math.min(innerWidth - 1, Math.max(0, r.left + r.width / 2)), Math.min(innerHeight - 1, Math.max(0, r.top + r.height / 2)));
     const name = (e.getAttribute('aria-label') || e.textContent || e.getAttribute('title') || e.value || '').replace(/\s+/g, ' ').trim().slice(0, 60);
     out.push({ sel: path(e), name, tag: e.tagName.toLowerCase(), group: e.tagName + '.' + [...e.classList].sort().join('.'),
-               disabled: !!(e.disabled || e.getAttribute('aria-disabled') === 'true'), covered: !!(c && c !== e && !e.contains(c) && !c.contains(e)),
+               disabled: !!(e.disabled || e.getAttribute('aria-disabled') === 'true'), current: !!(e.getAttribute('aria-current') && e.getAttribute('aria-current') !== 'false' || e.getAttribute('aria-selected') === 'true' || e.getAttribute('aria-pressed') === 'true' || e.matches('.active,.on,.current,.selected')), covered: !!(c && c !== e && !e.contains(c) && !c.contains(e)),
                href: e.tagName === 'A' ? e.getAttribute('href') : null });
   }
   return out; }"""
@@ -44,12 +44,13 @@ SCAN_JS = r"""(re) => {
 SIG_JS = r"""() => [location.pathname + location.hash, document.title, (document.querySelector('h1') || {}).textContent || '', document.querySelectorAll('dialog[open],[role=dialog]:not([hidden])').length,
   (window.S && S.screen) || ''].join(' | ').replace(/\s+/g, ' ').slice(0, 160)"""
 INIT_JS = r"""(() => { window.__tester = { csp: [], muts: 0 };
+  window.__testerLook = () => [document.querySelectorAll(':popover-open').length, Math.round(scrollY), [...document.querySelectorAll('*')].filter(e => e.scrollTop > 0).map(e => Math.round(e.scrollTop)).join(',')].join('|');
   document.addEventListener('securitypolicyviolation', e => window.__tester.csp.push(e.violatedDirective + ' ' + (e.blockedURI || '')));
   new MutationObserver(m => { window.__tester.muts += m.length; }).observe(document, { subtree: true, childList: true, attributes: true, characterData: true }); })();"""
 
 def run(cfg, out_dir, baseline=None, max_clicks=None, quiet=False):
   F, COV, WR = [], {'states': [], 'clicked': 0, 'skipped_deny': [], 'skipped_disabled': 0, 'skipped_covered': 0, 'sampled': 0, 'dead': 0}, []
-  deny = re.compile(cfg.get('deny', DENY), re.I); tech = cfg.get('tech', TECH); maxc = max_clicks or cfg.get('max_clicks', 80)
+  deny = re.compile(cfg.get('deny', DENY), re.I); allow_lab = re.compile(cfg['allow_labels'], re.I) if cfg.get('allow_labels') else None; tech = cfg.get('tech', TECH); maxc = max_clicks or cfg.get('max_clicks', 80)
   stubs = [(re.compile(s['url']), s.get('method', 'POST').upper(), s) for s in cfg.get('stubs', [])]
   allow = [re.compile(x) for x in cfg.get('allow_write', [])]
   out_dir = pathlib.Path(out_dir); shots = out_dir / 'shots'; shots.mkdir(parents=True, exist_ok=True)
@@ -62,7 +63,8 @@ def run(cfg, out_dir, baseline=None, max_clicks=None, quiet=False):
       ctx = b.new_context(bypass_csp=bool(cfg.get('bypass_csp', True)), **DEVICES[cfg.get('device', 'pc')])
       ctx.add_init_script(INIT_JS)
       if cfg.get('init_script'): ctx.add_init_script(cfg['init_script'])
-      pg = ctx.new_page(); ev = {'err': [], 'con': [], 'req': [], 'dlg': []}
+      pg = ctx.new_page(); ev = {'err': [], 'con': [], 'req': [], 'dlg': [], 'n': 0}
+      pg.on('request', lambda r: ev.__setitem__('n', ev['n'] + 1))
       pg.on('pageerror', lambda e: ev['err'].append(str(e)[:160]))
       pg.on('console', lambda m: ev['con'].append(m.text[:160]) if m.type == 'error' else None)
       pg.on('requestfailed', lambda r: ev['req'].append(f'{r.method} {r.url[:90]} — {r.failure}') if not re.search(r'ERR_ABORTED|BLOCKED_BY_CLIENT', str(r.failure)) else None)   # свої блоки запису — не вада
@@ -117,11 +119,11 @@ def run(cfg, out_dir, baseline=None, max_clicks=None, quiet=False):
         label = f"{c['tag']} «{c['name'] or '—'}»"
         if c['disabled']: COV['skipped_disabled'] += 1; continue
         if c['covered']: COV['skipped_covered'] += 1; continue
-        if deny.search(c['name'] or ''): COV['skipped_deny'].append(label); continue
+        if deny.search(c['name'] or '') and not (allow_lab and allow_lab.search(c['name'] or '')): COV['skipped_deny'].append(label); continue
         if c['href'] and re.match(r'^(https?:)?//', c['href']) and not c['href'].startswith(cfg['url'][:30]): continue   # зовнішні посилання — не наш сайт
         ctx, pg, ev = page(); path = f"{start['name']} → {label}"
         try:
-          ready(pg, start); e0 = len(ev['err']); m0 = pg.evaluate('window.__tester.muts'); u0 = pg.url
+          ready(pg, start); e0 = len(ev['err']); m0 = pg.evaluate('window.__tester.muts'); u0 = pg.url; l0 = pg.evaluate('window.__testerLook()'); n0 = ev['n']
           loc = pg.locator(c['sel']).first
           if c['tag'] == 'select':
             opts = loc.evaluate("e => [...e.options].filter(o => !o.disabled && o.value !== e.value).map(o => o.value)")
@@ -132,7 +134,9 @@ def run(cfg, out_dir, baseline=None, max_clicks=None, quiet=False):
           for r in ev['req'][:3]: add('✗', 'запит', start['name'], r, path)
           for d in ev['dlg']: add('⚠', 'нативне вікно', start['name'], d, path)
           moved = pg.evaluate('window.__tester.muts') - m0
-          if moved == 0 and pg.url == u0 and not ev['dlg'] and c['tag'] not in ('select',) and not c['href']:
+          # «мертва» (практика Sentry / Inspectlet «dead click», 21.10.2026): ні DOM, ні адреса, ні вікно, ні спливне (popover), ні фокус деінде (фокус на самій кнопці — не відгук), ні прокрутка, ні запит;
+          # вибраний (aria-current / .on) не судиться — клік по ньому й не мусить нічого міняти; посилання з адресою — теж ні
+          if moved == 0 and pg.url == u0 and not ev['dlg'] and ev['n'] == n0 and pg.evaluate('window.__testerLook()') == l0 and not pg.evaluate("(s) => { const a = document.activeElement, c = document.querySelector(s); return !!(a && a !== document.body && a !== c && !(c && c.contains(a))); }", c['sel']) and not c['current'] and c['tag'] not in ('select',) and not c['href']:
             COV['dead'] += 1; add('⚠', 'мертва кнопка', start['name'], 'клік нічого не змінив на сторінці (ні DOM, ні адреса, ні вікно)', path)
           sig = pg.evaluate(SIG_JS)
           if sig not in COV['states']: COV['states'].append(sig)
@@ -207,6 +211,7 @@ DEFECTS = {
   'JS-помилка': "<button onclick=\"undefinedFn()\">Зламана</button>",
   'технічний текст': "<button onclick=\"o.textContent='Ціна: '+undefined\">Ціна</button>",
   'мертва кнопка': "<button>Нічого не робить</button>",
+  'popover — не мертва': "<button popovertarget=pp>Підказка</button><div id=pp popover>текст</div>",
   'прокрутка вбік': "<div style='width:3000px;height:10px'></div>",
   'кнопка без назви': "<button onclick=\"o.textContent='x'\"></button>",
   'запис заблоковано': "<button onclick=\"fetch('/api/save',{method:'POST',body:'{}'}).catch(()=>{});o.textContent='шлю'\">Зберегти чернетку</button>",
@@ -224,8 +229,8 @@ def selftest():
   x, w, F = one('чиста', '')
   ok = not [f for f in F if f['lvl'] in ('✗', '⚠')]; bad += not ok; print(('✓' if ok else '✗') + ' чиста сторінка → тиша · ' + (' | '.join(f['kind'] + ': ' + f['msg'][:60] for f in F) or '0'))
   for k, html in DEFECTS.items():
-    x, w, F = one(k, html); hit = any(f['kind'] == k for f in F)
-    bad += not hit; print(('✓' if hit else '✗') + f' підкинуто «{k}» → спіймано')
+    x, w, F = one(k, html); hit = (not any(f['kind'] == 'мертва кнопка' for f in F)) if k.endswith('не мертва') else any(f['kind'] == k for f in F)
+    bad += not hit; print(('✓' if hit else '✗') + (f' «{k}» → тиша (хибної тривоги нема)' if k.endswith('не мертва') else f' підкинуто «{k}» → спіймано'))
   print(f'─── tester selftest: {len(DEFECTS) + 1 - bad}/{len(DEFECTS) + 1} ───'); return bad
 
 if __name__ == '__main__':
