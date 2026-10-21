@@ -26,6 +26,7 @@
 | варіанти вигляду обрано зараз, код — пізніше (примірка, тека `shots/`) | `tools/claude-code/SHOTS.md` |
 | суджу рендер, стенд, прев'ю, вирок пристрою | `kernel/wsd/Lens_verdict_protocol.md` — номер з маршруту на початку `Work_Standard.md` |
 | пишу детектор, гейт, смоук; патч перед комітом; діагноз помилки | `kernel/wsd/Lens_patch_check_protocol.md` |
+| шукаю вади в продукті як користувач: обхід без сценарію, пакети ПК / PWA, наскрізний сценарій (E2E) | `tools/tester/TESTER.md` → `tools/tester/explore.py` (конфіг — у репо продукту; `selftest` — зуби); запис у справжні дані — лише за словом Konst |
 | прев'ю для Konst | `tools/PREVIEW.md` — повний текст (у профілі — стиснення); крок «квиток / `gh_commit`» тут = `git push` у `Konst-Andre/sandbox` |
 | правило wsd за номером (`1.x`, `12.x`) | `kernel/wsd/Work_Standard.md` — «Зміст» і маршрут |
 | веду канон: куди записати, правка вічного файла | `kernel/wsd/Lens_governance_protocol.md` («Зміст» · К1/К2 і INTAKE · 12.11 · 12.15–12.20) |

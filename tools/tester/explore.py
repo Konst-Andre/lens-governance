@@ -1,0 +1,239 @@
+# explore.py · тестувальник ядра — ДОСЛІДНИК: сам ходить сайтом продукту, тисне все, що можна натиснути, і пише вади (Konst 21.10.2026, AE S96).
+# живе доки: у сімейства є веб-продукти. Метод, конфіг і межі — tools/tester/TESTER.md (читати перед першим запуском у новому продукті).
+# Практика (21.10.2026): Playwright Agents 1.56 — planner / generator / healer; WebProber, Explorbot, AutoExplore — агент ходить сайтом без сценарію
+#   і пише звіт про вади. Беремо: обхід без сценарію + звіт із шляхом повтору. Не беремо (поки): модель-дослідника — дорого й нестабільно; окремий шар потім.
+# Безпека: за замовчуванням БЛОКУЄ кожен запит, що щось пише (не GET/HEAD/OPTIONS), — крім «stubs» (відповідь-заглушка) і «allow_write» з конфігу;
+#   кнопки зі «словами-небезпеками» (Опублікувати, Видалити, Надіслати, Оплатити, Publish, Delete, Send, Pay…) не тисне. Тож на проді — без побічних дій.
+# Запуск:  python3 explore.py <конфіг.json> [--out <тека звіту>] [--baseline <файл>] [--max N]      · python3 explore.py selftest  (зуби)
+# Вихід: ✗ / ⚠ у консоль + <тека>/TESTER_<час>.md (вади зі шляхом кліків, знімки ✗, покриття, заблоковані записи, пакети ПК / PWA). Код виходу 1, якщо нові ✗.
+import sys, os, re, json, time, pathlib, datetime, tempfile, threading, http.server, socketserver, functools
+from playwright.sync_api import sync_playwright
+
+DENY = r'опублікув|видали|надісла|відправ|оплат|купит|замовит|вийти з|розлогін|скинути все|publish|delete|remove|send|submit|pay|buy|logout|sign out|reset all'
+TECH = r'\bundefined\b|\bNaN\b|\[object |\$\{|\bnull\b|Uncaught|TypeError|ReferenceError'
+DEVICES = {'pc': dict(viewport={'width': 1920, 'height': 1080}, device_scale_factor=1),
+           'iphone': dict(viewport={'width': 375, 'height': 812}, device_scale_factor=3, is_mobile=True, has_touch=True,
+                          user_agent='Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1')}
+
+# у сторінці: керуючі елементи станом зараз (видимі, досяжні, не вимкнені) — підпис, локатор для повтору, «група» для вибірки однакових
+CONTROLS_JS = r"""() => {
+  const vis = e => { const r = e.getBoundingClientRect(), s = getComputedStyle(e); return r.width > 2 && r.height > 2 && s.visibility !== 'hidden' && s.display !== 'none' && +s.opacity > 0.05; };
+  const path = e => { const p = []; for (let n = e; n && n.nodeType === 1 && n !== document.body; n = n.parentElement) {
+      if (n.id && document.querySelectorAll('#' + CSS.escape(n.id)).length === 1) { p.unshift('#' + CSS.escape(n.id)); break; }
+      let i = 1, s = n; while ((s = s.previousElementSibling)) if (s.tagName === n.tagName) i++;
+      p.unshift(n.tagName.toLowerCase() + ':nth-of-type(' + i + ')'); } return (p[0] && p[0][0] === '#' ? '' : 'body > ') + p.join(' > '); };
+  const out = [];
+  for (const e of document.querySelectorAll('a[href],button,[role=button],[role=tab],[role=menuitem],summary,select,input[type=checkbox],input[type=radio],[onclick]')) {
+    if (!vis(e) || e.closest('[inert]')) continue;
+    const r = e.getBoundingClientRect(), c = document.elementFromPoint(Math.min(innerWidth - 1, Math.max(0, r.left + r.width / 2)), Math.min(innerHeight - 1, Math.max(0, r.top + r.height / 2)));
+    const name = (e.getAttribute('aria-label') || e.textContent || e.getAttribute('title') || e.value || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+    out.push({ sel: path(e), name, tag: e.tagName.toLowerCase(), group: e.tagName + '.' + [...e.classList].sort().join('.'),
+               disabled: !!(e.disabled || e.getAttribute('aria-disabled') === 'true'), covered: !!(c && c !== e && !e.contains(c) && !c.contains(e)),
+               href: e.tagName === 'A' ? e.getAttribute('href') : null });
+  }
+  return out; }"""
+# у сторінці: технічне сміття у видимому тексті + атрибутах, прокрутка вбік, кнопки без назви
+SCAN_JS = r"""(re) => {
+  const R = new RegExp(re), out = { tech: [], hscroll: document.documentElement.scrollWidth > innerWidth + 1, noname: [] };
+  const vis = e => { const r = e.getBoundingClientRect(), s = getComputedStyle(e); return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none'; };
+  const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT); let n;
+  while ((n = w.nextNode())) { const t = n.textContent.trim(); if (t && n.parentElement && !/^(SCRIPT|STYLE)$/.test(n.parentElement.tagName) && vis(n.parentElement) && R.test(t)) out.tech.push(t.slice(0, 80)); }
+  for (const e of document.querySelectorAll('[title],[aria-label],[placeholder]')) if (vis(e)) for (const a of ['title', 'aria-label', 'placeholder']) { const v = e.getAttribute(a); if (v && R.test(v)) out.tech.push(a + ': ' + v.slice(0, 60)); }
+  for (const e of document.querySelectorAll('button,[role=button],a[href]')) if (vis(e) && !(e.getAttribute('aria-label') || e.textContent.trim() || e.getAttribute('title'))) out.noname.push(e.outerHTML.slice(0, 80));
+  out.tech = [...new Set(out.tech)].slice(0, 8); out.noname = out.noname.slice(0, 5); return out; }"""
+SIG_JS = r"""() => [location.pathname + location.hash, document.title, (document.querySelector('h1') || {}).textContent || '', document.querySelectorAll('dialog[open],[role=dialog]:not([hidden])').length,
+  (window.S && S.screen) || ''].join(' | ').replace(/\s+/g, ' ').slice(0, 160)"""
+INIT_JS = r"""(() => { window.__tester = { csp: [], muts: 0 };
+  document.addEventListener('securitypolicyviolation', e => window.__tester.csp.push(e.violatedDirective + ' ' + (e.blockedURI || '')));
+  new MutationObserver(m => { window.__tester.muts += m.length; }).observe(document, { subtree: true, childList: true, attributes: true, characterData: true }); })();"""
+
+def run(cfg, out_dir, baseline=None, max_clicks=None, quiet=False):
+  F, COV, WR = [], {'states': [], 'clicked': 0, 'skipped_deny': [], 'skipped_disabled': 0, 'skipped_covered': 0, 'sampled': 0, 'dead': 0}, []
+  deny = re.compile(cfg.get('deny', DENY), re.I); tech = cfg.get('tech', TECH); maxc = max_clicks or cfg.get('max_clicks', 80)
+  stubs = [(re.compile(s['url']), s.get('method', 'POST').upper(), s) for s in cfg.get('stubs', [])]
+  allow = [re.compile(x) for x in cfg.get('allow_write', [])]
+  out_dir = pathlib.Path(out_dir); shots = out_dir / 'shots'; shots.mkdir(parents=True, exist_ok=True)
+  def add(lvl, kind, where, msg, path=None, shot=None):
+    F.append({'lvl': lvl, 'kind': kind, 'where': where, 'msg': msg, 'path': path or '', 'shot': shot or ''})
+    if not quiet: print(f'{lvl} {kind} · {where} — {msg}' + (f'  [шлях: {path}]' if path else ''), flush=True)
+  with sync_playwright() as p:
+    b = p.chromium.launch()
+    def page():
+      ctx = b.new_context(bypass_csp=bool(cfg.get('bypass_csp', True)), **DEVICES[cfg.get('device', 'pc')])
+      ctx.add_init_script(INIT_JS)
+      if cfg.get('init_script'): ctx.add_init_script(cfg['init_script'])
+      pg = ctx.new_page(); ev = {'err': [], 'con': [], 'req': [], 'dlg': []}
+      pg.on('pageerror', lambda e: ev['err'].append(str(e)[:160]))
+      pg.on('console', lambda m: ev['con'].append(m.text[:160]) if m.type == 'error' else None)
+      pg.on('requestfailed', lambda r: ev['req'].append(f'{r.method} {r.url[:90]} — {r.failure}') if not re.search(r'ERR_ABORTED|BLOCKED_BY_CLIENT', str(r.failure)) else None)   # свої блоки запису — не вада
+      pg.on('response', lambda r: ev['req'].append(f'{r.request.method} {r.url[:90]} — {r.status}') if r.status >= 500 else None)
+      pg.on('dialog', lambda d: (ev['dlg'].append(d.type + ': ' + d.message[:80]), d.dismiss()))
+      def route(rt):
+        rq = rt.request; m = rq.method.upper()
+        if m in ('GET', 'HEAD', 'OPTIONS'): return rt.continue_()
+        for rx, sm, s in stubs:
+          if rx.search(rq.url) and sm == m:
+            body = s.get('body', {}); return rt.fulfill(status=s.get('status', 200), content_type='application/json', headers={'access-control-allow-origin': '*'},
+                                                       body=json.dumps(body, ensure_ascii=False) if not isinstance(body, str) else body)
+        if any(a.search(rq.url) for a in allow): return rt.continue_()
+        WR.append(f'{m} {rq.url[:100]}'); return rt.abort('blockedbyclient')
+      pg.route('**/*', route)
+      return ctx, pg, ev
+    def ready(pg, start):
+      pg.goto(cfg['url'], wait_until='domcontentloaded', timeout=45000)
+      if cfg.get('ready'): pg.wait_for_function(cfg['ready'], timeout=30000)
+      else: pg.wait_for_load_state('networkidle', timeout=30000)
+      if start.get('js'): pg.evaluate(start['js'])
+      pg.wait_for_timeout(cfg.get('settle_ms', 700))
+    def judge(pg, ev, where, path, base_err=0):
+      s = pg.evaluate(SCAN_JS, tech); csp = pg.evaluate('window.__tester ? window.__tester.csp : []')
+      shot = None
+      bad = ev['err'][base_err:] or s['tech'] or csp
+      if bad:
+        shot = f'{len(F):03d}.png'
+        try: pg.screenshot(path=str(shots / shot))
+        except Exception: shot = None
+      for e in ev['err'][base_err:]: add('✗', 'JS-помилка', where, e, path, shot)
+      if s['tech']: add('✗', 'технічний текст', where, ' | '.join(s['tech'][:4]), path, shot)
+      for c in csp: add('✗', 'CSP', where, c, path, shot)
+      if s['hscroll']: add('⚠', 'прокрутка вбік', where, f'сторінка ширша за екран', path)
+      for x in s['noname']: add('⚠', 'кнопка без назви', where, x, path)
+    for start in cfg.get('starts', [{'name': 'головна'}]):
+      ctx, pg, ev = page()
+      try: ready(pg, start)
+      except Exception as e: add('✗', 'старт', start['name'], f'стан не відкрився: {str(e)[:120]}'); ctx.close(); continue
+      sig0 = pg.evaluate(SIG_JS); COV['states'].append(sig0)
+      judge(pg, ev, start['name'], 'старт')
+      for c in ev['con'][:5]: add('⚠', 'консоль', start['name'], c, 'старт')
+      for r in ev['req'][:5]: add('✗', 'запит', start['name'], r, 'старт')
+      ctrls = pg.evaluate(CONTROLS_JS); ctx.close()
+      groups = {}
+      for c in ctrls: groups.setdefault(c['group'], []).append(c)
+      todo = []
+      for g, L in groups.items():
+        pick = L if len(L) < 5 else [L[0], L[len(L) // 2], L[-1]]
+        COV['sampled'] += len(L) - len(pick); todo += pick
+      for c in todo[:maxc]:
+        label = f"{c['tag']} «{c['name'] or '—'}»"
+        if c['disabled']: COV['skipped_disabled'] += 1; continue
+        if c['covered']: COV['skipped_covered'] += 1; continue
+        if deny.search(c['name'] or ''): COV['skipped_deny'].append(label); continue
+        if c['href'] and re.match(r'^(https?:)?//', c['href']) and not c['href'].startswith(cfg['url'][:30]): continue   # зовнішні посилання — не наш сайт
+        ctx, pg, ev = page(); path = f"{start['name']} → {label}"
+        try:
+          ready(pg, start); e0 = len(ev['err']); m0 = pg.evaluate('window.__tester.muts'); u0 = pg.url
+          loc = pg.locator(c['sel']).first
+          if c['tag'] == 'select':
+            opts = loc.evaluate("e => [...e.options].filter(o => !o.disabled && o.value !== e.value).map(o => o.value)")
+            if opts: loc.select_option(opts[0])
+          else: loc.click(timeout=4000)
+          pg.wait_for_timeout(cfg.get('after_click_ms', 900)); COV['clicked'] += 1
+          judge(pg, ev, start['name'], path, e0)
+          for r in ev['req'][:3]: add('✗', 'запит', start['name'], r, path)
+          for d in ev['dlg']: add('⚠', 'нативне вікно', start['name'], d, path)
+          moved = pg.evaluate('window.__tester.muts') - m0
+          if moved == 0 and pg.url == u0 and not ev['dlg'] and c['tag'] not in ('select',) and not c['href']:
+            COV['dead'] += 1; add('⚠', 'мертва кнопка', start['name'], 'клік нічого не змінив на сторінці (ні DOM, ні адреса, ні вікно)', path)
+          sig = pg.evaluate(SIG_JS)
+          if sig not in COV['states']: COV['states'].append(sig)
+        except Exception as e:
+          add('⚠', 'клік не вдався', start['name'], str(e).split('\n')[0][:140], path)
+        finally: ctx.close()
+    # пакети платформи — на першому старті
+    st0 = (cfg.get('starts') or [{'name': 'головна'}])[0]
+    if cfg.get('device', 'pc') == 'pc' and cfg.get('pack_pc', True):
+      ctx, pg, ev = page(); ready(pg, st0)
+      reach = pg.evaluate("""() => { const all = [...document.querySelectorAll('a[href],button,select,input,textarea,[tabindex]')].filter(e => { const r = e.getBoundingClientRect(), s = getComputedStyle(e);
+          return r.width > 2 && r.height > 2 && s.visibility !== 'hidden' && s.display !== 'none' && !e.disabled && e.tabIndex >= 0 && !e.closest('[inert]'); }); all.forEach((e, i) => e.dataset.tst = i); return all.length; }""")
+      seen = set()
+      for _ in range(min(reach + 5, 160)):
+        pg.keyboard.press('Tab'); i = pg.evaluate("document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.tst : null")
+        if i is not None: seen.add(i)
+      miss = pg.evaluate("(seen) => [...document.querySelectorAll('[data-tst]')].filter(e => !seen.includes(e.dataset.tst)).map(e => (e.getAttribute('aria-label') || e.textContent || e.tagName).trim().slice(0, 40))", list(seen))
+      if miss: add('⚠', 'клавіатура', st0['name'], f'Tab не доходить до {len(miss)} з {reach}: ' + ' · '.join(miss[:6]))
+      ctx.close()
+    if cfg.get('pwa') or cfg.get('device') == 'iphone':
+      ctx, pg, ev = page(); ready(pg, st0)
+      man = pg.evaluate("""async () => { const l = document.querySelector('link[rel=manifest]'); if (!l) return null; try { return await (await fetch(l.href)).json(); } catch (e) { return {error: String(e)}; } }""")
+      if not man: add('⚠', 'PWA', st0['name'], 'нема <link rel=manifest> — встановити на екран не вийде')
+      else:
+        need = [k for k in ('name', 'start_url', 'icons') if not man.get(k)]
+        if man.get('display') not in ('standalone', 'minimal-ui', 'fullscreen'): need.append('display=standalone')
+        sizes = ' '.join(i.get('sizes', '') for i in man.get('icons', []))
+        if '192x192' not in sizes or '512x512' not in sizes: need.append('іконки 192 і 512')
+        if need: add('⚠', 'PWA', st0['name'], 'маніфест: бракує ' + ', '.join(need))
+      sw = pg.evaluate("async () => !!(navigator.serviceWorker && await Promise.race([navigator.serviceWorker.getRegistration(), new Promise(r => setTimeout(() => r(null), 4000))]))")
+      if not sw: add('⚠', 'PWA', st0['name'], 'сервіс-воркер не зареєстровано — без мережі застосунок не відкриється')
+      else:
+        ctx.set_offline(True)
+        try: pg.reload(timeout=15000); txt = pg.evaluate("document.body.innerText.trim().length")
+        except Exception: txt = 0
+        if txt < 40: add('✗', 'PWA', st0['name'], 'без мережі сторінка порожня — офлайн не працює')
+        ctx.set_offline(False)
+      if not pg.evaluate("!!document.querySelector('meta[name=viewport]')"): add('⚠', 'PWA', st0['name'], 'нема meta viewport')
+      ctx.close()
+    b.close()
+  for wr in sorted(set(WR)): F.append({'lvl': 'ⓘ', 'kind': 'запис заблоковано', 'where': '', 'msg': wr, 'path': '', 'shot': ''})   # не вада: сторінка хотіла писати — тестувальник не пустив
+  # база відомих вад: блокує лише нове (як ui_lint --baseline)
+  key = lambda f: f"{f['kind']}|{f['where']}|{re.sub(r'[0-9]+', '#', f['msg'])[:80]}"
+  if baseline:
+    bp = pathlib.Path(baseline)
+    if not bp.exists(): bp.write_text(json.dumps(sorted({key(f) for f in F if f['lvl'] == '✗'}), ensure_ascii=False, indent=1), encoding='utf-8'); print(f'база записана: {bp}')
+    else:
+      base = set(json.loads(bp.read_text(encoding='utf-8')))
+      for f in F:
+        if f['lvl'] == '✗' and key(f) in base: f['lvl'] = 'ⓘ'; f['msg'] += ' — з бази'
+  x = sum(f['lvl'] == '✗' for f in F); w = sum(f['lvl'] == '⚠' for f in F)
+  rep = out_dir / f"TESTER_{datetime.datetime.now():%Y-%m-%d_%H%M}.md"
+  lines = [f"# Тестувальник · {cfg.get('name', '')} · {datetime.datetime.now():%d.%m.%Y %H:%M}", '',
+           f"{cfg['url']} · пристрій {cfg.get('device', 'pc')} · **✗ {x} · ⚠ {w}** · станів {len(COV['states'])} · кліків {COV['clicked']}", '',
+           '## Вади', '', '| | вид | де | що | шлях повтору | знімок |', '|---|---|---|---|---|---|',
+           *[f"| {f['lvl']} | {f['kind']} | {f['where']} | {f['msg'].replace('|', '/')} | {f['path'].replace('|', '/')} | {('shots/' + f['shot']) if f['shot'] else ''} |" for f in F if f['lvl'] != 'ⓘ'], '',
+           '## Покриття — куди дійшов і куди ні', '',
+           f"- станів: {len(COV['states'])} — " + ' ; '.join(COV['states'][:12]),
+           f"- натиснуто: {COV['clicked']} · однакових пропущено вибіркою: {COV['sampled']} · вимкнених: {COV['skipped_disabled']} · закритих іншим шаром: {COV['skipped_covered']}",
+           f"- не тиснув (слова-небезпеки): {len(COV['skipped_deny'])} — " + ' · '.join(sorted(set(COV['skipped_deny']))[:12]),
+           f"- заблоковано записів (не GET): {len(WR)} — " + ' · '.join(sorted(set(WR))[:8]), '',
+           '_Дослідник не бачить: зміст і логіку (чи правильна відповідь), дотик і WebKit, відчуття руху — це сценарії продукту й очі._']
+  rep.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+  print(f"─── тестувальник: ✗ {x} · ⚠ {w} · станів {len(COV['states'])} · кліків {COV['clicked']} · звіт {rep} ───")
+  return x, w, F
+
+SELF_PAGE = """<!doctype html><html lang=uk><head><meta charset=utf-8><meta name=viewport content="width=device-width"><title>selftest</title></head><body>
+<h1>Тест</h1><p id=o>старт</p>
+<button id=ok onclick="o.textContent='гаразд'">Добре</button>
+BAD</body></html>"""
+DEFECTS = {
+  'JS-помилка': "<button onclick=\"undefinedFn()\">Зламана</button>",
+  'технічний текст': "<button onclick=\"o.textContent='Ціна: '+undefined\">Ціна</button>",
+  'мертва кнопка': "<button>Нічого не робить</button>",
+  'прокрутка вбік': "<div style='width:3000px;height:10px'></div>",
+  'кнопка без назви': "<button onclick=\"o.textContent='x'\"></button>",
+  'запис заблоковано': "<button onclick=\"fetch('/api/save',{method:'POST',body:'{}'}).catch(()=>{});o.textContent='шлю'\">Зберегти чернетку</button>",
+}
+def selftest():
+  d = pathlib.Path(tempfile.mkdtemp(prefix='tester-')); bad = 0
+  class Q(http.server.SimpleHTTPRequestHandler):
+    def log_message(self, *a): pass
+  H = functools.partial(Q, directory=str(d))
+  srv = socketserver.ThreadingTCPServer(('127.0.0.1', 0), H); srv.daemon_threads = True; threading.Thread(target=srv.serve_forever, daemon=True).start()
+  url = f'http://127.0.0.1:{srv.server_address[1]}/'
+  def one(name, html):
+    (d / 'index.html').write_text(SELF_PAGE.replace('BAD', html), encoding='utf-8')
+    return run({'name': name, 'url': url, 'device': 'pc', 'pack_pc': False, 'settle_ms': 150, 'after_click_ms': 300}, d / ('out-' + str(abs(hash(name)))), quiet=True)
+  x, w, F = one('чиста', '')
+  ok = not [f for f in F if f['lvl'] in ('✗', '⚠')]; bad += not ok; print(('✓' if ok else '✗') + ' чиста сторінка → тиша · ' + (' | '.join(f['kind'] + ': ' + f['msg'][:60] for f in F) or '0'))
+  for k, html in DEFECTS.items():
+    x, w, F = one(k, html); hit = any(f['kind'] == k for f in F)
+    bad += not hit; print(('✓' if hit else '✗') + f' підкинуто «{k}» → спіймано')
+  print(f'─── tester selftest: {len(DEFECTS) + 1 - bad}/{len(DEFECTS) + 1} ───'); return bad
+
+if __name__ == '__main__':
+  a = sys.argv[1:]
+  if not a: print(__doc__ or 'python3 explore.py <конфіг.json> [--out тека] [--baseline файл] [--max N] | selftest'); sys.exit(2)
+  if a[0] == 'selftest': sys.exit(1 if selftest() else 0)
+  cfg = json.loads(pathlib.Path(a[0]).read_text(encoding='utf-8'))
+  opt = lambda k, d=None: a[a.index(k) + 1] if k in a else d
+  if opt('--url'): cfg['url'] = opt('--url')
+  x, w, F = run(cfg, opt('--out', 'tester-out'), opt('--baseline'), int(opt('--max', 0)) or None)
+  sys.exit(1 if x else 0)
