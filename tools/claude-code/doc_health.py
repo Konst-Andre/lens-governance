@@ -35,7 +35,7 @@ M1_LINES, M2_KB, M3_KB, M4_KB = 200, 25, 16, 80
 
 
 def files(root):
-    out = subprocess.run(['git', 'ls-files', '*.md'], cwd=root, capture_output=True, text=True).stdout.split()
+    out = subprocess.run(['git', '-c', 'core.quotePath=false', 'ls-files', '*.md'], cwd=root, capture_output=True, text=True).stdout.split()
     return [f for f in out if not f.startswith('archive/') and '/journal/' not in '/' + f]   # journal/ — архів ротації журналу гачків, читається грепом (18.10.2026: 73 КБ дало хибне M3)
 
 
@@ -95,7 +95,7 @@ M5_PATH = re.compile(r'^[\w.-]+(/[\w.-]+)+\.(md|js|mjs|py|sh|html|json|toml|yml|
 
 def dead_paths(root):
     """M5: `шлях/до/файла.розш` у живому .md, якого нема в репо (правила — шапка файла)."""
-    known = [k for k in subprocess.run(['git', 'ls-files'], cwd=root, capture_output=True, text=True).stdout.split('\n') if k]
+    known = [k for k in subprocess.run(['git', '-c', 'core.quotePath=false', 'ls-files'], cwd=root, capture_output=True, text=True).stdout.split('\n') if k]
     ks, alld = set(known), set()
     for k in known:
         d = os.path.dirname(k)
@@ -190,6 +190,7 @@ def selftest():
              ('архів ротації journal/ не рахується → ✓', {'tools/claude-code/hooks/journal/HOOK_JOURNAL_2026-10.md': sec(40)}, '✓', ''),
              ('M5: мертвий шлях у живому .md → ⚠', {'README.md': 'див. `tools/gone_v1.py`\n'}, '⚠', 'мертвих шляхів 1'),
              ('M5: хвіст наявного шляху (`data/x.json` = `site/data/x.json`) → ✓', {'site/data/x.json': '{}', 'README.md': 'дані — `data/x.json`\n'}, '✓', ''),
+             ('M5: кириличний шлях (git бере його в лапки без core.quotePath=false) → ✓ — пропуск AE S99', {'ДЛЯ_ОЛІ/HANDOFF_для_Claude.md': 'x', 'README.md': 'див. `ДЛЯ_ОЛІ/HANDOFF_для_Claude.md`\n'}, '✓', ''),
              ('M5: шлях від теки документа → ✓', {'docs/a/b.md': 'поруч — `c/d.md`\n', 'docs/a/c/d.md': 'x'}, '✓', ''),
              ('M5: блок коду, розділ історії, Репо:шлях, гола назва, DECISIONS → ✓', {'README.md': '```\n`tools/x/y.py`\n```\n## Переїзд — старий шлях\n`old/a.md`\n## Далі\n`QR-Lens:tools/q.py` · `gone.py`\n', 'docs/DECISIONS.md': '`tools/dead/z.py`\n'}, '✓', ''),
              ('M6: `AE-X` ✅ у самері, у черзі відкритий → ⚠', {'docs/CHERGA.md': Q, 'docs/summary/P_SUMMARY_2026-10-18.md': '## §0\n- `AE-X` ✅ зроблено\n'}, '⚠', 'черга відстала від самері 1'),
