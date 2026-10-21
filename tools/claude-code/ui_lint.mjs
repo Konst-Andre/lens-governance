@@ -12,6 +12,7 @@
 // 10 дія в прокрутці · 11 кнопки ряду · 12 сирота · 13 злито · 14 однакові заголовки · 15 дата й час · 16 зливається (16-б край кнопки) · 17 паритет тем · 18 кромка · 19 картка-список · 20 вкладена прокрутка · 21 шапка в прокрутці · 22 емодзі в кнопці · 23 нативне вікно · 24 фон у рамці · 25 кант рветься · 26 поле губиться; поза probe — натискання (:active / JS pointerdown, touchstart).
 // 31 форма виділення · 32 пунктир < 3:1 · 22 емодзі-значок без підпису → ✗ · 33 різнобій списків — AE S94, 20.10.2026.
 // 34 пояснення під кнопкою (→ «i») · 35 наведення (ПК, ≥ 1024: нема або ледь видно) — AE S96, 20.10.2026.
+// 38 пояснення абзацом (≥ 20 слів дрібного тексту поза «i» / вікном / таблицею / повідомленням → «i») — пропуск Konst, AE S99, 21.10.2026.
 // 37 налізає — текст ширший за свій блок при overflow: visible (не обрізаний, а виходить на сусіда) — пропуск Konst, AE S97, 21.10.2026 (вікно «Групи»).
 // 36 кадр не встиг (екран ще змінювався під час заміру) — AE S97, 21.10.2026: замір чекає шрифти, --ready і тишу DOM (до 3 с), а не фіксовані 400 мс;
 //    --json — чистий JSON у stdout (решта — stderr), --baseline бере і масив ключів, і звіт --json; 3 не судить прокручене за край обрізального предка.
@@ -302,6 +303,19 @@ function probe() {
     for (const el of all) { if (!/^(SMALL|P|SPAN|DIV)$/.test(el.tagName) || el.children.length || !el.getBoundingClientRect().width) continue;
       const t = (el.textContent || '').trim(); if (t.split(/\s+/).length < 6 || parseFloat(getComputedStyle(el).fontSize) > 12.5) continue;
       if (ctl(el.previousElementSibling)) add('⚠', 'пояснення під кнопкою', el, `«${t.slice(0, 40)}…» — підпис-пояснення під кнопкою; на робочому екрані це шум — перенести в «i» поруч з кнопкою (кукбук A117)`); } }
+  // 38. пояснення абзацом (пропуск Konst AE S99, 21.10.2026: абзац-пояснення в панелі й рядок клавіш під таблицею — «пояснення — у «i», не блоком тексту»):
+  //     блок, у якому ≥ 20 слів дрібного (≤ 13 px) тексту, без керуючих усередині (посилання й <kbd> — можна), поза «i» / вікном / таблицею — ⚠;
+  //     звітуємо найглибший такий блок. Не чіпаємо: дані (таблиця, поле), повідомлення про помилку й стан (role=alert/status, aria-live) —
+  //     те, без чого не виконати дію, лишається на екрані; додаткове пояснення — у «i» (Carbon «Tooltip usage», Coloplast «Toggletip», 21.10.2026).
+  { const words = t => (t.match(/[\p{L}\p{N}₴]+/gu) || []).length;
+    const small = el => { const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT); let n;
+      while ((n = w.nextNode())) if (n.textContent.trim() && parseFloat(getComputedStyle(n.parentElement).fontSize) > 13) return false; return true; };
+    const cand = el => !/^(HTML|BODY|MAIN|TABLE|THEAD|TBODY|TR|TD|TH|UL|OL|SELECT|TEXTAREA|BUTTON|INPUT|LABEL|SCRIPT|STYLE)$/.test(el.tagName)
+      && el.getBoundingClientRect().width && !el.closest('[popover],dialog,[role=tooltip],.tip,table,label,button,[role=alert],[role=status],[aria-live]')
+      && !el.querySelector('button,input,select,textarea,[role=button],[contenteditable]')
+      && words(el.innerText || '') >= 20 && small(el);
+    for (const el of all) { if (!cand(el) || [...el.children].some(cand)) continue;
+      add('⚠', 'пояснення абзацом', el, `«${(el.innerText || '').trim().replace(/\s+/g, ' ').slice(0, 40)}…» — ${words(el.innerText || '')} слів пояснення блоком на робочому екрані; пояснення — у «i» поруч із тим, що пояснює (кукбук A116 · A117)`); } }
   // 9. текст для людини: сміття з коду — ✗; жаргон — ⚠
   const txt = document.body.innerText;
   for (const bad of ['undefined', 'NaN', '[object', 'null']) if (new RegExp(`(^|[^\\w])${bad.replace('[', '\\[')}($|[^\\w])`).test(txt)) add('✗', 'текст', document.body, `на екрані «${bad}» — дані не підставились`);
@@ -379,6 +393,7 @@ const DEFECTS = {
   'емодзі ': `<div class=card><button aria-label="Рейка" style="min-width:44px;min-height:44px">☀</button></div>`,   // AE S94: значок-емодзі без підпису → ✗
   'пояснення під кнопкою': `<div class=card><div><button style="min-height:44px;padding:0 14px">Пробна розмова</button><small style="font-size:11.5px;display:block">Модель зіграє клієнта за цим сценарієм, як для фармацевта.</small></div></div>`,   // AE S96: підпис під «Пробна розмова»
   'наведення': `<style>.hv{min-height:44px;padding:0 14px;border:0;background:#fff}.hv:hover{background:#FFFEF6}</style><div class=card><button class=hv>Рядок списку</button></div>`,   // AE S96: наведення кремовим на білому — 1,01:1
+  'пояснення абзацом': `<div class=card><div style="font-size:12.5px;color:#555;background:#F6F7F8;padding:10px">Змінили бонус — сценарії з цією позицією в наборі перерахують орієнтир; якщо набір стане не дорожчим за замовлення, біля сценарію з’явиться позначка.</div></div>`,   // AE S99: абзац у панелі замість «i»
   'чуже правило': `<style>.err{padding:10px 14px;border:1px solid #c00}</style><div class=isl><span class="dot err" style="display:inline-block;width:8px;height:8px;background:#c00"></span></div>`,   // AE S93: .err тренажера → крапка редактора; selftest з --scope .isl
 };
 
