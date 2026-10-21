@@ -2,7 +2,7 @@
 // ui_lint — машинна частина огляду UI: те, що видно програмі, ловить програма, а не Konst («капсула прилипла», «текст обрізаний», «іконка вище»).
 // Очі агента лишаються: машина бачить ~третину вад (розвідка 10.10: axe/WCAG-огляди), решта — чек-лист воріт ui-review-gate.
 //
-// Запуск:  node ui_lint.mjs <url|файл.html> [--state "<js>"]… [--scope <корінь острова>] [--repo <тека>] [--width 390] [--height 844] [--json] [--baseline <файл>]   (низький екран Safari: --width 375 --height 634)
+// Запуск:  node ui_lint.mjs <url|файл.html> [--state "<js>"]… [--scope <корінь острова>] [--repo <тека>] [--width 390] [--height 844] [--json] [--baseline <файл>] [--ready "<js-умова>"]   (низький екран Safari: --width 375 --height 634)
 //          кожен --state — окремий стан (JS виконується на сторінці; між станами сторінка перезавантажується); без --state — лише початковий.
 //          --state — ВИРАЗ, не модуль: `await` верхнього рівня → ✗ «JS стану впав»; чекати — `new Promise(r=>setTimeout(()=>{…;r()},1800))` (QR CC-13, 15.10.2026: шіт відкривається з затримкою).
 //          Обидві теми (prefers-color-scheme light/dark) завжди. --repo: ✗ 0 → позначка для воріт (той самий хеш диффу, що в ui-review-gate).
@@ -12,6 +12,8 @@
 // 10 дія в прокрутці · 11 кнопки ряду · 12 сирота · 13 злито · 14 однакові заголовки · 15 дата й час · 16 зливається (16-б край кнопки) · 17 паритет тем · 18 кромка · 19 картка-список · 20 вкладена прокрутка · 21 шапка в прокрутці · 22 емодзі в кнопці · 23 нативне вікно · 24 фон у рамці · 25 кант рветься · 26 поле губиться; поза probe — натискання (:active / JS pointerdown, touchstart).
 // 31 форма виділення · 32 пунктир < 3:1 · 22 емодзі-значок без підпису → ✗ · 33 різнобій списків — AE S94, 20.10.2026.
 // 34 пояснення під кнопкою (→ «i») · 35 наведення (ПК, ≥ 1024: нема або ледь видно) — AE S96, 20.10.2026.
+// 36 кадр не встиг (екран ще змінювався під час заміру) — AE S97, 21.10.2026: замір чекає шрифти, --ready і тишу DOM (до 3 с), а не фіксовані 400 мс;
+//    --json — чистий JSON у stdout (решта — stderr), --baseline бере і масив ключів, і звіт --json; 3 не судить прокручене за край обрізального предка.
 // 27 плашка в тон тла · 28 панелі зливаються · 29 список-таблиця · 30 чуже правило (--scope <корінь острова>) — AE S93, 19.10.2026.
 // Звідки кожна (пропуск Konst, QR CC-N, рецепт кукбуку) — коментар біля неї.
 // Вивід: ✗ (ворота не пустять) · ⚠ (подивись очима) · ⓘ (не виміряно); exit 1 на ✗.
@@ -57,7 +59,12 @@ function probe() {
     // 3. прилипання до краю картки / вилазить за картку: капсули, бейджі, кнопки — елементи з власним тлом чи рамкою
     const chip = ((rgba(s.backgroundColor) || [0, 0, 0, 0])[3] > 0.05 || parseFloat(s.borderTopWidth) > 0 || s.backgroundImage !== 'none') && parseFloat(s.borderTopLeftRadius) > 0;
     const c = chip && card(el);
-    if (c && c !== el) { const q = c.getBoundingClientRect(), d = [r.top - q.top, q.right - r.right, q.bottom - r.bottom, r.left - q.left];
+    // AE S97: між капсулою й карткою буває прокрутка (список з overflow auto) — прокручене за її край не «вилазить», а сховане; судимо лише видиме в ній.
+    // Абсолютний елемент предок зі static не обрізає (Cypress #28638; Floating UI detectOverflow — «clipping ancestors», 21.10.2026), fixed — жоден.
+    let k = null; if (c && s.position !== 'fixed') for (let e = el.parentElement; e && e !== c; e = e.parentElement) { const o = getComputedStyle(e);
+      if ((o.overflowX !== 'visible' || o.overflowY !== 'visible') && !(s.position === 'absolute' && o.position === 'static')) { k = e; break; } }
+    const kr = k && k.getBoundingClientRect(), cut = !!kr && (r.top < kr.top - 1 || r.bottom > kr.bottom + 1 || r.left < kr.left - 1 || r.right > kr.right + 1);
+    if (c && c !== el && !cut) { const q = c.getBoundingClientRect(), d = [r.top - q.top, q.right - r.right, q.bottom - r.bottom, r.left - q.left];
       const full = r.width >= q.width - 2;   // на всю ширину картки (рядок, смужка) — не капсула
       if (!full && d.some(x => x < -1) && getComputedStyle(c).overflow === 'visible') add('✗', 'вилазить', el, `виходить за межі «${path(c)}» на ${Math.round(-Math.min(...d))} px`);
       else if (!full && d.some(x => x >= -1 && x < 2) && !(r.height >= q.height - 2)) add('✗', 'прилипло', el, `майже торкається краю «${path(c)}» (${d.map(x => Math.round(x)).join('/')} px) — «приклеєна капсула»`); }
@@ -311,6 +318,7 @@ function leaks(scope) {
   return out;
 }
 let SCOPE = '';   // --scope
+let READY = '';   // --ready: JS-умова готовності сторінки (S97); чекаємо після кожного завантаження, до 10 с
 
 const SELF = `<!doctype html><html><head><meta name=viewport content="width=device-width,initial-scale=1"><style>
 body{margin:0;font:15px/1.4 sans-serif;background:#fff;color:#111}@media(prefers-color-scheme:dark){body{background:#111;color:#eee}}
@@ -318,9 +326,10 @@ body{margin:0;font:15px/1.4 sans-serif;background:#fff;color:#111}@media(prefers
 .pill{display:inline-block;padding:2px 8px;border-radius:99px;background:#237770;color:#fff}.tl{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px}.ic{width:30px;height:30px;border-radius:50%;background:#bbb}.row{display:flex;gap:8px}.tile{flex:1;border-radius:10px;background:#ddd;padding:8px}
 .x44{position:relative;width:26px;height:26px;padding:0}.x44::after{content:'';position:absolute;inset:-12px}.grey{color:#aaa}.clip{width:60px;overflow:hidden;white-space:nowrap}button:active{transform:scale(.97)}.jsp{color:inherit}.jsp.pressing{transform:scale(.9)}</style><script>document.addEventListener('touchstart',()=>{},{passive:true});document.addEventListener('pointerdown',e=>{const c=e.target.closest('.jsp');if(c)c.classList.add('pressing')});document.addEventListener('pointercancel',()=>document.querySelectorAll('.pressing').forEach(x=>x.classList.remove('pressing')))</script></head><body>
 <div class=card id=ok><button class=x44 aria-label="Закрити">✕</button> <button style="min-height:48px;padding:0 16px">Завантажити KPI</button> <span class=pill>6 дн.</span> <a class=jsp href="#j" style="display:inline-block;padding:14px 18px">Відкрити (A67)</a></div>
-<div class=card><div style="height:96px;overflow-y:auto">${[1, 2, 3, 4].map(i => `<div class=li style="padding:4px 0">Рядок ${i} <button style="min-height:44px">Повернути</button></div>`).join('')}</div></div>
+<div class=card><div style="height:96px;overflow-y:auto">${[1, 2, 3, 4].map(i => `<div class=li style="padding:4px 0">Рядок ${i} <span class=pill>група</span> <button style="min-height:44px">Повернути</button></div>`).join('')}</div></div>
 ${'BAD'}</body></html>`;
 const DEFECTS = {
+  'кадр': `<div class=card id=tick>0</div><script>setInterval(()=>{tick.textContent+=1},150)</script>`,   // 36: екран не вщухає (S97)
   'прилипло': `<div class=card><span class=pill style="position:absolute;top:1px;right:30px">прилипла</span>.</div>`,
   'обрізано': `<div class=card><div class=clip>Дуже довгий підпис</div></div>`,
   'контраст': `<div class=card><span class=grey>сірий на сірому</span></div>`,
@@ -397,7 +406,13 @@ async function lint(target, states, width, theme, browser) {
   const res = [];
   for (const [i, st] of [null, ...states].entries()) {   // початковий екран — завжди, далі кожен стан
     await p.goto(target, { waitUntil: 'load' }); await p.waitForTimeout(400);
+    // 36. готовність кадру (AE S97: дані приходять мережею після load — 400 мс то встигали, то ні, і та сама сторінка давала 0 або 35 ✗)
+    try { await p.evaluate(() => document.fonts.ready.then(() => 1)); } catch {}
+    if (READY) { try { await p.waitForFunction(READY, null, { timeout: 10000 }); } catch { res.push({ lvl: '✗', kind: 'стан', where: st ? `стан ${i}` : 'початковий', msg: `умова --ready не настала за 10 с: ${READY.slice(0, 60)}` }); } }
     if (st) { try { await p.evaluate(st); } catch (e) { res.push({ lvl: '✗', kind: 'стан', where: `стан ${i}`, msg: 'JS стану впав: ' + e.message.split('\n')[0] }); } await p.waitForTimeout(700); }
+    { const sig = () => p.evaluate(() => document.querySelectorAll('*').length + ':' + document.body.innerText.length); let a0 = await sig(), still = false;
+      for (let n = 0; n < 5 && !still; n++) { await p.waitForTimeout(600); const a1 = await sig(); still = a1 === a0; a0 = a1; }
+      if (!still) res.push({ lvl: '⚠', kind: 'кадр', where: 'body', state: st ? `стан ${i}` : 'початковий', msg: `екран ще змінювався через 3 с після ${st ? 'стану' : 'завантаження'} — замір міг зловити проміжний кадр; дай --ready "<умова готовності>" або зупини таймер у стані` }); }
     const found = await p.evaluate(probe), pxs = found.filter(f => f.lvl === 'px');
     if (pxs.length) { const img = png(await p.screenshot({ type: 'png' })); for (const f of pxs) { const m = ringContrast(img, f); if (m == null) { f.lvl = 'ⓘ'; continue; }
       // допуск 0,15 — похибка кільця (згладжування, сусідні пікселі): ✗ лише явно нижче порогу, «на межі» — ⚠ (замір QR CC-17: 4,33–4,39 на межі, 4,07 і 2,52 — вади)
@@ -502,19 +517,20 @@ if (a[0] === 'selftest') {
 }
 if (!a[0]) { console.log('node ui_lint.mjs <url|файл> [--state "<js>"]… [--repo <тека>] [--width 390] [--height 844] [--json] | selftest'); process.exit(2); }
 let target = a[0]; if (!/^\w+:\/\//.test(target)) target = 'file://' + resolve(target);
-const states = [], opt = {}; for (let i = 1; i < a.length; i++) { if (a[i] === '--state') states.push(a[++i]); else if (a[i] === '--repo') opt.repo = a[++i]; else if (a[i] === '--width') opt.width = +a[++i]; else if (a[i] === '--height') HEIGHT = +a[++i]; else if (a[i] === '--scope') SCOPE = a[++i]; else if (a[i] === '--json') opt.json = true; else if (a[i] === '--baseline') opt.base = a[++i]; }
+const states = [], opt = {}; for (let i = 1; i < a.length; i++) { if (a[i] === '--state') states.push(a[++i]); else if (a[i] === '--repo') opt.repo = a[++i]; else if (a[i] === '--width') opt.width = +a[++i]; else if (a[i] === '--height') HEIGHT = +a[++i]; else if (a[i] === '--scope') SCOPE = a[++i]; else if (a[i] === '--json') opt.json = true; else if (a[i] === '--baseline') opt.base = a[++i]; else if (a[i] === '--ready') READY = a[++i]; }
 const r = await run(target, states, opt.width || 390);
 const acc = []; const af = opt.repo && join(resolve(opt.repo), '.ui-lint-accept');
 if (af && existsSync(af)) for (const l of (await import('node:fs')).readFileSync(af, 'utf8').split('\n')) { const [k, w, why] = l.split('|').map(x => (x || '').trim()); if (k && w && !k.startsWith('#')) acc.push({ k, w, why }); }
 for (const t of ['light', 'dark']) for (const f of r[t]) { const m = acc.find(a => a.k === f.kind && f.where.includes(a.w)); if (m && f.lvl !== 'ⓘ') { f.msg += ` — прийнято: ${m.why}`; f.lvl = 'ⓘ'; f.acc = true; } }
-if (opt.json) { console.log(JSON.stringify(r, null, 1)); }
+const say = (...m) => (opt.json ? console.error : console.log)(...m);   // --json: stdout — лише JSON (S97: рядок підсумку ламав файл бази)
 // --baseline <файл>: база відомих ✗ (Android Lint · SwiftLint --use-baseline; ключ — вид + елемент, не рядок: вставка рядків вище не робить старе «новим» —
 // claudeissues 82589, 07.2026). Файлу нема → записати поточні ✗ і вийти; є → блокує лише ✗ поза базою, виправлене з бази — назвати. Перезапис — лише руками (rm).
 if (opt.base) { const key = f => `${f.kind}|${f.where}`, cur = [...new Set(['light', 'dark'].flatMap(t => r[t].filter(f => f.lvl === '✗').map(key)))];
-  if (!existsSync(opt.base)) { writeFileSync(opt.base, JSON.stringify(cur, null, 1)); console.log(`✓ база ui_lint записана: ${cur.length} ✗ → ${opt.base} (до правки; після — той самий --baseline)`); process.exit(0); }
-  const base = new Set(JSON.parse((await import('node:fs')).readFileSync(opt.base, 'utf8'))), gone = [...base].filter(k => !cur.includes(k));
+  if (!existsSync(opt.base)) { writeFileSync(opt.base, JSON.stringify(cur, null, 1)); say(`✓ база ui_lint записана: ${cur.length} ✗ → ${opt.base} (до правки; після — той самий --baseline)`); process.exit(0); }
+  let B = JSON.parse((await import('node:fs')).readFileSync(opt.base, 'utf8')); if (!Array.isArray(B)) B = ['light', 'dark'].flatMap(t => (B[t] || []).filter(f => f.lvl === '✗').map(key));   // база — масив ключів або звіт --json
+  const base = new Set(B), gone = [...base].filter(k => !cur.includes(k));
   for (const t of ['light', 'dark']) for (const f of r[t]) if (f.lvl === '✗' && base.has(key(f))) { f.lvl = 'ⓘ'; f.acc = true; f.msg += ' — з бази (було до правки)'; }
-  if (gone.length) console.log(`ⓘ виправлено з бази: ${gone.length} (${gone.slice(0, 3).join(' · ')}${gone.length > 3 ? ' …' : ''})`); }
+  if (gone.length) say(`ⓘ виправлено з бази: ${gone.length} (${gone.slice(0, 3).join(' · ')}${gone.length > 3 ? ' …' : ''})`); }
 let x = 0, w = 0;
 for (const t of ['light', 'dark']) {
   const seen = new Set(); const rows = r[t].filter(f => { const k = f.lvl + f.kind + f.where + f.msg; if (seen.has(k)) return false; seen.add(k); return true; });
@@ -523,9 +539,10 @@ for (const t of ['light', 'dark']) {
     for (const f of rows.filter(f => f.acc)) console.log(`  ⓘ ${f.kind} · ${f.where} — ${f.msg}`);
     const n = rows.filter(f => f.lvl === 'ⓘ' && !f.acc).length; if (n) console.log(`  ⓘ не виміряно контраст на ${n} елементах (градієнт / картинка) — глянь очима`); }
 }
-console.log(`─── ui_lint: ✗ ${x} · ⚠ ${w} · екранів ${states.length + 1} (початковий + станів ${states.length}) × 2 теми ───`);
+if (opt.json) console.log(JSON.stringify(r, null, 1));
+say(`─── ui_lint: ✗ ${x} · ⚠ ${w} · екранів ${states.length + 1} (початковий + станів ${states.length}) × 2 теми ───`);
 if (opt.repo && !x) {   // позначка для воріт: той самий хеш диффу UI, що рахує ui-review-gate
   const hx = execFileSync('bash', [join(here, 'hooks/ui-review-gate.sh'), 'hash', resolve(opt.repo)], { encoding: 'utf8' }).trim();
-  if (hx) { writeFileSync(`/tmp/lens-uilint-${hx}`, `${new Date().toISOString()} ✗0 ⚠${w} ${target} states=${states.length || 1}\n`); console.log(`✓ позначка ui_lint для диффу ${hx.slice(0, 8)} — ворота огляду приймуть done`); }
+  if (hx) { writeFileSync(`/tmp/lens-uilint-${hx}`, `${new Date().toISOString()} ✗0 ⚠${w} ${target} states=${states.length || 1}\n`); say(`✓ позначка ui_lint для диффу ${hx.slice(0, 8)} — ворота огляду приймуть done`); }
 }
 process.exit(x ? 1 : 0);
