@@ -331,7 +331,7 @@ function probe() {
 function leaks(scope) {
   const roots = [...document.querySelectorAll(scope)]; if (!roots.length) return [{ lvl: '⚠', kind: 'чуже правило', where: scope, msg: `корінь острова «${scope}» не знайдено — перевірку витоків не виміряно` }];
   const els = roots.flatMap(r => [r, ...r.querySelectorAll('*')]), tok = scope.replace(/^[.#]/, ''), out = [], seen = new Set();
-  const BOX = /^(padding|margin|width|height|min-|max-|border(?!-collapse)|overflow|position|top|right|bottom|left|inset|display|transform|cursor|background|box-shadow|grid|flex|gap|z-index|outline)/;
+  const BOX = /^(padding|margin|width|height|min-|max-|border(?!-collapse)|overflow|position|top|right|bottom|left|inset|display|transform|cursor|background|box-shadow|grid|flex|gap|z-index|outline|font-family$|font-size$)/;   // + шрифт (пропуск AE S99: моно-цифри тренажера .num протекли в суми редактора)
   const walk = list => { for (const r of list) { if (r.cssRules && !r.selectorText) { walk(r.cssRules); continue; } if (!r.selectorText || r.selectorText.includes(tok)) continue;
     const props = [...r.style].filter(x => BOX.test(x)); if (!props.length) continue;
     for (const sel of r.selectorText.split(',').map(x => x.trim())) { if (!/[.#\[]/.test(sel.replace(/:[a-z-]+(\([^)]*\))?/g, ''))) continue;   // лише теги / * — скидання
@@ -394,6 +394,7 @@ const DEFECTS = {
   'пояснення під кнопкою': `<div class=card><div><button style="min-height:44px;padding:0 14px">Пробна розмова</button><small style="font-size:11.5px;display:block">Модель зіграє клієнта за цим сценарієм, як для фармацевта.</small></div></div>`,   // AE S96: підпис під «Пробна розмова»
   'наведення': `<style>.hv{min-height:44px;padding:0 14px;border:0;background:#fff}.hv:hover{background:#FFFEF6}</style><div class=card><button class=hv>Рядок списку</button></div>`,   // AE S96: наведення кремовим на білому — 1,01:1
   'пояснення абзацом': `<div class=card><div style="font-size:12.5px;color:#555;background:#F6F7F8;padding:10px">Змінили бонус — сценарії з цією позицією в наборі перерахують орієнтир; якщо набір стане не дорожчим за замовлення, біля сценарію з’явиться позначка.</div></div>`,   // AE S99: абзац у панелі замість «i»
+  'чуже правило ': `<style>.num{font-family:monospace}</style><div class=isl><b class=num style="display:inline-block;min-height:44px">647,00 ₴</b></div>`,   // AE S99: шрифт тренажера в острові
   'чуже правило': `<style>.err{padding:10px 14px;border:1px solid #c00}</style><div class=isl><span class="dot err" style="display:inline-block;width:8px;height:8px;background:#c00"></span></div>`,   // AE S93: .err тренажера → крапка редактора; selftest з --scope .isl
 };
 
@@ -536,7 +537,7 @@ if (a[0] === 'selftest') {
   const page = (x, n) => { const f = join(d, n + '.html'); writeFileSync(f, SELF.replace('BAD', x)); return 'file://' + f; };
   const clean = await run(page('', 'clean'), [], 390); const cl = [...clean.light, ...clean.dark].filter(x => x.lvl !== 'ⓘ');
   console.log((cl.length ? '✗' : '✓') + ` чиста сторінка → тиша (${cl.length ? cl.map(x => x.kind + ': ' + x.msg).join(' | ') : '0'})`); bad += !!cl.length;
-  for (const [k, html] of Object.entries(DEFECTS)) { SCOPE = k === 'чуже правило' ? '.isl' : ''; const r = await run(page(html, k), [], k === 'наведення' ? 1280 : 390); const hit = [...r.light, ...r.dark].some(x => x.kind === k.trim() && x.lvl !== 'ⓘ');
+  for (const [k, html] of Object.entries(DEFECTS)) { SCOPE = k.trim() === 'чуже правило' ? '.isl' : ''; const r = await run(page(html, k), [], k === 'наведення' ? 1280 : 390); const hit = [...r.light, ...r.dark].some(x => x.kind === k.trim() && x.lvl !== 'ⓘ');
     console.log((hit ? '✓' : '✗') + ` підкинуто «${k}» → спіймано`); bad += !hit; }
   console.log(`─── ui_lint selftest: ${Object.keys(DEFECTS).length + 1 - bad}/${Object.keys(DEFECTS).length + 1} ───`); process.exit(bad ? 1 : 0);
 }
