@@ -12,6 +12,7 @@
 // 10 дія в прокрутці · 11 кнопки ряду · 12 сирота · 13 злито · 14 однакові заголовки · 15 дата й час · 16 зливається (16-б край кнопки) · 17 паритет тем · 18 кромка · 19 картка-список · 20 вкладена прокрутка · 21 шапка в прокрутці · 22 емодзі в кнопці · 23 нативне вікно · 24 фон у рамці · 25 кант рветься · 26 поле губиться; поза probe — натискання (:active / JS pointerdown, touchstart).
 // 31 форма виділення · 32 пунктир < 3:1 · 22 емодзі-значок без підпису → ✗ · 33 різнобій списків — AE S94, 20.10.2026.
 // 34 пояснення під кнопкою (→ «i») · 35 наведення (ПК, ≥ 1024: нема або ледь видно) — AE S96, 20.10.2026.
+// 37 налізає — текст ширший за свій блок при overflow: visible (не обрізаний, а виходить на сусіда) — пропуск Konst, AE S97, 21.10.2026 (вікно «Групи»).
 // 36 кадр не встиг (екран ще змінювався під час заміру) — AE S97, 21.10.2026: замір чекає шрифти, --ready і тишу DOM (до 3 с), а не фіксовані 400 мс;
 //    --json — чистий JSON у stdout (решта — stderr), --baseline бере і масив ключів, і звіт --json; 3 не судить прокручене за край обрізального предка.
 // 27 плашка в тон тла · 28 панелі зливаються · 29 список-таблиця · 30 чуже правило (--scope <корінь острова>) — AE S93, 19.10.2026.
@@ -68,6 +69,14 @@ function probe() {
       const full = r.width >= q.width - 2;   // на всю ширину картки (рядок, смужка) — не капсула
       if (!full && d.some(x => x < -1) && getComputedStyle(c).overflow === 'visible') add('✗', 'вилазить', el, `виходить за межі «${path(c)}» на ${Math.round(-Math.min(...d))} px`);
       else if (!full && d.some(x => x >= -1 && x < 2) && !(r.height >= q.height - 2)) add('✗', 'прилипло', el, `майже торкається краю «${path(c)}» (${d.map(x => Math.round(x)).join('/')} px) — «приклеєна капсула»`); }
+    // 37. налізає (пропуск Konst AE S97: «за замовчуванням» у колонці 96 px, nowrap, ліз під кошик): текст ширший за власний блок і НЕ обрізаний — він виходить
+    //     за межі й лягає на сусіда; «обрізано» (№2) бачить лише hidden / clip. Блок із власною шириною (не inline), видимий вміст за правим краєм > 1 px.
+    //     Міряємо межі САМОГО тексту (Range), не scrollWidth: той рахує й ::after зони кліку (x44 у самоперевірці). Обидва боки — вирівняне праворуч лізе ліворуч.
+    if (own && s.display !== 'inline' && el.clientWidth > 0 && s.overflowX === 'visible' && s.textOverflow !== 'ellipsis') {
+      let L = Infinity, R = -Infinity; const rg = document.createRange();
+      for (const n of el.childNodes) if (n.nodeType === 3 && n.textContent.trim()) { rg.selectNodeContents(n); const b = rg.getBoundingClientRect(); if (b.width) { L = Math.min(L, b.left); R = Math.max(R, b.right); } }
+      const over = Math.max(R - r.right, r.left - L);
+      if (over > 1) add('✗', 'налізає', el, `текст виходить за свій блок на ${Math.round(over)} px і не обрізаний — заходить на сусіда (дай місце, перенос або «…»)`); }
     // 4. контраст тексту
     if (own && el.textContent.trim().length > 1) { const fg = rgba(s.color), bg = bgOf(el), px = parseFloat(s.fontSize), big = px >= 24 || (px >= 18.66 && +s.fontWeight >= 700), need = big ? 3 : 4.5;
       if (fg && bg) { const f = fg[3] < 1 ? blend(fg, bg) : fg, a = lum(f), b = lum(bg), cr = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
@@ -329,6 +338,7 @@ body{margin:0;font:15px/1.4 sans-serif;background:#fff;color:#111}@media(prefers
 <div class=card><div style="height:96px;overflow-y:auto">${[1, 2, 3, 4].map(i => `<div class=li style="padding:4px 0">Рядок ${i} <span class=pill>група</span> <button style="min-height:44px">Повернути</button></div>`).join('')}</div></div>
 ${'BAD'}</body></html>`;
 const DEFECTS = {
+  'налізає': `<div class=card style="display:flex;align-items:center;gap:4px"><small style="display:block;width:60px;white-space:nowrap">за замовчуванням</small><button aria-label="Видалити" style="min-height:44px;min-width:44px">✕</button></div>`,   // 37 (S97)
   'кадр': `<div class=card id=tick>0</div><script>setInterval(()=>{tick.textContent+=1},150)</script>`,   // 36: екран не вщухає (S97)
   'прилипло': `<div class=card><span class=pill style="position:absolute;top:1px;right:30px">прилипла</span>.</div>`,
   'обрізано': `<div class=card><div class=clip>Дуже довгий підпис</div></div>`,
