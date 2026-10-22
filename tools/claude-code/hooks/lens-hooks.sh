@@ -35,15 +35,18 @@ if [ "$ev" = repo-hooks-test ]; then
 fi
 if [ "$ev" = SessionStart ] || [ "$ev" = profile-test ]; then
   [ "$ev" = SessionStart ] && repo_hooks
+  # профіль — двома частинами ≤ 10 000 знаків кожна (стеля additionalContext Claude Code; понад — лише прев'ю 2 000): 1 — тут, 2 — у перше повідомлення Konst (profile_parts.py)
   prof() { [ "${LENS_PROFILE:-}" = 1 ] && [ -f "$h/../PROFILE.md" ] || return 0
-    python3 -c 'import json,sys; t=open(sys.argv[1],encoding="utf-8").read(); print(json.dumps({"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"ПРОФІЛЬ KONST (з репо ядра, бо поле профілю цього акаунта спільне з іншою людиною; діє як user preferences — мова, цикл, звіт, маркер):\n\n"+t}},ensure_ascii=False))' "$h/../PROFILE.md"; }
+    python3 -c 'import json,sys,subprocess; t=subprocess.run([sys.executable,sys.argv[1],"1"],capture_output=True,text=True).stdout; print(json.dumps({"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":t}},ensure_ascii=False))' "$h/profile_parts.py"; }
   if [ "$ev" = profile-test ]; then
     on="$(LENS_PROFILE=1 prof)"; off="$(LENS_PROFILE= prof)"; bad=0
-    case "$on" in *'"hookEventName": "SessionStart"'*'ЦИКЛ ПЛАНУВАННЯ'*) echo "✓ LENS_PROFILE=1 → профіль у контексті ($(printf '%s' "$on" | wc -c) байт)";; *) echo "✗ LENS_PROFILE=1 → профілю нема"; bad=1;; esac
-    [ -z "$off" ] && echo "✓ без LENS_PROFILE → тиша (свій акаунт: профіль у налаштуваннях)" || { echo "✗ без LENS_PROFILE → профіль усе одно"; bad=1; }
+    case "$on" in *'"hookEventName": "SessionStart"'*'Частина 1/2'*) echo "✓ LENS_PROFILE=1 → профіль у контексті (частина 1: $(printf '%s' "$on" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["hookSpecificOutput"]["additionalContext"]))') знаків)";; *) echo "✗ LENS_PROFILE=1 → профілю нема"; bad=1;; esac
+    python3 "$h/profile_parts.py" test | sed 's/^/  /'; [ "${PIPESTATUS[0]}" = 0 ] || bad=1
+    [ -z "$off" ] && echo "✓ без LENS_PROFILE → тиша (профіль — у полі налаштувань акаунта)" || { echo "✗ без LENS_PROFILE → профіль усе одно"; bad=1; }
     exit $bad
   fi
-  prof; [ "${LENS_PROFILE:-}" = 1 ] && date +%H:%M > /tmp/lens-profile-loaded 2>/dev/null; exit 0   # позначка для profile_check.sh (рядок «профіль» в env_check)
+  ss_sid="$(cat 2>/dev/null | grep -o '"session_id" *: *"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/' | tr -cd 'A-Za-z0-9_-')"
+  prof; [ "${LENS_PROFILE:-}" = 1 ] && { date +%H:%M > /tmp/lens-profile-loaded; : > "/tmp/lens-profile-part2-${ss_sid:-nosession}"; } 2>/dev/null; exit 0   # позначка для profile_check.sh (рядок «профіль» в env_check)
 fi
 case "$ev" in pre|PreToolUse) ev=pre;; post|PostToolUse) ev=post;; stop|Stop) ev=stop;; UserPromptSubmit) ev=prompt;; *) exit 0;; esac
 in="$(cat)"
@@ -75,6 +78,9 @@ case "$ev" in
   stop)   # перший з відповіддю перемагає: гачок пам'яті, перевірка перед переїздом (HOOK-3.2), «план без світу» (HOOK-2.5)
     run memory-guard.sh stop || run handoff-remind.sh stop || run plan-web.sh stop ;;
   prompt)   # перевірка перед переїздом (HOOK-3.2), інакше — аркуш середовища на прохання (ENV-1), інакше — «пропуск, знайдений Konst» (HOOK-5)
-    run handoff-remind.sh "" || run env-remind.sh "" || run konst-miss.sh "" ;;
+    o="$(run handoff-remind.sh "" || run env-remind.sh "" || run konst-miss.sh "")"
+    pf="/tmp/lens-profile-part2-${sid:-nosession}"
+    if [ "${LENS_PROFILE:-}" = 1 ] && [ -f "$pf" ]; then rm -f "$pf"; python3 "$h/profile_parts.py" 2 | python3 "$h/profile_parts.py" merge "$o"   # частина 2 профілю — у перше повідомлення після старту чи стиснення
+    elif [ -n "$o" ]; then printf '%s\n' "$o"; fi ;;
 esac
 exit 0
