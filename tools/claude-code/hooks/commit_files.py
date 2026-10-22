@@ -17,8 +17,12 @@
   5. мітки конфлікту злиття `<<<<<<< ` / `>>>>>>> ` на початку рядка (`check-merge-conflict`; у main пишуть кілька агентів)
   6. зламаний синтаксис `.json` / `.toml` (`check-json` · `check-toml`; `wrangler.toml` і `manifest.json` ламають деплой)
   7. два шляхи, що різняться лише регістром (`check-case-conflict`; Windows і Mac їх не розрізнять)
+  8. зламаний синтаксис змінених скриптів — `.sh`: `bash -n` (+ `shellcheck -S error`, якщо встановлено); `.py`: компіляція
+     (`check-ast`). Подія: Routes S1 22.10.2026 — вставка після `;;` зламала диспетчер гачків `lens-hooks.sh`, а з ним — усі гачки
+     всіх сесій; спіймано живим прогоном, не гейтом. Лише змінені файли — як у pre-commit (дешево, ~0,1 с на файл).
+     `bash -n` лише розбирає (не бачить семантики) — тому shellcheck, де є; його нема — тиша, не ✗.
 Не беремо з pre-commit-hooks: пробіли й кінці файлів (шум у диффах даних), no-commit-to-branch (ми свідомо комітимо в main),
-перевірки Python-коду (нема такого коду в продуктах), submodules (їх нема).
+submodules (їх нема).
 
   python3 commit_files.py selftest   — тимчасове репо: кожен випадок має дати свій ✗, чиста команда — тишу
   HOOK_INJECT=1 … selftest           — сторож вимкнено → selftest червоніє (зуби)
@@ -31,6 +35,7 @@ BIG = 1024 * 1024
 KEY = re.compile(rb'-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY')
 SECRET_NAME = re.compile(r'(^|/)(\.env(\..*)?|\.dev\.vars|id_(rsa|ed25519|ecdsa)[^/]*|[^/]*\.(pem|p12|pfx|key)|credentials\.json)$', re.I)
 CONFLICT = re.compile(rb'^(?:<{7} |>{7} )', re.M)
+SHELLCHECK = next((x for x in (os.environ.get('SHELLCHECK_BIN', ''), '/usr/bin/shellcheck', '/usr/local/bin/shellcheck') if x and os.path.isfile(x)), None)
 
 
 def git(top, *a):
@@ -83,7 +88,7 @@ def check(top, cmd):
         if any(WIN_BAD.search(p) or p.endswith((' ', '.')) or WIN_RESERVED.match(p) for p in parts):
             bad.append(f'ім\'я, якого Windows не створить: «{f}» (клон на Windows зламається) — перейменуй або прибери')
         elif '/' not in f and not explicit(f):
-            bad.append(f'новий файл у корені «{f}» не названо явно — випадковий? прибери; свідомий — `git add {f}` окремо')
+            bad.append(f'новий файл у корені «{f}» не названо явно — випадковий? прибери; свідомий — назви його в `git add {f}` у тій самій команді, що й коміт')
         if SECRET_NAME.search(f):
             bad.append(f'файл-секрет за іменем «{f}» — секрети ніколи в репо (змінні середовища сесії); додай у .gitignore')
         p = os.path.join(top, f)
@@ -112,6 +117,19 @@ def check(top, cmd):
                 tomllib.loads(b.decode('utf-8'))
         except Exception as e:
             bad.append(f'зламаний синтаксис «{f}»: {str(e)[:80]}')
+        if f.endswith('.sh') or b.startswith(b'#!/bin/bash') or b.startswith(b'#!/usr/bin/env bash'):
+            r = subprocess.run(['bash', '-n', p], capture_output=True, text=True)
+            if r.returncode:
+                bad.append(f'зламаний синтаксис bash «{f}»: {r.stderr.strip().splitlines()[-1][:120]}')
+            elif SHELLCHECK:
+                r = subprocess.run([SHELLCHECK, '-S', 'error', '-f', 'gcc'] + ([] if b.startswith(b'#!') else ['-s', 'bash']) + [p], capture_output=True, text=True)   # без шебанга — як bash (інакше SC2148 на кожному сорс-файлі)
+                if r.returncode and r.stdout.strip():
+                    bad.append(f'shellcheck (error) «{f}»: {r.stdout.strip().splitlines()[0][:140]}')
+        elif f.endswith('.py'):
+            try:
+                compile(b, f, 'exec')
+            except SyntaxError as e:
+                bad.append(f'зламаний синтаксис Python «{f}»: рядок {e.lineno}: {e.msg}')
     return bad
 
 
@@ -155,6 +173,14 @@ def selftest():
         open(d + '/lens/A.md', 'w').write('x\n')
         say(any('регістром' in x for x in check(d, 'git add -A && git commit -m x')), 'lens/A.md поруч з lens/a.md → ✗ регістр')
         os.remove(d + '/lens/A.md')
+        open(d + '/lens/h.sh', 'w').write('case "$1" in\n  a) echo a ;;\n  [ -z x ] && echo b\nesac\n')
+        say(any('синтаксис bash' in x for x in check(d, 'git add -A && git commit -m x')), 'зламаний .sh (рядок після ;; — подія Routes S1) → ✗')
+        open(d + '/lens/h.sh', 'w').write('case "$1" in\n  a) echo a ;;\nesac\n')
+        say(check(d, 'git add -A && git commit -m x') == [], 'справний .sh → тиша')
+        os.remove(d + '/lens/h.sh')
+        open(d + '/lens/t.py', 'w').write('def f(:\n  pass\n')
+        say(any('синтаксис Python' in x for x in check(d, 'git add -A && git commit -m x')), 'зламаний .py → ✗')
+        os.remove(d + '/lens/t.py')
         open(d + '/stray.txt', 'w').write('x')
         say(check(d, 'git add lens/a.md && git commit -m x') == [], 'нестежений файл, якого команда не додає → тиша (у коміт не піде)')
     finally:

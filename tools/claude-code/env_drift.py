@@ -64,7 +64,18 @@ def check(sheet_text, environ, settings_text, net):
         ok.append("✓ профіль з репо (LENS_PROFILE=1)")
     elif "LENS_PROFILE" in names and environ.get("LENS_PROFILE"):
         warn.append("⚠ LENS_PROFILE не 1 — повний профіль у сесію не кладеться → рядок `LENS_PROFILE=1`")
+    tools = re.findall(r"^- `([\w.-]+)` —", sheet_text.split("## 4 ", 1)[1], re.M) if "## 4 " in sheet_text else []
+    lost = [x for x in tools if not which(x)]
+    if lost:
+        warn.append(f"⚠ інструментів нема: {', '.join(lost)} → setup script застарів: Edit → Setup script, §3 аркуша цілком")
+    elif tools:
+        ok.append(f"✓ інструменти ({', '.join(tools)})")
     return warn, ok
+
+
+def which(x):
+    import shutil
+    return shutil.which(x)
 
 
 def probe():
@@ -85,10 +96,12 @@ def selftest():
              ("setup script старий → ⚠ замінити §3", env, '{"hooks":{}}', net, 1, "замінити §3"),
              ("settings.json нема → ⚠ setup script не спрацював", env, None, net, 1, "не спрацював"),
              ("мережа впала → ⚠", env, st, {"github.com": False}, 1, "мережа"),
-             ("LENS_PROFILE=0 → ⚠", dict(env, LENS_PROFILE="0"), st, net, 1, "LENS_PROFILE не 1")]
+             ("LENS_PROFILE=0 → ⚠", dict(env, LENS_PROFILE="0"), st, net, 1, "LENS_PROFILE не 1"),
+             ("інструмента з §4 нема → ⚠", env, st, net, 1, "інструментів нема")]
+    sheet_tools = sheet + "\n## 4 · Інструменти\n\n- `no-such-tool-xyz` — тест\n"
     bad = 0
     for name, e, s, n, want_n, want_s in cases:
-        w, o = check(sheet, e, s, n)
+        w, o = check(sheet_tools if name.startswith("інструмента") else sheet, e, s, n)
         good = (len(w) == want_n and (want_s is None or any(want_s in x for x in w))
                 and not any("s3cr3t-value" in x for x in w + o))   # значення секрету — ніколи у виводі
         bad += not good
