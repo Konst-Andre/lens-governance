@@ -70,7 +70,8 @@ case "$ev" in
     o1="$(printf '%s' "$in" | bash "$h/review-remind.sh" post 2>/dev/null)"; o2="$(printf '%s' "$in" | bash "$h/brief-guard.sh" post 2>/dev/null)"
     [ -n "$o1" ] && [ -z "$o2" ] && fire review-remind "$o1"
     [ -z "$o1" ] && [ -n "$o2" ] && fire brief-guard "$o2"
-    [ -n "$o1" ] && [ -n "$o2" ] && fire "review-remind+brief-guard" "$(python3 -c 'import json,sys; a,b=(json.loads(x)["hookSpecificOutput"] for x in sys.argv[1:3]); print(json.dumps({"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":a["additionalContext"]+"\n\n"+b["additionalContext"]}},ensure_ascii=False))' "$o1" "$o2")" ;;
+    [ -n "$o1" ] && [ -n "$o2" ] && fire "review-remind+brief-guard" "$(python3 -c 'import json,sys; a,b=(json.loads(x)["hookSpecificOutput"] for x in sys.argv[1:3]); print(json.dumps({"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":a["additionalContext"]+"\n\n"+b["additionalContext"]}},ensure_ascii=False))' "$o1" "$o2")"
+    [ -z "$o1" ] && [ -z "$o2" ] && [ "$tool" = Bash ] && run env-remind.sh post ;;   # коміт змінив аркуш середовища → запропонувати оновити (ENV-1)
   stop)   # перший з відповіддю перемагає: гачок пам'яті, перевірка перед переїздом (HOOK-3.2), «план без світу» (HOOK-2.5)
     run memory-guard.sh stop || run handoff-remind.sh stop || run plan-web.sh stop ;;
   prompt)   # перевірка перед переїздом (HOOK-3.2), інакше — аркуш середовища на прохання (ENV-1), інакше — «пропуск, знайдений Konst» (HOOK-5)

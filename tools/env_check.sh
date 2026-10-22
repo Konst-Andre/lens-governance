@@ -39,6 +39,7 @@ if [ "$debt" -gt 0 ]; then nf=$(printf '%s\n' $dfiles | sort -u | grep -c .); ag
   { [ "$nf" -ge 5 ] || [ "$age" -ge 7 ]; } && aud="$aud — ПОРА пакет за класом (lens-governance:tools/claude-code/templates/AUDIT_template.md)"; fi
 echo "env: github=${g:-000} cloudflare=${c:-000} · ${vars% } · гейт --gov: $gate · $aud"
 bash tools/claude-code/profile_check.sh   # профіль: звідки в цій сесії (як git config --show-origin) — з репо (LENS_PROFILE=1) чи з налаштувань; ACC-1 (ACCOUNT_MOVE.md)
+python3 tools/claude-code/env_drift.py --short   # середовище ⟂ аркуш tools/claude-code/ENVIRONMENT.md (ENV-1): змінні · setup script · мережа; ⚠ — з рядком, що вставити
 
 # ручні завантаження (Konst 04.10: «рідко, але буває») — тіло-«404» замість файла (так зламався модуль, MOD-1) · ім'я з пробілом
 f404=$(git grep -l -E '^(404: Not Found|404 Not Found)$' -- . 2>/dev/null | tr '\n' ' ')
