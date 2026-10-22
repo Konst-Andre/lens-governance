@@ -55,6 +55,13 @@ sid="$(printf '%s' "$in" | grep -o '"session_id" *: *"[^"]*"' | head -1 | sed 's
 # журнал спрацювань (HOOK-5, 10.10.2026): кожна відповідь гачка — рядок у /tmp/lens-hooks-<сесія>.tsv (час · подія · гачок · суть);
 # на переїзді handoff_check рахує їх і вимагає вердикти в tools/claude-code/hooks/HOOK_JOURNAL.md (справжнє · хибне · дубль · пропуск)
 fire() {   # $1 — гачок, $2 — його вивід (не порожній)
+  # стеля Claude Code: текст гачка понад 10 000 знаків модель бачить лише прев'ю на 2 000 (docs hooks «JSON output», 22.10.2026) → рядок «⚠ стеля» у журнал спрацювань
+  n="$(printf '%s' "$2" | python3 -c 'import json,sys
+try:
+    d=json.load(sys.stdin); h=d.get("hookSpecificOutput") or {}; print(max(len(str(h.get(k,""))) for k in ("additionalContext","permissionDecisionReason")) if h else len(str(d.get("reason",""))))
+except Exception: print(0)' 2>/dev/null)"
+  [ "${n:-0}" -gt 10000 ] && printf '%s	%s	%s	%s
+' "$(date -u +%FT%TZ)" "$ev" "$1" "⚠ СТЕЛЯ: текст гачка $n знаків > 10 000 — модель бачить лише прев'ю 2 000; розбити (profile_parts.py) або скоротити" >> "/tmp/lens-hooks-${sid:-nosession}.tsv" 2>/dev/null
   printf '%s\t%s\t%s\t%s\n' "$(date -u +%FT%TZ)" "$ev" "$1" "$(printf '%s' "$2" | tr '\n\t' '  ' | sed 's/"permissionDecisionReason": *"//;s/"reason": *"//;s/"additionalContext": *"//' | cut -c1-200)" >> "/tmp/lens-hooks-${sid:-nosession}.tsv" 2>/dev/null
   printf '%s\n' "$2"
 }
