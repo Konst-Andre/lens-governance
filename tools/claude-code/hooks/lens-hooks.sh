@@ -73,7 +73,7 @@ case "$ev" in
     [ -n "$o1" ] && [ -n "$o2" ] && fire "review-remind+brief-guard" "$(python3 -c 'import json,sys; a,b=(json.loads(x)["hookSpecificOutput"] for x in sys.argv[1:3]); print(json.dumps({"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":a["additionalContext"]+"\n\n"+b["additionalContext"]}},ensure_ascii=False))' "$o1" "$o2")" ;;
   stop)   # перший з відповіддю перемагає: гачок пам'яті, перевірка перед переїздом (HOOK-3.2), «план без світу» (HOOK-2.5)
     run memory-guard.sh stop || run handoff-remind.sh stop || run plan-web.sh stop ;;
-  prompt)   # перевірка перед переїздом (HOOK-3.2), інакше — «пропуск, знайдений Konst» (HOOK-5)
-    run handoff-remind.sh "" || run konst-miss.sh "" ;;
+  prompt)   # перевірка перед переїздом (HOOK-3.2), інакше — аркуш середовища на прохання (ENV-1), інакше — «пропуск, знайдений Konst» (HOOK-5)
+    run handoff-remind.sh "" || run env-remind.sh "" || run konst-miss.sh "" ;;
 esac
 exit 0
