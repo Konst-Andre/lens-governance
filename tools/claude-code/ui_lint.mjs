@@ -12,6 +12,7 @@
 // 10 дія в прокрутці · 11 кнопки ряду · 12 сирота · 13 злито · 14 однакові заголовки · 15 дата й час · 16 зливається (16-б край кнопки) · 17 паритет тем · 18 кромка · 19 картка-список · 20 вкладена прокрутка · 21 шапка в прокрутці · 22 емодзі в кнопці · 23 нативне вікно · 24 фон у рамці · 25 кант рветься · 26 поле губиться; поза probe — натискання (:active / JS pointerdown, touchstart).
 // 31 форма виділення · 32 пунктир < 3:1 · 22 емодзі-значок без підпису → ✗ · 33 різнобій списків — AE S94, 20.10.2026.
 // 34 пояснення під кнопкою (→ «i») · 35 наведення (ПК, ≥ 1024: нема або ледь видно) — AE S96, 20.10.2026.
+// 40 підказка стрибає (popover у першому видимому кадрі не на своєму місці — ставлять у «toggle», що приходить після показу) — пропуск Konst, AE S101, 22.10.2026.
 // 39 край розчиняється (поверхня ≥ 320×160 майже в тон тла, ΔE < 6, без рамки й тіні) — пропуск Konst, AE S99, 21.10.2026.
 // 38 пояснення абзацом (≥ 20 слів дрібного тексту поза «i» / вікном / таблицею / повідомленням → «i») — пропуск Konst, AE S99, 21.10.2026.
 // 37 налізає — текст ширший за свій блок при overflow: visible (не обрізаний, а виходить на сусіда) — пропуск Konst, AE S97, 21.10.2026 (вікно «Групи»).
@@ -409,6 +410,7 @@ const DEFECTS = {
 <option>+ Додати</option></select></div>`,   // AE S94: 3 з 7 списків на base-select, решта — ні
   'емодзі ': `<div class=card><button aria-label="Рейка" style="min-width:44px;min-height:44px">☀</button></div>`,   // AE S94: значок-емодзі без підпису → ✗
   'пояснення під кнопкою': `<div class=card><div><button style="min-height:44px;padding:0 14px">Пробна розмова</button><small style="font-size:11.5px;display:block">Модель зіграє клієнта за цим сценарієм, як для фармацевта.</small></div></div>`,   // AE S96: підпис під «Пробна розмова»
+  'підказка стрибає': `<style>.tp{position:fixed;inset:auto;margin:0;padding:8px;border:1px solid #888;background:#fff}</style><div class=card><button popovertarget=tp1 style="min-height:44px;min-width:120px;margin-left:200px">i</button><div popover id=tp1 class=tp>Пояснення</div></div><script>document.addEventListener('toggle',e=>{const t=e.target;if(e.newState!=='open')return;const r=document.querySelector('[popovertarget=tp1]').getBoundingClientRect();t.style.left=r.left+'px';t.style.top=(r.bottom+6)+'px'},true)</script>`,
   'наведення': `<style>.hv{min-height:44px;padding:0 14px;border:0;background:#fff}.hv:hover{background:#FFFEF6}</style><div class=card><button class=hv>Рядок списку</button></div>`,   // AE S96: наведення кремовим на білому — 1,01:1
   'пояснення абзацом': `<div class=card><div style="font-size:12.5px;color:#555;background:#F6F7F8;padding:10px">Змінили бонус — сценарії з цією позицією в наборі перерахують орієнтир; якщо набір стане не дорожчим за замовлення, біля сценарію з’явиться позначка.</div></div>`,   // AE S99: абзац у панелі замість «i»
   'край розчиняється': `<div style="background:#FEFDF5;padding:20px"><table style="border-collapse:collapse;width:600px"><tbody>${Array.from({length: 8}, () => '<tr><td style="background:#fff;padding:10px">Позиція</td><td style="background:#fff;padding:10px">12,00</td></tr>').join('')}</tbody></table></div>`,   // AE S99: тіло таблиці на тлі без краю
@@ -525,6 +527,28 @@ async function lint(target, states, width, theme, browser) {
         else if (same && crN(b0, b1) < 1.12) res.push({ lvl: '⚠', kind: 'наведення', where: hv[j].toLowerCase(), state: st ? `стан ${i}` : 'початковий', msg: `наведення ледь видно: тло змінюється лише на ${crN(b0, b1).toFixed(2)}:1 (< 1,12) — помітніше тло або межа` });
       }
     }
+    // 40. підказка стрибає (пропуск Konst AE S101, 22.10.2026 з ПК: «натискаю на букву і — на мить зліва з'являється табличка й зникає»).
+    //     Кнопка з popovertarget → клік → запис кадрів (requestAnimationFrame) прямокутника підказки: перший ВИДИМИЙ відкритий кадр далі ніж 4 px
+    //     від останнього → ✗. Причина в AE: позиція ставилась у «toggle», а браузер шле його вже після показу (MDN «Using the Popover API», 22.10.2026).
+    //     Лік — ставити до показу (CSS anchor positioning: anchor() / position-area; Chrome «Introducing the popover API») або ховати до місця
+    //     (visibility:hidden, доки «toggle» не поставив — так у AE). Справжні кадри, не примусовий стан — тому ✗.
+    {
+      const pv = await p.evaluate(() => { const out = [];
+        for (const b of document.querySelectorAll('[popovertarget]')) { const t = document.getElementById(b.getAttribute('popovertarget')); const r = b.getBoundingClientRect();
+          if (!t || !r.width || !r.height || b.disabled || getComputedStyle(b).visibility === 'hidden' || t.matches(':popover-open')) continue;
+          const c = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); if (!c || !(c === b || b.contains(c))) continue;
+          b.dataset.uilPop = out.length; out.push(b.tagName.toLowerCase() + (b.id ? '#' + b.id : '') + '[popovertarget=' + t.id + ']'); if (out.length >= 8) break; }
+        return out; });
+      for (let j = 0; j < pv.length; j++) {
+        const fr = await p.evaluate(j => new Promise(done => { const b = document.querySelector(`[data-uil-pop="${j}"]`), t = document.getElementById(b.getAttribute('popovertarget')), fr = [];
+          const shot = () => { const r = t.getBoundingClientRect(), s = getComputedStyle(t); fr.push({ open: t.matches(':popover-open'), vis: s.visibility !== 'hidden' && +s.opacity > 0.05 && r.width > 0, x: Math.round(r.left), y: Math.round(r.top) }); };
+          let n = 0; const tick = () => { shot(); if (++n < 8) requestAnimationFrame(tick); else { try { t.hidePopover(); } catch {} done(fr); } };
+          b.click(); shot(); requestAnimationFrame(tick); }), j);
+        const seen = fr.filter(f => f.open && f.vis);
+        if (seen.length > 1) { const a = seen[0], z = seen[seen.length - 1], d = Math.round(Math.hypot(a.x - z.x, a.y - z.y));
+          if (d > 4) res.push({ lvl: '✗', kind: 'підказка стрибає', where: pv[j], state: st ? `стан ${i}` : 'початковий', msg: `видима підказка спершу в (${a.x}, ${a.y}), потім стрибає на ${d} px до (${z.x}, ${z.y}) — блимає на краю екрана; ставити до показу (CSS anchor positioning) або ховати, доки не на місці (visibility:hidden до «toggle»)` }); }
+      }
+    }
     await cdp.detach();
     if (i === 0 && !(await p.evaluate(() => /touchstart/.test([...document.scripts].map(x => x.textContent).join(' ')) || document.body.hasAttribute('ontouchstart'))))
       res.push({ lvl: '⚠', kind: 'натискання', where: 'сторінка', msg: 'нема слухача touchstart — у Safari iOS :active на дотик не спрацює (додай document.addEventListener(\'touchstart\', () => {}, { passive: true }))', state: '' });
@@ -560,9 +584,13 @@ if (a[0] === 'selftest') {
     const pn = await run(page(`<button style="width:18px;height:18px;padding:0">i</button>`, 'nomodal'), [], 390);
     const tm = [...pm.light, ...pm.dark].some(x => x.kind === 'тап' && x.lvl === '✗'), tn = [...pn.light, ...pn.dark].some(x => x.kind === 'тап' && x.lvl === '✗');
     console.log((!tm && tn ? '✓' : '✗') + ` мала ціль під модальним вікном → тиша; без вікна → «тап» ✗ (${tm} · ${tn})`); bad += !(!tm && tn); }
+  { // AE S101: та сама підказка, але схована до місця (visibility:hidden, доки «toggle» не поставив) → «підказка стрибає» мовчить (зуби в обидва боки)
+    const pf = await run(page(`<style>.tp{position:fixed;inset:auto;margin:0;padding:8px;border:1px solid #888;background:#fff}.tp:popover-open:not([data-placed]){visibility:hidden}</style><div class=card><button popovertarget=tp1 style="min-height:44px;min-width:120px;margin-left:200px">i</button><div popover id=tp1 class=tp>Пояснення</div></div><script>document.addEventListener('toggle',e=>{const t=e.target;if(e.newState!=='open'){t.removeAttribute('data-placed');return}const r=document.querySelector('[popovertarget=tp1]').getBoundingClientRect();t.style.left=r.left+'px';t.style.top=(r.bottom+6)+'px';t.setAttribute('data-placed','')},true)</script>`, 'popfixed'), [], 390);
+    const jf = [...pf.light, ...pf.dark].some(x => x.kind === 'підказка стрибає');
+    console.log((!jf ? '✓' : '✗') + ` підказка, схована до місця → «підказка стрибає» мовчить (${jf})`); bad += jf; }
   for (const [k, html] of Object.entries(DEFECTS)) { SCOPE = k.trim() === 'чуже правило' ? '.isl' : ''; const r = await run(page(html, k), [], k === 'наведення' ? 1280 : 390); const hit = [...r.light, ...r.dark].some(x => x.kind === k.trim() && x.lvl !== 'ⓘ');
     console.log((hit ? '✓' : '✗') + ` підкинуто «${k}» → спіймано`); bad += !hit; }
-  console.log(`─── ui_lint selftest: ${Object.keys(DEFECTS).length + 2 - bad}/${Object.keys(DEFECTS).length + 2} ───`); process.exit(bad ? 1 : 0);
+  console.log(`─── ui_lint selftest: ${Object.keys(DEFECTS).length + 3 - bad}/${Object.keys(DEFECTS).length + 3} ───`); process.exit(bad ? 1 : 0);
 }
 if (!a[0]) { console.log('node ui_lint.mjs <url|файл> [--state "<js>"]… [--repo <тека>] [--width 390] [--height 844] [--json] | selftest'); process.exit(2); }
 let target = a[0]; if (!/^\w+:\/\//.test(target)) target = 'file://' + resolve(target);
