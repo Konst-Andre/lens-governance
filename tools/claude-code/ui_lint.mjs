@@ -12,6 +12,7 @@
 // 10 дія в прокрутці · 11 кнопки ряду · 12 сирота · 13 злито · 14 однакові заголовки · 15 дата й час · 16 зливається (16-б край кнопки) · 17 паритет тем · 18 кромка · 19 картка-список · 20 вкладена прокрутка · 21 шапка в прокрутці · 22 емодзі в кнопці · 23 нативне вікно · 24 фон у рамці · 25 кант рветься · 26 поле губиться; поза probe — натискання (:active / JS pointerdown, touchstart).
 // 31 форма виділення · 32 пунктир < 3:1 · 22 емодзі-значок без підпису → ✗ · 33 різнобій списків — AE S94, 20.10.2026.
 // 34 пояснення під кнопкою (→ «i») · 35 наведення (ПК, ≥ 1024: нема або ледь видно) — AE S96, 20.10.2026.
+// 39 край розчиняється (поверхня ≥ 320×160 майже в тон тла, ΔE < 6, без рамки й тіні) — пропуск Konst, AE S99, 21.10.2026.
 // 38 пояснення абзацом (≥ 20 слів дрібного тексту поза «i» / вікном / таблицею / повідомленням → «i») — пропуск Konst, AE S99, 21.10.2026.
 // 37 налізає — текст ширший за свій блок при overflow: visible (не обрізаний, а виходить на сусіда) — пропуск Konst, AE S97, 21.10.2026 (вікно «Групи»).
 // 36 кадр не встиг (екран ще змінювався під час заміру) — AE S97, 21.10.2026: замір чекає шрифти, --ready і тишу DOM (до 3 с), а не фіксовані 400 мс;
@@ -67,7 +68,7 @@ function probe() {
       if ((o.overflowX !== 'visible' || o.overflowY !== 'visible') && !(s.position === 'absolute' && o.position === 'static')) { k = e; break; } }
     const kr = k && k.getBoundingClientRect(), cut = !!kr && (r.top < kr.top - 1 || r.bottom > kr.bottom + 1 || r.left < kr.left - 1 || r.right > kr.right + 1);
     if (c && c !== el && !cut) { const q = c.getBoundingClientRect(), d = [r.top - q.top, q.right - r.right, q.bottom - r.bottom, r.left - q.left];
-      const full = r.width >= q.width - 2;   // на всю ширину картки (рядок, смужка) — не капсула
+      const full = r.width >= q.width - 2 || /^(TH|TD)$/.test(el.tagName);   // на всю ширину картки (рядок, смужка) — не капсула; клітинка таблиці торкається краю картки за будовою (хибне AE S99, Г4)
       if (!full && d.some(x => x < -1) && getComputedStyle(c).overflow === 'visible') add('✗', 'вилазить', el, `виходить за межі «${path(c)}» на ${Math.round(-Math.min(...d))} px`);
       else if (!full && d.some(x => x >= -1 && x < 2) && !(r.height >= q.height - 2)) add('✗', 'прилипло', el, `майже торкається краю «${path(c)}» (${d.map(x => Math.round(x)).join('/')} px) — «приклеєна капсула»`); }
     // 37. налізає (пропуск Konst AE S97: «за замовчуванням» у колонці 96 px, nowrap, ліз під кошик): текст ширший за власний блок і НЕ обрізаний — він виходить
@@ -260,6 +261,19 @@ function probe() {
       const dh = Math.abs(hueOf(fl) - hueOf(gl)), d = Math.min(dh, 360 - dh); if (d >= 35) continue;
       const key = el.tagName + '.' + [...el.classList].sort().join('.'); if (seen.has(key)) continue; seen.add(key);
       add('⚠', 'плашка в тон тла', el, `заливка (хрома ${fc.toFixed(0)}) на ґрунті того самого відтінку (хрома ${gc.toFixed(1)}, тон ближче ${d.toFixed(0)}°) — мітка кольором змазується; поклади на нейтральну поверхню (біла картка) або зміни тон плашки`); } }
+  // 39. край розчиняється (пропуск Konst AE S99: тіло таблиці біле на кремовому тлі, ΔE ≈ 4, без рамки й тіні — «по краях розчиняється»):
+  //     поверхня (власне тло, а в таблиці — тло клітинок) площею від 320×160 px, майже в тон тла під нею (ΔE < 6), без тіні й без рамки,
+  //     помітної на тому тлі, — ⚠; ліки — рамка чи тінь картки (як картки редактора), або тон поверхні виразніший.
+  { const vis = (s, side, under) => parseFloat(s['border' + side + 'Width']) > 0 && s['border' + side + 'Style'] !== 'none' && (() => { const c = rgba(s['border' + side + 'Color']); return c && c[3] > 0.2 && dE(lab(c), lab(under)) >= 6; })();
+    for (const el of all) { const r = el.getBoundingClientRect(); if (r.width < 320 || r.height < 160 || !el.parentElement) continue;
+      if (r.width >= innerWidth * 0.9 && r.height >= innerHeight * 0.9) continue;   // сама сторінка — тло, не картка (хибне на корені .v2, AE S99)
+      const s = getComputedStyle(el); let surf = rgba(s.backgroundColor), from = el;
+      if ((!surf || surf[3] < 0.99) && el.tagName === 'TABLE') { const td = el.querySelector('tbody td'); if (td) { surf = rgba(getComputedStyle(td).backgroundColor); from = td; } }
+      if (!surf || surf[3] < 0.99) continue;
+      const under = flatBg(el.parentElement); if (!under) continue; const d = dE(lab(surf), lab(under)); if (d < 0.5 || d >= 6) continue;
+      if (s.boxShadow !== 'none' || ['Top', 'Right', 'Bottom', 'Left'].filter(x => vis(s, x, under)).length >= 2) continue;
+      if (from !== el && getComputedStyle(from.closest('tbody') || from).boxShadow !== 'none') continue;
+      add('⚠', 'край розчиняється', el, `поверхня ${Math.round(r.width)}×${Math.round(r.height)} майже в тон тла під нею (ΔE ${d.toFixed(1)}), без рамки й тіні — край тоне; дай картці рамку або тінь`); } }
   // 28. панелі зливаються (пропуск Konst AE S93: рейка меню й список сценаріїв — одне тло, межа лише рискою; «все пласке, наче 2D»): дві сусідні високі панелі (≥ 50 % висоти вікна) впритул,
   //     тло однакове (ΔE < 2), тіні нема — ієрархію тримає лише лінія. Поверхні розводять тоном (Material 3 surface container: тло → контейнер → вищий контейнер) чи тінню, не рискою.
   { const tall = all.filter(e => { const r = e.getBoundingClientRect(); return r.height >= innerHeight * 0.5 && r.width >= 56 && r.width < innerWidth * 0.6; }), seen = new Set();
@@ -394,6 +408,7 @@ const DEFECTS = {
   'пояснення під кнопкою': `<div class=card><div><button style="min-height:44px;padding:0 14px">Пробна розмова</button><small style="font-size:11.5px;display:block">Модель зіграє клієнта за цим сценарієм, як для фармацевта.</small></div></div>`,   // AE S96: підпис під «Пробна розмова»
   'наведення': `<style>.hv{min-height:44px;padding:0 14px;border:0;background:#fff}.hv:hover{background:#FFFEF6}</style><div class=card><button class=hv>Рядок списку</button></div>`,   // AE S96: наведення кремовим на білому — 1,01:1
   'пояснення абзацом': `<div class=card><div style="font-size:12.5px;color:#555;background:#F6F7F8;padding:10px">Змінили бонус — сценарії з цією позицією в наборі перерахують орієнтир; якщо набір стане не дорожчим за замовлення, біля сценарію з’явиться позначка.</div></div>`,   // AE S99: абзац у панелі замість «i»
+  'край розчиняється': `<div style="background:#FEFDF5;padding:20px"><table style="border-collapse:collapse;width:600px"><tbody>${Array.from({length: 8}, () => '<tr><td style="background:#fff;padding:10px">Позиція</td><td style="background:#fff;padding:10px">12,00</td></tr>').join('')}</tbody></table></div>`,   // AE S99: тіло таблиці на тлі без краю
   'чуже правило ': `<style>.num{font-family:monospace}</style><div class=isl><b class=num style="display:inline-block;min-height:44px">647,00 ₴</b></div>`,   // AE S99: шрифт тренажера в острові
   'чуже правило': `<style>.err{padding:10px 14px;border:1px solid #c00}</style><div class=isl><span class="dot err" style="display:inline-block;width:8px;height:8px;background:#c00"></span></div>`,   // AE S93: .err тренажера → крапка редактора; selftest з --scope .isl
 };
