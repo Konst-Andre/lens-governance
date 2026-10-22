@@ -89,7 +89,10 @@ function probe() {
       // 5. дрібний текст
       if (px < 11) add('⚠', 'шрифт', el, `текст ${px}px < 11 — на телефоні дрібно`); }
     // 6. цілі тапу; поле вводу < 16 px
-    if (el.matches('a[href],button,[role=button],input:not([type=hidden]),select,textarea,summary')) {
+    // AE S100: під відкритим модальним вікном решта сторінки інертна (HTML «modal dialog» — inert) — натиснути її не можна, ціль не судимо;
+    //   зонд elementFromPoint влучав у тло вікна й міряв голу коробку («i» 18 px з ::before 26 → «18 < 24», хибне на вікні-переліку каталогу AE).
+    const modal = document.querySelector('dialog:modal');
+    if (el.matches('a[href],button,[role=button],input:not([type=hidden]),select,textarea,summary') && !(modal && !modal.contains(el))) {
       const lbl = (el.innerText || el.value || el.getAttribute('aria-label') || el.title || '').trim();
       // ціль = площа, що ловить дотик (з розширенням ::before/::after — modern-css.com «larger touch targets», 19.10.2026): зонд elementFromPoint від центру
       // в обидва боки по кожній осі; коробку лише коли зонд не дістає (поза екраном, під шаром). Хибне QR 18.10: ✕ 25×25 з ::after 44 → «25 < 44».
@@ -552,9 +555,14 @@ if (a[0] === 'selftest') {
   const page = (x, n) => { const f = join(d, n + '.html'); writeFileSync(f, SELF.replace('BAD', x)); return 'file://' + f; };
   const clean = await run(page('', 'clean'), [], 390); const cl = [...clean.light, ...clean.dark].filter(x => x.lvl !== 'ⓘ');
   console.log((cl.length ? '✗' : '✓') + ` чиста сторінка → тиша (${cl.length ? cl.map(x => x.kind + ': ' + x.msg).join(' | ') : '0'})`); bad += !!cl.length;
+  { // AE S100: хибне спрацювання — мала ціль ПІД відкритим модальним вікном інертна, «тап» мовчить; та сама кнопка без вікна — ✗ (зуби)
+    const pm = await run(page(`<button style="width:18px;height:18px;padding:0">i</button><dialog id=md><button style="min-height:44px;min-width:120px">Гаразд</button></dialog><script>md.showModal()</script>`, 'modal'), [], 390);
+    const pn = await run(page(`<button style="width:18px;height:18px;padding:0">i</button>`, 'nomodal'), [], 390);
+    const tm = [...pm.light, ...pm.dark].some(x => x.kind === 'тап' && x.lvl === '✗'), tn = [...pn.light, ...pn.dark].some(x => x.kind === 'тап' && x.lvl === '✗');
+    console.log((!tm && tn ? '✓' : '✗') + ` мала ціль під модальним вікном → тиша; без вікна → «тап» ✗ (${tm} · ${tn})`); bad += !(!tm && tn); }
   for (const [k, html] of Object.entries(DEFECTS)) { SCOPE = k.trim() === 'чуже правило' ? '.isl' : ''; const r = await run(page(html, k), [], k === 'наведення' ? 1280 : 390); const hit = [...r.light, ...r.dark].some(x => x.kind === k.trim() && x.lvl !== 'ⓘ');
     console.log((hit ? '✓' : '✗') + ` підкинуто «${k}» → спіймано`); bad += !hit; }
-  console.log(`─── ui_lint selftest: ${Object.keys(DEFECTS).length + 1 - bad}/${Object.keys(DEFECTS).length + 1} ───`); process.exit(bad ? 1 : 0);
+  console.log(`─── ui_lint selftest: ${Object.keys(DEFECTS).length + 2 - bad}/${Object.keys(DEFECTS).length + 2} ───`); process.exit(bad ? 1 : 0);
 }
 if (!a[0]) { console.log('node ui_lint.mjs <url|файл> [--state "<js>"]… [--repo <тека>] [--width 390] [--height 844] [--json] | selftest'); process.exit(2); }
 let target = a[0]; if (!/^\w+:\/\//.test(target)) target = 'file://' + resolve(target);
