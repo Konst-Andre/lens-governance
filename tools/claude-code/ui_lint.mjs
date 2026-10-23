@@ -12,7 +12,7 @@
 // 10 дія в прокрутці · 11 кнопки ряду · 12 сирота · 13 злито · 14 однакові заголовки · 15 дата й час · 16 зливається (16-б край кнопки) · 17 паритет тем · 18 кромка · 19 картка-список · 20 вкладена прокрутка · 21 шапка в прокрутці · 22 емодзі в кнопці · 23 нативне вікно · 24 фон у рамці · 25 кант рветься · 26 поле губиться; поза probe — натискання (:active / JS pointerdown, touchstart).
 // 31 форма виділення · 32 пунктир < 3:1 · 22 емодзі-значок без підпису → ✗ · 33 різнобій списків — AE S94, 20.10.2026.
 // 34 пояснення під кнопкою (→ «i») · 35 наведення (ПК, ≥ 1024: нема або ледь видно) — AE S96, 20.10.2026.
-// 42 знак не по центру (1–2 знаки чи один значок у маленькій кнопці / бейджі: «чорнило» зсунуте ≥ 0,5 px (до 24 px) / 1 px — пікселем) — пропуск Konst, AE S102, 23.10.2026.
+// 42 знак не по центру (1–2 знаки чи один значок у маленькій кнопці / бейджі: «чорнило» зсунуте ≥ 1 px або ≥ 0,5 px впритул до краю — пікселем) — пропуск Konst, AE S102, 23.10.2026.
 // 41 інструкція в повідомленні (порада про клавішу, «Передумали», «✕», > 1 речення в помилці, повтор «i») — правило Konst «форма пояснює себе», AE S101 В-211, 23.10.2026.
 // 40 підказка стрибає (popover у першому видимому кадрі не на своєму місці — ставлять у «toggle», що приходить після показу) — пропуск Konst, AE S101, 22.10.2026.
 // 39 край розчиняється (поверхня ≥ 320×160 майже в тон тла, ΔE < 6, без рамки й тіні) — пропуск Konst, AE S99, 21.10.2026.
@@ -367,8 +367,11 @@ function probe() {
     const s = getComputedStyle(el), boxed = parseFloat(s.borderTopWidth) > 0 || (rgba(s.backgroundColor) || [0, 0, 0, 0])[3] > 0.05; if (!boxed) continue;
     const t = (el.textContent || '').replace(/\s+/g, ''), svg = el.querySelectorAll('svg').length, kids = el.querySelectorAll('*').length;
     if (!((t.length >= 1 && t.length <= 2 && !svg && !el.children.length) || (!t && svg === 1 && el.children.length === 1))) continue; void kids;
+    const pe = el.style.pointerEvents; el.style.pointerEvents = 'auto';   // підказка клавіші «/» — pointer-events:none: без цього під нею «знаходиться» поле
+    const cx = r.left + r.width / 2, cy = r.top + r.height / 2, top = document.elementFromPoint(cx, cy), top2 = document.elementFromPoint(cx, r.top + 2); el.style.pointerEvents = pe;
+    if (!top || !(top === el || el.contains(top)) || !top2 || !(top2 === el || el.contains(top2))) continue;   // під іншим шаром (липка шапка списку) — пікселі чужі (хибне AE S102: «.sid» 2,8 px)
     const bt = parseFloat(s.borderTopWidth) || 0, bb = parseFloat(s.borderBottomWidth) || 0, bl = parseFloat(s.borderLeftWidth) || 0, br = parseFloat(s.borderRightWidth) || 0;
-    out.push({ lvl: 'ink', kind: 'знак не по центру', where: path(el), msg: '', rect: [r.left + bl, r.top + bt, r.width - bl - br, r.height - bt - bb] }); }
+    out.push({ lvl: 'ink', kind: 'знак не по центру', where: path(el), msg: '', rad: parseFloat(s.borderTopLeftRadius) || 0, rect: [r.left + bl, r.top + bt, r.width - bl - br, r.height - bt - bb] }); }
   // 9. текст для людини: сміття з коду — ✗; жаргон — ⚠
   const txt = document.body.innerText;
   for (const bad of ['undefined', 'NaN', '[object', 'null']) if (new RegExp(`(^|[^\\w])${bad.replace('[', '\\[')}($|[^\\w])`).test(txt)) add('✗', 'текст', document.body, `на екрані «${bad}» — дані не підставились`);
@@ -471,17 +474,27 @@ function png(buf) {
   return { w, h, bpp, px };
 }
 // 42. рамка «чорнила» всередині рамки кнопки: тло — медіана пікселів 1-го внутрішнього рядка згори й знизу; «чорнило» — відхилення > 60 у будь-якому каналі.
-//     «чорнило» — відхилення > 110 (ядро знака, без згладжування). Зсув = (зазор згори − зазор знизу) / 2 у CSS-px; ⚠ від 0,5 px (кнопка ≤ 24 px) / 1 px. Поза знімком / нема чорнила / строкате тло — не міряємо (тиша).
+//     «чорнило» — ядро знака: відхилення > 70 % найбільшого в кнопці (без згладжування). Зсув = (зазор згори − зазор знизу) / 2 у CSS-px; ⚠ від 1 px, або від 0,5 px, коли знак ближче 3 px до краю. Поза знімком / нема чорнила / строкате тло — не міряємо (тиша).
 function inkOffset(img, f) {
   const [x, y, w, h] = f.rect.map(v => Math.round(v * 2)); if (x < 0 || y < 0 || x + w > img.w || y + h > img.h || w < 8 || h < 8) return null;
+  // поза заокругленими кутами: крізь кут видно тло сторінки — світлі пікселі кута «чорнилом» на темній кнопці (хибне AE S102: активний номер 2,8 px)
+  const rr = Math.min(f.rad || 0, h / 4, w / 4) * 2;   // радіус кута у пікселях знімка
+  const ins = Y => { const dy = Math.min(Y - y, y + h - 1 - Y); return 3 + (dy >= rr ? 0 : Math.ceil(rr - Math.sqrt(Math.max(0, rr * rr - (rr - dy) ** 2)))); };   // відступ від краю на рядку Y — лише в дузі кута
+  const x0 = x, x1 = x + w;
   const at = (X, Y) => { const i = (Y * img.w + X) * img.bpp; return [img.px[i], img.px[i + 1], img.px[i + 2]]; };
-  const edge = []; for (let X = x + 4; X < x + w - 4; X++) { edge.push(at(X, y + 1), at(X, y + h - 2)); }
+  const edge = []; for (const Y of [y + 1, y + h - 2]) for (let X = x0 + ins(Y); X < x1 - ins(Y); X++) edge.push(at(X, Y));
   const med = c => { const v = edge.map(p => p[c]).sort((a, b) => a - b); return v[v.length >> 1]; }, bg = [med(0), med(1), med(2)];
   if (edge.filter(p => Math.max(...p.map((v, c) => Math.abs(v - bg[c]))) <= 24).length < edge.length * 0.8) return null;
-  const ink = Y => { for (let X = x + 4; X < x + w - 4; X++) { const p = at(X, Y); if (Math.max(...p.map((v, c) => Math.abs(v - bg[c]))) > 110) return true; } return false; };   // ядро знака: світлі пікселі згладжування (> 60) зміщували замір «/» з −1 до −0,25 px (AE S102)
+  const dif = q => Math.max(...q.map((v, c) => Math.abs(v - bg[c]))); let mx = 0;
+  for (let Y = y + 3; Y < y + h - 3; Y++) for (let X = x0 + ins(Y); X < x1 - ins(Y); X++) mx = Math.max(mx, dif(at(X, Y)));
+  if (mx < 60) return null;   // знака не видно на тлі — не міряємо
+  // ядро знака — 70 % найбільшого відхилення в кнопці (адаптивний поріг від місцевого діапазону — US10572751): сталий поріг 60 / 110
+  // зміщував замір «/» через згладжування (AE S102: −0,25 / −0,5 px замість −1,0); 0,7 — замір агента на двох білдах (rev 6 −1,0 ⟂ новий 0,0)
+  const ink = Y => { for (let X = x0 + ins(Y); X < x1 - ins(Y); X++) if (dif(at(X, Y)) > 0.7 * mx) return true; return false; };
   let top = -1, bot = -1; for (let Y = y + 3; Y < y + h - 3; Y++) if (ink(Y)) { if (top < 0) top = Y; bot = Y; }
   if (top < 0) return null;
-  return ((top - y) - (y + h - 1 - bot)) / 4;   // ×2 знімок, ділимо на 2 ще раз — половина різниці зазорів
+  const gt = (top - y) / 2, gb = (y + h - 1 - bot) / 2;   // зазори згори / знизу, CSS-px (знімок ×2)
+  return { d: (gt - gb) / 2, gap: Math.min(gt, gb) };
 }
 function ringContrast(img, f) {
   const [x, y, w, h] = f.rect.map(v => Math.round(v * 2)), pts = [];   // знімок ×2 (deviceScaleFactor контексту)
@@ -510,10 +523,11 @@ async function lint(target, states, width, theme, browser) {
       for (let n = 0; n < 5 && !still; n++) { await p.waitForTimeout(600); const a1 = await sig(); still = a1 === a0; a0 = a1; }
       if (!still) res.push({ lvl: '⚠', kind: 'кадр', where: 'body', state: st ? `стан ${i}` : 'початковий', msg: `екран ще змінювався через 3 с після ${st ? 'стану' : 'завантаження'} — замір міг зловити проміжний кадр; дай --ready "<умова готовності>" або зупини таймер у стані` }); }
     const found = await p.evaluate(probe), pxs = found.filter(f => f.lvl === 'px'), inks = found.filter(f => f.lvl === 'ink');
-    if (inks.length) { const img = png(await p.screenshot({ type: 'png' })); for (const f of inks) { const d = inkOffset(img, f);
-      const lim = f.rect[3] <= 24 ? 0.5 : 1;   // у кнопці до 24 px видно і пів пікселя («/» у 18 px: зазор 3 ⟂ 4 px — Konst побачив, AE S102)
-      if (d == null || Math.abs(d) < lim) { f.lvl = 'ok'; continue; }
-      f.lvl = '⚠'; f.msg = `знак зсунутий ${d < 0 ? 'вгору' : 'вниз'} на ${Math.abs(d).toFixed(1)} px від центру своєї кнопки (пікселі «чорнила», не рамка шрифту) — вирівняти: line-height / padding, не на око`; } }
+    if (inks.length) { const img = png(await p.screenshot({ type: 'png' })); for (const f of inks) { const m = inkOffset(img, f), d = m && m.d;
+      // тісно: зсув ≥ 0,5 px і знак ближче 3 px до краю — «торкається верхівки» («/» у 18 px: 3 ⟂ 4 px, Konst побачив, AE S102); інакше ⚠ від 1 px.
+      // 0,5 без тісноти — межа точності знімка ×2 («K» із зазорами 5 / 6 px давав 0,5)
+      if (m == null || !(Math.abs(d) >= 1 || (Math.abs(d) >= 0.5 && m.gap <= 3))) { f.lvl = 'ok'; continue; }
+      f.lvl = '⚠'; f.msg = `знак зсунутий ${d < 0 ? 'вгору' : 'вниз'} на ${Math.abs(d).toFixed(1)} px від центру своєї кнопки, до краю ${m.gap} px (пікселі «чорнила», не рамка шрифту) — вирівняти: line-height / padding, не на око`; } }
     if (pxs.length) { const img = png(await p.screenshot({ type: 'png' })); for (const f of pxs) { const m = ringContrast(img, f); if (m == null) { f.lvl = 'ⓘ'; continue; }
       // допуск 0,15 — похибка кільця (згладжування, сусідні пікселі): ✗ лише явно нижче порогу, «на межі» — ⚠ (замір QR CC-17: 4,33–4,39 на межі, 4,07 і 2,52 — вади)
       if (m < f.need - 0.15) { f.lvl = '✗'; f.msg = `контраст ${m.toFixed(2)}:1 < ${f.need}:1 — погано читається (фон — градієнт, заміряно пікселем)`; }
