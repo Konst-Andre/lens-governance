@@ -12,7 +12,7 @@
 // 10 дія в прокрутці · 11 кнопки ряду · 12 сирота · 13 злито · 14 однакові заголовки · 15 дата й час · 16 зливається (16-б край кнопки) · 17 паритет тем · 18 кромка · 19 картка-список · 20 вкладена прокрутка · 21 шапка в прокрутці · 22 емодзі в кнопці · 23 нативне вікно · 24 фон у рамці · 25 кант рветься · 26 поле губиться; поза probe — натискання (:active / JS pointerdown, touchstart).
 // 31 форма виділення · 32 пунктир < 3:1 · 22 емодзі-значок без підпису → ✗ · 33 різнобій списків — AE S94, 20.10.2026.
 // 34 пояснення під кнопкою (→ «i») · 35 наведення (ПК, ≥ 1024: нема або ледь видно) — AE S96, 20.10.2026.
-// 42 знак не по центру (1–2 знаки чи один значок у маленькій кнопці / бейджі: «чорнило» зсунуте ≥ 1 px — пікселем) — пропуск Konst, AE S102, 23.10.2026.
+// 42 знак не по центру (1–2 знаки чи один значок у маленькій кнопці / бейджі: «чорнило» зсунуте ≥ 0,5 px (до 24 px) / 1 px — пікселем) — пропуск Konst, AE S102, 23.10.2026.
 // 41 інструкція в повідомленні (порада про клавішу, «Передумали», «✕», > 1 речення в помилці, повтор «i») — правило Konst «форма пояснює себе», AE S101 В-211, 23.10.2026.
 // 40 підказка стрибає (popover у першому видимому кадрі не на своєму місці — ставлять у «toggle», що приходить після показу) — пропуск Konst, AE S101, 22.10.2026.
 // 39 край розчиняється (поверхня ≥ 320×160 майже в тон тла, ΔE < 6, без рамки й тіні) — пропуск Konst, AE S99, 21.10.2026.
@@ -361,7 +361,9 @@ function probe() {
   // 42. знак не по центру (пропуск Konst AE S102, 23.10.2026: «/» у пошуку «торкається верхівки» — замір пікселями: 4 px згори, 6 знизу;
   //     рамка тексту (Range) цього не бачить — шрифт ставить «/» вище своєї рамки). Кандидат: маленька кнопка чи бейдж (≤ 48×32 px) з рамкою або тлом,
   //     у якому 1–2 знаки або один значок SVG; міряє Node пікселями знімка (рамка «чорнила», як optical-properties; «оптичний центр мас» — ні, суб'єктивний).
-  for (const el of all) { const r = el.getBoundingClientRect(); if (r.width > 48 || r.height > 32 || r.width < 12 || r.height < 12) continue;
+  //     Кандидати — і з aria-hidden (декоративна підказка клавіші «/» прихована від читача екрана, але її бачать очі; AE S102 — vis() її пропускав).
+  const seen42 = [...document.querySelectorAll('body *')].filter(e => { const s = getComputedStyle(e), r = e.getBoundingClientRect(); return s.display !== 'none' && s.visibility !== 'hidden' && +s.opacity > 0.05 && r.width > 0 && !e.closest('[hidden]') && !e.closest('svg'); });
+  for (const el of seen42) { const r = el.getBoundingClientRect(); if (r.width > 48 || r.height > 32 || r.width < 12 || r.height < 12) continue;
     const s = getComputedStyle(el), boxed = parseFloat(s.borderTopWidth) > 0 || (rgba(s.backgroundColor) || [0, 0, 0, 0])[3] > 0.05; if (!boxed) continue;
     const t = (el.textContent || '').replace(/\s+/g, ''), svg = el.querySelectorAll('svg').length, kids = el.querySelectorAll('*').length;
     if (!((t.length >= 1 && t.length <= 2 && !svg && !el.children.length) || (!t && svg === 1 && el.children.length === 1))) continue; void kids;
@@ -446,7 +448,7 @@ const DEFECTS = {
   'підказка стрибає': `<style>.tp{position:fixed;inset:auto;margin:0;padding:8px;border:1px solid #888;background:#fff}</style><div class=card><button popovertarget=tp1 style="min-height:44px;min-width:120px;margin-left:200px">i</button><div popover id=tp1 class=tp>Пояснення</div></div><script>document.addEventListener('toggle',e=>{const t=e.target;if(e.newState!=='open')return;const r=document.querySelector('[popovertarget=tp1]').getBoundingClientRect();t.style.left=r.left+'px';t.style.top=(r.bottom+6)+'px'},true)</script>`,
   'наведення': `<style>.hv{min-height:44px;padding:0 14px;border:0;background:#fff}.hv:hover{background:#FFFEF6}</style><div class=card><button class=hv>Рядок списку</button></div>`,   // AE S96: наведення кремовим на білому — 1,01:1
   'пояснення абзацом': `<div class=card><div style="font-size:12.5px;color:#555;background:#F6F7F8;padding:10px">Змінили бонус — сценарії з цією позицією в наборі перерахують орієнтир; якщо набір стане не дорожчим за замовлення, біля сценарію з’явиться позначка.</div></div>`,   // AE S99: абзац у панелі замість «i»
-  'знак не по центру': `<div class=card><kbd style="display:inline-block;height:20px;padding:0 5px;border:1px solid #999;border-radius:5px;background:#fff;color:#111;font:600 12px/13px sans-serif;vertical-align:top">/</kbd></div>`,   // AE S102: «/» у пошуку вище центру
+  'знак не по центру': `<div class=card><kbd aria-hidden="true" style="display:inline-block;height:20px;padding:0 5px;border:1px solid #999;border-radius:5px;background:#fff;color:#111;font:600 12px/13px sans-serif;vertical-align:top">/</kbd></div>`,   // AE S102: «/» у пошуку вище центру
   'інструкція в повідомленні': `<div class=card><span role=alert style="font-size:13px">✕ Назва не може бути порожньою. Esc — повернути як було.</span></div>`,   // AE S101, В-211: помилка клітинки каталогу
   'край розчиняється': `<div style="background:#FEFDF5;padding:20px"><table style="border-collapse:collapse;width:600px"><tbody>${Array.from({length: 8}, () => '<tr><td style="background:#fff;padding:10px">Позиція</td><td style="background:#fff;padding:10px">12,00</td></tr>').join('')}</tbody></table></div>`,   // AE S99: тіло таблиці на тлі без краю
   'чуже правило ': `<style>.num{font-family:monospace}</style><div class=isl><b class=num style="display:inline-block;min-height:44px">647,00 ₴</b></div>`,   // AE S99: шрифт тренажера в острові
@@ -469,14 +471,14 @@ function png(buf) {
   return { w, h, bpp, px };
 }
 // 42. рамка «чорнила» всередині рамки кнопки: тло — медіана пікселів 1-го внутрішнього рядка згори й знизу; «чорнило» — відхилення > 60 у будь-якому каналі.
-//     Зсув = (зазор згори − зазор знизу) / 2 у CSS-px; |зсув| ≥ 1 → ⚠. Поза знімком / нема чорнила / строкате тло — не міряємо (тиша).
+//     «чорнило» — відхилення > 110 (ядро знака, без згладжування). Зсув = (зазор згори − зазор знизу) / 2 у CSS-px; ⚠ від 0,5 px (кнопка ≤ 24 px) / 1 px. Поза знімком / нема чорнила / строкате тло — не міряємо (тиша).
 function inkOffset(img, f) {
   const [x, y, w, h] = f.rect.map(v => Math.round(v * 2)); if (x < 0 || y < 0 || x + w > img.w || y + h > img.h || w < 8 || h < 8) return null;
   const at = (X, Y) => { const i = (Y * img.w + X) * img.bpp; return [img.px[i], img.px[i + 1], img.px[i + 2]]; };
   const edge = []; for (let X = x + 4; X < x + w - 4; X++) { edge.push(at(X, y + 1), at(X, y + h - 2)); }
   const med = c => { const v = edge.map(p => p[c]).sort((a, b) => a - b); return v[v.length >> 1]; }, bg = [med(0), med(1), med(2)];
   if (edge.filter(p => Math.max(...p.map((v, c) => Math.abs(v - bg[c]))) <= 24).length < edge.length * 0.8) return null;
-  const ink = Y => { for (let X = x + 4; X < x + w - 4; X++) { const p = at(X, Y); if (Math.max(...p.map((v, c) => Math.abs(v - bg[c]))) > 60) return true; } return false; };
+  const ink = Y => { for (let X = x + 4; X < x + w - 4; X++) { const p = at(X, Y); if (Math.max(...p.map((v, c) => Math.abs(v - bg[c]))) > 110) return true; } return false; };   // ядро знака: світлі пікселі згладжування (> 60) зміщували замір «/» з −1 до −0,25 px (AE S102)
   let top = -1, bot = -1; for (let Y = y + 3; Y < y + h - 3; Y++) if (ink(Y)) { if (top < 0) top = Y; bot = Y; }
   if (top < 0) return null;
   return ((top - y) - (y + h - 1 - bot)) / 4;   // ×2 знімок, ділимо на 2 ще раз — половина різниці зазорів
@@ -509,7 +511,8 @@ async function lint(target, states, width, theme, browser) {
       if (!still) res.push({ lvl: '⚠', kind: 'кадр', where: 'body', state: st ? `стан ${i}` : 'початковий', msg: `екран ще змінювався через 3 с після ${st ? 'стану' : 'завантаження'} — замір міг зловити проміжний кадр; дай --ready "<умова готовності>" або зупини таймер у стані` }); }
     const found = await p.evaluate(probe), pxs = found.filter(f => f.lvl === 'px'), inks = found.filter(f => f.lvl === 'ink');
     if (inks.length) { const img = png(await p.screenshot({ type: 'png' })); for (const f of inks) { const d = inkOffset(img, f);
-      if (d == null || Math.abs(d) < 1) { f.lvl = 'ok'; continue; }
+      const lim = f.rect[3] <= 24 ? 0.5 : 1;   // у кнопці до 24 px видно і пів пікселя («/» у 18 px: зазор 3 ⟂ 4 px — Konst побачив, AE S102)
+      if (d == null || Math.abs(d) < lim) { f.lvl = 'ok'; continue; }
       f.lvl = '⚠'; f.msg = `знак зсунутий ${d < 0 ? 'вгору' : 'вниз'} на ${Math.abs(d).toFixed(1)} px від центру своєї кнопки (пікселі «чорнила», не рамка шрифту) — вирівняти: line-height / padding, не на око`; } }
     if (pxs.length) { const img = png(await p.screenshot({ type: 'png' })); for (const f of pxs) { const m = ringContrast(img, f); if (m == null) { f.lvl = 'ⓘ'; continue; }
       // допуск 0,15 — похибка кільця (згладжування, сусідні пікселі): ✗ лише явно нижче порогу, «на межі» — ⚠ (замір QR CC-17: 4,33–4,39 на межі, 4,07 і 2,52 — вади)
