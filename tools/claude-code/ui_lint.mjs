@@ -12,6 +12,7 @@
 // 10 дія в прокрутці · 11 кнопки ряду · 12 сирота · 13 злито · 14 однакові заголовки · 15 дата й час · 16 зливається (16-б край кнопки) · 17 паритет тем · 18 кромка · 19 картка-список · 20 вкладена прокрутка · 21 шапка в прокрутці · 22 емодзі в кнопці · 23 нативне вікно · 24 фон у рамці · 25 кант рветься · 26 поле губиться; поза probe — натискання (:active / JS pointerdown, touchstart).
 // 31 форма виділення · 32 пунктир < 3:1 · 22 емодзі-значок без підпису → ✗ · 33 різнобій списків — AE S94, 20.10.2026.
 // 34 пояснення під кнопкою (→ «i») · 35 наведення (ПК, ≥ 1024: нема або ледь видно) — AE S96, 20.10.2026.
+// 41 інструкція в повідомленні (порада про клавішу, «Передумали», «✕», > 1 речення в помилці, повтор «i») — правило Konst «форма пояснює себе», AE S101 В-211, 23.10.2026.
 // 40 підказка стрибає (popover у першому видимому кадрі не на своєму місці — ставлять у «toggle», що приходить після показу) — пропуск Konst, AE S101, 22.10.2026.
 // 39 край розчиняється (поверхня ≥ 320×160 майже в тон тла, ΔE < 6, без рамки й тіні) — пропуск Konst, AE S99, 21.10.2026.
 // 38 пояснення абзацом (≥ 20 слів дрібного тексту поза «i» / вікном / таблицею / повідомленням → «i») — пропуск Konst, AE S99, 21.10.2026.
@@ -334,6 +335,28 @@ function probe() {
       && words(el.innerText || '') >= 20 && small(el);
     for (const el of all) { if (!cand(el) || [...el.children].some(cand)) continue;
       add('⚠', 'пояснення абзацом', el, `«${(el.innerText || '').trim().replace(/\s+/g, ' ').slice(0, 40)}…» — ${words(el.innerText || '')} слів пояснення блоком на робочому екрані; пояснення — у «i» поруч із тим, що пояснює (кукбук A116 · A117)`); } }
+  // 41. інструкція в повідомленні (правило Konst AE S101, 23.10.2026, В-211: «ми не інструкцію пишемо — треба, щоб користувач користувався сайтом так, наче вже знає
+  //     інструкцію»): повідомлення (помилка, стан, тост — role=alert/status, короткий aria-live, клас msg/err/error/toast, текст із «✕» на початку) — ⚠, коли в ньому
+  //     (а) порада про клавішу («Esc — …», «натисніть Enter») — клавіші живуть в «i»; (б) «Передумали — …» — дію вже видно кнопкою «↶» поруч;
+  //     (в) «✕» перед текстом — за виглядом це «закрити», а помилку кажуть значок і тон; (г) помилка (role=alert) довша за одне речення;
+  //     (д) речення з «i» сторінки (≥ 5 слів) повторено — пояснене раз не повторюється. «i», вікна й підказки не судимо — там клавішам і місце.
+  //     Практика: inline error — одне коротке речення «що не так» (Shopify Polaris «Inline error»; NN/g «Error-Message Guidelines», 23.10.2026).
+  { const norm = t => (t || '').replace(/\s+/g, ' ').trim(), wc = t => (t.match(/[\p{L}\p{N}]+/gu) || []).length;
+    const tips = [...document.querySelectorAll('[popover],[role=tooltip],.tip')].map(e => norm(e.textContent).toLowerCase()).filter(Boolean);
+    const isMsg = el => !el.closest('[popover],[role=tooltip],.tip,kbd') && !/^(BUTTON|INPUT|TEXTAREA|SELECT|OPTION)$/.test(el.tagName)
+      && (el.matches('[role=alert],[role=status],.msg,.err,.error,.toast') || (el.matches('[aria-live]:not([aria-live=off])') && wc(el.innerText || '') <= 40)
+          || /^\s*[✕×✖]\s+\S/.test([...el.childNodes].map(n => n.nodeType === 3 ? n.textContent : '').join('')));
+    const seen = new Set();
+    for (const el of all) { if (!isMsg(el) || [...seen].some(p => p.contains(el))) continue; seen.add(el);
+      const t = norm(el.innerText), why = []; if (!t) continue;
+      if (/(^|[^\p{L}])(Esc|Enter|Tab|Ctrl|Shift|Alt|Cmd)(\s*\+\s*\S+)?\s*[—–:-]\s*\p{L}|натисн\p{L}*\s+(клавішу\s+)?«?(Esc|Enter|Tab|Ctrl|Shift)/iu.test(t)) why.push('порада про клавішу (клавіші — в «i»)');
+      if (/передумал\p{L}*/iu.test(t)) why.push('«Передумали — …» (дію вже видно кнопкою поруч)');
+      if (/^[✕×✖]\s/.test(t)) why.push('«✕» перед текстом (виглядає як «закрити»; помилку кажуть значок і тон)');
+      const sent = t.split(/(?<=[.!?])\s+(?=[\p{Lu}«])/u).filter(x => wc(x) >= 2);
+      if (el.closest('[role=alert]') && sent.length > 1) why.push(`${sent.length} речення (помилка — одне: що не так)`);
+      const rep = sent.find(x => wc(x) >= 5 && tips.some(p => p.includes(x.replace(/[.!?]$/, '').toLowerCase())));
+      if (rep) why.push(`повтор пояснення з «i»: «${rep.slice(0, 40)}»`);
+      if (why.length) add('⚠', 'інструкція в повідомленні', el, `«${t.slice(0, 48)}» — ${why.join('; ')}; форма пояснює себе, текст — лише те, чого не видно (В-211 AE)`); } }
   // 9. текст для людини: сміття з коду — ✗; жаргон — ⚠
   const txt = document.body.innerText;
   for (const bad of ['undefined', 'NaN', '[object', 'null']) if (new RegExp(`(^|[^\\w])${bad.replace('[', '\\[')}($|[^\\w])`).test(txt)) add('✗', 'текст', document.body, `на екрані «${bad}» — дані не підставились`);
@@ -413,6 +436,7 @@ const DEFECTS = {
   'підказка стрибає': `<style>.tp{position:fixed;inset:auto;margin:0;padding:8px;border:1px solid #888;background:#fff}</style><div class=card><button popovertarget=tp1 style="min-height:44px;min-width:120px;margin-left:200px">i</button><div popover id=tp1 class=tp>Пояснення</div></div><script>document.addEventListener('toggle',e=>{const t=e.target;if(e.newState!=='open')return;const r=document.querySelector('[popovertarget=tp1]').getBoundingClientRect();t.style.left=r.left+'px';t.style.top=(r.bottom+6)+'px'},true)</script>`,
   'наведення': `<style>.hv{min-height:44px;padding:0 14px;border:0;background:#fff}.hv:hover{background:#FFFEF6}</style><div class=card><button class=hv>Рядок списку</button></div>`,   // AE S96: наведення кремовим на білому — 1,01:1
   'пояснення абзацом': `<div class=card><div style="font-size:12.5px;color:#555;background:#F6F7F8;padding:10px">Змінили бонус — сценарії з цією позицією в наборі перерахують орієнтир; якщо набір стане не дорожчим за замовлення, біля сценарію з’явиться позначка.</div></div>`,   // AE S99: абзац у панелі замість «i»
+  'інструкція в повідомленні': `<div class=card><span role=alert style="font-size:13px">✕ Назва не може бути порожньою. Esc — повернути як було.</span></div>`,   // AE S101, В-211: помилка клітинки каталогу
   'край розчиняється': `<div style="background:#FEFDF5;padding:20px"><table style="border-collapse:collapse;width:600px"><tbody>${Array.from({length: 8}, () => '<tr><td style="background:#fff;padding:10px">Позиція</td><td style="background:#fff;padding:10px">12,00</td></tr>').join('')}</tbody></table></div>`,   // AE S99: тіло таблиці на тлі без краю
   'чуже правило ': `<style>.num{font-family:monospace}</style><div class=isl><b class=num style="display:inline-block;min-height:44px">647,00 ₴</b></div>`,   // AE S99: шрифт тренажера в острові
   'чуже правило': `<style>.err{padding:10px 14px;border:1px solid #c00}</style><div class=isl><span class="dot err" style="display:inline-block;width:8px;height:8px;background:#c00"></span></div>`,   // AE S93: .err тренажера → крапка редактора; selftest з --scope .isl
@@ -588,9 +612,17 @@ if (a[0] === 'selftest') {
     const pf = await run(page(`<style>.tp{position:fixed;inset:auto;margin:0;padding:8px;border:1px solid #888;background:#fff}.tp:popover-open:not([data-placed]){visibility:hidden}</style><div class=card><button popovertarget=tp1 style="min-height:44px;min-width:120px;margin-left:200px">i</button><div popover id=tp1 class=tp>Пояснення</div></div><script>document.addEventListener('toggle',e=>{const t=e.target;if(e.newState!=='open'){t.removeAttribute('data-placed');return}const r=document.querySelector('[popovertarget=tp1]').getBoundingClientRect();t.style.left=r.left+'px';t.style.top=(r.bottom+6)+'px';t.setAttribute('data-placed','')},true)</script>`, 'popfixed'), [], 390);
     const jf = [...pf.light, ...pf.dark].some(x => x.kind === 'підказка стрибає');
     console.log((!jf ? '✓' : '✗') + ` підказка, схована до місця → «підказка стрибає» мовчить (${jf})`); bad += jf; }
+  { // AE S101 · В-211: «інструкція в повідомленні» — зуби кожної ознаки окремо (а–д) і тиша на правильному: одне речення без порад; клавіші в «i» — законні
+    const tip = `<div popover id=tq>Значення правляться прямо в клітинках таблиці каталогу. <kbd>Esc</kbd> — повернути як було</div>`;
+    const cases = [['а клавіша', `<span role=status>Збережено. Ctrl+S — опублікувати.</span>`], ['б передумали', `<div class=toast>Позиція зникне після «Опублікувати». Передумали — «↶ Повернути»</div>`],
+      ['в ✕', `<div class="msg e">✕ <span>опис настрою містить цифру</span></div>`], ['г два речення', `<span role=alert>Ціна — число. Наприклад 188 або 188,50 гривень.</span>`],
+      ['д повтор «i»', `<span role=status>Значення правляться прямо в клітинках таблиці каталогу.</span>${tip}`]];
+    let ok = 0; for (const [n, h] of cases) { const r = await run(page(`<div class=card>${h}</div>`, 'msg-' + n.split(' ')[0]), [], 390); if ([...r.light, ...r.dark].some(x => x.kind === 'інструкція в повідомленні')) ok++; else console.log(`✗ «інструкція в повідомленні»: ознака ${n} не спіймана`); }
+    const g = await run(page(`<div class=card><span role=alert>Назва не може бути порожньою.</span>${tip}</div>`, 'msg-good'), [], 390), gf = [...g.light, ...g.dark].some(x => x.kind === 'інструкція в повідомленні');
+    console.log((ok === cases.length && !gf ? '✓' : '✗') + ` «інструкція в повідомленні»: ознаки а–д ${ok}/${cases.length}, правильне повідомлення + клавіші в «i» → тиша (${!gf})`); bad += !(ok === cases.length && !gf); }
   for (const [k, html] of Object.entries(DEFECTS)) { SCOPE = k.trim() === 'чуже правило' ? '.isl' : ''; const r = await run(page(html, k), [], k === 'наведення' ? 1280 : 390); const hit = [...r.light, ...r.dark].some(x => x.kind === k.trim() && x.lvl !== 'ⓘ');
     console.log((hit ? '✓' : '✗') + ` підкинуто «${k}» → спіймано`); bad += !hit; }
-  console.log(`─── ui_lint selftest: ${Object.keys(DEFECTS).length + 3 - bad}/${Object.keys(DEFECTS).length + 3} ───`); process.exit(bad ? 1 : 0);
+  console.log(`─── ui_lint selftest: ${Object.keys(DEFECTS).length + 4 - bad}/${Object.keys(DEFECTS).length + 4} ───`); process.exit(bad ? 1 : 0);
 }
 if (!a[0]) { console.log('node ui_lint.mjs <url|файл> [--state "<js>"]… [--repo <тека>] [--width 390] [--height 844] [--json] | selftest'); process.exit(2); }
 let target = a[0]; if (!/^\w+:\/\//.test(target)) target = 'file://' + resolve(target);
