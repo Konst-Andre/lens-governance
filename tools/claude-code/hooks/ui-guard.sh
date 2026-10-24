@@ -21,6 +21,8 @@ if [ "$mode" = skip ]; then
   echo "✓ крок без пошуку — причину записано (/tmp/lens-ui-$sid-skips)"; exit 0
 fi
 if [ "$mode" = selftest ]; then
+  # зуби не залежать від теки запуску (AE S103: з кореня AE «обрані примірки» docs/shots давали 2 хибні ✗ — і на старій версії теж)
+  case "$0" in /*) ;; *) exec bash "$(pwd)/$0" selftest;; esac; cd /   # не /tmp: там відносна ціль — «робочий файл»
   ok=0; n=0; S="selftest$$"; Q="/tmp/lens-ui-$S-q"; rm -f "$Q" "/tmp/lens-ui-$S" "/tmp/lens-ui-$S-web"; touch "/tmp/lens-ui-$S" "/tmp/lens-ui-$S-web" "/tmp/lens-ui-$S-step"   # теми перевіряються в кроці, де звірка вже була
   t() { n=$((n+1)); got=$(python3 -c 'import json,sys; print(json.dumps({"session_id":sys.argv[1],"tool_name":"Write","tool_input":{"file_path":sys.argv[2],"content":sys.argv[3]}}))' "$S" "$2" "$3" | bash "$0" check | grep -c '"deny"'); [ "$got" = "$1" ] && ok=$((ok+1)) || echo "✗ $4 → $got, очікував $1"; }
   t 1 admin/worker.js "self.registration.showNotification(t)" "пуш без пошуку про пуш → стоп"
@@ -63,6 +65,19 @@ X" "запис .md, що лише згадує .html → тиша (хибне S9
 p='site/index.html'; open(p,'w').write(t)
 X" "запис .html через python без кукбука й пошуку → стоп"
   tb 1 "echo '<b>x</b>' > site/index.html" "запис .html перенаправленням у чистій сесії → стоп"
+  # AE S103: скрипт заміру в scratchpad — відносна ціль після cd /tmp, тіло heredoc (cat) з «> \$OUT/x.log», cp і .html у різних рядках → тиша
+  tb 0 "cd /tmp/claude-0/x/scratchpad/speed && cat > before.sh <<'EOF'
+t a node tools/a.js > \"\$OUT/a.log\" 2>&1
+cp -r site \$OUT/sitecopy
+t b python3 /tmp/Lens_validate.py --html site/index.html
+echo DONE >> \$OUT/times.tsv
+EOF
+chmod +x before.sh" "скрипт заміру в /tmp: cd + heredoc cat + cp і .html у різних рядках → тиша (хибне ×3 AE S103)"
+  tb 1 "cd site && cat > index.html <<X
+<b>x</b>
+X" "cd у репо + heredoc cat у .html → стоп (зуби S103)"
+  tb 1 "cp /tmp/x/new.html site/index.html" "cp нового .html у репо → стоп (зуби S103)"
+  tb 0 "cp site/index.html /tmp/x/old.html" "cp .html з репо в /tmp (база для порівняння) → тиша (S103)"
   touch "/tmp/lens-ui-$S-web" "/tmp/lens-ui-$S-step"
   tb 1 "echo '<b>x</b>' > site/index.html" "пошук є, кукбука нема → стоп"
   echo "{\"session_id\":\"$S\",\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"sed -n 864,889p kernel/cookbook/Lens_iOS_cookbook_3_material.md\"}}" | bash "$0" mark
@@ -96,6 +111,27 @@ ti = d.get("tool_input") or {}
 tool = d.get("tool_name", "")
 raw = json.dumps(ti, ensure_ascii=False)
 web = mark + "-web"   # пошук практики ззовні (профіль ЦИКЛ п.4; слово Konst 10.10: правило, що не виконується, — програмою)
+DEVNULL = r"\d?>>?&?\s*/dev/null|\d>&\d"   # 2>/dev/null, >/dev/null, 2>&1 — не запис (хибна відмова на «grep … 2>/dev/null», аудит 09.10)
+TG = r"(?:\bp\s*=\s*|open\(\s*(?=[\x27\x22][^\x27\x22]+[\x27\x22]\s*,\s*(?:mode\s*=\s*)?[\x27\x22][wax])|Path\(\s*(?=[\x27\x22][^\x27\x22]+[\x27\x22]\s*\)\s*\.write)|>\s*|\btee\s+(?:-a\s+)?|sed\s+-i\S*\s+(?:\x27[^\x27]*\x27|\x22[^\x22]*\x22)\s+)[\x27\x22]?([\w./~-]+\.[A-Za-z]+)"
+def segs(cmd):
+    # Команда Bash → сегменти (рядок · && · || · ;) з текою, куди вказує попередній `cd` (AE S103, 24.10.2026, хибне ×3 на скрипт заміру в scratchpad:
+    #   «cd /tmp/…/scratchpad && cat > before.sh <<EOF» — before.sh вважався файлом репо, а рядки тіла — записами shell).
+    # Тіло heredoc для cat / tee — ВМІСТ файлу, не команди: пропускаємо. Тіло для інтерпретатора (python3 - <<X) — код, лишається (його записи справжні).
+    out, lines, i = [], cmd.split("\n"), 0
+    while i < len(lines):
+        ln = lines[i]; out.append(ln); m = re.search(r"<<-?\s*[\x27\x22]?(\w+)[\x27\x22]?", ln); i += 1
+        if m and re.search(r"\b(cat|tee)\b", ln):
+            while i < len(lines) and lines[i].strip() != m.group(1): i += 1
+            i += 1
+    cur, res = d.get("cwd") or os.getcwd(), []
+    for s in re.split(r"\n|&&|\|\||;", "\n".join(out)):
+        m = re.match(r"\s*cd\s+([^\s;&|]+)\s*$", s)
+        if m:
+            p = os.path.expanduser(m.group(1).strip("\"\x27")); cur = os.path.normpath(p if os.path.isabs(p) else os.path.join(cur, p)); continue
+        res.append((re.sub(DEVNULL, "", s), cur))
+    return res
+def absp(x, cur): x = os.path.expanduser(x); return os.path.normpath(x if os.path.isabs(x) else os.path.join(cur, x))
+def tmp(x, cur): return absp(x, cur).startswith("/tmp/")   # робочі файли (scratchpad теж під /tmp) — не код репо
 if mode == "mark":
     # «кукбук» — індекс АБО сам том (AE S95: том A117 прочитано цілком, а гачок бачив лише індекс → дубль-стоп; рецепт — у томі, індекс — лише маршрут)
     if "Lens_cookbook_INDEX" in raw or re.search(r"cookbook/Lens_\w*cookbook\w*\.md", raw):
@@ -132,8 +168,9 @@ elif tool == "Bash":
     cmd = str(ti.get("command", ""))
     # ціль запису — шлях після p='…' / open('…' / > / tee / sed -i; код — лише коли серед цілей є файл коду поза /tmp (правка .md через python — не код; хибне QR CC-8)
     # open: лише з режимом запису w/a/x (читання open без режиму — не запис; хибне S90 AE). Тут без апострофів: код у bash-лапках
-    tg = re.findall(r"(?:\bp\s*=\s*|open\(\s*(?=[\x27\x22][^\x27\x22]+[\x27\x22]\s*,\s*(?:mode\s*=\s*)?[\x27\x22][wax])|>\s*|\btee\s+(?:-a\s+)?|sed\s+-i\S*\s+(?:\x27[^\x27]*\x27|\x22[^\x22]*\x22)\s+)[\x27\x22]?([\w./~-]+\.[A-Za-z]+)", re.sub(r"\d?>>?&?\s*/dev/null|\d>&\d", "", cmd))
-    if "tools/claude-code/hooks/" not in cmd and any(re.search(r"\.(html?|m?js|ts|toml|py|sh)$", x, re.I) and not x.startswith("/tmp/") for x in tg): code = cmd
+    tg = [(x, cur) for s, cur in segs(cmd) for x in re.findall(TG, s)]
+    # гачки ядра — свій цикл (selftest), не код продукту; шлях — справжній після cd (AE S103: з теки гачків «… > memory-guard.sh» вважався кодом)
+    if "tools/claude-code/hooks/" not in cmd and any(re.search(r"\.(html?|m?js|ts|toml|py|sh)$", x, re.I) and not tmp(x, cur) and not os.path.dirname(absp(x, cur)).endswith("tools/claude-code/hooks") for x, cur in tg): code = cmd
 if code:
     qs = open(mark + "-q", encoding="utf-8").read() if os.path.exists(mark + "-q") else ""
     miss = [(nm, rc, qw) for nm, cw, qw, rc in TOPICS if re.search(cw, code, re.I) and not re.search(qw, qs, re.I)]
@@ -154,11 +191,14 @@ if tool in ("Write", "Edit"):
     hit = bool(ui.search(str(ti.get("file_path", ""))))
 elif tool == "Bash":
     cmd = str(ti.get("command", ""))
-    w = re.sub(r"\d?>>?&?\s*/dev/null|\d>&\d", "", cmd)   # 2>/dev/null, >/dev/null, 2>&1 — не запис (хибна відмова на «grep … 2>/dev/null», аудит 09.10)
-    # UI — коли ЦІЛЬ запису .html/.css (ті самі цілі, що в «Крок» вище, + Path(…)), або cp/mv із .html у команді.
-    # Було: .html будь-де + ознака запису будь-де → хибне S90 AE 18.10: grep site/index.html поруч із json.load(open('settings.json')) · правка env_check.sh, що лише згадує index.html
-    tgw = re.findall(r"(?:\bp\s*=\s*|open\(\s*(?=[\x27\x22][^\x27\x22]+[\x27\x22]\s*,\s*(?:mode\s*=\s*)?[\x27\x22][wax])|Path\(\s*(?=[\x27\x22][^\x27\x22]+[\x27\x22]\s*\)\s*\.write)|>\s*|\btee\s+(?:-a\s+)?|sed\s+-i\S*\s+(?:\x27[^\x27]*\x27|\x22[^\x22]*\x22)\s+)[\x27\x22]?([\w./~-]+\.[A-Za-z]+)", w)
-    hit = any(ui.search(x) for x in tgw) or (bool(re.search(r"\b(cp|mv)\b", w)) and bool(ui.search(cmd)))
+    # UI — коли ЦІЛЬ запису .html/.css поза /tmp (ті самі цілі, що в «Крок» вище), або cp/mv, у ТОМУ Ж сегменті якого .html/.css, а ціль — не /tmp.
+    # Було: .html будь-де + ознака запису будь-де → хибне S90 AE 18.10: grep site/index.html поруч із json.load(open('settings.json')) · правка env_check.sh, що лише згадує index.html;
+    #   cp будь-де + .html будь-де → хибне AE S103: «cp -r site $OUT/x» в одному рядку, «--html site/index.html» в іншому.
+    hit = False
+    for s, cur in segs(cmd):
+        if any(ui.search(x) and not tmp(x, cur) for x in re.findall(TG, s)): hit = True
+        m = re.search(r"\b(cp|mv)\b(.*)", s)
+        if m and ui.search(m.group(2)) and m.group(2).split() and not tmp(m.group(2).split()[-1].strip("\"\x27"), cur): hit = True
 else:
     hit = False
 if hit and not need and not os.path.exists(mark + "-shots"):
