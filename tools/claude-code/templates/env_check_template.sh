@@ -38,7 +38,7 @@ if [ "$debt" -gt 0 ]; then nf=$(printf '%s\n' $dfiles | sort -u | grep -c .); ag
   aud="$aud · ⚠ борг аудиту: $debt коміт(ів), $nf файл(ів), найстаріший $age дн."
   { [ "$nf" -ge 5 ] || [ "$age" -ge 7 ]; } && aud="$aud — ПОРА пакет за класом (lens-governance:tools/claude-code/templates/AUDIT_template.md)"; fi
 echo "env: github=${g:-000} cloudflare=${c:-000} · ${vars% } · гейт: $gate · $aud"
-K=../lens-governance; [ -d "$K" ] || K=/tmp/lens-governance; [ -f "$K/tools/claude-code/profile_check.sh" ] && bash "$K/tools/claude-code/profile_check.sh"   # профіль (ACCOUNT_MOVE.md п.1-б)
+K=../lens-governance; [ -d "$K" ] || K=/tmp/lens-governance; [ -f "$K/tools/claude-code/profile_check.sh" ] && bash "$K/tools/claude-code/profile_check.sh"   # профіль: з репо (LENS_PROFILE=1) чи з налаштувань акаунта — lens-governance:tools/claude-code/ACCOUNT_MOVE.md п.1-а / 1-б
 
 # самері — живий журнал (профіль Konst, САМЕРІ): коміти агента (трейлер Claude-Session) після останнього оновлення самері.
 # >0 → попередня сесія комітила, не оновивши самері: звірити git log і дописати §0/§1 ДО роботи. Коміти Konst і ботів не рахуються.
@@ -56,26 +56,27 @@ else n=$(git rev-list --count --grep='Claude-Session' "$sm"..HEAD 2>/dev/null); 
 # прод (лише читання): <живий код ≡ репо; тека публікації; службове не видно — судити за ВМІСТОМ, не за HTTP-кодом>
 echo "прод: — (додати: живий код ≡ репо; тека публікації; службове не видно — за ВМІСТОМ)"
 
-# Спільні інструменти ядра — з КЛОНУ ядра поруч ($K, як профіль вище): виклик, не копія. Клон є в кожній сесії — його кладе setup script v3
+# Спільні інструменти ядра — з КЛОНУ ядра поруч ($K, як профіль вище): виклик, не копія. Клон кладе setup script v3 середовища; нема клону — рядки «ядра поруч нема»: налаштувати середовище, не обходити curl-ом
 # (lens-governance:tools/claude-code/CLAUDE_CODE.md «Гачки»: ядро серед репо сесії або /tmp/lens-governance), тож «curl | python» з main — зайвий шлях
-# виконання віддаленого коду (світ — mlab-sh postmortem wiki «GitHub Actions»: скрипт з гілки — ризик ланцюга постачання; випадок —
+# виконання віддаленого коду (скрипт з гілки — ризик ланцюга постачання; випадок —
 # lens-governance:tools/claude-code/ADOPTIONS.md, рядок AE 18.10.2026).
 CC="$K/tools/claude-code"
 # документи — ціна читання в Claude Code (ядро DOC-1: щосесійні ≤ 200 рядків · старт ≤ 25 КБ · розділ ≤ 16 КБ · > 80 КБ з маршрутом); лише ⚠, exit 0
 if [ -f "$CC/doc_health.py" ]; then python3 "$CC/doc_health.py" .; else echo "документи: — (ядра поруч нема: $K)"; fi
 
-# примірка — тека <документація>/shots/ (tools/claude-code/SHOTS.md): ✗ знімок без рядка · жива без знімків · файли після «прийнято»; ⚠ вік, вага, без накладки.
+# примірка — тека <документація>/shots/ (lens-governance:tools/claude-code/SHOTS.md): ✗ знімок без рядка · жива без знімків · файли після «прийнято»; ⚠ вік, вага, без накладки.
 # Теки нема — рядок «теки shots/ нема» (продукт без UI-рішень наперед — так і є).
 if [ -f "$CC/shots_check.py" ]; then python3 "$CC/shots_check.py" . || fail=1; else echo "примірка: — (ядра поруч нема: $K)"; fi
 # версія застосунку B · rev (VER-1, lens-governance:tools/claude-code/VERSIONS.md) — лише репо з інтерфейсом; параметри свого продукту:
 #   --code <файл коду застосунку> --re '<мітка: група B, група rev>' [--name '<шлях файлу білда з групою B>']
 # if [ -f "$CC/version_check.py" ]; then python3 "$CC/version_check.py" . --code <файл> --re '<регулярка>' ${ENV_INJECT:+--inject} || fail=1; else echo "версія: — (ядра поруч нема: $K)"; fi
+# зуби: ENV_INJECT=1 bash tools/env_check.sh — прилади з --inject підкидають ваду й мусять дати ✗ (зразок — QR-Lens:tools/env_check.sh; аудит 24.10.2026).
 # Мітки в коді ще нема (продукт заводить версію) — рядок «⚠ версія: мітки ще нема», не ✗ (зразок — AE-Simulator:tools/env_check.sh).
 
 # Cloudflare — СПІЛЬНИЙ акаунт усіх проєктів: бюджет (запити · збірки · прогноз) і свіжість правил. Рядки «⚠» — читати й діяти
-# за lens-governance:tools/cloudflare/CLOUDFLARE.md. Скрипт лише читає й завжди exit 0. Репо без Cloudflare — рядок прибрати.
+# за lens-governance:tools/cloudflare/CLOUDFLARE.md. Скрипт лише читає й завжди exit 0. Репо без Cloudflare — прибрати цей рядок, а також c= / cloudflare= у «мережа» і CLOUDFLARE_* у vars вище.
 if [ -f "$K/tools/cloudflare/cf_budget.sh" ]; then bash "$K/tools/cloudflare/cf_budget.sh"; else echo "cloudflare: — (ядра поруч нема: $K)"; fi
 
 [ "${g:-000}" = "000" ] && exit 1
-[ "${fail:-0}" = 1 ] && exit 1   # ✗ спільного інструмента (примірка, версія) — «exit 1 — розібратись до роботи» (CLAUDE_template)
+[ "${fail:-0}" = 1 ] && exit 1   # ✗ спільного інструмента (примірка, версія) — «exit 1 — розібратись до роботи» (CLAUDE.md репо; зразок — lens-governance:tools/claude-code/templates/CLAUDE_template.md)
 exit 0
