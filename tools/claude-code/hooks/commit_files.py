@@ -29,6 +29,11 @@
      Практика: перевірка в коміті за шляхом нового файлу (`git diff --cached --diff-filter=A`) → потрібний документ у тому ж коміті
      (ledgerline-docs «documentation types and rules», 24.10.2026); Danger у CI не беремо — комітить агент, ловити треба до коміту.
      «ядро: кандидат» — рядок у реєстрі ядра вже має бути, коли клон ядра поруч (../lens-governance · /tmp/lens-governance · LENS_KERNEL_DIR); нема клону — не судимо.
+  10. змінено ШАПКУ наявного приладу (ті самі теки й розширення, що п. 9): рядок-назва (перший) або «Запуск:» / «Usage» / «Вихід:» / «живе доки»
+     у перших 40 рядках (коментар чи docstring) — а карта репо (та сама, що п. 9, або .md поруч) у цей коміт не потрапила → ✗: опис у карті відстає
+     від приладу. Правка тіла без шапки — тиша (шапку міняють, коли міняється що міряє чи як кликати). Подія: AE S104 — описи змінених приладів
+     двічі за сесію правились руками. Практика: перевірка за диффом рядків використання → документ у тому ж коміті (borghei «doc-drift-detector»,
+     bjornmelin «docs-align», 24.10.2026); хмарні ШІ-сервіси звірки (DriftGuard) не беремо — потрібна локальна перевірка до коміту.
 Не беремо з pre-commit-hooks: пробіли й кінці файлів (шум у диффах даних), no-commit-to-branch (ми свідомо комітимо в main),
 submodules (їх нема).
 
@@ -163,6 +168,23 @@ def check(top, cmd):
         if not os.path.isfile(os.path.join(top, 'kernel/Lens_validate.py')) and not re.search(r'ядро:\s*\S', cmd):
             bad.append(f'новий прилад ({", ".join(os.path.basename(f) for f in tools)}) — у повідомленні коміту бракує рядка «ядро: …»: кандидат для інших продуктів '
                        f'(→ реєстр «Прилади продуктів» у lens-governance:tools/claude-code/CLAUDE_CODE.md, тим самим ходом) чи ні — й чому')
+    # 10. шапка наявного приладу змінилась, карта — ні (AE S104)
+    head_re = re.compile(r'(Запуск|Usage|Вихід|живе доки)\s*:', re.I)
+    for f in sorted(changed - added):
+        if not TOOL_RE.match(f) or re.search(r'(^|/)(archive|__pycache__|fixtures?|testdata)/', f): continue
+        diff = subprocess.run(['git', '-C', top, 'diff', 'HEAD', '-U0', '--', f], capture_output=True, text=True).stdout
+        hit = False
+        for h in re.finditer(r'^@@ -(\d+)(?:,\d+)? \+\d+(?:,\d+)? @@[^\n]*\n((?:[-+][^\n]*\n?)*)', diff, re.M):
+            start = int(h.group(1))
+            for ln in h.group(2).splitlines():
+                if ln.startswith(('---', '+++')) or not ln.startswith(('-', '+')): continue
+                t = ln[1:].lstrip()
+                if (start <= 1 and t.startswith(('#', '//', '/*', '*'))) or (start <= 40 and head_re.search(t)): hit = True
+        if not hit: continue
+        near = {os.path.join(os.path.dirname(f), x) for x in os.listdir(os.path.join(top, os.path.dirname(f) or '.')) if x.endswith('.md')}
+        if not (changed & (set(MAPS) | near)):
+            bad.append(f'шапку приладу «{f}» змінено (назва · «Запуск» · «Вихід» · «живе доки»), а карта репо в коміт не потрапила — онови рядок приладу '
+                       f'({" / ".join(m for m in MAPS if os.path.isfile(os.path.join(top, m))) or "docs/REPO_LAYOUT.md"}): що міряє · коли брати · запуск')
     return bad
 
 
@@ -231,7 +253,19 @@ def selftest():
         say(check(d, "git add -A && git commit -m 'ядро: ні'") == [], 'прилад в archive/ → тиша')
         os.makedirs(d + '/kernel'); open(d + '/kernel/Lens_validate.py', 'w').write('x = 1\n')
         say(not any('ядро:' in x for x in check(d, 'git add docs tools kernel/Lens_validate.py && git commit -m x')), 'ядро (є kernel/Lens_validate.py) — «ядро:» не вимагається')
-        shutil.rmtree(d + '/tools'); shutil.rmtree(d + '/docs'); shutil.rmtree(d + '/kernel')
+        shutil.rmtree(d + '/kernel')
+        # 10 · шапка наявного приладу змінилась, карта — ні (AE S104)
+        open(d + '/tools/stand/walk_v1.py', 'w').write('# walk_v1 · прохід\n# Запуск: python3 walk_v1.py site\nx = 1\n')
+        g('add', '-A'); g('-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'base')
+        open(d + '/tools/stand/walk_v1.py', 'w').write('# walk_v1 · прохід\n# Запуск: python3 walk_v1.py site --fast\nx = 1\n')
+        say(any('шапку приладу' in x for x in check(d, 'git commit -am x')), 'змінено «Запуск:» приладу, карта не в коміті → ✗')
+        open(d + '/docs/REPO_LAYOUT.md', 'w').write('прохід walk_v1 — що міряє; --fast\n')
+        say(not any('шапку' in x for x in check(d, 'git commit -am x')), 'та сама правка + рядок карти в коміті → тиша')
+        g('checkout', '--', 'docs/REPO_LAYOUT.md')
+        open(d + '/tools/stand/walk_v1.py', 'w').write('# walk_v1 · прохід\n# Запуск: python3 walk_v1.py site\nx = 2\n')
+        say(not any('шапку' in x for x in check(d, 'git commit -am x')), 'правка тіла приладу без шапки → тиша')
+        g('checkout', '--', 'tools/stand/walk_v1.py')
+        g('rm', '-rq', 'tools', 'docs'); g('-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'clean')
         open(d + '/stray.txt', 'w').write('x')
         say(check(d, 'git add lens/a.md && git commit -m x') == [], 'нестежений файл, якого команда не додає → тиша (у коміт не піде)')
     finally:
