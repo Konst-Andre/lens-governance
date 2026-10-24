@@ -24,7 +24,7 @@
 | device-тест на синтетичних даних (пісочниця) | `kernel/Lens_sandbox_manifest.md` |
 | варіанти вигляду обрано зараз, код — пізніше (примірка, тека `shots/`) | `tools/claude-code/SHOTS.md` |
 | суджу рендер, стенд, прев'ю, вирок пристрою | `kernel/wsd/Lens_verdict_protocol.md` — номер з маршруту на початку `Work_Standard.md` |
-| пишу детектор, гейт, смоук; патч перед комітом; діагноз помилки | `kernel/wsd/Lens_patch_check_protocol.md` |
+| пишу детектор, гейт, смоук; патч перед комітом; діагноз помилки | `kernel/wsd/Lens_patch_check_protocol.md`; **спершу — чи нема готового приладу**: `tools/claude-code/CLAUDE_CODE.md` «Що тут лежить» (ядро) і «Прилади продуктів» (зразки інших репо) |
 | шукаю вади в продукті як користувач: обхід без сценарію, пакети ПК / PWA, наскрізний сценарій (E2E) | `tools/tester/TESTER.md` → `tools/tester/explore.py` (конфіг — у репо продукту; `selftest` — зуби); запис у справжні дані — лише за словом Konst |
 | прев'ю для Konst | `tools/PREVIEW.md` — повний текст (у профілі — стиснення); крок «квиток / `gh_commit`» тут = `git push` у `Konst-Andre/sandbox` |
 | правило wsd за номером (`1.x`, `12.x`) | `kernel/wsd/Work_Standard.md` — «Зміст» і маршрут |
@@ -54,6 +54,7 @@
 | iOS / PWA / інтерфейс | томи 1–5 через `kernel/cookbook/Lens_cookbook_INDEX.md` |
 | як влаштувати репо для Claude Code, профіль Konst, аудит | `tools/claude-code/` |
 | протокол роботи (як ми працюємо) | `kernel/wsd/Work_Standard.md` — лише окремим ходом, це канон |
+| прилад продукту, що знадобиться іншим (прохід, детектор, порівняння) | рядок у `tools/claude-code/CLAUDE_CODE.md` «Прилади продуктів» тим самим ходом (сторож коміту `commit_files.py` п. 9 вимагає в продукті рядок «ядро: …»); у ядро — коли візьме другий продукт |
 | не влізло в жодну | `kernel/Lens_INDEX.md` §2 — там рішення |
 
 Новий рецепт кукбуку — рядки в `Lens_cookbook_INDEX.md` §2 і §3 тим самим комітом. Борг ядра, який не закрити зараз, — рядок у `kernel/Lens_governance_CHERGA.md`.

@@ -21,6 +21,13 @@
      (`check-ast`). Подія: Routes S1 22.10.2026 — вставка після `;;` зламала диспетчер гачків `lens-hooks.sh`, а з ним — усі гачки
      всіх сесій; спіймано живим прогоном, не гейтом. Лише змінені файли — як у pre-commit (дешево, ~0,1 с на файл).
      `bash -n` лише розбирає (не бачить семантики) — тому shellcheck, де є; його нема — тиша, не ✗.
+  9. новий прилад (`tools/` · `.claude/` · `.github/workflows/`: .py .sh .js .mjs .cjs .ts; не `archive/`) без рядка в карті репо —
+     ім'я без розширення має бути в `docs/REPO_LAYOUT.md` (або `REPO_LAYOUT.md` · ядро: `tools/claude-code/CLAUDE_CODE.md` · `kernel/Lens_REPO_LAYOUT.md`)
+     чи в .md поруч із приладом (`tools/tester/TESTER.md`); у продукті ще й рядок «ядро: …» у повідомленні коміту — кандидат для інших продуктів
+     (→ реєстр «Прилади продуктів» у `tools/claude-code/CLAUDE_CODE.md` ядра) чи ні й чому. Подія: AE S104 24.10.2026 — Konst: «втомився нагадувати:
+     інструмент, який створюється, повинен одразу мати мітки по документах, щоб наступна сесія про нього знала, і інші продукти теж».
+     Практика: перевірка в коміті за шляхом нового файлу (`git diff --cached --diff-filter=A`) → потрібний документ у тому ж коміті
+     (ledgerline-docs «documentation types and rules», 24.10.2026); Danger у CI не беремо — комітить агент, ловити треба до коміту.
 Не беремо з pre-commit-hooks: пробіли й кінці файлів (шум у диффах даних), no-commit-to-branch (ми свідомо комітимо в main),
 submodules (їх нема).
 
@@ -63,6 +70,10 @@ def add_args(cmd):
     if re.search(r'\bgit\b[^\n;&|]*\bcommit\b[^\n;&|]*\s-[a-zA-Z]*a[a-zA-Z]*\b', cmd):   # git commit -a / -am (не --amend)
         every = True
     return every, named
+
+
+TOOL_RE = re.compile(r'^(tools|\.claude|\.github/workflows)/.+\.(py|sh|js|mjs|cjs|ts)$')
+MAPS = ('docs/REPO_LAYOUT.md', 'REPO_LAYOUT.md', 'tools/claude-code/CLAUDE_CODE.md', 'kernel/Lens_REPO_LAYOUT.md')
 
 
 def check(top, cmd):
@@ -130,6 +141,21 @@ def check(top, cmd):
                 compile(b, f, 'exec')
             except SyntaxError as e:
                 bad.append(f'зламаний синтаксис Python «{f}»: рядок {e.lineno}: {e.msg}')
+    # 9. новий прилад без мітки в карті репо (і без рішення «ядро:» у продукті) — AE S104
+    tools = [f for f in sorted(added) if TOOL_RE.match(f) and not re.search(r'(^|/)(archive|__pycache__|fixtures?|testdata)/', f)]
+    if tools:
+        maps = [m for m in MAPS if os.path.isfile(os.path.join(top, m))]
+        read = lambda q: open(q, encoding='utf-8', errors='replace').read()
+        text = ''.join(read(os.path.join(top, m)) for m in maps)
+        for f in tools:
+            stem = os.path.splitext(os.path.basename(f))[0]
+            near = ''.join(read(os.path.join(top, os.path.dirname(f), x)) for x in os.listdir(os.path.join(top, os.path.dirname(f))) if x.endswith('.md'))
+            if stem not in text and stem not in near:
+                bad.append(f'новий прилад «{f}» без рядка в карті репо ({" / ".join(maps) or "карти нема — docs/REPO_LAYOUT.md за шаблоном ядра"}) — '
+                           f'що міряє · коли брати · запуск; інакше наступна сесія про нього не дізнається')
+        if not os.path.isfile(os.path.join(top, 'kernel/Lens_validate.py')) and not re.search(r'ядро:\s*\S', cmd):
+            bad.append(f'новий прилад ({", ".join(os.path.basename(f) for f in tools)}) — у повідомленні коміту бракує рядка «ядро: …»: кандидат для інших продуктів '
+                       f'(→ реєстр «Прилади продуктів» у lens-governance:tools/claude-code/CLAUDE_CODE.md, тим самим ходом) чи ні — й чому')
     return bad
 
 
@@ -181,6 +207,19 @@ def selftest():
         open(d + '/lens/t.py', 'w').write('def f(:\n  pass\n')
         say(any('синтаксис Python' in x for x in check(d, 'git add -A && git commit -m x')), 'зламаний .py → ✗')
         os.remove(d + '/lens/t.py')
+        # 9 · новий прилад без мітки (AE S104)
+        os.makedirs(d + '/tools/stand'); open(d + '/tools/stand/walk_v1.py', 'w').write('x = 1\n')
+        r = check(d, 'git add -A && git commit -m x'); say(any('без рядка в карті' in x for x in r) and any('ядро:' in x for x in r), 'новий прилад без карти й без «ядро:» → ✗ обидва')
+        os.makedirs(d + '/docs'); open(d + '/docs/REPO_LAYOUT.md', 'w').write('прохід walk_v1 — що міряє\n')
+        r = check(d, 'git add -A && git commit -m x'); say(not any('карті' in x for x in r) and any('ядро:' in x for x in r), 'у карті є, «ядро:» нема (продукт) → ✗ лише «ядро:»')
+        say(check(d, "git add -A && git commit -m 'прохід\n\nядро: ні — лише AE'") == [], 'у карті є й «ядро: ні — чому» → тиша')
+        os.makedirs(d + '/tools/tester'); open(d + '/tools/tester/run.py', 'w').write('x = 1\n'); open(d + '/tools/tester/TESTER.md', 'w').write('run — запуск\n')
+        say(check(d, "git add -A && git commit -m 'ядро: кандидат'") == [], 'прилад описано в .md поруч (tools/tester/TESTER.md) → тиша')
+        os.makedirs(d + '/tools/archive'); open(d + '/tools/archive/old_v0.py', 'w').write('x = 1\n')
+        say(check(d, "git add -A && git commit -m 'ядро: ні'") == [], 'прилад в archive/ → тиша')
+        os.makedirs(d + '/kernel'); open(d + '/kernel/Lens_validate.py', 'w').write('x = 1\n')
+        say(not any('ядро:' in x for x in check(d, 'git add docs tools kernel/Lens_validate.py && git commit -m x')), 'ядро (є kernel/Lens_validate.py) — «ядро:» не вимагається')
+        shutil.rmtree(d + '/tools'); shutil.rmtree(d + '/docs'); shutil.rmtree(d + '/kernel')
         open(d + '/stray.txt', 'w').write('x')
         say(check(d, 'git add lens/a.md && git commit -m x') == [], 'нестежений файл, якого команда не додає → тиша (у коміт не піде)')
     finally:
