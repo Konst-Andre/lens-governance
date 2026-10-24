@@ -25,7 +25,7 @@
 | **2** | `Lens_iOS_cookbook_2_navigation.md` | будую навігацію, bottom sheet, свайп рядка, календар/пікер у шіті | 46.0 KB |
 | **3** | `Lens_iOS_cookbook_3_material.md` | не той тон · картка не читається · глибина не та · тема ламає характер | 84.4 KB |
 | **4** | `Lens_iOS_cookbook_4_components.md` | треба конкретний контрол: селект, тогл, чіп, плитка, тост, нативне поле | 70.6 KB |
-| **5** | `Lens_iOS_cookbook_5_motion.md` | воно рухається не так · жест б'ється зі скролом · тап не відчувається · джанк · *машина руху й метод «інвентар → фаза → прилад» — `kernel/Lens_governance_CHERGA.md` `MOTION-1` (AE S103)* | 92.7 KB |
+| **5** | `Lens_iOS_cookbook_5_motion.md` | воно рухається не так · жест б'ється зі скролом · тап не відчувається · джанк · *машина руху й метод «інвентар → фаза → прилад» — `kernel/Lens_MOTION-1_brief.md` (AE S103)* | 92.7 KB |
 | **CF** | `tools/cloudflare/CLOUDFLARE.md` (не том — правила спільного акаунта) | будь-який проєкт на Cloudflare: ліміти акаунта, збірки Pages, watch paths, прев'ю, сирітки, актуалізація | — |
 | **6** | `Lens_bot_cookbook_6_telegram_workers.md` | будую чи лагоджу Telegram-бота на Cloudflare Workers + D1 + Mini App: ліміти, обрив, викладка, Bot API · серія `T` | 28.0 KB |
 
