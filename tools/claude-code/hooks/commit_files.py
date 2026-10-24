@@ -28,6 +28,7 @@
      інструмент, який створюється, повинен одразу мати мітки по документах, щоб наступна сесія про нього знала, і інші продукти теж».
      Практика: перевірка в коміті за шляхом нового файлу (`git diff --cached --diff-filter=A`) → потрібний документ у тому ж коміті
      (ledgerline-docs «documentation types and rules», 24.10.2026); Danger у CI не беремо — комітить агент, ловити треба до коміту.
+     «ядро: кандидат» — рядок у реєстрі ядра вже має бути, коли клон ядра поруч (../lens-governance · /tmp/lens-governance · LENS_KERNEL_DIR); нема клону — не судимо.
 Не беремо з pre-commit-hooks: пробіли й кінці файлів (шум у диффах даних), no-commit-to-branch (ми свідомо комітимо в main),
 submodules (їх нема).
 
@@ -153,6 +154,12 @@ def check(top, cmd):
             if stem not in text and stem not in near:
                 bad.append(f'новий прилад «{f}» без рядка в карті репо ({" / ".join(maps) or "карти нема — docs/REPO_LAYOUT.md за шаблоном ядра"}) — '
                            f'що міряє · коли брати · запуск; інакше наступна сесія про нього не дізнається')
+        # «ядро: кандидат» — рядок у реєстрі ядра має вже бути (аудит S104: інакше правило «тим самим ходом» ніхто не тримає); клону ядра поруч нема — не судимо
+        kd = os.environ.get('LENS_KERNEL_DIR') or next((k for k in (os.path.join(os.path.dirname(top), 'lens-governance'), '/tmp/lens-governance') if os.path.isfile(os.path.join(k, 'tools/claude-code/CLAUDE_CODE.md'))), None)
+        if re.search(r'ядро:\s*кандидат', cmd) and kd and os.path.isfile(os.path.join(kd, 'tools/claude-code/CLAUDE_CODE.md')):
+            reg = read(os.path.join(kd, 'tools/claude-code/CLAUDE_CODE.md'))
+            miss = [os.path.basename(f) for f in tools if os.path.splitext(os.path.basename(f))[0] not in reg]
+            if miss: bad.append(f'«ядро: кандидат», а в реєстрі «Прилади продуктів» ядра ({kd}/tools/claude-code/CLAUDE_CODE.md) рядка нема: {", ".join(miss)} — спершу рядок і коміт ядра')
         if not os.path.isfile(os.path.join(top, 'kernel/Lens_validate.py')) and not re.search(r'ядро:\s*\S', cmd):
             bad.append(f'новий прилад ({", ".join(os.path.basename(f) for f in tools)}) — у повідомленні коміту бракує рядка «ядро: …»: кандидат для інших продуктів '
                        f'(→ реєстр «Прилади продуктів» у lens-governance:tools/claude-code/CLAUDE_CODE.md, тим самим ходом) чи ні — й чому')
@@ -213,8 +220,13 @@ def selftest():
         os.makedirs(d + '/docs'); open(d + '/docs/REPO_LAYOUT.md', 'w').write('прохід walk_v1 — що міряє\n')
         r = check(d, 'git add -A && git commit -m x'); say(not any('карті' in x for x in r) and any('ядро:' in x for x in r), 'у карті є, «ядро:» нема (продукт) → ✗ лише «ядро:»')
         say(check(d, "git add -A && git commit -m 'прохід\n\nядро: ні — лише AE'") == [], 'у карті є й «ядро: ні — чому» → тиша')
+        kd = tempfile.mkdtemp(); os.makedirs(kd + '/tools/claude-code'); open(kd + '/tools/claude-code/CLAUDE_CODE.md', 'w').write('реєстр\n'); os.environ['LENS_KERNEL_DIR'] = kd
+        say(any('реєстрі' in x for x in check(d, "git add -A && git commit -m 'ядро: кандидат'")), '«ядро: кандидат» без рядка в реєстрі ядра → ✗ (аудит S104)')
+        open(kd + '/tools/claude-code/CLAUDE_CODE.md', 'w').write('| walk_v1 | AE |\n')
+        say(check(d, "git add -A && git commit -m 'ядро: кандидат'") == [], '«ядро: кандидат» і рядок у реєстрі є → тиша')
+        del os.environ['LENS_KERNEL_DIR']; shutil.rmtree(kd)
         os.makedirs(d + '/tools/tester'); open(d + '/tools/tester/run.py', 'w').write('x = 1\n'); open(d + '/tools/tester/TESTER.md', 'w').write('run — запуск\n')
-        say(check(d, "git add -A && git commit -m 'ядро: кандидат'") == [], 'прилад описано в .md поруч (tools/tester/TESTER.md) → тиша')
+        say(check(d, "git add -A && git commit -m 'ядро: ні — лише тут'") == [], 'прилад описано в .md поруч (tools/tester/TESTER.md) → тиша')   # «ні»: «кандидат» залежав би від клону ядра в /tmp
         os.makedirs(d + '/tools/archive'); open(d + '/tools/archive/old_v0.py', 'w').write('x = 1\n')
         say(check(d, "git add -A && git commit -m 'ядро: ні'") == [], 'прилад в archive/ → тиша')
         os.makedirs(d + '/kernel'); open(d + '/kernel/Lens_validate.py', 'w').write('x = 1\n')

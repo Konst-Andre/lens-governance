@@ -7,15 +7,38 @@
 # + база (AE S94, аудит 19.10 A1): при ✗ — той самий гейт на HEAD (тимчасовий worktree, ~1 с, лише коли коміт уже зупинено);
 #   ✗, що є й на HEAD, позначено «(було до правки)» — агент одразу бачить, що ✗ не його, і називає його Konst.
 # + сторож файлів коміту (commit_files.py, HOOK-2 п.«нові файли», QR CC-12 14.10.2026) — у БУДЬ-ЯКОМУ репо: що коміт внесе, включно з `git add -A` тієї ж команди.
+if [ "${1-}" = selftest ]; then   # AE S104: пошук `git commit` — справжній коміт ⟂ текст у тілі heredoc
+  ok=0; n=0; me="$(readlink -f "${BASH_SOURCE[0]}")"
+  t(){ n=$((n+1)); local got; got=$(python3 -c "import json,sys; print(json.dumps({\"tool_name\":\"Bash\",\"tool_input\":{\"command\":sys.argv[1]}}))" "$2" | COMMIT_GATE_DETECT=1 bash "$me"); [ "$got" = "$1" ] && { ok=$((ok+1)); echo "✓ $3"; } || echo "✗ $3 → $got, очікував $1"; }
+  t none "python3 - <<'EOF'
+say(check(d, \"git add -A && git commit -m x\") == [], 'випадок')
+EOF" "тіло heredoc з текстом «git add -A && git commit» → не коміт (хибне AE S104)"
+  t commit "cd /x && git add -A && git commit -m x" "справжній коміт після cd → коміт"
+  t commit "git add -A && git commit -q -F - <<'EOF'
+повідомлення
+ядро: ні
+EOF" "коміт з повідомленням у heredoc → коміт"
+  echo "commit-gate selftest: $ok/$n"; [ "$ok" = "$n" ]; exit
+fi
 H="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" python3 -c '
 import json, sys, re, os, glob, subprocess
 d = json.load(sys.stdin)
 if d.get("tool_name") != "Bash": sys.exit(0)
 cmd = str((d.get("tool_input") or {}).get("command", ""))
+# тіла heredoc — текст (скрипт, повідомлення коміту), не команди: для пошуку `git commit` їх вирізаємо (AE S104 24.10.2026, хибне: python3 - <<EOF
+#   з рядками selftest «git add -A && git commit -m …» → гейт ганявся й зупиняв правку); повний cmd — далі в commit_files (там «ядро: …» з повідомлення)
+L, keep, i = cmd.split("\n"), [], 0
+while i < len(L):
+    keep.append(L[i]); m = re.search(r"<<-?\s*[\x22]?(?:\x27)?(\w+)(?:\x27)?[\x22]?", L[i]); i += 1
+    if m:
+        while i < len(L) and L[i].strip() != m.group(1): i += 1
+scan = "\n".join(keep)
 GITC = r"^\s*(?:\w+=\S*\s+)*git\b(?:\s+-[cC]\s+\S+)*\s+commit\b"   # git … commit на початку команди; у тексті рядка (Python, heredoc) — ні (хибне 08.10 QR CC-4 · 19.10 AE S94)
-if not any(re.match(GITC, s) for s in re.split(r"&&|\|\||;|\||\n", cmd)): sys.exit(0)
+found = any(re.match(GITC, s) for s in re.split(r"&&|\|\||;|\||\n", scan))
+if os.environ.get("COMMIT_GATE_DETECT") == "1": print("commit" if found else "none"); sys.exit(0)   # selftest: лише пошук коміту
+if not found: sys.exit(0)
 cwd, dirs = d.get("cwd") or os.getcwd(), []
-for seg in re.split(r"&&|\|\||;|\n", cmd):
+for seg in re.split(r"&&|\|\||;|\n", scan):
     m = re.match(r"\s*cd\s+(\"[^\"]+\"|\x27[^\x27]+\x27|\S+)", seg)
     if m: cwd = os.path.expanduser(m.group(1).strip("\"\x27")) if os.path.isabs(os.path.expanduser(m.group(1).strip("\"\x27"))) else os.path.join(cwd, m.group(1).strip("\"\x27"))
     if re.match(GITC, seg):
