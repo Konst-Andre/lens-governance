@@ -21,6 +21,10 @@ check() {
   n=$(basename "$(git -C "$d" rev-parse --show-toplevel 2>/dev/null || echo "$d")")
   [ -f "$d/CLAUDE.md" ] || { echo "⚠ $n не адаптоване: нема CLAUDE.md → ADOPT (lens-governance:tools/claude-code/ADOPT.md)"; return 1; }
   if grep -q 'основна робота — у Project' "$d/CLAUDE.md"; then echo "✓ $n — шлях В (міст): лише CLAUDE.md, так і треба"; return 0; fi
+  # автономне репо (Konst AE S103 про Routes: «він сам по собі, свої інструменти й гачки, ядра не стосується»): CLAUDE.md каже, що ядро
+  #   в сесії не підключається → каркас ядра не вимагається. Без цього ⚠ щосесії — шум, що привчає пропускати ⚠ (Datadog, Rootly «alert fatigue»,
+  #   24.10.2026: глушити вузько, з доказом, у приладі; перевіряти, що справжня умова досі спрацьовує — зуби нижче)
+  if grep -q 'автономний' "$d/CLAUDE.md" && grep -qE '(ядро|lens-governance).{0,60}не підключається' "$d/CLAUDE.md"; then echo "✓ $n — автономне (свої правила, гачки й гейти; каркас ядра не вимагається)"; return 0; fi
   if [ -f "$d/kernel/Lens_INDEX.md" ]; then kind="ядро"
     for p in tools/env_check.sh .claude/hooks/session-start.sh tools/claude-code/audit_prompts.sh kernel/Lens_AUDIT.md \
              kernel/Lens_governance_CHERGA.md sessions/Lens_gov; do [ -e "$d/$p" ] || miss+=("$p"); done
@@ -98,6 +102,10 @@ if [ "${1:-}" = "--inject" ]; then
   printf 'pg.wait_for_timeout(100)\npg.wait_for_timeout(100)\npg.wait_for_timeout(100)\n' > "$t2/r/tools/walk_v1.py"; pw2=$(check "$t2/r")
   echo 'from pw_quiet import install' >> "$t2/r/tools/walk_v1.py"; pw2q=$(check "$t2/r"); rm -rf "$t2"
   [[ "$pw1" == *PW-1* ]] && [[ "$pw2" == *walk_v1.py*"PW-2"* ]] && [[ "$pw2q" != *PW-2* ]] || { ok=1; printf "✗ inject PW:\n1 %s\n2 %s\n3 %s\n" "$pw1" "$pw2" "$pw2q" | cut -c1-600; }
+  # автономне (AE S103): CLAUDE.md «автономний … ядро … не підключається» → ✓ без переліку; лише «автономний» без цього — звичайна перевірка
+  t3=$(mktemp -d); mkdir -p "$t3/r"; printf 'Routes автономний: ядро `lens-governance` у сесії не підключається.\n' > "$t3/r/CLAUDE.md"; au1=$(check "$t3/r")
+  printf 'Продукт автономний у рішеннях.\n' > "$t3/r/CLAUDE.md"; au0=$(check "$t3/r"); rm -rf "$t3"
+  [[ "$au1" == *автономне* ]] && [[ "$au0" == *"не адаптоване"* ]] || { ok=1; echo "✗ inject автономне: $au1 | $au0" | cut -c1-200; }
   [ $ok -eq 0 ] && echo "✓ inject: повний — ✓, без CLAUDE.md — ⚠, без docs/AUDIT.md — ⚠ з назвою, черга списком — ⚠ CQ-1, черга таблицею — ✓, стара копія скрипта аудиту — ⚠ AUD-2, інтерфейс без «Дизайн-основа» — ⚠ UI-1, env_check без спільного інструмента — ⚠ з назвою, з ним — ✓, curl інструментів ядра з main — ⚠" || echo "✗ inject: детектор сліпий ($full | $gone | $part)"
   exit $ok
 fi
