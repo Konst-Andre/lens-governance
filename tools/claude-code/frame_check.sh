@@ -52,6 +52,18 @@ check() {
   if [ "$kind" != "ядро" ] && [ -s "$d/tools/env_check.sh" ] && [ -n "$(find "$d" -name '*.html' -not -path '*/archive/*' -not -path '*/node_modules/*' -not -path '*/.git/*' -print -quit 2>/dev/null)" ] && ! grep -q 'version_check' "$d/tools/env_check.sh"; then
     miss+=("tools/env_check.sh не кличе version_check.py — версія застосунку B · rev без нагляду (VER-1, lens-governance:tools/claude-code/VERSIONS.md; рядок — templates/env_check_template.sh)")
   fi
+  # PW-1 (AE S103, 24.10.2026): хук старту з зашитим playwright==N — після оновлення образу (chromium-1243) зашите 1.56.0 шукало 1194, і всі
+  #   Python-гейти AE падали за 1 с. Версія — пара образу (templates/session_start_template.sh), рядок «браузер» в env_check (wsd 1.21 п.4)
+  grep -qE 'playwright==[0-9]' "$d/.claude/hooks/session-start.sh" 2>/dev/null && miss+=(".claude/hooks/session-start.sh зашиває playwright==N — пара образу, не число (PW-1, wsd 1.21; зразок — templates/session_start_template.sh)")
+  # PW-2 (AE S103): гейт, названий у CLAUDE.md, з ≥ 3 фіксованими паузами і без pw_quiet — простій «на око» (AE: ≈ 27 хв → 60 с). Практика —
+  #   eslint-plugin-playwright no-wait-for-timeout, Biome noPlaywrightWaitForTimeout (24.10.2026); у нас ⚠ і виняток, бо pw_quiet робить старі паузи безпечними.
+  #   Межа — «названий у CLAUDE.md»: старі версії приладів, що лишились поруч, не шумлять. Пауза справді потрібна — «pause-ok» у файлі з причиною.
+  local pw2=() f2 c2; while IFS= read -r f2; do
+    c2=$(grep -cE 'wait_for_timeout\(|waitForTimeout\(' "$f2" 2>/dev/null); [ "${c2:-0}" -ge 3 ] || continue
+    grep -qE 'pw_quiet|quiet_v1|pause-ok' "$f2" && continue
+    grep -qE "(^|[^A-Za-z0-9_])$(basename "${f2%.*}")([^A-Za-z0-9_]|$)" "$d/CLAUDE.md" && pw2+=("$(basename "$f2") ($c2)")
+  done < <(find "$d/tools" -type f \( -name '*.py' -o -name '*.mjs' -o -name '*.js' \) -not -path '*/archive/*' -not -path '*/node_modules/*' 2>/dev/null)
+  [ ${#pw2[@]} -gt 0 ] && miss+=("гейти з фіксованими паузами без pw_quiet: ${pw2[*]} — пауза = подія (PW-2, wsd 1.21; lens-governance:tools/claude-code/pw_quiet.py · pw_quiet.mjs)")
   # AUD-2 (05.10.2026): скрипт аудиту — копія зразка «як є»; стара копія жене дорогі паралельні проходи без класу
   [ -s "$d/tools/audit_prompts.sh" ] && ! cmp -s "$d/tools/audit_prompts.sh" "$KDIR/../tools/claude-code/audit_prompts.sh" && miss+=("tools/audit_prompts.sh ≠ зразок ядра — скопіювати (AUD-2)")
   if [ ${#miss[@]} -eq 0 ]; then echo "✓ $n — каркас на місці ($kind)"; return 0; fi
@@ -80,6 +92,12 @@ if [ "${1:-}" = "--inject" ]; then
   [ $rc_ui0 -eq 1 ] && [[ "$ui0" == *UI-1* ]] || ok=1; [ $rc_ui1 -eq 0 ] || ok=1   # UI-1: інтерфейс без «Дизайн-основа» — ⚠, з рядком — ✓
   [ $rc_ver0 -eq 1 ] && [[ "$ver0" == *VER-1* ]] || ok=1   # VER-1 (QR CC-17): інтерфейс, env_check без version_check — ⚠
   [ $rc_sh0 -eq 1 ] && [[ "$sh0" == *doc_health.py* ]] || ok=1; [ $rc_sh1 -eq 0 ] || ok=1; [ $rc_shd -eq 1 ] && [[ "$shd" == *shots_check.py* ]] && [[ "$shd" != *doc_health.py* ]] || ok=1   # примірка (CC-9): кличе doc_health, а shots_check ні → ⚠ саме з його назвою
+  # PW-1 · PW-2 (AE S103): зашитий playwright — ⚠; гейт з CLAUDE.md з паузами без pw_quiet — ⚠; з pw_quiet — ✓
+  t2=$(mktemp -d); mkdir -p "$t2/r/tools" "$t2/r/.claude/hooks"; echo 'гейт: tools/walk_v1.py' > "$t2/r/CLAUDE.md"
+  echo 'pip install "playwright==1.56.0"' > "$t2/r/.claude/hooks/session-start.sh"; pw1=$(check "$t2/r")
+  printf 'pg.wait_for_timeout(100)\npg.wait_for_timeout(100)\npg.wait_for_timeout(100)\n' > "$t2/r/tools/walk_v1.py"; pw2=$(check "$t2/r")
+  echo 'from pw_quiet import install' >> "$t2/r/tools/walk_v1.py"; pw2q=$(check "$t2/r"); rm -rf "$t2"
+  [[ "$pw1" == *PW-1* ]] && [[ "$pw2" == *walk_v1.py*"PW-2"* ]] && [[ "$pw2q" != *PW-2* ]] || { ok=1; printf "✗ inject PW:\n1 %s\n2 %s\n3 %s\n" "$pw1" "$pw2" "$pw2q" | cut -c1-600; }
   [ $ok -eq 0 ] && echo "✓ inject: повний — ✓, без CLAUDE.md — ⚠, без docs/AUDIT.md — ⚠ з назвою, черга списком — ⚠ CQ-1, черга таблицею — ✓, стара копія скрипта аудиту — ⚠ AUD-2, інтерфейс без «Дизайн-основа» — ⚠ UI-1, env_check без спільного інструмента — ⚠ з назвою, з ним — ✓, curl інструментів ядра з main — ⚠" || echo "✗ inject: детектор сліпий ($full | $gone | $part)"
   exit $ok
 fi

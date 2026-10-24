@@ -46,6 +46,13 @@ sm=$(git log -1 --format=%h -- "$SUMDIR" 2>/dev/null)
 if [ -z "$sm" ]; then echo "самері: — (у $SUMDIR ще нема)"
 else n=$(git rev-list --count --grep='Claude-Session' "$sm"..HEAD 2>/dev/null); [ "${n:-0}" -gt 0 ] && echo "⚠ самері відстає: після $sm комітів агента без самері — $n (git log $sm..HEAD)" || echo "самері: ≡ (останнє оновлення $sm)"; fi
 
+# браузер гейтів (wsd 1.21 п.4, AE S103) — лишити, якщо в репо є прилади Playwright: справжній запуск Chromium з Python і Node; розбіжність пакета
+#   й образу видно тут, а не падінням гейтів за 1 с через пів години (AE S103: образ дав chromium-1243, хук ставив зашите 1.56.0 під 1194)
+# pyb=$(timeout 60 python3 -c "from playwright.sync_api import sync_playwright as s
+# with s() as p: b=p.chromium.launch(); print(b.version.split('.')[0]); b.close()" 2>/dev/null) && pyb="python ✓ $pyb" || pyb="python ✗ — хук старту не поставив пару образу"
+# ndb=$(cd /tmp && timeout 60 node -e "import('/opt/node-tools/node_modules/playwright/index.mjs').then(async({chromium})=>{const b=await chromium.launch();console.log(b.version().split('.')[0]);await b.close()})" 2>/dev/null) && ndb="node ✓ $ndb" || ndb="node ✗"
+# case "$pyb $ndb" in *✗*) echo "⚠ браузер: $pyb · $ndb";; *) echo "браузер: $pyb · $ndb";; esac
+
 # прод (лише читання): <живий код ≡ репо; тека публікації; службове не видно — судити за ВМІСТОМ, не за HTTP-кодом>
 echo "прод: — (додати: живий код ≡ репо; тека публікації; службове не видно — за ВМІСТОМ)"
 
