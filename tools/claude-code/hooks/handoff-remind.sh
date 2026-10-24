@@ -7,7 +7,8 @@
 # ще нема з чого) · повтор без нових комітів (позначка /tmp/lens-handoff-<session_id> = HEAD усіх репо) · помилка розбору.
 # Формат — code.claude.com/docs/en/hooks «UserPromptSubmit» (поле prompt; additionalContext ≤ 10 000 знаків), 09.10.2026.
 # + Stop (bash handoff-remind.sh stop): переїзд оголошує АГЕНТ (стартове ```text чи «переїжджаємо» у відповіді) і є ✗ → decision: block (раз на стан HEAD; stop_hook_active → тиша).
-# Зуби: bash handoff-remind.sh selftest — 9 випадків (тригер → контекст з ✗; не тригер · «в новій сесії» в розповіді · перше повідомлення · повтор → тиша;
+# Клон лише для читання (звірка іншого продукту) — `touch <репо>/.git/lens-readonly`: гачок його не перевіряє (AE S103).
+# Зуби: bash handoff-remind.sh selftest — 11 випадків (тригер → контекст з ✗; не тригер · «в новій сесії» в розповіді · перше повідомлення · повтор → тиша;
 # новий коміт → знову; Stop: стартове з ✗ → block, звичайна відповідь і повтор → тиша).
 mode="${1:-run}"
 [ "$mode" = selftest ] && HOOK_IN="{}" || HOOK_IN="$(cat)"
@@ -22,6 +23,8 @@ def repos(roots):
     for root in roots:
         for d in sorted(glob.glob(os.path.join(root, '*', '.git'))):
             r = os.path.dirname(d)
+            # клон лише для читання (позначка .git/lens-readonly) — не репо сесії: хибне ×2 AE S103 — вади QR і Routes, склонованих для звірки, блокували Stop
+            if os.path.exists(os.path.join(r, '.git', 'lens-readonly')): continue
             if any(os.path.isdir(os.path.join(r, s)) for s in ('sessions', 'docs/summary')): out.append(r)   # Lens · не-Lens каркас (S90 AE)
     return out
 
@@ -84,7 +87,10 @@ def selftest():
                           ('Stop: повтор через гачок (stop_hook_active) → тиша', S('```text\nx\n```', True, 'p3'), False)]:
         out = stop(d, [t], t); ok = (out is not None and '✗' in out) == want
         print(('✓' if ok else '✗') + ' ' + name); bad += not ok
-    print(f'selftest: {10 - bad}/10'); return 1 if bad else 0
+    open(os.path.join(r, '.git', 'lens-readonly'), 'w').close()
+    ok = stop(S('Переїжджаємо. ```text\nСтарт: …\n```', s='p4'), [t], t) is None
+    print(('✓' if ok else '✗') + ' Stop: клон лише для читання (.git/lens-readonly) → тиша (хибне AE S103)'); bad += not ok
+    print(f'selftest: {11 - bad}/11'); return 1 if bad else 0
 
 def stop(d, roots, mark_dir='/tmp'):
     """Stop: переїзд оголошує агент (стартове чи «переїжджаємо» у відповіді) — є ✗ → block, щоб виправив до кінця ходу."""

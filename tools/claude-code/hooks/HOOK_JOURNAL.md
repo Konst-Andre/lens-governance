@@ -84,3 +84,6 @@
 | 24.10 | `session_019x6QqN` · AE S103 | ui-guard 3 | **хибне ×3:** скрипт у scratchpad — ціль після `cd /tmp`, тіло heredoc `cat`, `cp` і `.html` у різних рядках; selftest залежав від теки | `segs()`: сегменти + тека `cd`, heredoc cat/tee пропущено; selftest 24 → 28, з `/` |
 | 24.10 | `session_019x6QqN` · AE S103 | memory-guard 1 | **хибне:** `AE_EDIT_CODE=так?` (ключ=значення) і «так і має бути» (прислівник) у стартовому | ключ=значення і звороти «так і …» — геть; selftest 15 → 17 |
 | 24.10 | `session_019x6QqN` · AE S103 | ui-guard 1 | **справжнє:** новий крок після коміту без пошуку — правка гачка пам'яті; пошук уже був у кроці раніше, правило «крок = від коміту до коміту» тримає | — |
+| 24.10 | `session_019x6QqN` · AE S103 | handoff-remind (Stop) 2 | **хибне ×2:** перевіряв клони QR і Routes, взяті лише для читання (їхні давні ✗) | клон для читання — `.git/lens-readonly` → пропуск; selftest 10 → 11 |
+| 24.10 | `session_019x6QqN` · AE S103 | handoff-remind (Stop) 1 | **справжнє:** голе `ui-guard.sh` у стартовому — дав повний шлях | AE `21b4eda` |
+| 24.10 | `session_019x6QqN` · AE S103 | ui-guard «Крок» 5 | **справжнє ×5:** після коміту — новий крок без пошуку; кожен пошук дав джерело в рішення (MDN getComputedTiming, add_init_script path, eslint no-wait-for-timeout, motion tokens) | — |
