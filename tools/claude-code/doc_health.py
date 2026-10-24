@@ -26,6 +26,9 @@
      перевірки виконується «на око»; Х3–Х4 перепису пропустили шість таких (§1 · §3-п.15 · §8.1 · §8.2 · §8.9 · §8.10) — побачив лише замір.
      Практика — системна інженерія NASA: метод перевірки (inspection · analysis · demonstration · test) називається, коли вимогу пишуть
      (LSU / NASA «Writing Requirements» L22.02; NTRS 20110008330 Ares I-X, 19.10.2026).
+  M9 прилад без згадки — файл приладу (tools/ · .claude/ · .github/, не .md), чиє ім'я (без розширення) не згадує жоден живий .md.
+     Чому (Konst AE S103: «чи знала б наступна сесія про все, що ми зробили?»): M5 ловить документ без файла, а файл без документа —
+     ні; новий прилад, не вписаний у карту репо, наступний агент не знайде й збудує вдруге. Перший прогін 24.10: ядро 0, AE 2 справжні.
 Лише ⚠ (не блокує): один рядок для env_check; адреси — --list.
   python3 doc_health.py [<репо>] [--list] | selftest
 """
@@ -65,7 +68,18 @@ def scan(root):
     found += queue_behind(root)
     found += dead_sections(root)
     found += unchecked_rules(root)
+    found += orphan_tools(root)
     return found
+
+
+def orphan_tools(root):
+    """M9: прилад (tools/ · .claude/ · .github/), про який не каже жоден живий .md — ім'я без розширення."""
+    ls = subprocess.run(['git', '-c', 'core.quotePath=false', 'ls-files', 'tools', '.claude', '.github'], cwd=root, capture_output=True, text=True).stdout.split('\n')
+    tl = [f for f in ls if f and not f.endswith('.md') and '__pycache__' not in f and '/journal/' not in f and not f.startswith('archive/')]
+    if not tl: return []
+    text = '\n'.join(open(os.path.join(root, f), encoding='utf-8', errors='replace').read() for f in files(root) if os.path.isfile(os.path.join(root, f)))
+    return [('M9', f, 'про прилад не каже жоден живий документ — рядок у карту репо (REPO_LAYOUT / CLAUDE_CODE.md), або в archive/')
+            for f in tl if os.path.splitext(os.path.basename(f))[0] not in text]
 
 
 def queue_behind(root):
@@ -160,7 +174,7 @@ def line(root):
     if not f: return '✓', f'документи: ✓ щосесійні ≤ {M1_LINES} рядків · старт ≤ {M2_KB} КБ · розділи ≤ {M3_KB} КБ · великі з маршрутом'
     by = {}
     for m, *_ in f: by[m] = by.get(m, 0) + 1
-    name = {'M1': 'щосесійні задовгі', 'M2': 'файли старту завеликі', 'M3': f'розділів > {M3_KB} КБ', 'M4': f'> {M4_KB} КБ без маршруту', 'M5': 'мертвих шляхів', 'M6': 'черга відстала від самері', 'M7': 'мертвих адрес §', 'M8': 'правил без «Як перевірити»'}
+    name = {'M1': 'щосесійні задовгі', 'M2': 'файли старту завеликі', 'M3': f'розділів > {M3_KB} КБ', 'M4': f'> {M4_KB} КБ без маршруту', 'M5': 'мертвих шляхів', 'M9': 'приладів без згадки', 'M6': 'черга відстала від самері', 'M7': 'мертвих адрес §', 'M8': 'правил без «Як перевірити»'}
     worst = max((x for x in f if x[0] == 'M3'), key=lambda x: float(re.search(r'(\d+) КБ', x[2])[1]), default=None)
     return '⚠', 'документи: ' + ' · '.join(f'{name[m]} {n}' for m, n in sorted(by.items())) + (f' (найбільший — {worst[1]} {worst[2]})' if worst else '') + ' — деталі: doc_health.py --list'
 
@@ -197,6 +211,8 @@ def selftest():
              ('M6: «`AE-X`: підкрок ✅» і закритий у черзі `AE-Y` → ✓', {'docs/CHERGA.md': Q.replace('| `AE-Y` | y | 18.10.2026 | z |', '| `AE-Y` | y | закрито | z |'), 'docs/summary/P_SUMMARY_2026-10-18.md': '## §0\n- `AE-X`: знімок ✅\n- `AE-Y` ✅\n'}, '✓', '')]
     cases += [('M7: «§13-д» без заголовка §13 → ⚠', {'lens/S.md': '## §1 А\nx\n## §2 Б\nx\n## §3 В\nдив. §13-д\n'}, '⚠', 'мертвих адрес § 1'),
               ('M7: «§3-п.2» є заголовок · «gov §12.4» · «Бібліотека §7.1» → ✓', {'lens/S.md': '## §1 А\nx\n## §2 Б\nx\n## §3 В\nдив. §3-п.2 · gov §12.4 · Бібліотека §7.1\n'}, '✓', '')]
+    cases += [('M9: прилад, про який не каже жоден .md → ⚠', {'tools/gone_v1.py': 'x', 'README.md': 'нічого\n'}, '⚠', 'приладів без згадки 1'),
+              ('M9: прилад згаданий іменем без розширення → ✓', {'tools/stand/walk_v2.py': 'x', 'docs/REPO_LAYOUT.md': 'прохід walk_v2 — чинний\n'}, '✓', '')]
     F = 'Кожне правило — **Правило** · **Чому** · **Як перевірити**.\n'
     cases += [('M8: форма оголошена, розділ з правилом без перевірки → ⚠', {'lens/F.md': F + '### 1 А\n**Правило.** x\n**Як перевірити.** y\n### 2 Б\n**Правило.** z\n'}, '⚠', 'правил без «Як перевірити» 1'),
               ('M8: без оголошеної форми · K2:n/a · перевірка є → ✓', {'lens/G.md': '### 1\n**Правило.** x\n', 'lens/F.md': F + '### 1\n**Правило.** x\n<!-- K2:n/a -->\n### 2\n**Правило.** y **Як перевірити:** z\n'}, '✓', '')]
