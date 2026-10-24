@@ -3,7 +3,7 @@
 // Рух НЕ судить — лише статичні кадри (переходи на час натискання й наведення вимкнено, AE S103); рух — окремий прилад, kernel/Lens_MOTION-1_brief.md.
 // Очі агента лишаються: машина бачить ~третину вад (розвідка 10.10: axe/WCAG-огляди), решта — чек-лист воріт ui-review-gate.
 //
-// Запуск:  node ui_lint.mjs <url|файл.html> [--state "<js>"]… [--scope <корінь острова>] [--repo <тека>] [--width 390] [--height 844] [--themes light|dark|both] [--json] [--baseline <файл>] [--ready "<js-умова>"]   (низький екран Safari: --width 375 --height 634)
+// Запуск:  node ui_lint.mjs <url|файл.html> [--state "<js>"]… [--scope <корінь острова>] [--repo <тека>] [--width 390] [--height 844] [--themes light|dark|both] [--serial] [--json] [--baseline <файл>] [--ready "<js-умова>"]   (низький екран Safari: --width 375 --height 634)
 //          кожен --state — окремий стан (JS виконується на сторінці; між станами сторінка перезавантажується); без --state — лише початковий.
 //          --state — ВИРАЗ, не модуль: `await` верхнього рівня → ✗ «JS стану впав»; чекати — `new Promise(r=>setTimeout(()=>{…;r()},1800))` (QR CC-13, 15.10.2026: шіт відкривається з затримкою).
 //          Теми (prefers-color-scheme): типово обидві, паралельно; --themes light|dark — продукт з однією схемою (AE S103: темний прохід AE = копія світлого). --repo: ✗ 0 → позначка для воріт (той самий хеш диффу, що в ui-review-gate).
@@ -398,6 +398,7 @@ function leaks(scope) {
   return out;
 }
 let THEMES = ['light', 'dark'];   // --themes light|dark|both (AE S103)
+let SERIAL = false;   // --serial — теми по черзі (AE S103, аудит)
 let SCOPE = '';   // --scope
 let READY = '';   // --ready: JS-умова готовності сторінки (S97); чекаємо після кожного завантаження, до 10 с
 
@@ -514,15 +515,19 @@ function ringContrast(img, f) {
 async function lint(target, states, width, theme, browser, scope = SCOPE) {
   const ctx = await browser.newContext({ viewport: { width, height: HEIGHT }, deviceScaleFactor: 2, colorScheme: theme });
   const p = await ctx.newPage(), errs = [], dlg = []; p.on('pageerror', e => errs.push(e.message)); p.on('dialog', d => { dlg.push(d.type() + ': ' + d.message()); d.dismiss().catch(() => {}); });   // 23. нативне вікно (пропуск Konst QR CC-12: «свій підпис» відкрив prompt браузера) p.on('console', m => m.type() === 'error' && !/Failed to load resource/.test(m.text()) && errs.push(m.text()));
+  // AE S103 (wsd 1.21, аудит 24.10.2026: «ui_lint сам має паузи без “чому N”»): пауза після завантаження й після стану — «тиша до N» (pw_quiet.js:
+  //   таймери сторінки з терміном у вікні · скінченні анімації · запити · два кадри), а не простій; QUIET=0 — старі паузи (негативний контроль).
+  const QOFF = process.env.QUIET === '0'; if (!QOFF) await p.addInitScript({ path: join(here, 'pw_quiet.js') });
+  const quiet = ms => QOFF ? p.waitForTimeout(ms) : p.evaluate(m => window.__aeQuiet ? window.__aeQuiet(m) : new Promise(r => setTimeout(r, m)), ms).catch(() => p.waitForTimeout(ms));
   const res = [];
   for (const [i, st] of [null, ...states].entries()) {   // початковий екран — завжди, далі кожен стан
-    await p.goto(target, { waitUntil: 'load' }); await p.waitForTimeout(400);
+    await p.goto(target, { waitUntil: 'load' }); await quiet(400);
     // 36. готовність кадру (AE S97: дані приходять мережею після load — 400 мс то встигали, то ні, і та сама сторінка давала 0 або 35 ✗)
     try { await p.evaluate(() => document.fonts.ready.then(() => 1)); } catch {}
     if (READY) { try { await p.waitForFunction(READY, null, { timeout: 10000 }); } catch { res.push({ lvl: '✗', kind: 'стан', where: st ? `стан ${i}` : 'початковий', msg: `умова --ready не настала за 10 с: ${READY.slice(0, 60)}` }); } }
-    if (st) { try { await p.evaluate(st); } catch (e) { res.push({ lvl: '✗', kind: 'стан', where: `стан ${i}`, msg: 'JS стану впав: ' + e.message.split('\n')[0] }); } await p.waitForTimeout(700); }
+    if (st) { try { await p.evaluate(st); } catch (e) { res.push({ lvl: '✗', kind: 'стан', where: `стан ${i}`, msg: 'JS стану впав: ' + e.message.split('\n')[0] }); } await quiet(700); }
     { const sig = () => p.evaluate(() => document.querySelectorAll('*').length + ':' + document.body.innerText.length); let a0 = await sig(), still = false;
-      for (let n = 0; n < 5 && !still; n++) { await p.waitForTimeout(600); const a1 = await sig(); still = a1 === a0; a0 = a1; }
+      for (let n = 0; n < 5 && !still; n++) { await p.waitForTimeout(600);   /* pause-ok: вікно тиші DOM (№36) — справжній час за задумом */ const a1 = await sig(); still = a1 === a0; a0 = a1; }
       if (!still) res.push({ lvl: '⚠', kind: 'кадр', where: 'body', state: st ? `стан ${i}` : 'початковий', msg: `екран ще змінювався через 3 с після ${st ? 'стану' : 'завантаження'} — замір міг зловити проміжний кадр; дай --ready "<умова готовності>" або зупини таймер у стані` }); }
     const found = await p.evaluate(probe), pxs = found.filter(f => f.lvl === 'px'), inks = found.filter(f => f.lvl === 'ink');
     if (inks.length) { const img = png(await p.screenshot({ type: 'png' })); for (const f of inks) { const m = inkOffset(img, f), d = m && m.d;
@@ -642,7 +647,9 @@ async function lint(target, states, width, theme, browser, scope = SCOPE) {
 //   browser — спільний (самоперевірка: один запуск Chromium на всі сторінки замість запуску на кожну).
 async function run(target, states, width, { browser, scope = SCOPE, themes = THEMES } = {}) {
   const own = !browser; const b = browser || await (await pw()).chromium.launch();
-  const out = { light: [], dark: [] }; await Promise.all(themes.map(async t => { out[t] = await lint(target, states, width, t, b, scope); }));
+  const out = { light: [], dark: [] };
+  if (SERIAL) for (const t of themes) out[t] = await lint(target, states, width, t, b, scope);   // --serial — діагностика (wsd 1.21 п.3; як Playwright --workers=1): паралельний дав ✗, послідовний ні → вада під навантаженням
+  else await Promise.all(themes.map(async t => { out[t] = await lint(target, states, width, t, b, scope); }));
   if (own) await b.close();
   // 17. паритет тем: та сама поверхня має обʼєм в одній темі й пласка в іншій (інструмент може різнитись — A66: світла тінь, темна світло зверху)
   const V = t => Object.fromEntries(out[t].filter(f => f.lvl === 'vol').map(f => [f.state + '|' + f.where, f.msg]));
@@ -690,9 +697,9 @@ if (a[0] === 'selftest') {
   await B.close(); let bad = 0; for (const [line, b] of out) { console.log(line); bad += b; }
   console.log(`─── ui_lint selftest: ${T.length - bad}/${T.length} · ${Math.round((Date.now() - t0) / 1000)} с ───`); process.exit(bad ? 1 : 0);
 }
-if (!a[0]) { console.log('node ui_lint.mjs <url|файл> [--state "<js>"]… [--repo <тека>] [--width 390] [--height 844] [--themes light|dark|both] [--json] | selftest'); process.exit(2); }
+if (!a[0]) { console.log('node ui_lint.mjs <url|файл> [--state "<js>"]… [--repo <тека>] [--width 390] [--height 844] [--themes light|dark|both] [--serial] [--json] | selftest'); process.exit(2); }
 let target = a[0]; if (!/^\w+:\/\//.test(target)) target = 'file://' + resolve(target);
-const states = [], opt = {}; for (let i = 1; i < a.length; i++) { if (a[i] === '--state') states.push(a[++i]); else if (a[i] === '--repo') opt.repo = a[++i]; else if (a[i] === '--width') opt.width = +a[++i]; else if (a[i] === '--height') HEIGHT = +a[++i]; else if (a[i] === '--scope') SCOPE = a[++i]; else if (a[i] === '--json') opt.json = true; else if (a[i] === '--baseline') opt.base = a[++i]; else if (a[i] === '--ready') READY = a[++i]; else if (a[i] === '--themes') { const v = a[++i]; THEMES = v === 'both' ? ['light', 'dark'] : [v]; if (!THEMES.every(x => x === 'light' || x === 'dark')) { console.error('--themes light|dark|both'); process.exit(2); } } }
+const states = [], opt = {}; for (let i = 1; i < a.length; i++) { if (a[i] === '--state') states.push(a[++i]); else if (a[i] === '--repo') opt.repo = a[++i]; else if (a[i] === '--width') opt.width = +a[++i]; else if (a[i] === '--height') HEIGHT = +a[++i]; else if (a[i] === '--scope') SCOPE = a[++i]; else if (a[i] === '--json') opt.json = true; else if (a[i] === '--baseline') opt.base = a[++i]; else if (a[i] === '--ready') READY = a[++i]; else if (a[i] === '--serial') SERIAL = true; else if (a[i] === '--themes') { const v = a[++i]; THEMES = v === 'both' ? ['light', 'dark'] : [v]; if (!THEMES.every(x => x === 'light' || x === 'dark')) { console.error('--themes light|dark|both'); process.exit(2); } } }
 const T0 = Date.now(); const r = await run(target, states, opt.width || 390);
 const acc = []; const af = opt.repo && join(resolve(opt.repo), '.ui-lint-accept');
 if (af && existsSync(af)) for (const l of (await import('node:fs')).readFileSync(af, 'utf8').split('\n')) { const [k, w, why] = l.split('|').map(x => (x || '').trim()); if (k && w && !k.startsWith('#')) acc.push({ k, w, why }); }
