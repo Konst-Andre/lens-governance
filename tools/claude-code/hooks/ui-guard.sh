@@ -77,6 +77,12 @@ chmod +x before.sh" "скрипт заміру в /tmp: cd + heredoc cat + cp і
 <b>x</b>
 X" "cd у репо + heredoc cat у .html → стоп (зуби S103)"
   tb 1 "cp /tmp/x/new.html site/index.html" "cp нового .html у репо → стоп (зуби S103)"
+  # AE S104: копія сайту в scratchpad через змінну — «SP=/tmp/…; cd \$SP/site_fix && python3 - <<EOF p='index.html'» → тиша; змінна на теку репо → стоп
+  tb 0 "SP=/tmp/claude-0/x/scratchpad; rm -rf \$SP/site_fix && cp -r /home/u/AE/site \$SP/site_fix && cd \$SP/site_fix && python3 - <<'EOF'
+p='index.html'; s=open(p,encoding='utf-8').read()
+open(p,'w',encoding='utf-8').write(s)
+EOF" "копія сайту в /tmp через змінну теки → тиша (хибне AE S104)"
+  tb 1 "D=site; cd \$D && echo '<b>x</b>' > index.html" "змінна на теку репо + запис .html → стоп (зуби S104)"
   tb 0 "cp site/index.html /tmp/x/old.html" "cp .html з репо в /tmp (база для порівняння) → тиша (S103)"
   touch "/tmp/lens-ui-$S-web" "/tmp/lens-ui-$S-step"
   tb 1 "echo '<b>x</b>' > site/index.html" "пошук є, кукбука нема → стоп"
@@ -117,15 +123,22 @@ def segs(cmd):
     # Команда Bash → сегменти (рядок · && · || · ;) з текою, куди вказує попередній `cd` (AE S103, 24.10.2026, хибне ×3 на скрипт заміру в scratchpad:
     #   «cd /tmp/…/scratchpad && cat > before.sh <<EOF» — before.sh вважався файлом репо, а рядки тіла — записами shell).
     # Тіло heredoc для cat / tee — ВМІСТ файлу, не команди: пропускаємо. Тіло для інтерпретатора (python3 - <<X) — код, лишається (його записи справжні).
-    out, lines, i = [], cmd.split("\n"), 0
+    out, lines, i = [], cmd.split("\n"), 0   # out: (рядок, тіло heredoc інтерпретатора?) — там «p=\x27…\x27» це код, не змінна shell
     while i < len(lines):
-        ln = lines[i]; out.append(ln); m = re.search(r"<<-?\s*[\x27\x22]?(\w+)[\x27\x22]?", ln); i += 1
+        ln = lines[i]; out.append((ln, False)); m = re.search(r"<<-?\s*[\x27\x22]?(\w+)[\x27\x22]?", ln); i += 1
         if m and re.search(r"\b(cat|tee)\b", ln):
             while i < len(lines) and lines[i].strip() != m.group(1): i += 1
             i += 1
-    cur, res = d.get("cwd") or os.getcwd(), []
-    for s in re.split(r"\n|&&|\|\||;", "\n".join(out)):
-        m = re.match(r"\s*cd\s+([^\s;&|]+)\s*$", s)
+        elif m:
+            while i < len(lines) and lines[i].strip() != m.group(1): out.append((lines[i], True)); i += 1
+    # Змінні shell, задані в тій самій команді (NAME=значення), розкриваються в cd і в цілях запису (AE S104, 24.10.2026, хибне: «SP=/tmp/…/scratchpad; cd $SP/site_fix &&
+    #   python3 - <<EOF p=\x27index.html\x27» — тека копії в scratchpad, а гачок бачив «$SP/site_fix» як відносну теку репо).
+    cur, res, env = d.get("cwd") or os.getcwd(), [], {}
+    xv = lambda t: re.sub(r"\$\{?([A-Za-z_]\w*)\}?", lambda m: env.get(m.group(1), m.group(0)), t)
+    for s, body in ((x, b) for ln, b in out for x in re.split(r"&&|\|\||;", ln)):
+        a = not body and re.match(r"\s*(?:export\s+)?([A-Za-z_]\w*)=([\x27\x22]?)([^\s\x27\x22;&|]*)\2\s*$", s)
+        if a: env[a.group(1)] = xv(a.group(3)); continue
+        s = xv(s); m = not body and re.match(r"\s*cd\s+([^\s;&|]+)\s*$", s)
         if m:
             p = os.path.expanduser(m.group(1).strip("\"\x27")); cur = os.path.normpath(p if os.path.isabs(p) else os.path.join(cur, p)); continue
         res.append((re.sub(DEVNULL, "", s), cur))
