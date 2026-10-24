@@ -2,10 +2,10 @@
 // ui_lint — машинна частина огляду UI: те, що видно програмі, ловить програма, а не Konst («капсула прилипла», «текст обрізаний», «іконка вище»).
 // Очі агента лишаються: машина бачить ~третину вад (розвідка 10.10: axe/WCAG-огляди), решта — чек-лист воріт ui-review-gate.
 //
-// Запуск:  node ui_lint.mjs <url|файл.html> [--state "<js>"]… [--scope <корінь острова>] [--repo <тека>] [--width 390] [--height 844] [--json] [--baseline <файл>] [--ready "<js-умова>"]   (низький екран Safari: --width 375 --height 634)
+// Запуск:  node ui_lint.mjs <url|файл.html> [--state "<js>"]… [--scope <корінь острова>] [--repo <тека>] [--width 390] [--height 844] [--themes light|dark|both] [--json] [--baseline <файл>] [--ready "<js-умова>"]   (низький екран Safari: --width 375 --height 634)
 //          кожен --state — окремий стан (JS виконується на сторінці; між станами сторінка перезавантажується); без --state — лише початковий.
 //          --state — ВИРАЗ, не модуль: `await` верхнього рівня → ✗ «JS стану впав»; чекати — `new Promise(r=>setTimeout(()=>{…;r()},1800))` (QR CC-13, 15.10.2026: шіт відкривається з затримкою).
-//          Обидві теми (prefers-color-scheme light/dark) завжди. --repo: ✗ 0 → позначка для воріт (той самий хеш диффу, що в ui-review-gate).
+//          Теми (prefers-color-scheme): типово обидві, паралельно; --themes light|dark — продукт з однією схемою (AE S103: темний прохід AE = копія світлого). --repo: ✗ 0 → позначка для воріт (той самий хеш диффу, що в ui-review-gate).
 //          <repo>/.ui-lint-accept — відомі вади, прийняті Konst: рядок «вид | шматок адреси елемента | причина · дата» → ⓘ (не блокує, але друкується щоразу).
 //          node ui_lint.mjs selftest — зуби: сторінка з підкинутими вадами (кожна мусить дати свій рядок) і чиста (0).
 // Перевірки: 1 скрол убік · 2 обрізано · 3 прилипло / вилазить · 4 контраст (4-б — на градієнті пікселем знімка) · 5 шрифт · 6 тап, без назви, iOS-зум · 7 накладання · 8 ряд · 9 текст (сміття, жаргон) ·
@@ -396,6 +396,7 @@ function leaks(scope) {
   for (const sh of document.styleSheets) { let rs; try { rs = sh.cssRules; } catch { continue; } walk(rs); }
   return out;
 }
+let THEMES = ['light', 'dark'];   // --themes light|dark|both (AE S103)
 let SCOPE = '';   // --scope
 let READY = '';   // --ready: JS-умова готовності сторінки (S97); чекаємо після кожного завантаження, до 10 с
 
@@ -509,7 +510,7 @@ function ringContrast(img, f) {
   return (Math.max(A, B) + 0.05) / (Math.min(A, B) + 0.05);
 }
 
-async function lint(target, states, width, theme, browser) {
+async function lint(target, states, width, theme, browser, scope = SCOPE) {
   const ctx = await browser.newContext({ viewport: { width, height: HEIGHT }, deviceScaleFactor: 2, colorScheme: theme });
   const p = await ctx.newPage(), errs = [], dlg = []; p.on('pageerror', e => errs.push(e.message)); p.on('dialog', d => { dlg.push(d.type() + ': ' + d.message()); d.dismiss().catch(() => {}); });   // 23. нативне вікно (пропуск Konst QR CC-12: «свій підпис» відкрив prompt браузера) p.on('console', m => m.type() === 'error' && !/Failed to load resource/.test(m.text()) && errs.push(m.text()));
   const res = [];
@@ -533,7 +534,7 @@ async function lint(target, states, width, theme, browser) {
       if (m < f.need - 0.15) { f.lvl = '✗'; f.msg = `контраст ${m.toFixed(2)}:1 < ${f.need}:1 — погано читається (фон — градієнт, заміряно пікселем)`; }
       else if (m < f.need) { f.lvl = '⚠'; f.msg = `контраст ${m.toFixed(2)}:1 — на межі ${f.need}:1 (фон — градієнт, пікселем ± 0,15) — глянь очима`; } else f.lvl = 'ok'; } }
     for (const f of found.filter(f => f.lvl !== 'ok')) { delete f.rect; delete f.fg; delete f.need; res.push({ ...f, state: st ? `стан ${i}` : 'початковий' }); }
-    if (SCOPE) for (const f of await p.evaluate(leaks, SCOPE)) res.push({ ...f, state: st ? `стан ${i}` : 'початковий' });   // 30. чуже правило
+    if (scope) for (const f of await p.evaluate(leaks, scope)) res.push({ ...f, state: st ? `стан ${i}` : 'початковий' });   // 30. чуже правило
     // натискання: притиснути, виміряти, відпустити ПОЗА елементом (клік не спрацює). Однаковий вигляд → ⚠ «нема відгуку» (Konst 10.10: анімація пресу)
     const sig = await p.evaluate(() => { const seen = new Set(), out = [];
       for (const e of document.querySelectorAll('a[href],button,[role=button],summary,label[for]')) { const s = getComputedStyle(e); if (s.display === 'none' || !e.getClientRects().length) continue; e.scrollIntoView({ block: 'center', behavior: 'instant' }); const r = e.getBoundingClientRect();
@@ -545,6 +546,14 @@ async function lint(target, states, width, theme, browser) {
       return out; });
     // вмикаємо :active примусово (DevTools CSS.forcePseudoState) — без кліків: справжнє натискання мишею закривало шіт (тап «по фону») і псувало решту вимірів
     const cdp = await p.context().newCDPSession(p); await cdp.send('DOM.enable'); await cdp.send('CSS.enable');
+    // AE S103 (24.10.2026, AE-SPEED): паузи 400/350/200/350 мс на кнопку (з першої версії, «довше за будь-який перехід») — 1,3 с × 40 кнопок × стан × тема.
+    //   Перевіряється КІНЦЕВИЙ вигляд, не рух → на час натискання й наведення переходи вимкнено (як Playwright animations:'disabled' — домотує
+    //   до кінця; itechguides · macmyths, 24.10.2026), і досить двох кадрів. Анімації (@keyframes) не чіпаємо — за два кадри вигляд уже інший.
+    //   Стиль не застосувався (CSP сторінки тощо — перевіряємо самим transition-duration) → старі паузи: зуби не губляться за жодних умов.
+    const fz = await p.evaluate(() => { try { const s = new CSSStyleSheet(); s.replaceSync('*,*::before,*::after{transition-duration:0s!important;transition-delay:0s!important}');
+      document.adoptedStyleSheets = [...document.adoptedStyleSheets, s]; window.__uilFz = s;
+      const t = document.createElement('i'); t.style.transition = 'opacity 9s'; document.body.appendChild(t); const ok = getComputedStyle(t).transitionDuration === '0s'; t.remove(); return ok; } catch { return false; } });
+    const settle = ms => fz ? p.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))) : p.waitForTimeout(ms);
     const { root } = await cdp.send('DOM.getDocument', { depth: 0 });
     for (let j = 0; j < Math.min(sig.length, 40); j++) {
       const el = p.locator(`[data-uil-press="${j}"]`);
@@ -553,13 +562,13 @@ async function lint(target, states, width, theme, browser) {
       let nodeId; try { ({ nodeId } = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector: `[data-uil-press="${j}"]` })); } catch { continue; }
       if (!nodeId) continue;
       const before = await look();
-      await cdp.send('CSS.forcePseudoState', { nodeId, forcedPseudoClasses: ['active'] }); await p.waitForTimeout(400);   // довше за будь-який перехід відгуку
+      await cdp.send('CSS.forcePseudoState', { nodeId, forcedPseudoClasses: ['active'] }); await settle(400);   // довше за будь-який перехід відгуку
       const css = await look();
-      await cdp.send('CSS.forcePseudoState', { nodeId, forcedPseudoClasses: [] }); await p.waitForTimeout(350);
+      await cdp.send('CSS.forcePseudoState', { nodeId, forcedPseudoClasses: [] }); await settle(350);
       // і JS-натискання (кукбук A67: клас .pressing на pointerdown) — синтетична подія без кліку
-      await el.evaluate(e => e.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerType: 'touch', isPrimary: true }))); await p.waitForTimeout(200);
+      await el.evaluate(e => e.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerType: 'touch', isPrimary: true }))); await settle(200);
       const js = await look();
-      await el.evaluate(e => e.dispatchEvent(new PointerEvent('pointercancel', { bubbles: true, pointerType: 'touch', isPrimary: true }))); await p.waitForTimeout(350);
+      await el.evaluate(e => e.dispatchEvent(new PointerEvent('pointercancel', { bubbles: true, pointerType: 'touch', isPrimary: true }))); await settle(350);
       if (before === css && before === js) res.push({ lvl: '⚠', kind: 'натискання', where: sig[j].toLowerCase(), msg: 'на натискання вигляд не змінюється (ні :active, ні JS pointerdown) — палець не відчуває кнопку; рецепт — кукбук A67', state: st ? `стан ${i}` : 'початковий' });
     }
     // 35. наведення (пропуск Konst AE S96, 20.10.2026 з ПК: «рядок під курсором ледь помітний… кнопки не мають ховера взагалі») — лише ПК (ширина ≥ 1024: миша).
@@ -586,7 +595,7 @@ async function lint(target, states, width, theme, browser) {
         let nodeId; try { ({ nodeId } = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector: `[data-uil-hover="${j}"]` })); } catch { continue; }
         if (!nodeId) continue;
         const before = await look();
-        await cdp.send('CSS.forcePseudoState', { nodeId, forcedPseudoClasses: ['hover'] }); await p.waitForTimeout(300);
+        await cdp.send('CSS.forcePseudoState', { nodeId, forcedPseudoClasses: ['hover'] }); await settle(300);
         const after = await look();
         await cdp.send('CSS.forcePseudoState', { nodeId, forcedPseudoClasses: [] });
         const on = (c, g) => { const a = c[3]; return [c[0] * a + g[0] * (1 - a), c[1] * a + g[1] * (1 - a), c[2] * a + g[2] * (1 - a)]; };
@@ -595,6 +604,7 @@ async function lint(target, states, width, theme, browser) {
         else if (same && crN(b0, b1) < 1.12) res.push({ lvl: '⚠', kind: 'наведення', where: hv[j].toLowerCase(), state: st ? `стан ${i}` : 'початковий', msg: `наведення ледь видно: тло змінюється лише на ${crN(b0, b1).toFixed(2)}:1 (< 1,12) — помітніше тло або межа` });
       }
     }
+    if (fz) await p.evaluate(() => { document.adoptedStyleSheets = document.adoptedStyleSheets.filter(s => s !== window.__uilFz); });   // №40 дивиться справжні кадри — переходи назад
     // 40. підказка стрибає (пропуск Konst AE S101, 22.10.2026 з ПК: «натискаю на букву і — на мить зліва з'являється табличка й зникає»).
     //     Кнопка з popovertarget → клік → запис кадрів (requestAnimationFrame) прямокутника підказки: перший ВИДИМИЙ відкритий кадр далі ніж 4 px
     //     від останнього → ✗. Причина в AE: позиція ставилась у «toggle», а браузер шле його вже після показу (MDN «Using the Popover API», 22.10.2026).
@@ -626,10 +636,13 @@ async function lint(target, states, width, theme, browser) {
   await ctx.close(); return res;
 }
 
-async function run(target, states, width) {
-  const { chromium } = await pw(); const b = await chromium.launch();
-  const out = {}; for (const t of ['light', 'dark']) out[t] = await lint(target, states, width, t, b);
-  await b.close();
+// AE S103 (AE-SPEED): теми — паралельно, контекстами одного браузера (BrowserStack «waitForTimeout», 24.10.2026: ізоляція — контекст, не процес);
+//   --themes light|dark — продукт з однією схемою (AE: prefers-color-scheme у сайті нема, темний прохід = копія світлого). Типово — обидві.
+//   browser — спільний (самоперевірка: один запуск Chromium на всі сторінки замість запуску на кожну).
+async function run(target, states, width, { browser, scope = SCOPE, themes = THEMES } = {}) {
+  const own = !browser; const b = browser || await (await pw()).chromium.launch();
+  const out = { light: [], dark: [] }; await Promise.all(themes.map(async t => { out[t] = await lint(target, states, width, t, b, scope); }));
+  if (own) await b.close();
   // 17. паритет тем: та сама поверхня має обʼєм в одній темі й пласка в іншій (інструмент може різнитись — A66: світла тінь, темна світло зверху)
   const V = t => Object.fromEntries(out[t].filter(f => f.lvl === 'vol').map(f => [f.state + '|' + f.where, f.msg]));
   const L = V('light'), D = V('dark'), seen = new Set();
@@ -643,35 +656,43 @@ const here = dirname(fileURLToPath(import.meta.url));
 let HEIGHT = 844;   // --height: Safari з панеллю ≈ 634 на 375 px (QR CC-7: шіт влазив у 844, а на телефоні — ні)
 const a = process.argv.slice(2);
 if (a[0] === 'selftest') {
-  const d = mkdtempSync(join(tmpdir(), 'uilint-')); let bad = 0;
+  // AE S103 (AE-SPEED): один браузер на всі сторінки й черга по 4 (було — запуск Chromium на кожну сторінку, послідовно, ≈ 10 хв).
+  //   Вивід — у порядку випадків, незалежно від того, хто закінчив першим.
+  const d = mkdtempSync(join(tmpdir(), 'uilint-')); const B = await (await pw()).chromium.launch(); const t0 = Date.now();
   const page = (x, n) => { const f = join(d, n + '.html'); writeFileSync(f, SELF.replace('BAD', x)); return 'file://' + f; };
-  const clean = await run(page('', 'clean'), [], 390); const cl = [...clean.light, ...clean.dark].filter(x => x.lvl !== 'ⓘ');
-  console.log((cl.length ? '✗' : '✓') + ` чиста сторінка → тиша (${cl.length ? cl.map(x => x.kind + ': ' + x.msg).join(' | ') : '0'})`); bad += !!cl.length;
-  { // AE S100: хибне спрацювання — мала ціль ПІД відкритим модальним вікном інертна, «тап» мовчить; та сама кнопка без вікна — ✗ (зуби)
-    const pm = await run(page(`<button style="width:18px;height:18px;padding:0">i</button><dialog id=md><button style="min-height:44px;min-width:120px">Гаразд</button></dialog><script>md.showModal()</script>`, 'modal'), [], 390);
-    const pn = await run(page(`<button style="width:18px;height:18px;padding:0">i</button>`, 'nomodal'), [], 390);
-    const tm = [...pm.light, ...pm.dark].some(x => x.kind === 'тап' && x.lvl === '✗'), tn = [...pn.light, ...pn.dark].some(x => x.kind === 'тап' && x.lvl === '✗');
-    console.log((!tm && tn ? '✓' : '✗') + ` мала ціль під модальним вікном → тиша; без вікна → «тап» ✗ (${tm} · ${tn})`); bad += !(!tm && tn); }
-  { // AE S101: та сама підказка, але схована до місця (visibility:hidden, доки «toggle» не поставив) → «підказка стрибає» мовчить (зуби в обидва боки)
-    const pf = await run(page(`<style>.tp{position:fixed;inset:auto;margin:0;padding:8px;border:1px solid #888;background:#fff}.tp:popover-open:not([data-placed]){visibility:hidden}</style><div class=card><button popovertarget=tp1 style="min-height:44px;min-width:120px;margin-left:200px">i</button><div popover id=tp1 class=tp>Пояснення</div></div><script>document.addEventListener('toggle',e=>{const t=e.target;if(e.newState!=='open'){t.removeAttribute('data-placed');return}const r=document.querySelector('[popovertarget=tp1]').getBoundingClientRect();t.style.left=r.left+'px';t.style.top=(r.bottom+6)+'px';t.setAttribute('data-placed','')},true)</script>`, 'popfixed'), [], 390);
-    const jf = [...pf.light, ...pf.dark].some(x => x.kind === 'підказка стрибає');
-    console.log((!jf ? '✓' : '✗') + ` підказка, схована до місця → «підказка стрибає» мовчить (${jf})`); bad += jf; }
-  { // AE S101 · В-211: «інструкція в повідомленні» — зуби кожної ознаки окремо (а–д) і тиша на правильному: одне речення без порад; клавіші в «i» — законні
+  const R = (html, n, width = 390, scope = '') => run(page(html, n), [], width, { browser: B, scope }).then(r => [...r.light, ...r.dark]);
+  const T = [];   // кожен випадок — () => [рядок, вада?]
+  T.push(async () => { const cl = (await R('', 'clean')).filter(x => x.lvl !== 'ⓘ');
+    return [(cl.length ? '✗' : '✓') + ` чиста сторінка → тиша (${cl.length ? cl.map(x => x.kind + ': ' + x.msg).join(' | ') : '0'})`, !!cl.length]; });
+  T.push(async () => { // AE S100: хибне спрацювання — мала ціль ПІД відкритим модальним вікном інертна, «тап» мовчить; та сама кнопка без вікна — ✗ (зуби)
+    const [pm, pn] = await Promise.all([R(`<button style="width:18px;height:18px;padding:0">i</button><dialog id=md><button style="min-height:44px;min-width:120px">Гаразд</button></dialog><script>md.showModal()</script>`, 'modal'),
+      R(`<button style="width:18px;height:18px;padding:0">i</button>`, 'nomodal')]);
+    const tm = pm.some(x => x.kind === 'тап' && x.lvl === '✗'), tn = pn.some(x => x.kind === 'тап' && x.lvl === '✗');
+    return [(!tm && tn ? '✓' : '✗') + ` мала ціль під модальним вікном → тиша; без вікна → «тап» ✗ (${tm} · ${tn})`, !(!tm && tn)]; });
+  T.push(async () => { // AE S101: та сама підказка, але схована до місця (visibility:hidden, доки «toggle» не поставив) → «підказка стрибає» мовчить (зуби в обидва боки)
+    const jf = (await R(`<style>.tp{position:fixed;inset:auto;margin:0;padding:8px;border:1px solid #888;background:#fff}.tp:popover-open:not([data-placed]){visibility:hidden}</style><div class=card><button popovertarget=tp1 style="min-height:44px;min-width:120px;margin-left:200px">i</button><div popover id=tp1 class=tp>Пояснення</div></div><script>document.addEventListener('toggle',e=>{const t=e.target;if(e.newState!=='open'){t.removeAttribute('data-placed');return}const r=document.querySelector('[popovertarget=tp1]').getBoundingClientRect();t.style.left=r.left+'px';t.style.top=(r.bottom+6)+'px';t.setAttribute('data-placed','')},true)</script>`, 'popfixed')).some(x => x.kind === 'підказка стрибає');
+    return [(!jf ? '✓' : '✗') + ` підказка, схована до місця → «підказка стрибає» мовчить (${jf})`, jf]; });
+  T.push(async () => { // AE S101 · В-211: «інструкція в повідомленні» — зуби кожної ознаки окремо (а–д) і тиша на правильному: одне речення без порад; клавіші в «i» — законні
     const tip = `<div popover id=tq>Значення правляться прямо в клітинках таблиці каталогу. <kbd>Esc</kbd> — повернути як було</div>`;
     const cases = [['а клавіша', `<span role=status>Збережено. Ctrl+S — опублікувати.</span>`], ['б передумали', `<div class=toast>Позиція зникне після «Опублікувати». Передумали — «↶ Повернути»</div>`],
       ['в ✕', `<div class="msg e">✕ <span>опис настрою містить цифру</span></div>`], ['г два речення', `<span role=alert>Ціна — число. Наприклад 188 або 188,50 гривень.</span>`],
       ['д повтор «i»', `<span role=status>Значення правляться прямо в клітинках таблиці каталогу.</span>${tip}`]];
-    let ok = 0; for (const [n, h] of cases) { const r = await run(page(`<div class=card>${h}</div>`, 'msg-' + n.split(' ')[0]), [], 390); if ([...r.light, ...r.dark].some(x => x.kind === 'інструкція в повідомленні')) ok++; else console.log(`✗ «інструкція в повідомленні»: ознака ${n} не спіймана`); }
-    const g = await run(page(`<div class=card><span role=alert>Назва не може бути порожньою.</span>${tip}</div>`, 'msg-good'), [], 390), gf = [...g.light, ...g.dark].some(x => x.kind === 'інструкція в повідомленні');
-    console.log((ok === cases.length && !gf ? '✓' : '✗') + ` «інструкція в повідомленні»: ознаки а–д ${ok}/${cases.length}, правильне повідомлення + клавіші в «i» → тиша (${!gf})`); bad += !(ok === cases.length && !gf); }
-  for (const [k, html] of Object.entries(DEFECTS)) { SCOPE = k.trim() === 'чуже правило' ? '.isl' : ''; const r = await run(page(html, k), [], k === 'наведення' ? 1280 : 390); const hit = [...r.light, ...r.dark].some(x => x.kind === k.trim() && x.lvl !== 'ⓘ');
-    console.log((hit ? '✓' : '✗') + ` підкинуто «${k}» → спіймано`); bad += !hit; }
-  console.log(`─── ui_lint selftest: ${Object.keys(DEFECTS).length + 4 - bad}/${Object.keys(DEFECTS).length + 4} ───`); process.exit(bad ? 1 : 0);
+    const hits = await Promise.all(cases.map(([n, h]) => R(`<div class=card>${h}</div>`, 'msg-' + n.split(' ')[0]).then(r => r.some(x => x.kind === 'інструкція в повідомленні'))));
+    const miss = cases.filter((_, i) => !hits[i]).map(([n]) => n), ok = cases.length - miss.length;
+    const gf = (await R(`<div class=card><span role=alert>Назва не може бути порожньою.</span>${tip}</div>`, 'msg-good')).some(x => x.kind === 'інструкція в повідомленні');
+    return [(ok === cases.length && !gf ? '✓' : '✗') + ` «інструкція в повідомленні»: ознаки а–д ${ok}/${cases.length}${miss.length ? ' (не спіймано: ' + miss.join(', ') + ')' : ''}, правильне повідомлення + клавіші в «i» → тиша (${!gf})`, !(ok === cases.length && !gf)]; });
+  for (const [k, html] of Object.entries(DEFECTS)) T.push(async () => {
+    const hit = (await R(html, 'd' + Object.keys(DEFECTS).indexOf(k), k === 'наведення' ? 1280 : 390, k.trim() === 'чуже правило' ? '.isl' : '')).some(x => x.kind === k.trim() && x.lvl !== 'ⓘ');
+    return [(hit ? '✓' : '✗') + ` підкинуто «${k}» → спіймано`, !hit]; });
+  const out = new Array(T.length); let next = 0;
+  await Promise.all(Array.from({ length: Math.min(4, T.length) }, async () => { while (next < T.length) { const j = next++; out[j] = await T[j](); } }));
+  await B.close(); let bad = 0; for (const [line, b] of out) { console.log(line); bad += b; }
+  console.log(`─── ui_lint selftest: ${T.length - bad}/${T.length} · ${Math.round((Date.now() - t0) / 1000)} с ───`); process.exit(bad ? 1 : 0);
 }
-if (!a[0]) { console.log('node ui_lint.mjs <url|файл> [--state "<js>"]… [--repo <тека>] [--width 390] [--height 844] [--json] | selftest'); process.exit(2); }
+if (!a[0]) { console.log('node ui_lint.mjs <url|файл> [--state "<js>"]… [--repo <тека>] [--width 390] [--height 844] [--themes light|dark|both] [--json] | selftest'); process.exit(2); }
 let target = a[0]; if (!/^\w+:\/\//.test(target)) target = 'file://' + resolve(target);
-const states = [], opt = {}; for (let i = 1; i < a.length; i++) { if (a[i] === '--state') states.push(a[++i]); else if (a[i] === '--repo') opt.repo = a[++i]; else if (a[i] === '--width') opt.width = +a[++i]; else if (a[i] === '--height') HEIGHT = +a[++i]; else if (a[i] === '--scope') SCOPE = a[++i]; else if (a[i] === '--json') opt.json = true; else if (a[i] === '--baseline') opt.base = a[++i]; else if (a[i] === '--ready') READY = a[++i]; }
-const r = await run(target, states, opt.width || 390);
+const states = [], opt = {}; for (let i = 1; i < a.length; i++) { if (a[i] === '--state') states.push(a[++i]); else if (a[i] === '--repo') opt.repo = a[++i]; else if (a[i] === '--width') opt.width = +a[++i]; else if (a[i] === '--height') HEIGHT = +a[++i]; else if (a[i] === '--scope') SCOPE = a[++i]; else if (a[i] === '--json') opt.json = true; else if (a[i] === '--baseline') opt.base = a[++i]; else if (a[i] === '--ready') READY = a[++i]; else if (a[i] === '--themes') { const v = a[++i]; THEMES = v === 'both' ? ['light', 'dark'] : [v]; if (!THEMES.every(x => x === 'light' || x === 'dark')) { console.error('--themes light|dark|both'); process.exit(2); } } }
+const T0 = Date.now(); const r = await run(target, states, opt.width || 390);
 const acc = []; const af = opt.repo && join(resolve(opt.repo), '.ui-lint-accept');
 if (af && existsSync(af)) for (const l of (await import('node:fs')).readFileSync(af, 'utf8').split('\n')) { const [k, w, why] = l.split('|').map(x => (x || '').trim()); if (k && w && !k.startsWith('#')) acc.push({ k, w, why }); }
 for (const t of ['light', 'dark']) for (const f of r[t]) { const m = acc.find(a => a.k === f.kind && f.where.includes(a.w)); if (m && f.lvl !== 'ⓘ') { f.msg += ` — прийнято: ${m.why}`; f.lvl = 'ⓘ'; f.acc = true; } }
@@ -693,9 +714,9 @@ for (const t of ['light', 'dark']) {
     const n = rows.filter(f => f.lvl === 'ⓘ' && !f.acc).length; if (n) console.log(`  ⓘ не виміряно контраст на ${n} елементах (градієнт / картинка) — глянь очима`); }
 }
 if (opt.json) console.log(JSON.stringify(r, null, 1));
-say(`─── ui_lint: ✗ ${x} · ⚠ ${w} · екранів ${states.length + 1} (початковий + станів ${states.length}) × 2 теми ───`);
+say(`─── ui_lint: ✗ ${x} · ⚠ ${w} · екранів ${states.length + 1} (початковий + станів ${states.length}) × ${THEMES.length === 2 ? '2 теми' : 'тема ' + (THEMES[0] === 'light' ? 'світла' : 'темна')} · ${Math.round((Date.now() - T0) / 1000)} с ───`);
 if (opt.repo && !x) {   // позначка для воріт: той самий хеш диффу UI, що рахує ui-review-gate
   const hx = execFileSync('bash', [join(here, 'hooks/ui-review-gate.sh'), 'hash', resolve(opt.repo)], { encoding: 'utf8' }).trim();
-  if (hx) { writeFileSync(`/tmp/lens-uilint-${hx}`, `${new Date().toISOString()} ✗0 ⚠${w} ${target} states=${states.length || 1}\n`); say(`✓ позначка ui_lint для диффу ${hx.slice(0, 8)} — ворота огляду приймуть done`); }
+  if (hx) { writeFileSync(`/tmp/lens-uilint-${hx}`, `${new Date().toISOString()} ✗0 ⚠${w} ${target} states=${states.length || 1} themes=${THEMES.join('+')}\n`); say(`✓ позначка ui_lint для диффу ${hx.slice(0, 8)} — ворота огляду приймуть done`); }
 }
 process.exit(x ? 1 : 0);
