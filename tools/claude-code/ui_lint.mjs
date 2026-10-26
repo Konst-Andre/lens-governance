@@ -12,7 +12,8 @@
 // Перевірки: 1 скрол убік · 2 обрізано · 3 прилипло / вилазить · 4 контраст (4-б — на градієнті пікселем знімка) · 5 шрифт · 6 тап, без назви, iOS-зум · 7 накладання · 8 ряд · 9 текст (сміття, жаргон) ·
 // 10 дія в прокрутці · 11 кнопки ряду · 12 сирота · 13 злито · 14 однакові заголовки · 15 дата й час · 16 зливається (16-б край кнопки) · 17 паритет тем · 18 кромка · 19 картка-список · 20 вкладена прокрутка · 21 шапка в прокрутці · 22 емодзі в кнопці · 23 нативне вікно · 24 фон у рамці · 25 кант рветься · 26 поле губиться; поза probe — натискання (:active / JS pointerdown, touchstart).
 // 31 форма виділення · 32 пунктир < 3:1 · 22 емодзі-значок без підпису → ✗ · 33 різнобій списків — AE S94, 20.10.2026.
-// 34 пояснення під кнопкою (→ «i») · 35 наведення (ПК, ≥ 1024: нема або ледь видно) — AE S96, 20.10.2026.
+// 34 пояснення під кнопкою (→ «i») · 35 наведення (ПК, ≥ 1024: нема або ледь видно; S107 — і «лише тінь < 0,12») — AE S96, 20.10.2026.
+// 43 список угорі (закритий base-select не flex — текст притиснутий догори; рецепт A117) — пропуск Konst, AE S107, 26.10.2026.
 // 42 знак не по центру (1–2 знаки чи один значок у маленькій кнопці / бейджі: «чорнило» зсунуте ≥ 1 px або ≥ 0,5 px впритул до краю — пікселем) — пропуск Konst, AE S102, 23.10.2026.
 // 41 інструкція в повідомленні (порада про клавішу, «Передумали», «✕», > 1 речення в помилці, повтор «i») — правило Konst «форма пояснює себе», AE S101 В-211, 23.10.2026.
 // 40 підказка стрибає (popover у першому видимому кадрі не на своєму місці — ставлять у «toggle», що приходить після показу) — пропуск Konst, AE S101, 22.10.2026.
@@ -359,6 +360,12 @@ function probe() {
       const rep = sent.find(x => wc(x) >= 5 && tips.some(p => p.includes(x.replace(/[.!?]$/, '').toLowerCase())));
       if (rep) why.push(`повтор пояснення з «i»: «${rep.slice(0, 40)}»`);
       if (why.length) add('⚠', 'інструкція в повідомленні', el, `«${t.slice(0, 48)}» — ${why.join('; ')}; форма пояснює себе, текст — лише те, чого не видно (В-211 AE)`); } }
+  // 43. текст у списку притиснутий догори (пропуск Konst AE S107, «Сортувати»: «текст прижатий до поверхні, не відцентрований»): закритий <select> з
+  //     appearance: base-select ставить текст угору, якщо сам список не flex (рецепт A117: display:inline-flex; align-items:center; W3C CSSWG, березень 2026 —
+  //     «button-like elements don't do any vertical alignment», 26.10.2026). Дешево — лише обчислений стиль.
+  for (const el of document.querySelectorAll('select')) { const s = getComputedStyle(el); if (!vis(el) || s.appearance !== 'base-select') continue;
+    const lh = parseFloat(s.lineHeight) || parseFloat(s.fontSize) * 1.2, room = el.clientHeight - parseFloat(s.paddingTop) - parseFloat(s.paddingBottom);   // відступи вже центрують — тиші (AE: «+ Додати позицію»)
+    if ((!/flex|grid/.test(s.display) || !/center/.test(s.alignItems)) && room > lh * 1.25) add('⚠', 'список угорі', el, `закритий список (base-select) — display:${s.display}, align-items:${s.alignItems}: текст притиснутий догори; display:inline-flex; align-items:center (A117)`); }
   // 42. знак не по центру (пропуск Konst AE S102, 23.10.2026: «/» у пошуку «торкається верхівки» — замір пікселями: 4 px згори, 6 знизу;
   //     рамка тексту (Range) цього не бачить — шрифт ставить «/» вище своєї рамки). Кандидат: маленька кнопка чи бейдж (≤ 48×32 px) з рамкою або тлом,
   //     у якому 1–2 знаки або один значок SVG; міряє Node пікселями знімка (рамка «чорнила», як optical-properties; «оптичний центр мас» — ні, суб'єктивний).
@@ -452,6 +459,8 @@ const DEFECTS = {
   'емодзі ': `<div class=card><button aria-label="Рейка" style="min-width:44px;min-height:44px">☀</button></div>`,   // AE S94: значок-емодзі без підпису → ✗
   'пояснення під кнопкою': `<div class=card><div><button style="min-height:44px;padding:0 14px">Пробна розмова</button><small style="font-size:11.5px;display:block">Модель зіграє клієнта за цим сценарієм, як для фармацевта.</small></div></div>`,   // AE S96: підпис під «Пробна розмова»
   'підказка стрибає': `<style>.tp{position:fixed;inset:auto;margin:0;padding:8px;border:1px solid #888;background:#fff}</style><div class=card><button popovertarget=tp1 style="min-height:44px;min-width:120px;margin-left:200px">i</button><div popover id=tp1 class=tp>Пояснення</div></div><script>document.addEventListener('toggle',e=>{const t=e.target;if(e.newState!=='open')return;const r=document.querySelector('[popovertarget=tp1]').getBoundingClientRect();t.style.left=r.left+'px';t.style.top=(r.bottom+6)+'px'},true)</script>`,
+  'наведення ': `<style>.hv2{min-height:44px;padding:0 14px;border:1px solid #ddd;background:#fff;transition:none}.hv2:hover{box-shadow:0 6px 18px rgba(28,30,36,.08)}</style><div class=card><button class=hv2>Плитка</button></div>`,   // AE S107: лише тінь .08
+  'список угорі': `<style>select.sb{appearance:base-select;height:34px;padding:0 10px}</style><div class=card><select class=sb aria-label=Сортувати><option>За назвою</option></select></div>`,   // AE S107
   'наведення': `<style>.hv{min-height:44px;padding:0 14px;border:0;background:#fff}.hv:hover{background:#FFFEF6}</style><div class=card><button class=hv>Рядок списку</button></div>`,   // AE S96: наведення кремовим на білому — 1,01:1
   'пояснення абзацом': `<div class=card><div style="font-size:12.5px;color:#555;background:#F6F7F8;padding:10px">Змінили бонус — сценарії з цією позицією в наборі перерахують орієнтир; якщо набір стане не дорожчим за замовлення, біля сценарію з’явиться позначка.</div></div>`,   // AE S99: абзац у панелі замість «i»
   'знак не по центру': `<div class=card><kbd aria-hidden="true" style="display:inline-block;height:20px;padding:0 5px;border:1px solid #999;border-radius:5px;background:#fff;color:#111;font:600 12px/13px sans-serif;vertical-align:top">/</kbd></div>`,   // AE S102: «/» у пошуку вище центру
@@ -597,7 +606,7 @@ async function lint(target, states, width, theme, browser, scope = SCOPE) {
         const el = p.locator(`[data-uil-hover="${j}"]`);
         const look = () => el.evaluate(e => { const rg = c => { const m = c.match(/rgba?\(([^)]+)\)/); if (!m) return [0, 0, 0, 0]; const v = m[1].split(/[ ,/]+/).filter(Boolean).map(Number); return [v[0], v[1], v[2], v[3] ?? 1]; };
           let g = e.parentElement, gc = [255, 255, 255, 1]; while (g) { const x = rg(getComputedStyle(g).backgroundColor); if (x[3] > 0.5) { gc = x; break; } g = g.parentElement; }
-          const s = getComputedStyle(e); return { bg: rg(s.backgroundColor), ground: gc, rest: [s.borderTopColor, s.borderBottomColor, s.boxShadow, s.color, s.textDecorationLine, s.outlineStyle, s.backgroundImage, s.filter].join('|') }; });
+          const s = getComputedStyle(e); return { bg: rg(s.backgroundColor), ground: gc, sh: s.boxShadow, rest: [s.borderTopColor, s.borderBottomColor, s.color, s.textDecorationLine, s.outlineStyle, s.backgroundImage, s.filter, s.transform].join('|') }; });
         let nodeId; try { ({ nodeId } = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector: `[data-uil-hover="${j}"]` })); } catch { continue; }
         if (!nodeId) continue;
         const before = await look();
@@ -605,7 +614,10 @@ async function lint(target, states, width, theme, browser, scope = SCOPE) {
         const after = await look();
         await cdp.send('CSS.forcePseudoState', { nodeId, forcedPseudoClasses: [] });
         const on = (c, g) => { const a = c[3]; return [c[0] * a + g[0] * (1 - a), c[1] * a + g[1] * (1 - a), c[2] * a + g[2] * (1 - a)]; };
-        const b0 = on(before.bg, before.ground), b1 = on(after.bg, after.ground), same = before.rest === after.rest, bgSame = b0.every((v, q) => Math.abs(v - b1[q]) < 1);
+        const b0 = on(before.bg, before.ground), b1 = on(after.bg, after.ground), shSame = before.sh === after.sh, same = before.rest === after.rest && shSame, bgSame = b0.every((v, q) => Math.abs(v - b1[q]) < 1);
+        // AE S107 (пропуск Konst: «ховер ледь помітний» — плитка, лише тінь rgba(…,.08)): змінилась лише тінь, і найтемніша її частина прозоріша за 0,12 → «ледь видно»
+        const shA = (after.sh.match(/rgba?\([^)]*\)/g) || []).map(c => { const v = c.slice(c.indexOf('(') + 1, -1).split(/[ ,/]+/).filter(Boolean).map(Number); return v[3] ?? 1; });
+        if (!shSame && before.rest === after.rest && bgSame && shA.length && Math.max(...shA) < 0.12) { res.push({ lvl: '⚠', kind: 'наведення', where: hv[j].toLowerCase(), state: st ? `стан ${i}` : 'початковий', msg: `наведення ледь видно: змінюється лише тінь з прозорістю ${Math.max(...shA).toFixed(2)} (< 0,12) — дай підйом (тінь ≥ 0,2 або зсув) чи межу` }); continue; }
         if (same && bgSame) res.push({ lvl: '⚠', kind: 'наведення', where: hv[j].toLowerCase(), state: st ? `стан ${i}` : 'початковий', msg: 'на наведення мишею вигляд не змінюється — на ПК не видно, що це можна натиснути (тло на тон темніше, межа або підкреслення)' });
         else if (same && crN(b0, b1) < 1.12) res.push({ lvl: '⚠', kind: 'наведення', where: hv[j].toLowerCase(), state: st ? `стан ${i}` : 'початковий', msg: `наведення ледь видно: тло змінюється лише на ${crN(b0, b1).toFixed(2)}:1 (< 1,12) — помітніше тло або межа` });
       }
@@ -690,7 +702,7 @@ if (a[0] === 'selftest') {
     const gf = (await R(`<div class=card><span role=alert>Назва не може бути порожньою.</span>${tip}</div>`, 'msg-good')).some(x => x.kind === 'інструкція в повідомленні');
     return [(ok === cases.length && !gf ? '✓' : '✗') + ` «інструкція в повідомленні»: ознаки а–д ${ok}/${cases.length}${miss.length ? ' (не спіймано: ' + miss.join(', ') + ')' : ''}, правильне повідомлення + клавіші в «i» → тиша (${!gf})`, !(ok === cases.length && !gf)]; });
   for (const [k, html] of Object.entries(DEFECTS)) T.push(async () => {
-    const hit = (await R(html, 'd' + Object.keys(DEFECTS).indexOf(k), k === 'наведення' ? 1280 : 390, k.trim() === 'чуже правило' ? '.isl' : '')).some(x => x.kind === k.trim() && x.lvl !== 'ⓘ');
+    const hit = (await R(html, 'd' + Object.keys(DEFECTS).indexOf(k), k.trim() === 'наведення' ? 1280 : 390, k.trim() === 'чуже правило' ? '.isl' : '')).some(x => x.kind === k.trim() && x.lvl !== 'ⓘ');
     return [(hit ? '✓' : '✗') + ` підкинуто «${k}» → спіймано`, !hit]; });
   const out = new Array(T.length); let next = 0;
   await Promise.all(Array.from({ length: Math.min(4, T.length) }, async () => { while (next < T.length) { const j = next++; out[j] = await T[j](); } }));
