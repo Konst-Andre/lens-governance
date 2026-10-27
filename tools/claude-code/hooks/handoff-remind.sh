@@ -11,6 +11,7 @@
 # + РЕВІЗІЯ (AE S109, слово Konst: «одним словом — щоб кожного разу не пояснювати»): «ревізія» · «звір пам'ять» · «звірка пам'яті» у повідомленні Konst →
 #   той самий handoff_check + чек-лист «що з сесії ще не має дому» (рішення → DECISIONS · прилади → карта репо · правила → CLAUDE.md · брифи §0) — без переїзду.
 # + post (bash handoff-remind.sh post, PostToolUse Bash після `git commit`): той самий handoff_check щокоміту; у контекст — лише НОВІ ✗ / ⚠ (бачені — тиша, /tmp/lens-handoff-post-<сесія>).
+#   Проти шуму (досвід AE S109, гачок у перевірці): новизна — за змістом без чисел і хешів; «описи…» — по документу; «незакомічене» — лише на переїзді; «самері відстає» — від POST_LAG комітів.
 # Зуби: bash handoff-remind.sh selftest — 11 випадків (тригер → контекст з ✗; не тригер · «в новій сесії» в розповіді · перше повідомлення · повтор → тиша;
 # новий коміт → знову; Stop: стартове з ✗ → block, звичайна відповідь і повтор → тиша).
 mode="${1:-run}"
@@ -106,7 +107,33 @@ def selftest():
     o1 = post(P('cd x && git commit -qm x'), [t], t); o2 = post(P('git commit -qm y'), [t], t); o3 = post(P('git status'), [t], t); o4 = post(P("echo '{\"command\":\"git commit -m x\"}' | bash h.sh", 'q2'), [t], t)
     ok = o1 is not None and '✗' in o1 and o2 is None and o3 is None and o4 is None
     print(('✓' if ok else '✗') + ' post: коміт → нові ✗; повтор того самого → тиша; не коміт і «git commit» у тексті echo → тиша'); bad += not ok
-    print(f'selftest: {13 - bad}/13'); return 1 if bad else 0
+    mk = os.path.join(t, 'pf'); F = lambda ls: post_filter(ls, mk)[0]
+    r1 = F(['⚠ бриф a.md відстає: 1 коміт(ів)', '✗ незакомічене: 2 (x)', '✗ самері відстає: після abc1234 комітів агента без самері — 1 (abc1234)', '⚠ описи, що згадують змінений у сесії код, але не мінялись: README.md (g.sh)'])
+    r2 = F(['⚠ бриф a.md відстає: 2 коміт(ів)', '✗ самері відстає: після abc1234 комітів агента без самері — 3 (abc1234 def5678 0a1b2c3)', '⚠ описи, що згадують змінений у сесії код, але не мінялись: README.md (g.sh) · docs/B.md (h.py)'])
+    ok = (len(r1) == 2 and not any('незакомічене' in x or 'самері' in x for x in r1)
+          and len(r2) == 2 and any('самері' in x for x in r2) and any('docs/B.md' in x and 'README' not in x for x in r2) and not any('бриф a.md' in x for x in r2))
+    print(('✓' if ok else '✗') + ' post: шум — те саме з іншим числом · незакомічене · самері < 3 → тиша; новий документ в «описах» і самері ≥ 3 → є'); bad += not ok
+    print(f'selftest: {14 - bad}/14'); return 1 if bad else 0
+
+POST_LAG = 3   # «самері відстає» після коміту — лише від стількох комітів (на кожен однорядковий коміт — шум; переїзд ловить усе)
+def post_filter(lines, mark):
+    """Шум гачка після коміту (досвід AE S109): новизна — за змістом без чисел і хешів; «описи…» — по документу; без «незакомічене»; самері — з порогом."""
+    norm = lambda l: re.sub(r'\b[0-9a-f]{7,40}\b', '@', re.sub(r'\d+([.,]\d+)?', '#', l))
+    seen = set(open(mark, encoding='utf-8').read().splitlines()) if os.path.exists(mark) else set()
+    new, keys = [], set()
+    for l in lines:
+        if 'незакомічене' in l: continue   # посеред роботи це норма; перевіряє переїзд
+        m = re.search(r'самері відстає.*?—\s*(\d+)', l)
+        if m and int(m.group(1)) < POST_LAG: continue
+        docs = re.findall(r'([\w./-]+\.md) \(([^)]*)\)', l) if 'описи' in l else []
+        if docs:
+            fresh = [(f, w) for f, w in docs if 'опис:' + f not in seen]; keys |= {'опис:' + f for f, _ in docs}
+            if fresh: new.append(l.split(':', 1)[0] + ': ' + ' · '.join(f'{f} ({w})' for f, w in fresh))
+            continue
+        k = norm(l); keys.add(k)
+        if k not in seen: new.append(l)
+    open(mark, 'w', encoding='utf-8').write('\n'.join(sorted(seen | keys)))
+    return new, keys
 
 def post(d, roots, mark_dir='/tmp'):
     """PostToolUse Bash: щойно був `git commit` → handoff_check; у контекст лише нові ✗ / ⚠ (бачені в цій сесії — тиша)."""
@@ -115,11 +142,8 @@ def post(d, roots, mark_dir='/tmp'):
     rs = repos(roots)
     if not rs: return None
     r = subprocess.run([sys.executable, HC, *rs], capture_output=True, text=True)
-    lines = [l.strip() for l in r.stdout.splitlines() if l.strip().startswith(('✗', '⚠'))]
-    mark = os.path.join(mark_dir, 'lens-handoff-post-' + re.sub(r'\W', '', d.get('session_id') or 'x'))
-    seen = set(open(mark, encoding='utf-8').read().splitlines()) if os.path.exists(mark) else set()
-    new = [l for l in lines if l not in seen]
-    open(mark, 'w', encoding='utf-8').write('\n'.join(sorted(seen | set(lines))))
+    new, keys = post_filter([l.strip() for l in r.stdout.splitlines() if l.strip().startswith(('✗', '⚠'))],
+                            os.path.join(mark_dir, 'lens-handoff-post-' + re.sub(r'\W', '', d.get('session_id') or 'x')))
     if not new: return None
     return ("Гачок «пам'ять після коміту» (AE S109) — handoff_check знайшов нове:\n" + '\n'.join(new)[:4000] +
             "\n✗ — виправ наступним комітом; ⚠ — звір: опис не відстає від коду? рішення / прилад / правило мають дім?")
