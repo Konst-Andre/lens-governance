@@ -66,7 +66,9 @@ function probe() {
     if (own && s.textOverflow === 'ellipsis' && el.scrollWidth > el.clientWidth + 1) add('⚠', 'обрізано', el, 'текст скорочено «…» — це задумано? людина не побачить кінця');
     // 3. прилипання до краю картки / вилазить за картку: капсули, бейджі, кнопки — елементи з власним тлом чи рамкою
     const chip = ((rgba(s.backgroundColor) || [0, 0, 0, 0])[3] > 0.05 || parseFloat(s.borderTopWidth) > 0 || s.backgroundImage !== 'none') && parseFloat(s.borderTopLeftRadius) > 0;
-    const c = chip && card(el);
+    // AE S109: випадне меню / вікно (role=menu|dialog|listbox, absolute|fixed) виходить за картку за будовою — не «вилазить» (хибне: вікно «Дані» примірки v10)
+    const pop = /^(absolute|fixed)$/.test(s.position) && el.matches('[role=menu],[role=dialog],[role=listbox]');
+    const c = chip && !pop && card(el);
     // AE S97: між капсулою й карткою буває прокрутка (список з overflow auto) — прокручене за її край не «вилазить», а сховане; судимо лише видиме в ній.
     // Абсолютний елемент предок зі static не обрізає (Cypress #28638; Floating UI detectOverflow — «clipping ancestors», 21.10.2026), fixed — жоден.
     let k = null; if (c && s.position !== 'fixed') for (let e = el.parentElement; e && e !== c; e = e.parentElement) { const o = getComputedStyle(e);
@@ -689,6 +691,11 @@ if (a[0] === 'selftest') {
       R(`<button style="width:18px;height:18px;padding:0">i</button>`, 'nomodal')]);
     const tm = pm.some(x => x.kind === 'тап' && x.lvl === '✗'), tn = pn.some(x => x.kind === 'тап' && x.lvl === '✗');
     return [(!tm && tn ? '✓' : '✗') + ` мала ціль під модальним вікном → тиша; без вікна → «тап» ✗ (${tm} · ${tn})`, !(!tm && tn)]; });
+  T.push(async () => { // AE S109: випадне меню (role=menu, absolute) виходить за картку → «вилазить» мовчить; той самий блок без ролі — ✗ (зуби)
+    const box = r => `<div class=card style="position:relative;height:60px"><div ${r} style="position:absolute;top:40px;left:20px;width:200px;height:160px;border-radius:12px;border:1px solid #ddd;background:#fff">Пункт</div></div>`;
+    const [pm, pn] = await Promise.all([R(box('role=menu'), 'popmenu'), R(box(''), 'popnone')]);
+    const m = pm.some(x => x.kind === 'вилазить'), n = pn.some(x => x.kind === 'вилазить');
+    return [(!m && n ? '✓' : '✗') + ` випадне меню за карткою → тиша; той самий блок без ролі → «вилазить» (${m} · ${n})`, !(!m && n)]; });
   T.push(async () => { // AE S101: та сама підказка, але схована до місця (visibility:hidden, доки «toggle» не поставив) → «підказка стрибає» мовчить (зуби в обидва боки)
     const jf = (await R(`<style>.tp{position:fixed;inset:auto;margin:0;padding:8px;border:1px solid #888;background:#fff}.tp:popover-open:not([data-placed]){visibility:hidden}</style><div class=card><button popovertarget=tp1 style="min-height:44px;min-width:120px;margin-left:200px">i</button><div popover id=tp1 class=tp>Пояснення</div></div><script>document.addEventListener('toggle',e=>{const t=e.target;if(e.newState!=='open'){t.removeAttribute('data-placed');return}const r=document.querySelector('[popovertarget=tp1]').getBoundingClientRect();t.style.left=r.left+'px';t.style.top=(r.bottom+6)+'px';t.setAttribute('data-placed','')},true)</script>`, 'popfixed')).some(x => x.kind === 'підказка стрибає');
     return [(!jf ? '✓' : '✗') + ` підказка, схована до місця → «підказка стрибає» мовчить (${jf})`, jf]; });
