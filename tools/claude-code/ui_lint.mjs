@@ -92,7 +92,9 @@ function probe() {
         if (cr < need) add('✗', 'контраст', el, `контраст ${cr.toFixed(2)}:1 < ${need}:1 — погано читається`); }
       else if (fg && !el.closest('[class*="brand"],[data-logo]')) { const cx = r.left + r.width / 2, cy = r.top + r.height / 2, hit = cx >= 0 && cy >= 0 && cx < innerWidth && cy < innerHeight && (t => t && (t === el || el.contains(t)))(document.elementFromPoint(cx, cy));
         // 4-б. фон — градієнт / картинка: міряє Node пікселем знімка (кільце довкола тексту); текст поза екраном чи під шаром — «не виміряно»; логотип (клас *brand*, data-logo) — виняток WCAG 1.4.3
-        out.push({ lvl: hit ? 'px' : 'ⓘ', kind: 'контраст', where: path(el), msg: 'фон — градієнт чи картинка: контраст не виміряно, глянь очима', rect: [r.left, r.top, r.width, r.height], fg, need }); }
+        // AE S109: кільце — довкола ВЛАСНОГО тексту, не всього елемента: у кнопки-чипа кільце довкола рамки міряло тло сторінки за кнопкою (хибне 1,00:1 — білий на синьому градієнті)
+        const tr = (q => q.length ? [Math.min(...q.map(v => v.left)), Math.min(...q.map(v => v.top)), Math.max(...q.map(v => v.right)), Math.max(...q.map(v => v.bottom))] : null)([...el.childNodes].filter(n => n.nodeType === 3 && n.textContent.trim()).map(n => { const g = document.createRange(); g.selectNodeContents(n); return g.getBoundingClientRect(); }).filter(v => v.width));
+        out.push({ lvl: hit ? 'px' : 'ⓘ', kind: 'контраст', where: path(el), msg: 'фон — градієнт чи картинка: контраст не виміряно, глянь очима', rect: tr ? [tr[0], tr[1], tr[2] - tr[0], tr[3] - tr[1]] : [r.left, r.top, r.width, r.height], fg, need }); }
       // 5. дрібний текст
       if (px < 11) add('⚠', 'шрифт', el, `текст ${px}px < 11 — на телефоні дрібно`); }
     // 6. цілі тапу; поле вводу < 16 px
@@ -691,6 +693,9 @@ if (a[0] === 'selftest') {
       R(`<button style="width:18px;height:18px;padding:0">i</button>`, 'nomodal')]);
     const tm = pm.some(x => x.kind === 'тап' && x.lvl === '✗'), tn = pn.some(x => x.kind === 'тап' && x.lvl === '✗');
     return [(!tm && tn ? '✓' : '✗') + ` мала ціль під модальним вікном → тиша; без вікна → «тап» ✗ (${tm} · ${tn})`, !(!tm && tn)]; });
+  T.push(async () => { // AE S109: білий текст на синьому градієнті кнопки з дочірнім елементом — кільце довкола тексту → тиша (було 1,00:1 — кільце довкола рамки кнопки)
+    const g = (await R(`<div class=card><button style="display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 14px;border:0;border-radius:999px;background:linear-gradient(180deg,#0E8CC6,#0071A3);color:#fff;font:600 15px system-ui">Усі<i style="font-style:normal;margin-left:5px">21</i></button></div>`, 'gradbtn')).filter(x => x.kind === 'контраст' && x.lvl === '✗');
+    return [(!g.length ? '✓' : '✗') + ` білий на синьому градієнті кнопки → тиша (${g.map(x => x.msg).join(' | ') || '0'})`, !!g.length]; });
   T.push(async () => { // AE S109: випадне меню (role=menu, absolute) виходить за картку → «вилазить» мовчить; той самий блок без ролі — ✗ (зуби)
     const box = r => `<div class=card style="position:relative;height:60px"><div ${r} style="position:absolute;top:40px;left:20px;width:200px;height:160px;border-radius:12px;border:1px solid #ddd;background:#fff">Пункт</div></div>`;
     const [pm, pn] = await Promise.all([R(box('role=menu'), 'popmenu'), R(box(''), 'popnone')]);
