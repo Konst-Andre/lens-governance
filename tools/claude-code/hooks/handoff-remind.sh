@@ -8,6 +8,9 @@
 # Формат — code.claude.com/docs/en/hooks «UserPromptSubmit» (поле prompt; additionalContext ≤ 10 000 знаків), 09.10.2026.
 # + Stop (bash handoff-remind.sh stop): переїзд оголошує АГЕНТ (стартове ```text чи «переїжджаємо» у відповіді) і є ✗ → decision: block (раз на стан HEAD; stop_hook_active → тиша).
 # Клон лише для читання (звірка іншого продукту) — `touch <репо>/.git/lens-readonly`: гачок його не перевіряє (AE S103).
+# + РЕВІЗІЯ (AE S109, слово Konst: «одним словом — щоб кожного разу не пояснювати»): «ревізія» · «звір пам'ять» · «звірка пам'яті» у повідомленні Konst →
+#   той самий handoff_check + чек-лист «що з сесії ще не має дому» (рішення → DECISIONS · прилади → карта репо · правила → CLAUDE.md · брифи §0) — без переїзду.
+# + post (bash handoff-remind.sh post, PostToolUse Bash після `git commit`): той самий handoff_check щокоміту; у контекст — лише НОВІ ✗ / ⚠ (бачені — тиша, /tmp/lens-handoff-post-<сесія>).
 # Зуби: bash handoff-remind.sh selftest — 11 випадків (тригер → контекст з ✗; не тригер · «в новій сесії» в розповіді · перше повідомлення · повтор → тиша;
 # новий коміт → знову; Stop: стартове з ✗ → block, звичайна відповідь і повтор → тиша).
 mode="${1:-run}"
@@ -15,6 +18,7 @@ mode="${1:-run}"
 export HOOK_IN HC="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/handoff_check.py"
 python3 - "$mode" <<'PY'
 import json, os, re, subprocess, sys, tempfile, glob
+REV = re.compile(r"\bревізі[яюї]\b|\bзвір\w*\s+пам.?ят\w*|\bзвірк\w+\s+пам.?ят\w*", re.I)   # ревізія пам'яті без переїзду (AE S109)
 TRIG = re.compile(r"переїжджаємо|переїжджай\w*|переїхати|переїдемо|стартов\w+\s+повідомлен\w*|\bнов[ау]\s+сесі[яю]\b", re.I)   # лише команди: «переїжджаємо / переїхати / стартове / нову сесію»; іменник «переїзд» — розповідь (тричі хибне 10.10), «переїжджає» — опис (G6 «переїжджає в скрипт», хибне 10.10 QR CC-7) — журнал гачків §1
 HC = os.environ['HC']
 
@@ -39,7 +43,8 @@ def first_prompt(tp):
     return True
 
 def run(d, roots, mark_dir='/tmp'):
-    if not TRIG.search(d.get('prompt') or ''): return None
+    pr = d.get('prompt') or ''; rev = bool(REV.search(pr)) and not TRIG.search(pr)
+    if not (TRIG.search(pr) or rev): return None
     if first_prompt(d.get('transcript_path') or ''): return None
     rs = repos(roots)
     if not rs: return None
@@ -48,6 +53,10 @@ def run(d, roots, mark_dir='/tmp'):
     if os.path.exists(mark) and open(mark).read() == h: return None
     open(mark, 'w').write(h)
     r = subprocess.run([sys.executable, HC, *rs], capture_output=True, text=True)
+    if rev: return ("Гачок «ревізія пам'яті» (AE S109) — handoff_check:\n" + r.stdout.strip()[:6000] +
+            "\n\nРевізія — без переїзду: ✗ — виправ і закоміть; ⚠ — звір. Потім пройди сесію (git log з її початку) і для КОЖНОГО: рішення Konst чи агента → `DECISIONS` (В-N) або бриф; "
+            "новий прилад → карта репо (REPO_LAYOUT) + «Прилади продуктів» ядра; нове правило → CLAUDE.md / профіль / рецепт; зміна стану → брифи §0 і черга; урок → свій дім + рядок у самері. "
+            "Звіт Konst — таблиця «що · дім · коміт» і «чого ще нема».")
     return ("Гачок «перевірка пам'яті перед переїздом» (HOOK-3.2) — handoff_check:\n" + r.stdout.strip()[:6000] +
             "\n\nДо стартового повідомлення: ✗ — виправ і закоміть; ⚠ — звір. Потім прочитай §0 і стартове ОЧИМА НОВОГО АГЕНТА: "
             "(а) з першого екрана ясно, що робимо далі й у якому порядку? (б) нема історії замість «як є»? "
@@ -90,7 +99,30 @@ def selftest():
     open(os.path.join(r, '.git', 'lens-readonly'), 'w').close()
     ok = stop(S('Переїжджаємо. ```text\nСтарт: …\n```', s='p4'), [t], t) is None
     print(('✓' if ok else '✗') + ' Stop: клон лише для читання (.git/lens-readonly) → тиша (хибне AE S103)'); bad += not ok
-    print(f'selftest: {11 - bad}/11'); return 1 if bad else 0
+    os.remove(os.path.join(r, '.git', 'lens-readonly'))   # далі — звичайне репо сесії
+    ok = (lambda o: o is not None and 'ревізія' in o)(run(D('зроби ревізію? ні — просто ревізія пам\'яті, будь ласка', mid, 'r1'), [t], t))
+    print(('✓' if ok else '✗') + ' «ревізія пам\'яті» → контекст ревізії (без переїзду)'); bad += not ok
+    P = lambda c, s='q1': {'tool_input': {'command': c}, 'session_id': s}
+    o1 = post(P('cd x && git commit -qm x'), [t], t); o2 = post(P('git commit -qm y'), [t], t); o3 = post(P('git status'), [t], t); o4 = post(P("echo '{\"command\":\"git commit -m x\"}' | bash h.sh", 'q2'), [t], t)
+    ok = o1 is not None and '✗' in o1 and o2 is None and o3 is None and o4 is None
+    print(('✓' if ok else '✗') + ' post: коміт → нові ✗; повтор того самого → тиша; не коміт і «git commit» у тексті echo → тиша'); bad += not ok
+    print(f'selftest: {13 - bad}/13'); return 1 if bad else 0
+
+def post(d, roots, mark_dir='/tmp'):
+    """PostToolUse Bash: щойно був `git commit` → handoff_check; у контекст лише нові ✗ / ⚠ (бачені в цій сесії — тиша)."""
+    cmd = ((d.get('tool_input') or {}).get('command') or '')
+    if not re.search(r'(?:^|[;&|(]\s*)git(?:\s+-C\s+\S+)?\s+commit\b', cmd) or '--dry-run' in cmd: return None   # git commit на місці команди (echo «…git commit…» — не коміт, хибне S109)
+    rs = repos(roots)
+    if not rs: return None
+    r = subprocess.run([sys.executable, HC, *rs], capture_output=True, text=True)
+    lines = [l.strip() for l in r.stdout.splitlines() if l.strip().startswith(('✗', '⚠'))]
+    mark = os.path.join(mark_dir, 'lens-handoff-post-' + re.sub(r'\W', '', d.get('session_id') or 'x'))
+    seen = set(open(mark, encoding='utf-8').read().splitlines()) if os.path.exists(mark) else set()
+    new = [l for l in lines if l not in seen]
+    open(mark, 'w', encoding='utf-8').write('\n'.join(sorted(seen | set(lines))))
+    if not new: return None
+    return ("Гачок «пам'ять після коміту» (AE S109) — handoff_check знайшов нове:\n" + '\n'.join(new)[:4000] +
+            "\n✗ — виправ наступним комітом; ⚠ — звір: опис не відстає від коду? рішення / прилад / правило мають дім?")
 
 def stop(d, roots, mark_dir='/tmp'):
     """Stop: переїзд оголошує агент (стартове чи «переїжджаємо» у відповіді) — є ✗ → block, щоб виправив до кінця ходу."""
@@ -111,6 +143,11 @@ def stop(d, roots, mark_dir='/tmp'):
 
 mode = sys.argv[1]
 if mode == 'selftest': sys.exit(selftest())
+if mode == 'post':
+    try: out = post(json.loads(os.environ.get('HOOK_IN') or '{}'), ['/home/user'])
+    except Exception: out = None
+    if out: print(json.dumps({'hookSpecificOutput': {'hookEventName': 'PostToolUse', 'additionalContext': out}}, ensure_ascii=False))
+    sys.exit(0)
 if mode == 'stop':
     try: out = stop(json.loads(os.environ.get('HOOK_IN') or '{}'), ['/home/user'])
     except Exception: out = None
