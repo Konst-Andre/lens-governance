@@ -544,17 +544,19 @@ async function lint(target, states, width, theme, browser, scope = SCOPE) {
   //   таймери сторінки з терміном у вікні · скінченні анімації · запити · два кадри), а не простій; QUIET=0 — старі паузи (негативний контроль).
   const QOFF = process.env.QUIET === '0'; if (!QOFF) await p.addInitScript({ path: join(here, 'pw_quiet.js') });
   const quiet = ms => QOFF ? p.waitForTimeout(ms) : p.evaluate(m => window.__aeQuiet ? window.__aeQuiet(m) : new Promise(r => setTimeout(r, m)), ms).catch(() => p.waitForTimeout(ms));
-  const res = [];
-  for (const [i, st] of [null, ...states].entries()) {   // початковий екран — завжди, далі кожен стан
+  const res = [], tr = m => { if (process.env.UIL_TRACE) console.error(`· ${new Date().toISOString().slice(11, 19)} ${m}`); };   // UIL_TRACE=1 — де стоїть прогін (AE S113: стан висів без сліду)
+  for (const [i, st] of [null, ...states].entries()) { tr(`стан ${i}: завантаження`);   // початковий екран — завжди, далі кожен стан
     await p.goto(target, { waitUntil: 'load' }); await quiet(400);
     // 36. готовність кадру (AE S97: дані приходять мережею після load — 400 мс то встигали, то ні, і та сама сторінка давала 0 або 35 ✗)
     try { await p.evaluate(() => document.fonts.ready.then(() => 1)); } catch {}
     if (READY) { try { await p.waitForFunction(READY, null, { timeout: 10000 }); } catch { res.push({ lvl: '✗', kind: 'стан', where: st ? `стан ${i}` : 'початковий', msg: `умова --ready не настала за 10 с: ${READY.slice(0, 60)}` }); } }
-    if (st) { try { await p.evaluate(st); } catch (e) { res.push({ lvl: '✗', kind: 'стан', where: `стан ${i}`, msg: 'JS стану впав: ' + e.message.split('\n')[0] }); } await quiet(700); }
+    // AE S113: проміс стану, що не виконався (колбек упав усередині setTimeout — r() не викликано), тримав прогін вічно — тепер межа 30 с і ✗ з помилкою сторінки
+    if (st) { tr(`стан ${i}: JS стану`); let to; try { await Promise.race([p.evaluate(st), new Promise((_, no) => { to = setTimeout(() => no(new Error('не завершився за 30 с' + (errs.length ? ' — помилка сторінки: ' + errs[errs.length - 1].slice(0, 120) : ''))), 30000); })]); }
+      catch (e) { res.push({ lvl: '✗', kind: 'стан', where: `стан ${i}`, msg: 'JS стану впав: ' + e.message.split('\n')[0] }); } finally { clearTimeout(to); } await quiet(700); }
     { const sig = () => p.evaluate(() => document.querySelectorAll('*').length + ':' + document.body.innerText.length); let a0 = await sig(), still = false;
       for (let n = 0; n < 5 && !still; n++) { await p.waitForTimeout(600);   /* pause-ok: вікно тиші DOM (№36) — справжній час за задумом */ const a1 = await sig(); still = a1 === a0; a0 = a1; }
       if (!still) res.push({ lvl: '⚠', kind: 'кадр', where: 'body', state: st ? `стан ${i}` : 'початковий', msg: `екран ще змінювався через 3 с після ${st ? 'стану' : 'завантаження'} — замір міг зловити проміжний кадр; дай --ready "<умова готовності>" або зупини таймер у стані` }); }
-    const found = await p.evaluate(probe), pxs = found.filter(f => f.lvl === 'px'), inks = found.filter(f => f.lvl === 'ink');
+    tr(`стан ${i}: probe`); const found = await p.evaluate(probe), pxs = found.filter(f => f.lvl === 'px'), inks = found.filter(f => f.lvl === 'ink');
     if (inks.length) { const img = png(await p.screenshot({ type: 'png' })); for (const f of inks) { const m = inkOffset(img, f), d = m && m.d;
       // тісно: зсув ≥ 0,5 px і знак ближче 3 px до краю — «торкається верхівки» («/» у 18 px: 3 ⟂ 4 px, Konst побачив, AE S102); інакше ⚠ від 1 px.
       // 0,5 без тісноти — межа точності знімка ×2 («K» із зазорами 5 / 6 px давав 0,5)
@@ -587,7 +589,7 @@ async function lint(target, states, width, theme, browser, scope = SCOPE) {
     const settle = ms => fz ? p.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))) : p.waitForTimeout(ms);
     const { root } = await cdp.send('DOM.getDocument', { depth: 0 });
     for (let j = 0; j < Math.min(sig.length, 40); j++) {
-      const el = p.locator(`[data-uil-press="${j}"]`);
+      const el = p.locator(`[data-uil-press="${j}"]`); tr(`стан ${i}: натискання ${j} ${sig[j]}`);
       // вигляд = сама кнопка + її підкладка ::before + перший вкладений елемент (стиск часто на них: квадратик галочки, капсула в полі); колір тексту — ні: браузер сам фарбує посилання на :active
       const look = () => el.evaluate(e => [getComputedStyle(e), getComputedStyle(e, '::before'), e.firstElementChild && getComputedStyle(e.firstElementChild)].filter(Boolean).map(s => [s.transform, s.backgroundColor, s.boxShadow, s.opacity, s.filter].join('|')).join('#'));
       let nodeId; try { ({ nodeId } = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector: `[data-uil-press="${j}"]` })); } catch { continue; }
@@ -607,7 +609,7 @@ async function lint(target, states, width, theme, browser, scope = SCOPE) {
     //     змінилось лише тло, і нове до старого < 1,12:1 (на тлі батька) → ⚠ «ледь видно». Поріг — замір AE: #FFFEF6 на білому 1,01 (Konst: «ледь помітно»), #EFEEE8 — 1,16 (видно).
     //     WCAG наведення сам не нормує (1.4.11 — фокус і стан; accessibleweb.com «hover state contrast», 20.10.2026: для наведення радять виразне тло або межу).
     //     Примусовий стан ≠ справжня миша (WebKit 199165: правила з :not(:hover)) — тому лише ⚠, не ✗.
-    if (width >= 1024) {
+    tr(`стан ${i}: наведення`); if (width >= 1024) {
       const hv = await p.evaluate(() => { const seen = new Set(), out = [];
         for (const e of document.querySelectorAll('a[href],button,[role=button],select,input:not([type=hidden]):not([type=checkbox]):not([type=radio]),textarea')) { const s = getComputedStyle(e); if (s.display === 'none' || !e.getClientRects().length) continue;
           e.scrollIntoView({ block: 'center', behavior: 'instant' }); const r = e.getBoundingClientRect();
