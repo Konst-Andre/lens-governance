@@ -6,8 +6,13 @@
 #   кнопки зі «словами-небезпеками» (Опублікувати, Видалити, Надіслати, Оплатити, Publish, Delete, Send, Pay…) не тисне. Тож на проді — без побічних дій.
 # Запуск:  python3 explore.py <конфіг.json> [--out <тека звіту>] [--baseline <файл>] [--max N]      · python3 explore.py selftest  (зуби)
 # Вихід: ✗ / ⚠ у консоль + <тека>/TESTER_<час>.md (вади зі шляхом кліків, знімки ✗, покриття, заблоковані записи, пакети ПК / PWA). Код виходу 1, якщо нові ✗.
+# Паузи (AE S111, PW-2 / wsd 1.21): «після старту» (settle_ms) і «після кліку» (after_click_ms) — «тиша до N» ядра (tools/claude-code/pw_quiet.py): повертається, щойно
+#   таймери сторінки у вікні, скінченні анімації й запити скінчились, і так два кадри; вікно «сторінка не затихає» (0,7 с) — справжній час (pg.wait_real): воно
+#   РАХУЄ зміни за час, тиша його зламала б. QUIET=0 — старі фіксовані паузи (негативний контроль, запасний режим). Звіт і консоль кажуть, скільки зекономлено.
 import sys, os, re, json, time, pathlib, datetime, tempfile, threading, http.server, socketserver, functools
 from playwright.sync_api import sync_playwright
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / 'claude-code'))
+from pw_quiet import install as quiet_install, report as quiet_report   # пауза = подія, не число (PW-2)
 
 DENY = r'опублікув|видали|надісла|відправ|оплат|купит|замовит|вийти з|розлогін|скинути все|publish|delete|remove|send|submit|pay|buy|logout|sign out|reset all'
 TECH = r'\bundefined\b|\bNaN\b|\[object |\$\{|\bnull\b|Uncaught|TypeError|ReferenceError'
@@ -64,7 +69,7 @@ def run(cfg, out_dir, baseline=None, max_clicks=None, quiet=False):
       ctx = b.new_context(bypass_csp=bool(cfg.get('bypass_csp', True)), **DEVICES[cfg.get('device', 'pc')])
       ctx.add_init_script(INIT_JS)
       if cfg.get('init_script'): ctx.add_init_script(cfg['init_script'])
-      pg = ctx.new_page(); ev = {'err': [], 'con': [], 'req': [], 'dlg': [], 'n': 0}
+      pg = quiet_install(ctx.new_page()); ev = {'err': [], 'con': [], 'req': [], 'dlg': [], 'n': 0}   # wait_for_timeout(N) — тиша до N; wait_real — справжній час
       pg.on('request', lambda r: ev.__setitem__('n', ev['n'] + 1))
       pg.on('pageerror', lambda e: ev['err'].append(str(e)[:160]))
       pg.on('console', lambda m: ev['con'].append(m.text[:160]) if m.type == 'error' else None)
@@ -140,7 +145,7 @@ def run(cfg, out_dir, baseline=None, max_clicks=None, quiet=False):
             dd = [abs(a - b) for a, b in zip(s0, s1) if a != b]
             if dd and max(dd) <= 48 and not (calm_ok and calm_ok.search(c['name'] or '')):
               add('⚠', 'зсув після кліку', start['name'], f'прокрутка зрушила на {max(dd)} px без переходу — вміст «повзе» з кожним кліком', path)
-          mq = pg.evaluate('window.__tester.muts'); pg.wait_for_timeout(700); storm = pg.evaluate('window.__tester.muts') - mq
+          mq = pg.evaluate('window.__tester.muts'); pg.wait_real(700); storm = pg.evaluate('window.__tester.muts') - mq   # вікно ЛІЧБИ — справжній час, не тиша
           if storm > cfg.get('calm_max', 20) and not (calm_ok and calm_ok.search(c['name'] or '')):
             add('⚠', 'сторінка не затихає', start['name'], f'після кліку DOM міняється далі: {storm} змін за 0,7 с (цикл перемальовувань?)', path)
           judge(pg, ev, start['name'], path, e0)
@@ -203,7 +208,7 @@ def run(cfg, out_dir, baseline=None, max_clicks=None, quiet=False):
   x = sum(f['lvl'] == '✗' for f in F); w = sum(f['lvl'] == '⚠' for f in F)
   rep = out_dir / f"TESTER_{datetime.datetime.now():%Y-%m-%d_%H%M}.md"
   lines = [f"# Тестувальник · {cfg.get('name', '')} · {datetime.datetime.now():%d.%m.%Y %H:%M}", '',
-           f"{cfg['url']} · пристрій {cfg.get('device', 'pc')} · **✗ {x} · ⚠ {w}** · станів {len(COV['states'])} · кліків {COV['clicked']}", '',
+           f"{cfg['url']} · пристрій {cfg.get('device', 'pc')} · **✗ {x} · ⚠ {w}** · станів {len(COV['states'])} · кліків {COV['clicked']} · {quiet_report()}", '',
            '## Вади', '', '| | вид | де | що | шлях повтору | знімок |', '|---|---|---|---|---|---|',
            *[f"| {f['lvl']} | {f['kind']} | {f['where']} | {f['msg'].replace('|', '/')} | {f['path'].replace('|', '/')} | {('shots/' + f['shot']) if f['shot'] else ''} |" for f in F if f['lvl'] != 'ⓘ'], '',
            '## Покриття — куди дійшов і куди ні', '',
@@ -213,7 +218,7 @@ def run(cfg, out_dir, baseline=None, max_clicks=None, quiet=False):
            f"- заблоковано записів (не GET): {len(WR)} — " + ' · '.join(sorted(set(WR))[:8]), '',
            '_Дослідник (S110) ще бачить «зсув після кліку» і «сторінка не затихає»; не бачить: зміст і логіку (чи правильна відповідь), дотик і WebKit, відчуття руху — це сценарії продукту й очі._']
   rep.write_text('\n'.join(lines) + '\n', encoding='utf-8')
-  print(f"─── тестувальник: ✗ {x} · ⚠ {w} · станів {len(COV['states'])} · кліків {COV['clicked']} · звіт {rep} ───")
+  print(f"─── тестувальник: ✗ {x} · ⚠ {w} · станів {len(COV['states'])} · кліків {COV['clicked']} · {quiet_report()} · звіт {rep} ───")
   return x, w, F
 
 SELF_PAGE = """<!doctype html><html lang=uk><head><meta charset=utf-8><meta name=viewport content="width=device-width"><title>selftest</title></head><body>
@@ -230,6 +235,8 @@ DEFECTS = {
   'зсув після кліку': "<div id=sc style='height:120px;overflow:auto'><div style='height:900px'>довгий список</div></div><button onclick=\"sc.scrollTop+=20;o.textContent='вибрано'\">Вибрати</button>",
   'сторінка не затихає': "<button onclick=\"setInterval(()=>{o.textContent=String(Math.random())},25)\">Перейменувати</button>",
   'запис заблоковано': "<button onclick=\"fetch('/api/save',{method:'POST',body:'{}'}).catch(()=>{});o.textContent='шлю'\">Зберегти чернетку</button>",
+  # S111 (тиша): дія, відкладена на 200 мс (у вікні after_click_ms), — тиша її дочікується, тож кнопка не «мертва»
+  'відкладена дія — не мертва': "<button onclick=\"setTimeout(()=>{o.textContent='пізніше'},200)\">Пізніше</button>",
 }
 def selftest():
   d = pathlib.Path(tempfile.mkdtemp(prefix='tester-')); bad = 0
