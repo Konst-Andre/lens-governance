@@ -613,10 +613,15 @@ async function lint(target, states, width, theme, browser, scope = SCOPE) {
           const s = getComputedStyle(e); return { bg: rg(s.backgroundColor), ground: gc, sh: s.boxShadow, rest: [s.borderTopColor, s.borderBottomColor, s.color, s.textDecorationLine, s.outlineStyle, s.backgroundImage, s.filter, s.transform].join('|') }; });
         let nodeId; try { ({ nodeId } = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector: `[data-uil-hover="${j}"]` })); } catch { continue; }
         if (!nodeId) continue;
-        const before = await look();
-        await cdp.send('CSS.forcePseudoState', { nodeId, forcedPseudoClasses: ['hover'] }); await settle(300);
-        const after = await look();
-        await cdp.send('CSS.forcePseudoState', { nodeId, forcedPseudoClasses: [] });
+        // AE S111: сторінка перемальовує шматок асинхронно (доїхали дані) — вузол зникає між DOM.querySelector і замірами («Could not find node with given id»):
+        //   цей елемент пропускаємо, а не валимо весь прогін (раніше падала база стану A — порожній lint_a.json і ✗ гейта без жодної вади).
+        let before, after;
+        try {
+          before = await look();
+          await cdp.send('CSS.forcePseudoState', { nodeId, forcedPseudoClasses: ['hover'] }); await settle(300);
+          after = await look();
+          await cdp.send('CSS.forcePseudoState', { nodeId, forcedPseudoClasses: [] });
+        } catch { try { await cdp.send('CSS.forcePseudoState', { nodeId, forcedPseudoClasses: [] }); } catch {} continue; }
         const on = (c, g) => { const a = c[3]; return [c[0] * a + g[0] * (1 - a), c[1] * a + g[1] * (1 - a), c[2] * a + g[2] * (1 - a)]; };
         const b0 = on(before.bg, before.ground), b1 = on(after.bg, after.ground), shSame = before.sh === after.sh, same = before.rest === after.rest && shSame, bgSame = b0.every((v, q) => Math.abs(v - b1[q]) < 1);
         // AE S107 (пропуск Konst: «ховер ледь помітний» — плитка, лише тінь rgba(…,.08)): змінилась лише тінь, і найтемніша її частина прозоріша за 0,12 → «ледь видно»
