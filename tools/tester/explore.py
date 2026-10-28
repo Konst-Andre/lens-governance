@@ -9,6 +9,9 @@
 # Паузи (AE S111, PW-2 / wsd 1.21): «після старту» (settle_ms) і «після кліку» (after_click_ms) — «тиша до N» ядра (tools/claude-code/pw_quiet.py): повертається, щойно
 #   таймери сторінки у вікні, скінченні анімації й запити скінчились, і так два кадри; вікно «сторінка не затихає» (0,7 с) — справжній час (pg.wait_real): воно
 #   РАХУЄ зміни за час, тиша його зламала б. QUIET=0 — старі фіксовані паузи (негативний контроль, запасний режим). Звіт і консоль кажуть, скільки зекономлено.
+# Кеш прогону (AE S112): кожен клік — як і раніше, з чистої сторінки, але GET-відповіді 200 беруться з пам'яті прогону (route.fetch → route.fulfill), а не з мережі:
+#   відкриття сторінки 2,0 → 0,14 с (замір AE ?hdr, 28.10.2026). Не-200 не кешуються — ✗ «запит 5xx» видно щоразу. Між прогонами кешу нема (бачимо сьогоднішній сайт).
+#   Вимкнути: конфіг "cache": false або TESTER_CACHE=0 (негативний контроль); окремі адреси — "nocache" (regex; напр., опитування сервера, що чекає нових даних).
 import sys, os, re, json, time, pathlib, datetime, tempfile, threading, http.server, socketserver, functools
 from playwright.sync_api import sync_playwright
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / 'claude-code'))
@@ -60,6 +63,9 @@ def run(cfg, out_dir, baseline=None, max_clicks=None, quiet=False):
   stubs = [(re.compile(s['url']), s.get('method', 'POST').upper(), s) for s in cfg.get('stubs', [])]
   allow = [re.compile(x) for x in cfg.get('allow_write', [])]
   out_dir = pathlib.Path(out_dir); shots = out_dir / 'shots'; shots.mkdir(parents=True, exist_ok=True)
+  use_cache = cfg.get('cache', True) and os.environ.get('TESTER_CACHE', '1') != '0'; nocache = re.compile(cfg['nocache']) if cfg.get('nocache') else None
+  CACHE, CST = {}, {'hit': 0, 'miss': 0}   # кеш прогону: адреса → (статус, заголовки, тіло); лише GET 200
+  DROP = ('content-encoding', 'content-length', 'transfer-encoding')   # тіло в кеші вже розпаковане — ці заголовки збрехали б браузеру
   def add(lvl, kind, where, msg, path=None, shot=None):
     F.append({'lvl': lvl, 'kind': kind, 'where': where, 'msg': msg, 'path': path or '', 'shot': shot or ''})
     if not quiet: print(f'{lvl} {kind} · {where} — {msg}' + (f'  [шлях: {path}]' if path else ''), flush=True)
@@ -78,7 +84,15 @@ def run(cfg, out_dir, baseline=None, max_clicks=None, quiet=False):
       pg.on('dialog', lambda d: (ev['dlg'].append(d.type + ': ' + d.message[:80]), d.dismiss()))
       def route(rt):
         rq = rt.request; m = rq.method.upper()
-        if m in ('GET', 'HEAD', 'OPTIONS'): return rt.continue_()
+        if m in ('GET', 'HEAD', 'OPTIONS'):
+          if m != 'GET' or not use_cache or not rq.url.startswith('http') or (nocache and nocache.search(rq.url)): return rt.continue_()
+          hit = CACHE.get(rq.url)
+          if hit: CST['hit'] += 1; return rt.fulfill(status=hit[0], headers=hit[1], body=hit[2])
+          try: r = rt.fetch(); body = r.body()
+          except Exception: return rt.continue_()   # мережа впала — хай браузер спробує сам і покаже «запит» як є
+          CST['miss'] += 1
+          if r.status == 200: CACHE[rq.url] = (200, {k: v for k, v in r.headers.items() if k.lower() not in DROP}, body)
+          return rt.fulfill(status=r.status, headers={k: v for k, v in r.headers.items() if k.lower() not in DROP}, body=body)
         for rx, sm, s in stubs:
           if rx.search(rq.url) and sm == m:
             body = s.get('body', {}); return rt.fulfill(status=s.get('status', 200), content_type='application/json', headers={'access-control-allow-origin': '*'},
@@ -206,9 +220,10 @@ def run(cfg, out_dir, baseline=None, max_clicks=None, quiet=False):
       for f in F:
         if f['lvl'] == '✗' and key(f) in base: f['lvl'] = 'ⓘ'; f['msg'] += ' — з бази'
   x = sum(f['lvl'] == '✗' for f in F); w = sum(f['lvl'] == '⚠' for f in F)
+  cache_line = f"кеш: {len(CACHE)} адрес, з пам'яті {CST['hit']} · з мережі {CST['miss']}" if use_cache else 'кеш: вимкнено'
   rep = out_dir / f"TESTER_{datetime.datetime.now():%Y-%m-%d_%H%M}.md"
   lines = [f"# Тестувальник · {cfg.get('name', '')} · {datetime.datetime.now():%d.%m.%Y %H:%M}", '',
-           f"{cfg['url']} · пристрій {cfg.get('device', 'pc')} · **✗ {x} · ⚠ {w}** · станів {len(COV['states'])} · кліків {COV['clicked']} · {quiet_report()}", '',
+           f"{cfg['url']} · пристрій {cfg.get('device', 'pc')} · **✗ {x} · ⚠ {w}** · станів {len(COV['states'])} · кліків {COV['clicked']} · {quiet_report()} · {cache_line}", '',
            '## Вади', '', '| | вид | де | що | шлях повтору | знімок |', '|---|---|---|---|---|---|',
            *[f"| {f['lvl']} | {f['kind']} | {f['where']} | {f['msg'].replace('|', '/')} | {f['path'].replace('|', '/')} | {('shots/' + f['shot']) if f['shot'] else ''} |" for f in F if f['lvl'] != 'ⓘ'], '',
            '## Покриття — куди дійшов і куди ні', '',
@@ -218,8 +233,8 @@ def run(cfg, out_dir, baseline=None, max_clicks=None, quiet=False):
            f"- заблоковано записів (не GET): {len(WR)} — " + ' · '.join(sorted(set(WR))[:8]), '',
            '_Дослідник (S110) ще бачить «зсув після кліку» і «сторінка не затихає»; не бачить: зміст і логіку (чи правильна відповідь), дотик і WebKit, відчуття руху — це сценарії продукту й очі._']
   rep.write_text('\n'.join(lines) + '\n', encoding='utf-8')
-  print(f"─── тестувальник: ✗ {x} · ⚠ {w} · станів {len(COV['states'])} · кліків {COV['clicked']} · {quiet_report()} · звіт {rep} ───")
-  return x, w, F
+  print(f"─── тестувальник: ✗ {x} · ⚠ {w} · станів {len(COV['states'])} · кліків {COV['clicked']} · {quiet_report()} · {cache_line} · звіт {rep} ───")
+  return x, w, F, CST
 
 SELF_PAGE = """<!doctype html><html lang=uk><head><meta charset=utf-8><meta name=viewport content="width=device-width"><title>selftest</title></head><body>
 <h1>Тест</h1><p id=o>старт</p>
@@ -236,24 +251,32 @@ DEFECTS = {
   'сторінка не затихає': "<button onclick=\"setInterval(()=>{o.textContent=String(Math.random())},25)\">Перейменувати</button>",
   'запис заблоковано': "<button onclick=\"fetch('/api/save',{method:'POST',body:'{}'}).catch(()=>{});o.textContent='шлю'\">Зберегти чернетку</button>",
   # S111 (тиша): дія, відкладена на 200 мс (у вікні after_click_ms), — тиша її дочікується, тож кнопка не «мертва»
+  'запит 5xx на кожній сторінці': "<script>fetch('/boom').catch(()=>{})</script><button onclick=\"o.textContent='ще'\">Ще</button>",
   'відкладена дія — не мертва': "<button onclick=\"setTimeout(()=>{o.textContent='пізніше'},200)\">Пізніше</button>",
 }
 def selftest():
   d = pathlib.Path(tempfile.mkdtemp(prefix='tester-')); bad = 0
   class Q(http.server.SimpleHTTPRequestHandler):
     def log_message(self, *a): pass
+    def do_GET(self):
+      if self.path.startswith('/boom'): self.send_error(500); return   # S112: 5xx не ховається кешем — видно на кожній сторінці
+      return super().do_GET()
   H = functools.partial(Q, directory=str(d))
   srv = socketserver.ThreadingTCPServer(('127.0.0.1', 0), H); srv.daemon_threads = True; threading.Thread(target=srv.serve_forever, daemon=True).start()
   url = f'http://127.0.0.1:{srv.server_address[1]}/'
   def one(name, html):
     (d / 'index.html').write_text(SELF_PAGE.replace('BAD', html), encoding='utf-8')
     return run({'name': name, 'url': url, 'device': 'pc', 'pack_pc': False, 'settle_ms': 150, 'after_click_ms': 300}, d / ('out-' + str(abs(hash(name)))), quiet=True)
-  x, w, F = one('чиста', '')
+  x, w, F, C = one('чиста', '')
   ok = not [f for f in F if f['lvl'] in ('✗', '⚠')]; bad += not ok; print(('✓' if ok else '✗') + ' чиста сторінка → тиша · ' + (' | '.join(f['kind'] + ': ' + f['msg'][:60] for f in F) or '0'))
+  on = os.environ.get('TESTER_CACHE', '1') != '0'   # S112: кеш справді працює (друга сторінка — з пам'яті), а з TESTER_CACHE=0 — нуль
+  ok = (C['hit'] > 0) == on; bad += not ok; print(('✓' if ok else '✗') + f" кеш прогону: з пам'яті {C['hit']} (очікую {'> 0' if on else '0'})")
   for k, html in DEFECTS.items():
-    x, w, F = one(k, html); hit = (not any(f['kind'] == 'мертва кнопка' for f in F)) if k.endswith('не мертва') else any(f['kind'] == k for f in F)
+    x, w, F, C = one(k, html)
+    if k == 'запит 5xx на кожній сторінці': hit = sum(f['kind'] == 'запит' for f in F) >= 2   # старт і сторінка кліку — обидві бачать 500
+    else: hit = (not any(f['kind'] == 'мертва кнопка' for f in F)) if k.endswith('не мертва') else any(f['kind'] == k for f in F)
     bad += not hit; print(('✓' if hit else '✗') + (f' «{k}» → тиша (хибної тривоги нема)' if k.endswith('не мертва') else f' підкинуто «{k}» → спіймано'))
-  print(f'─── tester selftest: {len(DEFECTS) + 1 - bad}/{len(DEFECTS) + 1} ───'); return bad
+  print(f'─── tester selftest: {len(DEFECTS) + 2 - bad}/{len(DEFECTS) + 2} ───'); return bad
 
 if __name__ == '__main__':
   a = sys.argv[1:]
@@ -262,5 +285,5 @@ if __name__ == '__main__':
   cfg = json.loads(pathlib.Path(a[0]).read_text(encoding='utf-8'))
   opt = lambda k, d=None: a[a.index(k) + 1] if k in a else d
   if opt('--url'): cfg['url'] = opt('--url')
-  x, w, F = run(cfg, opt('--out', 'tester-out'), opt('--baseline'), int(opt('--max', 0)) or None)
+  x, w, F, _ = run(cfg, opt('--out', 'tester-out'), opt('--baseline'), int(opt('--max', 0)) or None)
   sys.exit(1 if x else 0)
