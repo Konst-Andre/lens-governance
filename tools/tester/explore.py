@@ -44,6 +44,7 @@ SCAN_JS = r"""(re) => {
 SIG_JS = r"""() => [location.pathname + location.hash, document.title, (document.querySelector('h1') || {}).textContent || '', document.querySelectorAll('dialog[open],[role=dialog]:not([hidden])').length,
   (window.S && S.screen) || ''].join(' | ').replace(/\s+/g, ' ').slice(0, 160)"""
 INIT_JS = r"""(() => { window.__tester = { csp: [], muts: 0 };
+  window.__testerScroll = () => [...document.querySelectorAll('*')].filter(e => e.scrollHeight > e.clientHeight + 4 && /auto|scroll/.test(getComputedStyle(e).overflowY)).map(e => Math.round(e.scrollTop)).concat([Math.round(scrollY)]);
   window.__testerLook = () => [document.querySelectorAll(':popover-open').length, Math.round(scrollY), [...document.querySelectorAll('*')].filter(e => e.scrollTop > 0).map(e => Math.round(e.scrollTop)).join(',')].join('|');
   document.addEventListener('securitypolicyviolation', e => window.__tester.csp.push(e.violatedDirective + ' ' + (e.blockedURI || '')));
   new MutationObserver(m => { window.__tester.muts += m.length; }).observe(document, { subtree: true, childList: true, attributes: true, characterData: true }); })();"""
@@ -123,13 +124,25 @@ def run(cfg, out_dir, baseline=None, max_clicks=None, quiet=False):
         if c['href'] and re.match(r'^(https?:)?//', c['href']) and not c['href'].startswith(cfg['url'][:30]): continue   # зовнішні посилання — не наш сайт
         ctx, pg, ev = page(); path = f"{start['name']} → {label}"
         try:
-          ready(pg, start); e0 = len(ev['err']); m0 = pg.evaluate('window.__tester.muts'); u0 = pg.url; l0 = pg.evaluate('window.__testerLook()'); n0 = ev['n']
+          ready(pg, start); e0 = len(ev['err']); m0 = pg.evaluate('window.__tester.muts'); u0 = pg.url; l0 = pg.evaluate('window.__testerLook()'); n0 = ev['n']; s0 = pg.evaluate('window.__testerScroll()')
           loc = pg.locator(c['sel']).first
           if c['tag'] == 'select':
             opts = loc.evaluate("e => [...e.options].filter(o => !o.disabled && o.value !== e.value).map(o => o.value)")
             if opts: loc.select_option(opts[0])
           else: loc.click(timeout=4000)
           pg.wait_for_timeout(cfg.get('after_click_ms', 900)); COV['clicked'] += 1
+          # S110 (AE, пропуск Konst): «зсув після кліку» — натиснутий елемент на місці, адреса та сама, вікна нема, а прокрутка зрушила на 1–48 px (повзе з кожним кліком);
+          #   CLS цього не бачить навмисно (hadRecentInput: зсуви ≤ 500 мс після дії не рахуються — MDN, web.dev, 28.10.2026), тому — окремий замір до / після.
+          #   «сторінка не затихає» — після паузи кліку DOM міняється далі (цикл перемальовувань: поле вводу губить фокус і з'являється знову). Виняток — calm_ok (regex назв).
+          calm_ok = re.compile(cfg['calm_ok'], re.I) if cfg.get('calm_ok') else None
+          s1 = pg.evaluate('window.__testerScroll()')
+          if pg.url == u0 and not ev['dlg'] and len(s1) == len(s0) and pg.locator(c['sel']).count() and not pg.evaluate("document.querySelectorAll('dialog[open]').length"):
+            dd = [abs(a - b) for a, b in zip(s0, s1) if a != b]
+            if dd and max(dd) <= 48 and not (calm_ok and calm_ok.search(c['name'] or '')):
+              add('⚠', 'зсув після кліку', start['name'], f'прокрутка зрушила на {max(dd)} px без переходу — вміст «повзе» з кожним кліком', path)
+          mq = pg.evaluate('window.__tester.muts'); pg.wait_for_timeout(700); storm = pg.evaluate('window.__tester.muts') - mq
+          if storm > cfg.get('calm_max', 20) and not (calm_ok and calm_ok.search(c['name'] or '')):
+            add('⚠', 'сторінка не затихає', start['name'], f'після кліку DOM міняється далі: {storm} змін за 0,7 с (цикл перемальовувань?)', path)
           judge(pg, ev, start['name'], path, e0)
           for r in ev['req'][:3]: add('✗', 'запит', start['name'], r, path)
           for d in ev['dlg']: add('⚠', 'нативне вікно', start['name'], d, path)
@@ -198,7 +211,7 @@ def run(cfg, out_dir, baseline=None, max_clicks=None, quiet=False):
            f"- натиснуто: {COV['clicked']} · однакових пропущено вибіркою: {COV['sampled']} · вимкнених: {COV['skipped_disabled']} · закритих іншим шаром: {COV['skipped_covered']}",
            f"- не тиснув (слова-небезпеки): {len(COV['skipped_deny'])} — " + ' · '.join(sorted(set(COV['skipped_deny']))[:12]),
            f"- заблоковано записів (не GET): {len(WR)} — " + ' · '.join(sorted(set(WR))[:8]), '',
-           '_Дослідник не бачить: зміст і логіку (чи правильна відповідь), дотик і WebKit, відчуття руху — це сценарії продукту й очі._']
+           '_Дослідник (S110) ще бачить «зсув після кліку» і «сторінка не затихає»; не бачить: зміст і логіку (чи правильна відповідь), дотик і WebKit, відчуття руху — це сценарії продукту й очі._']
   rep.write_text('\n'.join(lines) + '\n', encoding='utf-8')
   print(f"─── тестувальник: ✗ {x} · ⚠ {w} · станів {len(COV['states'])} · кліків {COV['clicked']} · звіт {rep} ───")
   return x, w, F
@@ -214,6 +227,8 @@ DEFECTS = {
   'popover — не мертва': "<button popovertarget=pp>Підказка</button><div id=pp popover>текст</div>",
   'прокрутка вбік': "<div style='width:3000px;height:10px'></div>",
   'кнопка без назви': "<button onclick=\"o.textContent='x'\"></button>",
+  'зсув після кліку': "<div id=sc style='height:120px;overflow:auto'><div style='height:900px'>довгий список</div></div><button onclick=\"sc.scrollTop+=20;o.textContent='вибрано'\">Вибрати</button>",
+  'сторінка не затихає': "<button onclick=\"setInterval(()=>{o.textContent=String(Math.random())},25)\">Перейменувати</button>",
   'запис заблоковано': "<button onclick=\"fetch('/api/save',{method:'POST',body:'{}'}).catch(()=>{});o.textContent='шлю'\">Зберегти чернетку</button>",
 }
 def selftest():
