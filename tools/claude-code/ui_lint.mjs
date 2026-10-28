@@ -13,6 +13,7 @@
 // 10 дія в прокрутці · 11 кнопки ряду · 12 сирота · 13 злито · 14 однакові заголовки · 15 дата й час · 16 зливається (16-б край кнопки) · 17 паритет тем · 18 кромка · 19 картка-список · 20 вкладена прокрутка · 21 шапка в прокрутці · 22 емодзі в кнопці · 23 нативне вікно · 24 фон у рамці · 25 кант рветься · 26 поле губиться; поза probe — натискання (:active / JS pointerdown, touchstart).
 // 31 форма виділення · 32 пунктир < 3:1 · 22 емодзі-значок без підпису → ✗ · 33 різнобій списків — AE S94, 20.10.2026.
 // 34 пояснення під кнопкою (→ «i») · 35 наведення (ПК, ≥ 1024: нема або ледь видно; S107 — і «лише тінь < 0,12») — AE S96, 20.10.2026.
+// 44 число-близнюк (те саме число ≥ 10 двічі в одній шапці: підпис ⟂ чип) — пропуск Konst, AE S113, 28.10.2026.
 // 43 список угорі (закритий base-select не flex — текст притиснутий догори; рецепт A117) — пропуск Konst, AE S107, 26.10.2026.
 // 42 знак не по центру (1–2 знаки чи один значок у маленькій кнопці / бейджі: «чорнило» зсунуте ≥ 1 px або ≥ 0,5 px впритул до краю — пікселем) — пропуск Konst, AE S102, 23.10.2026.
 // 41 інструкція в повідомленні (порада про клавішу, «Передумали», «✕», > 1 речення в помилці, повтор «i») — правило Konst «форма пояснює себе», AE S101 В-211, 23.10.2026.
@@ -370,6 +371,16 @@ function probe() {
   for (const el of document.querySelectorAll('select')) { const s = getComputedStyle(el); if (!vis(el) || s.appearance !== 'base-select') continue;
     const lh = parseFloat(s.lineHeight) || parseFloat(s.fontSize) * 1.2, room = el.clientHeight - parseFloat(s.paddingTop) - parseFloat(s.paddingBottom);   // відступи вже центрують — тиші (AE: «+ Додати позицію»)
     if ((!/flex|grid/.test(s.display) || !/center/.test(s.alignItems)) && room > lh * 1.25) add('⚠', 'список угорі', el, `закритий список (base-select) — display:${s.display}, align-items:${s.alignItems}: текст притиснутий догори; display:inline-flex; align-items:center (A117)`); }
+  // 44. число-близнюк (пропуск Konst AE S113, 28.10.2026: «181 препарат» тихим текстом біля заголовка дублює чип «Усі 181» — «треба машину навчити ловити,
+  //     чи не дублюються вони»): у шапці (header · role=banner · .ed-head · клас *-head) те саме число ≥ 10 стоїть у двох окремих листових елементах.
+  //     Число — ціле окремим словом: не частина дати, часу, суми з копійками чи відсотка. Друге число нічого не каже — лишити там, де ним керують (чип, бейдж).
+  for (const hd of document.querySelectorAll('header, [role=banner], .ed-head, [class$="-head"], [class*="-head "]')) { if (!vis(hd) || hd.parentElement?.closest('header, [role=banner], .ed-head, [class$="-head"], [class*="-head "]')) continue;
+    const seen = new Map();
+    for (const el of hd.querySelectorAll('*')) { if (!vis(el) || el.closest('svg, [hidden], [role=menu], .hm')) continue;
+      const own = [...el.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join(' ');
+      for (const m of own.matchAll(/(?<![\d.,:\/])(\d{2,})(?![\d.,:%\/])/g)) { const k = m[1]; if (!seen.has(k)) seen.set(k, []); seen.get(k).push(el); } }
+    for (const [k, els] of seen) { const xs = els.filter((e, i) => !els.some((o, j) => j !== i && (o.contains(e) || e.contains(o)))); if (xs.length >= 2)
+      add('⚠', 'число-близнюк', xs[1], `число ${k} у шапці ${xs.length} рази («${(xs[0].textContent || '').trim().slice(0, 30)}» ⟂ «${(xs[1].textContent || '').trim().slice(0, 30)}») — друге нічого не каже; лишити там, де ним керують (чип, бейдж)`); } }
   // 42. знак не по центру (пропуск Konst AE S102, 23.10.2026: «/» у пошуку «торкається верхівки» — замір пікселями: 4 px згори, 6 знизу;
   //     рамка тексту (Range) цього не бачить — шрифт ставить «/» вище своєї рамки). Кандидат: маленька кнопка чи бейдж (≤ 48×32 px) з рамкою або тлом,
   //     у якому 1–2 знаки або один значок SVG; міряє Node пікселями знімка (рамка «чорнила», як optical-properties; «оптичний центр мас» — ні, суб'єктивний).
@@ -464,6 +475,7 @@ const DEFECTS = {
   'пояснення під кнопкою': `<div class=card><div><button style="min-height:44px;padding:0 14px">Пробна розмова</button><small style="font-size:11.5px;display:block">Модель зіграє клієнта за цим сценарієм, як для фармацевта.</small></div></div>`,   // AE S96: підпис під «Пробна розмова»
   'підказка стрибає': `<style>.tp{position:fixed;inset:auto;margin:0;padding:8px;border:1px solid #888;background:#fff}</style><div class=card><button popovertarget=tp1 style="min-height:44px;min-width:120px;margin-left:200px">i</button><div popover id=tp1 class=tp>Пояснення</div></div><script>document.addEventListener('toggle',e=>{const t=e.target;if(e.newState!=='open')return;const r=document.querySelector('[popovertarget=tp1]').getBoundingClientRect();t.style.left=r.left+'px';t.style.top=(r.bottom+6)+'px'},true)</script>`,
   'наведення ': `<style>.hv2{min-height:44px;padding:0 14px;border:1px solid #ddd;background:#fff;transition:none}.hv2:hover{box-shadow:0 6px 18px rgba(28,30,36,.08)}</style><div class=card><button class=hv2>Плитка</button></div>`,   // AE S107: лише тінь .08
+  'число-близнюк': `<div class=card><div class=ed-head><h1>Антибіотики</h1><span>21 позиція</span><button aria-pressed=true>Усі <i>21</i></button></div></div>`,   // AE S113
   'список угорі': `<style>select.sb{appearance:base-select;height:34px;padding:0 10px}</style><div class=card><select class=sb aria-label=Сортувати><option>За назвою</option></select></div>`,   // AE S107
   'наведення': `<style>.hv{min-height:44px;padding:0 14px;border:0;background:#fff}.hv:hover{background:#FFFEF6}</style><div class=card><button class=hv>Рядок списку</button></div>`,   // AE S96: наведення кремовим на білому — 1,01:1
   'пояснення абзацом': `<div class=card><div style="font-size:12.5px;color:#555;background:#F6F7F8;padding:10px">Змінили бонус — сценарії з цією позицією в наборі перерахують орієнтир; якщо набір стане не дорожчим за замовлення, біля сценарію з’явиться позначка.</div></div>`,   // AE S99: абзац у панелі замість «i»
