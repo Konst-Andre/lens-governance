@@ -5,6 +5,7 @@
 # Безпека: за замовчуванням БЛОКУЄ кожен запит, що щось пише (не GET/HEAD/OPTIONS), — крім «stubs» (відповідь-заглушка) і «allow_write» з конфігу;
 #   кнопки зі «словами-небезпеками» (Опублікувати, Видалити, Надіслати, Оплатити, Publish, Delete, Send, Pay…) не тисне. Тож на проді — без побічних дій.
 # Запуск:  python3 explore.py <конфіг.json> [--out <тека звіту>] [--baseline <файл>] [--max N]      · python3 explore.py selftest  (зуби)
+# Переглядач (AE S115): "viewers" у конфігу — сценарій viewer.py (порядок як на екрані, фокус у вікні, жест = один крок, закриття); неописаний — ⚠ сам.
 # Вихід: ✗ / ⚠ у консоль + <тека>/TESTER_<час>.md (вади зі шляхом кліків, знімки ✗, покриття, заблоковані записи, пакети ПК / PWA). Код виходу 1, якщо нові ✗.
 # Паузи (AE S111, PW-2 / wsd 1.21): «після старту» (settle_ms) і «після кліку» (after_click_ms) — «тиша до N» ядра (tools/claude-code/pw_quiet.py): повертається, щойно
 #   таймери сторінки у вікні, скінченні анімації й запити скінчились, і так два кадри; вікно «сторінка не затихає» (0,7 с) — справжній час (pg.wait_real): воно
@@ -16,6 +17,7 @@ import sys, os, re, json, time, pathlib, datetime, tempfile, threading, http.ser
 from playwright.sync_api import sync_playwright
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / 'claude-code'))
 from pw_quiet import install as quiet_install, report as quiet_report   # пауза = подія, не число (PW-2)
+import viewer as VW   # сценарій «переглядач» (AE S115, TESTER.md §8): гортає за видимим порядком, фокус у вікні, жест = один крок
 
 DENY = r'опублікув|видали|надісла|відправ|оплат|купит|замовит|вийти з|розлогін|скинути все|publish|delete|remove|send|submit|pay|buy|logout|sign out|reset all'
 TECH = r'\bundefined\b|\bNaN\b|\[object |\$\{|\bnull\b|Uncaught|TypeError|ReferenceError'
@@ -120,12 +122,16 @@ def run(cfg, out_dir, baseline=None, max_clicks=None, quiet=False):
       for c in csp: add('✗', 'CSP', where, c, path, shot)
       if s['hscroll']: add('⚠', 'прокрутка вбік', where, f'сторінка ширша за екран', path)
       for x in s['noname']: add('⚠', 'кнопка без назви', where, x, path)
+    known_vw = [VW.setup(v)['dialog'] for v in cfg.get('viewers', [])]; seen_vw = set()
+    def unseen(pg, where, path):   # переглядач, якого конфіг не описав, — ⚠ один раз (TESTER.md §8 п. 1: «знайти переглядач сам»)
+      for d in pg.evaluate(VW.UNCOVERED_JS, [known_vw, VW.NEXT, VW.PREV]):
+        if d not in seen_vw: seen_vw.add(d); add('⚠', 'переглядач без перевірки', where, f'вікно {d} гортає («Попереднє / Наступне»), а в конфігу його нема — опиши в "viewers" (TESTER.md §8)', path)
     for start in cfg.get('starts', [{'name': 'головна'}]):
       ctx, pg, ev = page()
       try: ready(pg, start)
       except Exception as e: add('✗', 'старт', start['name'], f'стан не відкрився: {str(e)[:120]}'); ctx.close(); continue
       sig0 = pg.evaluate(SIG_JS); COV['states'].append(sig0)
-      judge(pg, ev, start['name'], 'старт')
+      judge(pg, ev, start['name'], 'старт'); unseen(pg, start['name'], 'старт')
       for c in ev['con'][:5]: add('⚠', 'консоль', start['name'], c, 'старт')
       for r in ev['req'][:5]: add('✗', 'запит', start['name'], r, 'старт')
       ctrls = pg.evaluate(CONTROLS_JS); ctx.close()
@@ -162,7 +168,7 @@ def run(cfg, out_dir, baseline=None, max_clicks=None, quiet=False):
           mq = pg.evaluate('window.__tester.muts'); pg.wait_real(700); storm = pg.evaluate('window.__tester.muts') - mq   # вікно ЛІЧБИ — справжній час, не тиша
           if storm > cfg.get('calm_max', 20) and not (calm_ok and calm_ok.search(c['name'] or '')):
             add('⚠', 'сторінка не затихає', start['name'], f'після кліку DOM міняється далі: {storm} змін за 0,7 с (цикл перемальовувань?)', path)
-          judge(pg, ev, start['name'], path, e0)
+          judge(pg, ev, start['name'], path, e0); unseen(pg, start['name'], path)
           for r in ev['req'][:3]: add('✗', 'запит', start['name'], r, path)
           for d in ev['dlg']: add('⚠', 'нативне вікно', start['name'], d, path)
           moved = pg.evaluate('window.__tester.muts') - m0
@@ -175,6 +181,7 @@ def run(cfg, out_dir, baseline=None, max_clicks=None, quiet=False):
         except Exception as e:
           add('⚠', 'клік не вдався', start['name'], str(e).split('\n')[0][:140], path)
         finally: ctx.close()
+    if cfg.get('viewers'): VW.run_viewers(cfg, page, ready, add, COV)   # сценарій «переглядач» — з чистих сторінок, після кліків
     # пакети платформи — на першому старті
     st0 = (cfg.get('starts') or [{'name': 'головна'}])[0]
     if cfg.get('device', 'pc') == 'pc' and cfg.get('pack_pc', True):
@@ -231,6 +238,7 @@ def run(cfg, out_dir, baseline=None, max_clicks=None, quiet=False):
            f"- натиснуто: {COV['clicked']} · однакових пропущено вибіркою: {COV['sampled']} · вимкнених: {COV['skipped_disabled']} · закритих іншим шаром: {COV['skipped_covered']}",
            f"- не тиснув (слова-небезпеки): {len(COV['skipped_deny'])} — " + ' · '.join(sorted(set(COV['skipped_deny']))[:12]),
            f"- заблоковано записів (не GET): {len(WR)} — " + ' · '.join(sorted(set(WR))[:8]), '',
+           *(['## Переглядачі — гортання за видимим порядком (TESTER.md §8)', '', *VW.report_lines(COV), ''] if COV.get('viewers') else []),
            '_Дослідник (S110) ще бачить «зсув після кліку» і «сторінка не затихає»; не бачить: зміст і логіку (чи правильна відповідь), дотик і WebKit, відчуття руху — це сценарії продукту й очі._']
   rep.write_text('\n'.join(lines) + '\n', encoding='utf-8')
   print(f"─── тестувальник: ✗ {x} · ⚠ {w} · станів {len(COV['states'])} · кліків {COV['clicked']} · {quiet_report()} · {cache_line} · звіт {rep} ───")
@@ -276,7 +284,9 @@ def selftest():
     if k == 'запит 5xx на кожній сторінці': hit = sum(f['kind'] == 'запит' for f in F) >= 2   # старт і сторінка кліку — обидві бачать 500
     else: hit = (not any(f['kind'] == 'мертва кнопка' for f in F)) if k.endswith('не мертва') else any(f['kind'] == k for f in F)
     bad += not hit; print(('✓' if hit else '✗') + (f' «{k}» → тиша (хибної тривоги нема)' if k.endswith('не мертва') else f' підкинуто «{k}» → спіймано'))
-  print(f'─── tester selftest: {len(DEFECTS) + 2 - bad}/{len(DEFECTS) + 2} ───'); return bad
+  import shutil; shutil.copy(pathlib.Path(__file__).resolve().parent / 'selftest' / 'viewer.html', d / 'viewer.html')   # S115: зуби сценарію «переглядач»
+  vb, vn = VW.selftest(run, url); bad += vb
+  print(f'─── tester selftest: {len(DEFECTS) + 2 + vn - bad}/{len(DEFECTS) + 2 + vn} ───'); return bad
 
 if __name__ == '__main__':
   a = sys.argv[1:]

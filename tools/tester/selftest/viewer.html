@@ -1,0 +1,58 @@
+<!doctype html>
+<!-- viewer.html · зразок переглядача для зубів сценарію «переглядач» тестувальника ядра (tools/tester/viewer.py, TESTER.md §8).
+     живе доки: живе сценарій «переглядач». Чиста сторінка — правильний переглядач (тиша); ?bad=<вада> вмикає одну ваду:
+     order (гортає за прихованою таблицею — вада AE S114) · focus (після кроку фокус падає на сторінку) · wheel (колесо без замка — жест гортає багато)
+     · slow (крок 300 мс) · counter (лічильник рахує й позиції без фото) · closefocus (після закриття фокус «у нікуди») · leak (другий екран гортає список першого). -->
+<html lang="uk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>viewer selftest</title>
+<style>
+body{font:14px/1.4 system-ui,sans-serif;margin:16px;display:grid;grid-template-columns:1fr 240px;gap:16px}
+.grp h2{font-size:15px;margin:12px 0 6px}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.it{height:60px;border:1px solid #bbb;border-radius:8px;background:#fff}
+.it.sel{outline:3px solid #2b6be6}
+.it.b2{order:-1}   /* CSS-порядок: на екрані «Б2» стоїть першим у групі Б, у DOM — другим */
+table{display:none}
+dialog{width:360px;text-align:center}
+dialog::backdrop{background:rgba(0,0,0,.4)}
+.nav{width:44px;height:44px}
+</style></head><body>
+<main id="main"></main>
+<aside><p id="pv">нічого не вибрано</p><button type="button" id="zoom">Збільшити</button><button type="button" onclick="show(cur==='a'?'b':'a')">Інший екран</button></aside>
+<dialog id="v" aria-label="Фото"></dialog>
+<script>
+const BAD = new URLSearchParams(location.search).get('bad') || '';
+const DATA = {a:{'Група А':['a1','a2','a3','a4','a5','a6','a7'], 'Група Б':['b1','b2','b3','b4','b5']}, b:{'Інший екран':['c1','c2','c3','c4','c5']}};
+const NOPH = new Set(['a4']);   // позиція без фото — переглядач її пропускає
+let cur = 'a', sel = null, V = null;
+const $ = s => document.querySelector(s);
+function show(s){ cur = s; sel = null; const d = DATA[s];
+  $('#main').innerHTML = Object.entries(d).map(([g, xs]) => `<section class="grp"><h2>${g}</h2><div class="grid">${xs.map(x => `<button type="button" class="it ${x === 'b2' ? 'b2' : ''}" data-id="${x}" data-ph="${NOPH.has(x) ? 0 : 1}">${x}</button>`).join('')}</div></section>`).join('')
+    + `<table>${Object.values(d).flat().reverse().map(x => `<tr class="it" data-id="${x}"><td>${x}</td></tr>`).join('')}</table>`;   /* прихована таблиця — інший порядок */
+  side(); }
+function side(){ $('#pv').textContent = sel ? 'Вибрано: ' + sel : 'нічого не вибрано'; }
+/* видимий порядок: рядок за рядком, як читає людина */
+const visible = () => { const L = [...document.querySelectorAll('#main .grid .it')].map(e => ({e, r:e.getBoundingClientRect()})).sort((p, q) => Math.abs(p.r.top - q.r.top) > 5 ? p.r.top - q.r.top : p.r.left - q.r.left);
+  return L.map(x => x.e.dataset.id).filter(x => !NOPH.has(x)); };
+const dom = () => [...document.querySelectorAll('table tr.it')].map(e => e.dataset.id).filter(x => !NOPH.has(x));
+function open(id){ if(!(BAD === 'leak' && V)){ const xs = (BAD === 'order' ? dom : visible)(); V = {list: () => xs}; } draw(id);   /* перелік — знімок на відкритті; leak — знімок попереднього екрана */ const d = $('#v'); if(!d.open) d.showModal(); }
+function draw(id){ const d = $('#v'), xs = V.list(), i = xs.indexOf(id), m = BAD === 'counter' ? Object.values(DATA[cur]).flat().length : xs.length;
+  if(BAD === 'slow'){ const t = performance.now(); while(performance.now() - t < 300); }
+  d.dataset.id = id;
+  d.innerHTML = `<button type="button" class="x" aria-label="Закрити">✕</button><button type="button" class="nav l" aria-label="Попереднє фото">‹</button><b>${id}</b><button type="button" class="nav r" aria-label="Наступне фото">›</button><div>${i + 1} з ${m}</div>`;
+  if(d.open && BAD !== 'focus') (d.querySelector(V.last === 'l' ? '.nav.l' : '.nav.r')).focus(); }
+function step(dd){ const d = $('#v'); if(!d.open) return; const xs = V.list(), i = xs.indexOf(d.dataset.id); const c = xs[(i + dd + xs.length) % xs.length];
+  V.last = dd < 0 ? 'l' : 'r'; sel = c; document.querySelectorAll('.it.sel').forEach(e => e.classList.remove('sel')); document.querySelector(`#main [data-id="${c}"]`)?.classList.add('sel');
+  side(); $('#zoom').replaceWith($('#zoom').cloneNode(true)); bindZoom(); draw(c); }   /* крок перемальовує бічну панель — той, хто відкрив, зникає (як в AE) */
+function bindZoom(){ $('#zoom').onclick = () => { if(sel && !NOPH.has(sel)) open(sel); }; }
+bindZoom();
+document.addEventListener('click', e => { const it = e.target.closest('#main .it'); if(!it) return; sel = it.dataset.id; document.querySelectorAll('.it.sel').forEach(x => x.classList.remove('sel')); it.classList.add('sel'); side(); });
+const d = $('#v'); let acc = 0, lock = 0;
+d.addEventListener('click', e => { if(e.target === d || e.target.closest('.x')) return d.close(); const n = e.target.closest('.nav'); if(n) step(n.classList.contains('l') ? -1 : 1); });
+document.addEventListener('keydown', e => { if(!d.open || !/^Arrow(Left|Right)$/.test(e.key)) return; e.preventDefault(); step(e.key === 'ArrowLeft' ? -1 : 1); }, true);
+d.addEventListener('wheel', e => { e.preventDefault(); const now = Date.now();
+  if(BAD !== 'wheel'){ if(now < lock){ lock = now + 220; acc = 0; return; } }
+  acc += e.deltaY; if(Math.abs(acc) < 40) return; const dd = acc > 0 ? 1 : -1; acc = 0; lock = now + 350; step(dd); }, {passive:false});
+d.addEventListener('close', () => setTimeout(() => { if(BAD === 'closefocus') return; const a = document.activeElement; if(a && a !== document.body && !d.contains(a)) return;   /* після Esc фокус ще на кнопці закритого вікна — це теж «загублено» */
+  document.querySelector(`#main [data-id="${d.dataset.id}"]`)?.focus(); }, 0));
+show('a');
+</script></body></html>
