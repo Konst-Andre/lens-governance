@@ -166,7 +166,11 @@ def run_viewers(cfg, page, ready, add, COV):
                                    'колесо 3 клацання за 0,4 с': ([100, 100, 100], 0.133)}.items():
             if 'жест' in skip: break
             b0 = _cur(pg, v); i0 = L.index(b0) if b0 in L else 0
-            for dlt in deltas: pg.mouse.wheel(0, dlt); time.sleep(gap)
+            # серія — подіями в самій сторінці таймером (рецепт A118, замір AE S115): 40 викликів CDP з Python під навантаженням стоять > 220 мс,
+            #   замок жесту спадає й «один жест» стає двома — хибний ✗; ціль — елемент під курсором ЩОРАЗУ (крок перемальовує вікно: застарілий вузол
+            #   поза DOM, подія нікуди не спливає — зуби «колесо без замка» мовчали, selftest 30.10), як справжнє колесо
+            pg.evaluate("""async ([sel, ds, gap]) => { const d = document.querySelector(sel); if (!d) return; const r = d.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
+              for (const dy of ds) { const t = document.elementFromPoint(x, y) || d; t.dispatchEvent(new WheelEvent('wheel', { deltaY: dy, deltaMode: 0, bubbles: true, cancelable: true, clientX: x, clientY: y })); await new Promise(z => setTimeout(z, gap)); } }""", [v['dialog'], deltas, int(gap * 1000)])
             pg.wait_real(v['wheel_gap_ms'])
             c1 = _cur(pg, v); moved = ((L.index(c1) - i0) % len(L)) if c1 in L else None
             if moved != 1: flag('✗', 'жест', f'{g}: зрушило на {moved if moved is not None else "?"} (має бути рівно 1) — «{b0}» → «{c1}»', path + f' → {g}')
