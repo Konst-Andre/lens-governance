@@ -189,6 +189,7 @@ def run_viewers(cfg, page, ready, add, COV):
         try:
           ctx, pg, ev, sname = begin(v); L = _order(pg, v); _open(pg, v, L[0])
           b = _cur(pg, v); pg.keyboard.press('ArrowRight'); _wait_change(pg, v, b); shown = _cur(pg, v)   # крок перед закриттям: часто саме він прибирає того, хто відкрив
+          pg.wait_real(300)   # S116: людина закриває не в ту ж мить, що крок; без паузи вада «фокус лишився на кнопці закритого вікна» ховалась (AE B115 rev 1, ловилась випадково)
           if how == 'Esc': pg.keyboard.press('Escape')
           elif how == '«✕»':
             x = _btn(pg, v, 'close', 'close')
@@ -199,7 +200,8 @@ def run_viewers(cfg, page, ready, add, COV):
             pg.mouse.click(*pt)
           # S116: подія, не пауза — сайт повертає фокус у `close` → setTimeout (обидва асинхронні); 250 мс під навантаженням гейтів не вистачало
           #   (AE gates_v1: фокус на BODY, поодинці ✓). Чекаємо «вікно закрите й фокус не на body» до 2 с; не настало — судимо як є (справжній ✗)
-          try: pg.wait_for_function(f"() => !document.querySelector({_js(v['dialog'])}) && document.activeElement && document.activeElement !== document.body", timeout=2000)
+          #   «Ще не повернувся» = body АБО всередині закритого вікна (A118: a === body || dialog.contains(a); клік поза лишає фокус на самому <dialog>, S116)
+          try: pg.wait_for_function(f"() => {{ const a = document.activeElement; return !document.querySelector({_js(v['dialog'])}) && a && a !== document.body && !a.closest('dialog:not([open])'); }}", timeout=2000)
           except Exception: pass
           r = pg.evaluate(f"""(sh) => {{ const idf = {v['id']}, a = document.activeElement, open = !!document.querySelector({_js(v['dialog'])});
             const it = a && a.closest && a.closest({_js(v['items'])}), extra = {_js(v.get('close_focus') or '')};
