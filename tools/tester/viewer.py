@@ -197,7 +197,10 @@ def run_viewers(cfg, page, ready, add, COV):
           else:
             pt = pg.evaluate(f"() => {{ const r = document.querySelector({_js(v['dialog'])}).getBoundingClientRect(); return r.left > 30 ? [r.left / 2, innerHeight / 2] : [8, 8]; }}")
             pg.mouse.click(*pt)
-          pg.wait_real(250)
+          # S116: подія, не пауза — сайт повертає фокус у `close` → setTimeout (обидва асинхронні); 250 мс під навантаженням гейтів не вистачало
+          #   (AE gates_v1: фокус на BODY, поодинці ✓). Чекаємо «вікно закрите й фокус не на body» до 2 с; не настало — судимо як є (справжній ✗)
+          try: pg.wait_for_function(f"() => !document.querySelector({_js(v['dialog'])}) && document.activeElement && document.activeElement !== document.body", timeout=2000)
+          except Exception: pass
           r = pg.evaluate(f"""(sh) => {{ const idf = {v['id']}, a = document.activeElement, open = !!document.querySelector({_js(v['dialog'])});
             const it = a && a.closest && a.closest({_js(v['items'])}), extra = {_js(v.get('close_focus') or '')};
             const ok = !!(a && a !== document.body && a.isConnected && (a.hasAttribute('data-vw-opener') || (it && idf(it) === sh) || (extra && a.matches(extra))));
