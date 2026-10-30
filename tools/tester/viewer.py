@@ -249,7 +249,7 @@ SELF_BAD = {'order': 'порядок', 'focus': 'фокус', 'wheel': 'жест
 def selftest(run, url):
   bad = 0
   def one(q):
-    cfg = {'name': 'viewer ' + (q or 'чиста'), 'url': url + 'viewer.html' + (f'?bad={q}' if q else ''), 'device': 'pc', 'pack_pc': False, 'max_clicks': 0, 'settle_ms': 150, 'after_click_ms': 300,
+    cfg = {'name': 'viewer ' + (q or 'чиста'), 'url': url + 'viewer.html' + (f'?bad={q}' if q else ''), 'device': 'pc', 'viewers_only': True, 'settle_ms': 150, 'after_click_ms': 300,
            'starts': [{'name': 'екран А'}], 'viewers': [dict(SELF_CFG, name='А', start='екран А'), dict(SELF_CFG, name='Б', start='екран А', js="show('b')")],
            'viewer_cross': [{'from': 'А', 'to': 'Б'}]}
     import tempfile; return run(cfg, tempfile.mkdtemp(prefix='tester-vw-'), quiet=True)[2]

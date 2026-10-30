@@ -4,7 +4,10 @@
 #   і пише звіт про вади. Беремо: обхід без сценарію + звіт із шляхом повтору. Не беремо (поки): модель-дослідника — дорого й нестабільно; окремий шар потім.
 # Безпека: за замовчуванням БЛОКУЄ кожен запит, що щось пише (не GET/HEAD/OPTIONS), — крім «stubs» (відповідь-заглушка) і «allow_write» з конфігу;
 #   кнопки зі «словами-небезпеками» (Опублікувати, Видалити, Надіслати, Оплатити, Publish, Delete, Send, Pay…) не тисне. Тож на проді — без побічних дій.
-# Запуск:  python3 explore.py <конфіг.json> [--out <тека звіту>] [--baseline <файл>] [--max N]      · python3 explore.py selftest  (зуби)
+# Запуск:  python3 explore.py <конфіг.json> [--out <тека звіту>] [--baseline <файл>] [--max N] [--url <адреса>] [--serve <тека>] [--viewers-only]   · python3 explore.py selftest  (зуби)
+#   --serve <тека> (AE S116): локальний сервер на теку (копія сайту, гілка, зіпсована копія для зубів) — адреса конфігу підміняється на http://127.0.0.1:<порт>/;
+#   --viewers-only (AE S116, шар у гейтах продукту): лише сценарій «переглядач» — без обходу кліками й пакетів ПК / PWA (≈ 2 хв замість 10+);
+#     конфіг без "viewers" — ✗ «конфіг» (гейт, якому нічого перевіряти, не мусить бути зеленим).
 # Переглядач (AE S115): "viewers" у конфігу — сценарій viewer.py (порядок як на екрані, фокус у вікні, жест = один крок, закриття); неописаний — ⚠ сам.
 # Вихід: ✗ / ⚠ у консоль + <тека>/TESTER_<час>.md (вади зі шляхом кліків, знімки ✗, покриття, заблоковані записи, пакети ПК / PWA). Код виходу 1, якщо нові ✗.
 # Паузи (AE S111, PW-2 / wsd 1.21): «після старту» (settle_ms) і «після кліку» (after_click_ms) — «тиша до N» ядра (tools/claude-code/pw_quiet.py): повертається, щойно
@@ -61,7 +64,7 @@ INIT_JS = r"""(() => { window.__tester = { csp: [], muts: 0 };
 
 def run(cfg, out_dir, baseline=None, max_clicks=None, quiet=False):
   F, COV, WR = [], {'states': [], 'clicked': 0, 'skipped_deny': [], 'skipped_disabled': 0, 'skipped_covered': 0, 'sampled': 0, 'dead': 0}, []
-  deny = re.compile(cfg.get('deny', DENY), re.I); allow_lab = re.compile(cfg['allow_labels'], re.I) if cfg.get('allow_labels') else None; tech = cfg.get('tech', TECH); maxc = max_clicks or cfg.get('max_clicks', 80)
+  deny = re.compile(cfg.get('deny', DENY), re.I); allow_lab = re.compile(cfg['allow_labels'], re.I) if cfg.get('allow_labels') else None; tech = cfg.get('tech', TECH); maxc = max_clicks or cfg.get('max_clicks', 80); vonly = bool(cfg.get('viewers_only'))
   stubs = [(re.compile(s['url']), s.get('method', 'POST').upper(), s) for s in cfg.get('stubs', [])]
   allow = [re.compile(x) for x in cfg.get('allow_write', [])]
   out_dir = pathlib.Path(out_dir); shots = out_dir / 'shots'; shots.mkdir(parents=True, exist_ok=True)
@@ -126,7 +129,8 @@ def run(cfg, out_dir, baseline=None, max_clicks=None, quiet=False):
     def unseen(pg, where, path):   # переглядач, якого конфіг не описав, — ⚠ один раз (TESTER.md §8 п. 1: «знайти переглядач сам»)
       for d in pg.evaluate(VW.UNCOVERED_JS, [known_vw, VW.NEXT, VW.PREV]):
         if d not in seen_vw: seen_vw.add(d); add('⚠', 'переглядач без перевірки', where, f'вікно {d} гортає («Попереднє / Наступне»), а в конфігу його нема — опиши в "viewers" (TESTER.md §8)', path)
-    for start in cfg.get('starts', [{'name': 'головна'}]):
+    if vonly and not cfg.get('viewers'): add('✗', 'конфіг', 'viewers_only', 'режим «лише переглядачі», а в конфігу нема "viewers" — перевіряти нічого')
+    for start in ([] if vonly else cfg.get('starts', [{'name': 'головна'}])):   # --viewers-only: без обходу кліками
       ctx, pg, ev = page()
       try: ready(pg, start)
       except Exception as e: add('✗', 'старт', start['name'], f'стан не відкрився: {str(e)[:120]}'); ctx.close(); continue
@@ -184,7 +188,7 @@ def run(cfg, out_dir, baseline=None, max_clicks=None, quiet=False):
     if cfg.get('viewers'): VW.run_viewers(cfg, page, ready, add, COV)   # сценарій «переглядач» — з чистих сторінок, після кліків
     # пакети платформи — на першому старті
     st0 = (cfg.get('starts') or [{'name': 'головна'}])[0]
-    if cfg.get('device', 'pc') == 'pc' and cfg.get('pack_pc', True):
+    if cfg.get('device', 'pc') == 'pc' and cfg.get('pack_pc', True) and not vonly:
       ctx, pg, ev = page(); ready(pg, st0)
       reach = pg.evaluate("""() => { const all = [...document.querySelectorAll('a[href],button,select,input,textarea,[tabindex]')].filter(e => { const r = e.getBoundingClientRect(), s = getComputedStyle(e);
           return r.width > 2 && r.height > 2 && s.visibility !== 'hidden' && s.display !== 'none' && !e.disabled && e.tabIndex >= 0 && !e.closest('[inert]'); }); all.forEach((e, i) => e.dataset.tst = i); return all.length; }""")
@@ -195,7 +199,7 @@ def run(cfg, out_dir, baseline=None, max_clicks=None, quiet=False):
       miss = pg.evaluate("(seen) => [...document.querySelectorAll('[data-tst]')].filter(e => !seen.includes(e.dataset.tst)).map(e => (e.getAttribute('aria-label') || e.textContent || e.tagName).trim().slice(0, 40))", list(seen))
       if miss: add('⚠', 'клавіатура', st0['name'], f'Tab не доходить до {len(miss)} з {reach}: ' + ' · '.join(miss[:6]))
       ctx.close()
-    if cfg.get('pwa') or cfg.get('device') == 'iphone':
+    if (cfg.get('pwa') or cfg.get('device') == 'iphone') and not vonly:
       ctx, pg, ev = page(); ready(pg, st0)
       man = pg.evaluate("""async () => { const l = document.querySelector('link[rel=manifest]'); if (!l) return null; try { return await (await fetch(l.href)).json(); } catch (e) { return {error: String(e)}; } }""")
       if not man: add('⚠', 'PWA', st0['name'], 'нема <link rel=manifest> — встановити на екран не вийде')
@@ -286,14 +290,27 @@ def selftest():
     bad += not hit; print(('✓' if hit else '✗') + (f' «{k}» → тиша (хибної тривоги нема)' if k.endswith('не мертва') else f' підкинуто «{k}» → спіймано'))
   import shutil; shutil.copy(pathlib.Path(__file__).resolve().parent / 'selftest' / 'viewer.html', d / 'viewer.html')   # S115: зуби сценарію «переглядач»
   vb, vn = VW.selftest(run, url); bad += vb
-  print(f'─── tester selftest: {len(DEFECTS) + 2 + vn - bad}/{len(DEFECTS) + 2 + vn} ───'); return bad
+  # S116: --viewers-only — обходу кліками нема (мертва кнопка на сторінці не помічена), а без "viewers" — ✗ «конфіг», не тиша
+  (d / 'index.html').write_text(SELF_PAGE.replace('BAD', DEFECTS['мертва кнопка']), encoding='utf-8')
+  F = run({'name': 'лише переглядачі', 'url': url, 'device': 'pc', 'viewers_only': True, 'settle_ms': 150}, d / 'out-vonly', quiet=True)[2]
+  ok = not any(f['kind'] == 'мертва кнопка' for f in F); bad += not ok; print(('✓' if ok else '✗') + ' --viewers-only → обходу кліками нема')
+  ok = any(f['lvl'] == '✗' and f['kind'] == 'конфіг' for f in F); bad += not ok; print(('✓' if ok else '✗') + ' --viewers-only без "viewers" → ✗ «конфіг»')
+  print(f'─── tester selftest: {len(DEFECTS) + 4 + vn - bad}/{len(DEFECTS) + 4 + vn} ───'); return bad
 
 if __name__ == '__main__':
   a = sys.argv[1:]
-  if not a: print(__doc__ or 'python3 explore.py <конфіг.json> [--out тека] [--baseline файл] [--max N] | selftest'); sys.exit(2)
+  if not a: print(__doc__ or 'python3 explore.py <конфіг.json> [--out тека] [--baseline файл] [--max N] [--url адреса] [--serve тека] [--viewers-only] | selftest'); sys.exit(2)
   if a[0] == 'selftest': sys.exit(1 if selftest() else 0)
   cfg = json.loads(pathlib.Path(a[0]).read_text(encoding='utf-8'))
   opt = lambda k, d=None: a[a.index(k) + 1] if k in a else d
   if opt('--url'): cfg['url'] = opt('--url')
+  if '--viewers-only' in a: cfg['viewers_only'] = True
+  if opt('--serve'):   # локальна копія сайту: той самий сервер, що в selftest, без журналу запитів
+    class Q(http.server.SimpleHTTPRequestHandler):
+      def log_message(self, *x): pass
+    root = pathlib.Path(opt('--serve')).resolve()
+    if not (root / 'index.html').exists(): print(f'✗ --serve {root}: нема index.html'); sys.exit(2)
+    srv = socketserver.ThreadingTCPServer(('127.0.0.1', 0), functools.partial(Q, directory=str(root))); srv.daemon_threads = True
+    threading.Thread(target=srv.serve_forever, daemon=True).start(); cfg['url'] = f'http://127.0.0.1:{srv.server_address[1]}/'
   x, w, F, _ = run(cfg, opt('--out', 'tester-out'), opt('--baseline'), int(opt('--max', 0)) or None)
   sys.exit(1 if x else 0)
