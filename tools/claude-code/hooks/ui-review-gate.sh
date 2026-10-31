@@ -73,6 +73,9 @@ def gate(d):
         files, hx = ui_state(top)
         if files and not os.path.exists(mark(hx)): bad.append((top, files, hx))
     if not bad: return None
+    if re.search(r"ui-review-gate\.sh\s+done\b", cmd):   # AE S117 (Konst: «збалансувати старе правило, не нове»): огляд уже написано, але тією ж командою — гачок бачить стан ДО неї;
+        return {"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny",   # заборона та сама, без чек-листа на 2 КБ — лише що зробити
+            "permissionDecisionReason": "Позначка огляду й коміт — в одній команді: гачок бачить стан до неї. Виконай `ui-review-gate.sh done …` окремою командою, потім коміт."}}
     why = " | ".join(f"{os.path.basename(t)}: {', '.join(f[:4])}{' …' if len(f) > 4 else ''} (дифф {h[:8]})" for t, f, h in bad)
     return {"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny",
         "permissionDecisionReason": f"Огляд UI до коміту: змінено UI — {why}; позначки огляду цього диффу нема. "
@@ -123,6 +126,8 @@ if mode == "selftest":
         open(f"{tmp}/a.html", "w").write("<p>2</p>")
         say(gate(ev("git add -A && git commit -m x")) is not None, "зуби: .html змінено, позначки нема → deny")
         say(gate(ev("git status")) is None, "не коміт → тиша")
+        r = gate(ev("bash x/ui-review-gate.sh done \"огляд\" . && git commit -am x"))
+        say(r is not None and len(r["hookSpecificOutput"]["permissionDecisionReason"]) < 200, "позначка й коміт однією командою → deny коротко (без чек-листа)")
         subprocess.run(["git", "-C", tmp, "stash", "-q"], check=True); os.makedirs(f"{tmp}/shots/P1", exist_ok=True)
         open(f"{tmp}/shots/P1/fit.css", "w").write("p{}"); subprocess.run(["git", "-C", tmp, "add", "-A"], check=True); subprocess.run(["git", "-C", tmp, "commit", "-qm", "fit"], check=True)
         os.remove(f"{tmp}/shots/P1/fit.css")
