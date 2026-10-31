@@ -82,3 +82,4 @@
 
 | дата | сесія · репо | перевірка | вердикт | що змінено (коміт · тест) |
 |---|---|---|---|---|
+| 31.10 | `session_014fR6Ws` · AE S118 | підсумок сесії (рядки по одному — `journal/HOOK_JOURNAL_2026-10.md`, ротація цього ж дня): `ui-guard` ×4 · `brief-guard` ×2 · `handoff-remind` ×11 · `commit-gate` ×2 · `konst-miss` ×2 | **справжнє всі:** `ui-guard` — 3 рази дошукав практику (NN/g toggle · Incode typography · GitLab Pajamas · W3C ACT / F78 · MDN combobox), 1 — `skip` з причиною (дрібна правка шаблону); `brief-guard` — §0 брифів AE-BON / AE-PORT / AE-HDR дописано; `handoff-remind` — самері дописувалось щоходу (останнє — хеші rev 13); `commit-gate` — карта репо й рядок «ядро: …» для нового приладу; `konst-miss` — 1 дубль уроку S117, 1 справжній пропуск → `focus_ring_v1` | — |
