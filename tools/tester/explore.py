@@ -62,7 +62,8 @@ INIT_JS = r"""(() => { window.__tester = { csp: [], muts: 0 };
   document.addEventListener('securitypolicyviolation', e => window.__tester.csp.push(e.violatedDirective + ' ' + (e.blockedURI || '')));
   new MutationObserver(m => { window.__tester.muts += m.length; }).observe(document, { subtree: true, childList: true, attributes: true, characterData: true }); })();"""
 
-def run(cfg, out_dir, baseline=None, max_clicks=None, quiet=False):
+def run(cfg, out_dir, baseline=None, max_clicks=None, quiet=False, shard=None, collect=False):
+  # shard=(k, n): лише старти k, k+n, … (паралельний прогін --jobs, AE S119); переглядачі й пакети платформи — у шматку 0; collect — сирі F/COV без звіту
   F, COV, WR = [], {'states': [], 'clicked': 0, 'skipped_deny': [], 'skipped_disabled': 0, 'skipped_covered': 0, 'sampled': 0, 'dead': 0}, []
   deny = re.compile(cfg.get('deny', DENY), re.I); allow_lab = re.compile(cfg['allow_labels'], re.I) if cfg.get('allow_labels') else None; tech = cfg.get('tech', TECH); maxc = max_clicks or cfg.get('max_clicks', 80); vonly = bool(cfg.get('viewers_only'))
   stubs = [(re.compile(s['url']), s.get('method', 'POST').upper(), s) for s in cfg.get('stubs', [])]
@@ -117,7 +118,7 @@ def run(cfg, out_dir, baseline=None, max_clicks=None, quiet=False):
       shot = None
       bad = ev['err'][base_err:] or s['tech'] or csp
       if bad:
-        shot = f'{len(F):03d}.png'
+        shot = (f's{shard[0]}-' if shard else '') + f'{len(F):03d}.png'
         try: pg.screenshot(path=str(shots / shot))
         except Exception: shot = None
       for e in ev['err'][base_err:]: add('✗', 'JS-помилка', where, e, path, shot)
@@ -130,11 +131,12 @@ def run(cfg, out_dir, baseline=None, max_clicks=None, quiet=False):
       for d in pg.evaluate(VW.UNCOVERED_JS, [known_vw, VW.NEXT, VW.PREV]):
         if d not in seen_vw: seen_vw.add(d); add('⚠', 'переглядач без перевірки', where, f'вікно {d} гортає («Попереднє / Наступне»), а в конфігу його нема — опиши в "viewers" (TESTER.md §8)', path)
     if vonly and not cfg.get('viewers'): add('✗', 'конфіг', 'viewers_only', 'режим «лише переглядачі», а в конфігу нема "viewers" — перевіряти нічого')
-    for start in ([] if vonly else cfg.get('starts', [{'name': 'головна'}])):   # --viewers-only: без обходу кліками
+    S0 = [] if vonly else cfg.get('starts', [{'name': 'головна'}])
+    for start in (S0[shard[0]::shard[1]] if shard else S0):   # --viewers-only: без обходу кліками; --jobs: свій шматок стартів
       ctx, pg, ev = page()
       try: ready(pg, start)
       except Exception as e: add('✗', 'старт', start['name'], f'стан не відкрився: {str(e)[:120]}'); ctx.close(); continue
-      sig0 = pg.evaluate(SIG_JS); COV['states'].append(sig0)
+      sig0 = pg.evaluate(SIG_JS); COV['states'] += [] if sig0 in COV['states'] else [sig0]   # S119: лічба — різні стани (раніше старт дописувався й повтором: «38» = 25 різних)
       judge(pg, ev, start['name'], 'старт'); unseen(pg, start['name'], 'старт')
       for c in ev['con'][:5]: add('⚠', 'консоль', start['name'], c, 'старт')
       for r in ev['req'][:5]: add('✗', 'запит', start['name'], r, 'старт')
@@ -185,10 +187,11 @@ def run(cfg, out_dir, baseline=None, max_clicks=None, quiet=False):
         except Exception as e:
           add('⚠', 'клік не вдався', start['name'], str(e).split('\n')[0][:140], path)
         finally: ctx.close()
-    if cfg.get('viewers'): VW.run_viewers(cfg, page, ready, add, COV)   # сценарій «переглядач» — з чистих сторінок, після кліків
+    first = not shard or shard[0] == 0   # переглядачі й пакети — один раз на прогін
+    if cfg.get('viewers') and first: VW.run_viewers(cfg, page, ready, add, COV)   # сценарій «переглядач» — з чистих сторінок, після кліків
     # пакети платформи — на першому старті
     st0 = (cfg.get('starts') or [{'name': 'головна'}])[0]
-    if cfg.get('device', 'pc') == 'pc' and cfg.get('pack_pc', True) and not vonly:
+    if cfg.get('device', 'pc') == 'pc' and cfg.get('pack_pc', True) and not vonly and first:
       ctx, pg, ev = page(); ready(pg, st0)
       reach = pg.evaluate("""() => { const all = [...document.querySelectorAll('a[href],button,select,input,textarea,[tabindex]')].filter(e => { const r = e.getBoundingClientRect(), s = getComputedStyle(e);
           return r.width > 2 && r.height > 2 && s.visibility !== 'hidden' && s.display !== 'none' && !e.disabled && e.tabIndex >= 0 && !e.closest('[inert]'); }); all.forEach((e, i) => e.dataset.tst = i); return all.length; }""")
@@ -199,7 +202,7 @@ def run(cfg, out_dir, baseline=None, max_clicks=None, quiet=False):
       miss = pg.evaluate("(seen) => [...document.querySelectorAll('[data-tst]')].filter(e => !seen.includes(e.dataset.tst)).map(e => (e.getAttribute('aria-label') || e.textContent || e.tagName).trim().slice(0, 40))", list(seen))
       if miss: add('⚠', 'клавіатура', st0['name'], f'Tab не доходить до {len(miss)} з {reach}: ' + ' · '.join(miss[:6]))
       ctx.close()
-    if (cfg.get('pwa') or cfg.get('device') == 'iphone') and not vonly:
+    if (cfg.get('pwa') or cfg.get('device') == 'iphone') and not vonly and first:
       ctx, pg, ev = page(); ready(pg, st0)
       man = pg.evaluate("""async () => { const l = document.querySelector('link[rel=manifest]'); if (!l) return null; try { return await (await fetch(l.href)).json(); } catch (e) { return {error: String(e)}; } }""")
       if not man: add('⚠', 'PWA', st0['name'], 'нема <link rel=manifest> — встановити на екран не вийде')
@@ -220,6 +223,11 @@ def run(cfg, out_dir, baseline=None, max_clicks=None, quiet=False):
       if not pg.evaluate("!!document.querySelector('meta[name=viewport]')"): add('⚠', 'PWA', st0['name'], 'нема meta viewport')
       ctx.close()
     b.close()
+  if collect: return {'F': F, 'COV': COV, 'WR': WR, 'cache': len(CACHE), 'CST': CST, 'quiet': quiet_report(), 'use_cache': use_cache}
+  return finish(cfg, out_dir, baseline, F, COV, WR, len(CACHE), CST, quiet_report(), use_cache)
+
+def finish(cfg, out_dir, baseline, F, COV, WR, ncache, CST, qline, use_cache):
+  out_dir = pathlib.Path(out_dir)
   for wr in sorted(set(WR)): F.append({'lvl': 'ⓘ', 'kind': 'запис заблоковано', 'where': '', 'msg': wr, 'path': '', 'shot': ''})   # не вада: сторінка хотіла писати — тестувальник не пустив
   # база відомих вад: блокує лише нове (як ui_lint --baseline)
   key = lambda f: f"{f['kind']}|{f['where']}|{re.sub(r'[0-9]+', '#', f['msg'])[:80]}"
@@ -231,10 +239,10 @@ def run(cfg, out_dir, baseline=None, max_clicks=None, quiet=False):
       for f in F:
         if f['lvl'] == '✗' and key(f) in base: f['lvl'] = 'ⓘ'; f['msg'] += ' — з бази'
   x = sum(f['lvl'] == '✗' for f in F); w = sum(f['lvl'] == '⚠' for f in F)
-  cache_line = f"кеш: {len(CACHE)} адрес, з пам'яті {CST['hit']} · з мережі {CST['miss']}" if use_cache else 'кеш: вимкнено'
+  cache_line = f"кеш: {ncache} адрес, з пам'яті {CST['hit']} · з мережі {CST['miss']}" if use_cache else 'кеш: вимкнено'
   rep = out_dir / f"TESTER_{datetime.datetime.now():%Y-%m-%d_%H%M}.md"
   lines = [f"# Тестувальник · {cfg.get('name', '')} · {datetime.datetime.now():%d.%m.%Y %H:%M}", '',
-           f"{cfg['url']} · пристрій {cfg.get('device', 'pc')} · **✗ {x} · ⚠ {w}** · станів {len(COV['states'])} · кліків {COV['clicked']} · {quiet_report()} · {cache_line}", '',
+           f"{cfg['url']} · пристрій {cfg.get('device', 'pc')} · **✗ {x} · ⚠ {w}** · станів {len(COV['states'])} · кліків {COV['clicked']} · {qline} · {cache_line}", '',
            '## Вади', '', '| | вид | де | що | шлях повтору | знімок |', '|---|---|---|---|---|---|',
            *[f"| {f['lvl']} | {f['kind']} | {f['where']} | {f['msg'].replace('|', '/')} | {f['path'].replace('|', '/')} | {('shots/' + f['shot']) if f['shot'] else ''} |" for f in F if f['lvl'] != 'ⓘ'], '',
            '## Покриття — куди дійшов і куди ні', '',
@@ -245,8 +253,30 @@ def run(cfg, out_dir, baseline=None, max_clicks=None, quiet=False):
            *(['## Переглядачі — гортання за видимим порядком (TESTER.md §8)', '', *VW.report_lines(COV), ''] if COV.get('viewers') else []),
            '_Дослідник (S110) ще бачить «зсув після кліку» і «сторінка не затихає»; не бачить: зміст і логіку (чи правильна відповідь), дотик і WebKit, відчуття руху — це сценарії продукту й очі._']
   rep.write_text('\n'.join(lines) + '\n', encoding='utf-8')
-  print(f"─── тестувальник: ✗ {x} · ⚠ {w} · станів {len(COV['states'])} · кліків {COV['clicked']} · {quiet_report()} · {cache_line} · звіт {rep} ───")
+  print(f"─── тестувальник: ✗ {x} · ⚠ {w} · станів {len(COV['states'])} · кліків {COV['clicked']} · {qline} · {cache_line} · звіт {rep} ───")
   return x, w, F, CST
+
+def _shard(a):   # окремий процес: свій браузер і свій шматок стартів
+  cfg, out, maxc, k, n = a
+  return run(cfg, out, None, maxc, True, (k, n), True)
+
+def run_jobs(cfg, out_dir, baseline, max_clicks, jobs):
+  """S119 (AE, Konst: «пришвидшити без втрати якості»): старти незалежні (кожен — свій контекст браузера) → ділимо їх між процесами
+  (свій браузер у кожному; спільного змінного стану нема — практика sharding Playwright, testdino.com 31.10.2026), вади й покриття
+  зливаємо в ОДИН звіт тим самим finish(). Знімки — з префіксом шматка (s0-…, s1-…), щоб не перетерлись."""
+  import concurrent.futures as CF
+  n = max(1, min(jobs, len(cfg.get('starts') or [1])))
+  with CF.ProcessPoolExecutor(n) as ex: parts = list(ex.map(_shard, [(cfg, out_dir, max_clicks, k, n) for k in range(n)]))
+  F, WR, COV, CST = [], [], {}, {'hit': 0, 'miss': 0}
+  for r in parts:
+    F += r['F']; WR += r['WR']; CST['hit'] += r['CST']['hit']; CST['miss'] += r['CST']['miss']
+    for k, v in r['COV'].items():
+      if k == 'states': COV.setdefault(k, []); COV[k] += [s for s in v if s not in COV[k]]
+      elif isinstance(v, bool) or not isinstance(v, (int, list)): COV[k] = COV.get(k) or v
+      elif isinstance(v, int): COV[k] = COV.get(k, 0) + v
+      else: COV[k] = COV.get(k, []) + v
+  q = f"паралельно {n} · " + ' | '.join(r['quiet'] for r in parts)
+  return finish(cfg, out_dir, baseline, F, COV, WR, max(r['cache'] for r in parts), CST, q, parts[0]['use_cache'])
 
 SELF_PAGE = """<!doctype html><html lang=uk><head><meta charset=utf-8><meta name=viewport content="width=device-width"><title>selftest</title></head><body>
 <h1>Тест</h1><p id=o>старт</p>
@@ -312,5 +342,9 @@ if __name__ == '__main__':
     if not (root / 'index.html').exists(): print(f'✗ --serve {root}: нема index.html'); sys.exit(2)
     srv = socketserver.ThreadingTCPServer(('127.0.0.1', 0), functools.partial(Q, directory=str(root))); srv.daemon_threads = True
     threading.Thread(target=srv.serve_forever, daemon=True).start(); cfg['url'] = f'http://127.0.0.1:{srv.server_address[1]}/'
-  x, w, F, _ = run(cfg, opt('--out', 'tester-out'), opt('--baseline'), int(opt('--max', 0)) or None)
+  jobs = int(opt('--jobs', os.environ.get('TESTER_JOBS', '1')))
+  if jobs > 1 and not cfg.get('viewers_only'):
+    x, w, F, _ = run_jobs(cfg, opt('--out', 'tester-out'), opt('--baseline'), int(opt('--max', 0)) or None, jobs)
+  else:
+    x, w, F, _ = run(cfg, opt('--out', 'tester-out'), opt('--baseline'), int(opt('--max', 0)) or None)
   sys.exit(1 if x else 0)
