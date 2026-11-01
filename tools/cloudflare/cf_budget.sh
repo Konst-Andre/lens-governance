@@ -44,6 +44,33 @@ try:
     share('запити сьогодні', sum(by.values()), L.get('workers_requests_day'))
     if by: parts[-1] += f' · більше всіх {top}'
 except Exception as e: parts.append('запити — не заміряно (' + type(e).__name__ + ')')
+# 1-б · CPU на запит за 7 днів (AE S120): «чи не завеликий файл даних» вирішує не розмір, а CPU воркера, що його розбирає (ліміт Free — CLOUDFLARE.md §1).
+#   Суддя — ВІДМОВИ `exceededCpu` / `exceededResources` (✗) і ТИПОВИЙ запит p50 (⚠ від порогу alarm_share): Cloudflare дає «перенесення» CPU —
+#   окремі запити понад ліміт без помилок, якщо типові нижче; падіння — коли ліміт перевищено постійно (developers.cloudflare.com/workers/platform/limits;
+#   пояснення Cloudflare в community.cloudflare.com «Far over CPU time limit for free plan», 01.11.2026). p99 — лише для довідки.
+#   Замір 01.11.2026: ae-edit p50 7,2 · p99 17,9 мс; airlens p50 19,2 · p99 44 мс; відмов 0 у всіх.
+try:
+    d7 = (now - datetime.timedelta(days=7)).strftime('%Y-%m-%dT%H:%M:%SZ'); t1 = now.strftime('%Y-%m-%dT%H:%M:%SZ')
+    q = ('{viewer{accounts(filter:{accountTag:"%s"}){workersInvocationsAdaptive(limit:1000,filter:{datetime_geq:"%s",datetime_leq:"%s"})'
+         '{sum{requests} quantiles{cpuTimeP50 cpuTimeP99} dimensions{scriptName status}}}}}') % (acc, d7, t1)
+    rows = get('https://api.cloudflare.com/client/v4/graphql', {'query': q})['data']['viewer']['accounts'][0]['workersInvocationsAdaptive']
+    cpu, bad = {}, {}
+    for r in rows:
+        n, st = r['dimensions']['scriptName'], r['dimensions']['status']
+        if st in ('exceededCpu', 'exceededResources'): bad[n] = bad.get(n, 0) + r['sum']['requests']
+        if st == 'success':
+            w = r['sum']['requests']; p50, p99 = r['quantiles']['cpuTimeP50'] / 1000.0, r['quantiles']['cpuTimeP99'] / 1000.0
+            c = cpu.setdefault(n, [0, 0.0, 0.0]); c[0] += w; c[1] += p50 * w; c[2] = max(c[2], p99)   # p50 — зважене за запитами між зрізами
+    lim = float(L.get('workers_cpu_ms', 0) or 0)
+    if cpu and lim:
+        med = {n: c[1] / c[0] for n, c in cpu.items() if c[0]}
+        for n, k in bad.items(): warn.append(f'✗ ТРИВОГА cloudflare: {n} — {k} відмов через CPU за 7 дн. (exceededCpu) · CLOUDFLARE.md §1 «CPU на запит»')
+        for n, m in sorted(med.items(), key=lambda kv: -kv[1]):
+            pc = 100.0 * m / lim + inj
+            if pc >= alarm: warn.append(f'⚠ ТРИВОГА cloudflare: CPU {n} — типовий запит p50 {m:.1f} мс із {lim:.0f} ({pc:.0f}%), p99 {cpu[n][2]:.1f} мс, відмов {bad.get(n, 0)} за 7 дн. · CLOUDFLARE.md §1 «CPU на запит»')
+        hot = max(med, key=med.get); pc = 100.0 * med[hot] / lim + inj
+        parts.append(f"{'✗ ' if bad else '⚠ ' if pc >= alarm else ''}CPU 7 дн.: відмов {sum(bad.values())} · найгарячіший {hot} p50 {med[hot]:.1f} мс із {lim:.0f}")
+except Exception as e: parts.append('CPU — не заміряно (' + type(e).__name__ + ')')
 # 2 · збірки Pages цього календарного місяця + заводські налаштування
 try:
     projs = get(API + '/pages/projects')['result']; total = 0; per = {}; wide = []

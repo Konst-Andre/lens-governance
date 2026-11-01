@@ -12,6 +12,7 @@
 
 ```cf-limits
 workers_requests_day=100000
+workers_cpu_ms=10
 pages_builds_month=500
 workers_builds_minutes_month=3000
 alarm_share=70
@@ -23,7 +24,7 @@ fresh_days=30
 | ресурс | ліміт Free | на що скидається | хто їсть | що буде при переповненні | джерело (перевірено) |
 |---|---|---|---|---|---|
 | запити до воркерів + Pages Functions | 100 000 / добу на **акаунт** | опівночі UTC | бот (вебхук, крон), API сайтів, проксі моделі | помилка 1027 — воркер не відповідає до кінця доби | developers.cloudflare.com/workers/platform/limits (03.10.2026) |
-| CPU на запит | 10 мс | — | важкий розбір, рендер | обрив запиту `exceededResources` | там само |
+| CPU на запит | 10 мс | — | важкий розбір, рендер | обрив запиту `exceededResources` | там само **Як судити (AE S120, 01.11.2026):** окремі запити понад 10 мс проходять без помилок — Cloudflare дає «перенесення» CPU (rollover), якщо типові запити нижче межі; падіння (Error 1102, `exceededCpu`) — коли межу перевищено постійно (пояснення Cloudflare в community.cloudflare.com «Far over CPU time limit for free plan», 01.11.2026; на офіційній сторінці механізм не описано — не перевірено). Тому `cf_budget` судить відмови (✗) і **p50** (⚠ від alarm_share), p99 — довідка. Замір 01.11: airlens p50 19,2 мс (постійно понад межу, відмов 0) · ae-edit 7,2 · qr-admin 7,0. |
 | статика Pages / `[assets]` воркера | без ліміту, безкоштовно | — | сайти, Mini App | — | developers.cloudflare.com/pages/functions/pricing (03.10.2026) |
 | **збірки Pages** | **500 / місяць на акаунт**, 1 водночас | календарний місяць | **кожен push у будь-яку гілку будь-якого підключеного репо** (за замовчуванням) | нові деплої стоять: сайт живий, але зміни (і дані з редактора) не доїжджають | developers.cloudflare.com/pages/platform/limits (03.10.2026) |
 | збірки воркерів (Workers Builds) | 3 000 хв / місяць, 1 водночас, 20 хв на збірку | місяць | push у репо з підключеним Workers Builds | викладка стоїть | developers.cloudflare.com/workers/ci-cd/builds/limits-and-pricing (03.10.2026) |
