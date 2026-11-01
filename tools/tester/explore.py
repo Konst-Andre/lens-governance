@@ -342,7 +342,8 @@ if __name__ == '__main__':
     if not (root / 'index.html').exists(): print(f'✗ --serve {root}: нема index.html'); sys.exit(2)
     srv = socketserver.ThreadingTCPServer(('127.0.0.1', 0), functools.partial(Q, directory=str(root))); srv.daemon_threads = True
     threading.Thread(target=srv.serve_forever, daemon=True).start(); cfg['url'] = f'http://127.0.0.1:{srv.server_address[1]}/'
-  jobs = int(opt('--jobs', os.environ.get('TESTER_JOBS', '1')))
+  jobs = int(opt('--jobs', os.environ.get('TESTER_JOBS', '0')))   # S119: 0 = сам — min(4, ядер); --jobs 1 — послідовно (налагодження, порівняння)
+  if jobs <= 0: jobs = min(4, os.cpu_count() or 1)
   if jobs > 1 and not cfg.get('viewers_only'):
     x, w, F, _ = run_jobs(cfg, opt('--out', 'tester-out'), opt('--baseline'), int(opt('--max', 0)) or None, jobs)
   else:
