@@ -20,6 +20,7 @@ import sys, os, re, json, time, pathlib, datetime, tempfile, threading, http.ser
 from playwright.sync_api import sync_playwright
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / 'claude-code'))
 from pw_quiet import install as quiet_install, report as quiet_report   # пауза = подія, не число (PW-2)
+RUN = {'t0': time.time(), 'jobs': 1}   # AE S120 («швидкомір»): тривалість і --jobs — у шапці звіту, env_check продукту читає їх зі звіту
 import viewer as VW   # сценарій «переглядач» (AE S115, TESTER.md §8): гортає за видимим порядком, фокус у вікні, жест = один крок
 
 DENY = r'опублікув|видали|надісла|відправ|оплат|купит|замовит|вийти з|розлогін|скинути все|publish|delete|remove|send|submit|pay|buy|logout|sign out|reset all'
@@ -242,7 +243,7 @@ def finish(cfg, out_dir, baseline, F, COV, WR, ncache, CST, qline, use_cache):
   cache_line = f"кеш: {ncache} адрес, з пам'яті {CST['hit']} · з мережі {CST['miss']}" if use_cache else 'кеш: вимкнено'
   rep = out_dir / f"TESTER_{datetime.datetime.now():%Y-%m-%d_%H%M}.md"
   lines = [f"# Тестувальник · {cfg.get('name', '')} · {datetime.datetime.now():%d.%m.%Y %H:%M}", '',
-           f"{cfg['url']} · пристрій {cfg.get('device', 'pc')} · **✗ {x} · ⚠ {w}** · станів {len(COV['states'])} · кліків {COV['clicked']} · {qline} · {cache_line}", '',
+           f"{cfg['url']} · пристрій {cfg.get('device', 'pc')} · **✗ {x} · ⚠ {w}** · станів {len(COV['states'])} · кліків {COV['clicked']} · {qline} · {cache_line} · тривалість {time.time() - RUN['t0']:.0f} с · jobs {RUN['jobs']}", '',
            '## Вади', '', '| | вид | де | що | шлях повтору | знімок |', '|---|---|---|---|---|---|',
            *[f"| {f['lvl']} | {f['kind']} | {f['where']} | {f['msg'].replace('|', '/')} | {f['path'].replace('|', '/')} | {('shots/' + f['shot']) if f['shot'] else ''} |" for f in F if f['lvl'] != 'ⓘ'], '',
            '## Покриття — куди дійшов і куди ні', '',
@@ -344,6 +345,7 @@ if __name__ == '__main__':
     threading.Thread(target=srv.serve_forever, daemon=True).start(); cfg['url'] = f'http://127.0.0.1:{srv.server_address[1]}/'
   jobs = int(opt('--jobs', os.environ.get('TESTER_JOBS', '0')))   # S119: 0 = сам — min(4, ядер); --jobs 1 — послідовно (налагодження, порівняння)
   if jobs <= 0: jobs = min(4, os.cpu_count() or 1)
+  RUN['jobs'] = jobs
   if jobs > 1 and not cfg.get('viewers_only'):
     x, w, F, _ = run_jobs(cfg, opt('--out', 'tester-out'), opt('--baseline'), int(opt('--max', 0)) or None, jobs)
   else:

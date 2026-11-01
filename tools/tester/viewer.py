@@ -10,7 +10,7 @@
 #   3 клацання колеса за 0,4 с = 1 крок; (е) час кроку (у сторінці: подія → кадр після зміни) ≤ max_ms — ⚠; (є) закрити Esc · «✕» · клік поза →
 #   фокус на тому, хто відкрив, чи на показаному; вибір у списку синхронний, якщо заявлено; (ж) переглядач іншого екрана не бере стан попереднього.
 # Паузи: кроки колеса — СПРАВЖНІЙ час (pg.wait_real): замок жесту живе на Date.now(), «тиша» його не бачить і повернулась би одразу → хибний ✗.
-import re, time, json
+import os, re, time, json
 
 NEXT = r'наступн|next|›|→'
 PREV = r'попередн|prev|‹|←'
@@ -114,7 +114,8 @@ def run_viewers(cfg, page, ready, add, COV):
     skip = v['skip']; cnt_rx = v.get('counter', COUNTER)
     def flag(lvl, check, msg, path):
       if check in skip: line['ok'].append(f'{check} — пропущено: {skip[check]}'); return
-      add(lvl, 'переглядач: ' + check, name, msg, path); line['bad'].append(check)
+      add(lvl, 'переглядач: ' + check, name, msg, path)
+      if lvl != 'ⓘ': line['bad'].append(check)   # AE S120: ⓘ (серія розтяглась) — не вада переглядача
 
     # ── (а)(б)(в)(г)(е) канал за каналом: клавіші · кнопки · колесо — кожен з чистої сторінки ──
     for chan in ('клавіші', 'кнопки', 'колесо'):
@@ -169,11 +170,21 @@ def run_viewers(cfg, page, ready, add, COV):
             # серія — подіями в самій сторінці таймером (рецепт A118, замір AE S115): 40 викликів CDP з Python під навантаженням стоять > 220 мс,
             #   замок жесту спадає й «один жест» стає двома — хибний ✗; ціль — елемент під курсором ЩОРАЗУ (крок перемальовує вікно: застарілий вузол
             #   поза DOM, подія нікуди не спливає — зуби «колесо без замка» мовчали, selftest 30.10), як справжнє колесо
-            pg.evaluate("""async ([sel, ds, gap]) => { const d = document.querySelector(sel); if (!d) return; const r = d.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
-              for (const dy of ds) { const t = document.elementFromPoint(x, y) || d; t.dispatchEvent(new WheelEvent('wheel', { deltaY: dy, deltaMode: 0, bubbles: true, cancelable: true, clientX: x, clientY: y })); await new Promise(z => setTimeout(z, gap)); } }""", [v['dialog'], deltas, int(gap * 1000)])
-            pg.wait_real(v['wheel_gap_ms'])
+            # AE S120 (AE-T): під навантаженням (4 браузери + гейти) таймер сторінки розтягує серію — проміжок понад замок сайту, і сайт ЧЕСНО бачить
+            #   два жести → хибний ✗ (S119: «зрушило на 2», повтор 3/3 ✓). Серія повертає фактичні проміжки; розтяглась (> max(1,5 × ціль, ціль + 60 мс)) —
+            #   це не той жест, що судимо: повтор до 2 разів, далі ⓘ без вироку. Зуби ті самі: «колесо без замка» на нерозтягнутій серії — ✗ (selftest).
+            lim = max(1.5 * gap * 1000, gap * 1000 + 60)
+            for att in range(3):
+              b0 = _cur(pg, v); i0 = L.index(b0) if b0 in L else 0
+              gaps = pg.evaluate("""async ([sel, ds, gap]) => { const d = document.querySelector(sel); if (!d) return []; const r = d.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2, ts = [];
+              for (const dy of ds) { const t = document.elementFromPoint(x, y) || d; ts.push(performance.now()); t.dispatchEvent(new WheelEvent('wheel', { deltaY: dy, deltaMode: 0, bubbles: true, cancelable: true, clientX: x, clientY: y })); await new Promise(z => setTimeout(z, gap)); }
+              return ts.slice(1).map((t, i) => t - ts[i]); }""", [v['dialog'], deltas, int(gap * 1000) + int(os.environ.get('VIEWER_STRETCH_MS') or 0)]) or []   # VIEWER_STRETCH_MS — ін'єкція «серія розтяглась» (selftest)
+              pg.wait_real(v['wheel_gap_ms'])
+              if max(gaps, default=0) <= lim or os.environ.get('VIEWER_NO_RETRY'): break
             c1 = _cur(pg, v); moved = ((L.index(c1) - i0) % len(L)) if c1 in L else None
-            if moved != 1: flag('✗', 'жест', f'{g}: зрушило на {moved if moved is not None else "?"} (має бути рівно 1) — «{b0}» → «{c1}»', path + f' → {g}')
+            if max(gaps, default=0) > lim and not os.environ.get('VIEWER_NO_RETRY'):
+              flag('ⓘ', 'жест не судимо', f'{g}: серія розтяглась під навантаженням 3 рази (найдовший проміжок {max(gaps):.0f} мс > {lim:.0f}) — повтори прогін без гейтів поруч', path + f' → {g}')
+            elif moved != 1: flag('✗', 'жест', f'{g}: зрушило на {moved if moved is not None else "?"} (має бути рівно 1) — «{b0}» → «{c1}»' + (f' · найдовший проміжок серії {max(gaps):.0f} мс' if gaps else ''), path + f' → {g}')
             else: line['ok'].append(f'жест: {g}')
       except Exception as e:
         flag('✗', 'не відкрився', f'{chan}: {str(e).splitlines()[0][:140]}', name)
@@ -264,4 +275,10 @@ def selftest(run, url):
   for q, kind in SELF_BAD.items():
     F = one(q); hit = any(f['kind'] == 'переглядач: ' + kind for f in F)
     bad += not hit; print(('✓' if hit else '✗') + f' переглядач: підкинуто «{q}» → «{kind}» ' + ('спіймано' if hit else 'НЕ спіймано · ' + ' | '.join(f["kind"] for f in F if f['lvl'] != 'ⓘ')))
-  return bad, len(SELF_BAD) + 1
+  # AE S120: серія, розтягнута навантаженням (ін'єкція VIEWER_STRETCH_MS), — ⓘ «жест не судимо», не ✗ «жест»; на «колесі без замка» теж без хибного ✗
+  os.environ['VIEWER_STRETCH_MS'] = '400'
+  try: F = one('wheel')
+  finally: os.environ.pop('VIEWER_STRETCH_MS', None)
+  ok_ = any(f['kind'] == 'переглядач: жест не судимо' for f in F) and not any(f['kind'] == 'переглядач: жест' for f in F)
+  bad += not ok_; print(('✓' if ok_ else '✗') + ' переглядач: серія розтяглась (+400 мс) → ⓘ «жест не судимо», ✗ «жест» нема')
+  return bad, len(SELF_BAD) + 2

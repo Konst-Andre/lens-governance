@@ -208,7 +208,7 @@ def check_repo(repo, now=None):
             L.append(('✗', f'бриф {rel} не за шаблоном: нема §0 «Коротко» зі Стан · Далі · Чекає → tools/claude-code/templates/BRIEF_template.md')); continue
         last = git(repo, 'log', '-1', '--format=%H', '--', rel)
         if last:
-            n = sum(1 for c in git(repo, 'log', '--format=%H', f'{last}..HEAD').split() if any(f and not f.endswith('.md') for f in git(repo, 'show', '--name-only', '--format=', c).split('\n'))
+            n = sum(1 for c in git(repo, 'log', '--format=%H', f'{last}..HEAD').split() if any(f and not f.lower().endswith(NOT_CODE) for f in git(repo, 'show', '--name-only', '--format=', c).split('\n'))
                     and not re.search(r'бриф\s*:', git(repo, 'log', '-1', '--format=%B', c), re.I))   # «бриф: …» у коміті — брифи розглянуто свідомо (як brief-guard); AE S94: код BRIEF-2 робив «відсталим» бриф ARCH-1
             if n: L.append(('⚠', f'бриф {rel} відстає: {n} коміт(ів) коду після його останньої правки — §0 «Коротко» і «Кроки» ще «як є»?'))
     # (7) незбережене: контейнер скинеться — пропаде
@@ -309,9 +309,14 @@ def report(repos):
 JPATH = 'tools/claude-code/hooks/HOOK_JOURNAL.md'
 
 
+# (9) «код» для свіжості брифу — усе, крім документів і даних (AE S120, кандидат журналу гачків S119: коміти даних Олі з редактора й робота АНЦ —
+#     .json · фото — робили брифи «відсталими» без жодної зміни коду). Перелік — що НЕ код: невідоме розширення лишається кодом (сліпої плями нема).
+NOT_CODE = ('.md', '.json', '.webp', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.avif', '.csv', '.tsv', '.txt', '.xlsx', '.pdf')
+
+
 def selftest():
     def sh(d, *c): subprocess.run(c, cwd=d, check=True, capture_output=True)
-    def mk(summary, extra=None, commit_after=False, new_after=False, both=False, dirty=False, code_after=False):
+    def mk(summary, extra=None, commit_after=False, new_after=False, both=False, dirty=False, code_after=False, data_after=False):
         d = tempfile.mkdtemp(prefix='hc-'); r = os.path.join(d, 'Prod'); os.makedirs(os.path.join(r, 'sessions')); os.makedirs(os.path.join(r, 'lens'))
         sh(r, 'git', 'init', '-q'); sh(r, 'git', 'config', 'user.email', 't@t'); sh(r, 'git', 'config', 'user.name', 't')
         open(os.path.join(r, 'lens/A.md'), 'w').write('## 0. Коротко\n- далі `lens/A.md`\n')
@@ -331,6 +336,10 @@ def selftest():
             os.makedirs(os.path.join(r, 'tools')); open(os.path.join(r, 'tools/run_me.sh'), 'w').write('echo')
             sh(r, 'git', 'add', '-A'); sh(r, 'git', 'commit', '-qm', 'код\n' + (code_after if isinstance(code_after, str) else '') + '\nClaude-Session: https://claude.ai/code/session_T')
             open(os.path.join(r, 'sessions/P_session_summary_X.md'), 'a').write('\n'); sh(r, 'git', 'commit', '-qam', 'самері\n\nClaude-Session: https://claude.ai/code/session_T')
+        if data_after:   # AE S120: коміт лише даних (редактор / робот) — не «код» для свіжості брифу
+            os.makedirs(os.path.join(r, 'site/data'), exist_ok=True); os.makedirs(os.path.join(r, 'site/anc/img'), exist_ok=True)
+            open(os.path.join(r, 'site/data/catalog.json'), 'w').write('{}'); open(os.path.join(r, 'site/anc/img/a.webp'), 'w').write('x')
+            sh(r, 'git', 'add', '-A'); sh(r, 'git', 'commit', '-qm', 'дані з редактора: site/data/catalog.json')
         if dirty: open(os.path.join(r, 'lens/A.md'), 'a').write('z')
         if commit_after:
             open(os.path.join(r, 'lens/A.md'), 'a').write('y'); sh(r, 'git', 'commit', '-qam', 'код\n\nClaude-Session: https://claude.ai/code/session_T')
@@ -371,6 +380,7 @@ def selftest():
         ('бриф ядра без «§0 Коротко» → ✗, винятку kernel/ нема (BRIEF-2 крок 4)', mk(good, {'kernel/Lens_X_brief.md': '# X\n## §1 Навіщо\n'}), '✗:не за шаблоном'),
         ('бриф за шаблоном, код після нього з «бриф: без змін — …» → без «відстає»', mk(good, {'lens/X_brief.md': '# X\n## §0 Коротко\n- **Стан:** a\n- **Далі:** b\n- **Чекає Konst:** c\n'}, code_after='бриф: без змін — інший пункт'), '!відстає'),
         ('бриф за шаблоном, код після нього → ⚠ «відстає» (BRIEF-2)', mk(good, {'lens/X_brief.md': '# X\n## §0 Коротко\n- **Стан:** a\n- **Далі:** b\n- **Чекає Konst:** c\n'}, code_after=True), 'відстає'),
+        ('бриф за шаблоном, після нього лише коміт даних (.json · фото) → без «відстає» (AE S120)', mk(good, {'lens/X_brief.md': '# X\n## §0 Коротко\n- **Стан:** a\n- **Далі:** b\n- **Чекає Konst:** c\n'}, data_after=True), '!відстає'),
         ('не-Lens: самері без стартового → ✗', mk_nl(good_nl.split('## §6')[0]), 'стартове повідомлення нема'),
     ]
     bad = 0

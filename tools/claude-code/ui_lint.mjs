@@ -154,7 +154,14 @@ function probe() {
     const s = getComputedStyle(el), px = parseFloat(s.fontSize);
     // 12. сирота: останній рядок — 1–2 знаки («збірка 26 / с») — розрив усередині шматка, що мав бути цілим
     const rg = document.createRange(); rg.selectNodeContents(el); const lines = {};
-    for (const q of rg.getClientRects()) if (q.width > 0) { const k = Math.round(q.top / 3); lines[k] = (lines[k] || 0) + q.width; }
+    // AE S120 (кандидат журналу гачків S119): рядок — за ПЕРЕТИНОМ по вертикалі, не за округленим верхом: «128,13 ₴» з дрібнішим «₴» в одному рядку
+    //   (верх прямокутників 29 і 18 px висоти різний) рахувався двома рядками → хибна «сирота». Прямокутник іде в рядок, якщо перекриває його ≥ половини меншої висоти.
+    const rows = [];
+    for (const q of [...rg.getClientRects()].filter(q => q.width > 0).sort((x, y) => x.top - y.top)) {
+      const r = rows.find(r => Math.min(r.b, q.bottom) - Math.max(r.t, q.top) >= 0.5 * Math.min(r.b - r.t, q.height));
+      if (r) { r.t = Math.min(r.t, q.top); r.b = Math.max(r.b, q.bottom); r.w += q.width; } else rows.push({ t: q.top, b: q.bottom, w: q.width });
+    }
+    rows.forEach((r, i) => { lines[i] = r.w; });
     const ks = Object.keys(lines).map(Number).sort((x, y) => x - y);
     if (ks.length >= 2 && lines[ks[ks.length - 1]] < px * 1.6) once('⚠', 'сирота', el, `останній рядок — ${Math.round(lines[ks[ks.length - 1]])} px (1–2 знаки) — розрив усередині шматка; тримати цілим (white-space: nowrap / нерозривний пробіл)`);
     // 13. злитий підпис: дата/час і ще ≥ 2 різні речі через «·» в одному рядку — око не відділяє «коли» від «що» й «стан» (стан — значком, що — заголовком)
@@ -707,6 +714,9 @@ if (a[0] === 'selftest') {
   const T = [];   // кожен випадок — () => [рядок, вада?]
   T.push(async () => { const cl = (await R('', 'clean')).filter(x => x.lvl !== 'ⓘ');
     return [(cl.length ? '✗' : '✓') + ` чиста сторінка → тиша (${cl.length ? cl.map(x => x.kind + ': ' + x.msg).join(' | ') : '0'})`, !!cl.length]; });
+  T.push(async () => { // AE S120: сума з дрібнішим «₴» в одному рядку (nowrap) → «сирота» мовчить; справжня сирота («збірка 26 / с») — ⚠ (зуби в обидва боки — DEFECTS)
+    const g = (await R(`<div class=card><b style="display:block;font-size:24px;white-space:nowrap">128,13 <span style="font-size:13px">₴</span></b></div>`, 'curr')).filter(x => x.kind === 'сирота');
+    return [(!g.length ? '✓' : '✗') + ` сума з дрібнішим «₴» в одному рядку → «сирота» мовчить (${g.map(x => x.msg).join(' | ') || '0'})`, !!g.length]; });
   T.push(async () => { // AE S100: хибне спрацювання — мала ціль ПІД відкритим модальним вікном інертна, «тап» мовчить; та сама кнопка без вікна — ✗ (зуби)
     const [pm, pn] = await Promise.all([R(`<button style="width:18px;height:18px;padding:0">i</button><dialog id=md><button style="min-height:44px;min-width:120px">Гаразд</button></dialog><script>md.showModal()</script>`, 'modal'),
       R(`<button style="width:18px;height:18px;padding:0">i</button>`, 'nomodal')]);
