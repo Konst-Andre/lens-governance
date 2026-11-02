@@ -87,7 +87,7 @@ PY
     python3 - "$OUT/$n.$m.txt" "$(realpath "$f")" "$f" <<'PY'
 import re, sys
 txt = open(sys.argv[1], encoding='utf-8', errors='replace').read(); full, rel = sys.argv[2], sys.argv[3]
-m = re.search(r'(?im)^.*\b(scope|обсяг)\b.*$', txt)
+m = re.search(r'(?im)^[\s>*#|-]*\**\s*(scope|обсяг)\b\**\s*[:—-].*$', txt)   # лише рядок-мітка «Scope:» / «Обсяг:» на початку (S124: слово «scope» у таблиці давало хибне ✗)
 L = m.group(0) if m else ''; base = rel.split('/')[-1]; repo = full.split('/')[-len(rel.split('/')) - 1]
 other = [d for d in re.findall(r'([\w.-]+)/' + re.escape(base), L) if d not in (repo, rel.split('/')[-2] if '/' in rel else repo)]
 if m and full not in L and (other or (rel not in L and base not in L)):
