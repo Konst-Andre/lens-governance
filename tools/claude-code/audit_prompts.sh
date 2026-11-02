@@ -49,7 +49,7 @@ for f in "$@"; do
   n=$(echo "$f" | tr '/' '_')
   for m in $models; do
     eff="--effort high"   # sonnet теж high: 06.10 на wsd знайшов ядро знахідок opus за пів ціни; без --effort думав у 7 разів менше
-    timeout 1500 claude -p --model "$m" $eff "${world[@]}" --output-format json "/doctor prompt-audit $f" > "$OUT/$n.$m.json" 2> "$OUT/$n.$m.err"   # stderr окремо: попередження CLI (06.10: «Ignoring … permissions») ламали JSON
+    timeout 1500 claude -p --model "$m" $eff "${world[@]}" --output-format json "/doctor prompt-audit $(realpath "$f") — аудитуй лише цей файл (повний шлях); інші CLAUDE.md у контексті — не обсяг" > "$OUT/$n.$m.json" 2> "$OUT/$n.$m.err"   # stderr окремо: попередження CLI (06.10: «Ignoring … permissions») ламали JSON
     line=$(python3 - "$OUT/$n.$m.json" "$OUT/$n.$m.txt" <<'PY'
 import json, sys
 raw = open(sys.argv[1], encoding='utf-8', errors='replace').read()
@@ -82,6 +82,17 @@ except Exception:
     den = {}
 print(f'   докази: посилань `файл:рядок` {len(refs)}, зламаних {len(bad)}' + (' — ' + ' · '.join(sorted(bad)[:6]) if bad else '') +
       f' · вебадрес {len(set(re.findall(r"https?://[^\s)`|>]+", txt)))} · відмов інструментів {sum(den.values())}' + (f' ({dict(den)})' if den else ''))
+PY
+    # S124 (AE): обсяг — той файл? Haiku раз узяла CLAUDE.md ядра замість продукту (два CLAUDE.md у контексті) → повний шлях у запиті вище й звірка рядка «Scope» звіту
+    python3 - "$OUT/$n.$m.txt" "$(realpath "$f")" "$f" <<'PY'
+import re, sys
+txt = open(sys.argv[1], encoding='utf-8', errors='replace').read(); full, rel = sys.argv[2], sys.argv[3]
+m = re.search(r'(?im)^.*\b(scope|обсяг)\b.*$', txt)
+L = m.group(0) if m else ''; base = rel.split('/')[-1]; repo = full.split('/')[-len(rel.split('/')) - 1]
+other = [d for d in re.findall(r'([\w.-]+)/' + re.escape(base), L) if d not in (repo, rel.split('/')[-2] if '/' in rel else repo)]
+if m and full not in L and (other or (rel not in L and base not in L)):
+    print(f'   ✗ обсяг: рядок «Scope» називає інший файл, ніж {rel} ({repo}) — звіт не про той файл: «{L.strip()[:160]}»')
+elif not m: print('   ⓘ обсяг: рядка «Scope» у звіті нема — звірити очима')
 PY
     c=$(echo "$line" | grep -oE '\$[0-9.]+' | tr -d '$'); total=$(python3 -c "print(round($total + ${c:-0}, 2))")
     case "$line" in ERR*) echo "СТОП: помилка або ліміт — решту проходів не запущено (сумарно \$$total)"; exit 1;; esac
