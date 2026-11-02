@@ -46,8 +46,8 @@ try:
 except Exception as e: parts.append('запити — не заміряно (' + type(e).__name__ + ')')
 # 1-б · CPU на запит за 7 днів (AE S120): «чи не завеликий файл даних» вирішує не розмір, а CPU воркера, що його розбирає (ліміт Free — CLOUDFLARE.md §1).
 #   Суддя — ВІДМОВИ `exceededCpu` / `exceededResources` (✗) і ТИПОВИЙ запит p50 (⚠ від порогу alarm_share): Cloudflare дає «перенесення» CPU —
-#   окремі запити понад ліміт без помилок, якщо типові нижче; падіння — коли ліміт перевищено постійно (developers.cloudflare.com/workers/platform/limits;
-#   пояснення Cloudflare в community.cloudflare.com «Far over CPU time limit for free plan», 01.11.2026). p99 — лише для довідки.
+#   окремі запити понад ліміт без помилок, якщо типові нижче; падіння — коли ліміт перевищено постійно (developers.cloudflare.com/workers/platform/limits,
+#   оновлено 29.10.2026: «built-in flexibility … infrequently runs over»; механізм «перенесення» — community.cloudflare.com «Far over CPU time limit for free plan», 01.11.2026). p99 — лише для довідки.
 #   Замір 01.11.2026: ae-edit p50 7,2 · p99 17,9 мс; airlens p50 19,2 · p99 44 мс; відмов 0 у всіх.
 try:
     d7 = (now - datetime.timedelta(days=7)).strftime('%Y-%m-%dT%H:%M:%SZ'); t1 = now.strftime('%Y-%m-%dT%H:%M:%SZ')
