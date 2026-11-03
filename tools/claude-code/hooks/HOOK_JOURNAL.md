@@ -85,3 +85,4 @@
 
 | дата | сесія · репо | перевірка | вердикт | що змінено (коміт · тест) |
 |---|---|---|---|---|
+| 03.11 | `session_01NZGxE1` · AE S125 | вердикти сесії: `brief-guard` 2 · `commit-gate` 1 · `handoff-remind` 7 · `ui-guard` 7 · `ui-review-gate` 1 | **справжні всі, крім** `ui-guard` ×1 хибне-межове («кеш» на `no-store`) і skip ×3 з причиною: `commit-gate` — карта репо й «ядро:» для нового приладу; `handoff-remind` — голі назви, мертвий шлях, самері відстає, «правило вже в ядрі» (поправка); `ui-guard` — 4 пошуки змінили форму (CVE переадресації, ratchet, `<img>`/EXIF, git-rebase); `ui-review-gate` — 2 вади. Деталі — `journal/HOOK_JOURNAL_2026-11.md` |
