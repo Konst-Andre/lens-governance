@@ -526,6 +526,13 @@ Baseline, Safari 18+.
    `::view-transition-*(root)` 0,0,0) або через VT-types. Інакше другий VT підхопить
    чужу `@keyframes`.
 
+**Морф «мініатюра → вікно» (`<dialog>` у top layer; AE S126, 03.11.2026):** ім'я (`view-transition-name`) знімається з мініатюри й ставиться
+на фото вікна **в колбеку**, `showModal()` — теж у колбеку; тимчасові імена — геть у `finished.finally` (одне ім'я — один елемент до й після:
+developer.chrome.com «Same-document view transitions»; практика — medienbaecker.com, pqina.nl). Краще за перелік джерел: **джерело — останній
+`pointerdown` / Enter (≤ 1,5 с)**; відкривач, перемальований до відкриття (таблиця), — та сама мініатюра за кодом. Прилад чекає `finished`,
+а не фіксовану паузу (замір AE: ≈ 0,4 с від натиску до кінця; під навантаженням прогону — понад 1,2 с) — інакше хибне «ім'я лишилось». Зразок — `AE-Simulator:site/index.html` `PHOTO.big`,
+прилад `AE-Simulator:tools/stand/photo_live_v1.py`.
+
 **Семантика per-context ≠ непослідовність:** slide = same-context reclaim,
 VT-crossfade = context switch. Один продукт може мати обидва — вони кодують різні події.
 
