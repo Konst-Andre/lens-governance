@@ -8,7 +8,7 @@
 # Перевірки (кожна — окремий рядок звіту): (а) порядок = видимий (геометрія getClientRects, рядок за рядком), край — по колу / стоп за конфігом;
 #   (б) окремо клавіші ← / →, кнопки, колесо; (в) фокус у вікні після кожного кроку; (г) лічильник «N з M»; (д) жест: 40 подій колеса по 16 мс = 1 крок,
 #   3 клацання колеса за 0,4 с = 1 крок; (е) час кроку (у сторінці: подія → кадр після зміни) ≤ max_ms — ⚠; (є) закрити Esc · «✕» · клік поза →
-#   фокус на тому, хто відкрив, чи на показаному; вибір у списку синхронний, якщо заявлено; (ж) переглядач іншого екрана не бере стан попереднього.
+#   фокус на тому, хто відкрив, чи на показаному; (з) колесо — з першої миті після відкриття, без паузи (AE S127: морф відкриття губив колесо); вибір у списку синхронний, якщо заявлено; (ж) переглядач іншого екрана не бере стан попереднього.
 # Паузи: кроки колеса — СПРАВЖНІЙ час (pg.wait_real): замок жесту живе на Date.now(), «тиша» його не бачить і повернулась би одразу → хибний ✗.
 import os, re, time, json
 
@@ -60,7 +60,7 @@ def _cur(pg, v):
   return pg.evaluate(f"() => {v['current']}")
 
 
-def _open(pg, v, cid):
+def _open(pg, v, cid, settle=True):
   # відкрити на позиції cid так, як людина: клік по елементу переліку → (кнопка «Збільшити», якщо є) → вікно
   pg.evaluate(f"""(c) => {{ const idf = {v['id']}; document.querySelectorAll('[data-vw-t],[data-vw-opener]').forEach(e => {{ e.removeAttribute('data-vw-t'); e.removeAttribute('data-vw-opener'); }});
     const e = [...document.querySelectorAll({_js(v['items'])})].find(e => e.getClientRects().length && !e.closest('dialog') && idf(e) === c); if (e) e.setAttribute('data-vw-t', '1'); }}""", cid)
@@ -70,7 +70,9 @@ def _open(pg, v, cid):
     o = pg.locator(v['opener']).first; o.evaluate("e => e.setAttribute('data-vw-opener', '1')"); o.click(timeout=5000)
   else: pg.evaluate("() => { const e = document.querySelector('[data-vw-t]'); if (e) e.setAttribute('data-vw-opener', '1'); }")
   pg.wait_for_function(f"() => !!document.querySelector({_js(v['dialog'])})", timeout=5000, polling=100)
-  pg.wait_for_timeout(300)
+  # AE S127: settle=False — канал «колесо» крутить одразу, як вікно відкрилось: вікно з морфом (View Transitions, 0,3 с) губило колесо, поки йшла
+  #   анімація (дослід: 0 мс — 0 з 8, 500 мс — 8 з 8); «тиша» анімації не бачить, тож пауза тут ховала ваду через раз — переглядач мусить брати колесо з першої миті
+  if settle: pg.wait_for_timeout(300)
 
 
 def _btn(pg, v, rx_key, sel_key):
@@ -126,7 +128,7 @@ def run_viewers(cfg, page, ready, add, COV):
         if len(L) < 2: line['ok'].append(f'{chan}: видимих позицій {len(L)} — гортати нічого'); break
         k = min(v['steps'], len(L) - 1)
         at = len(L) // 2 if chan == 'кнопки' else 0
-        _open(pg, v, L[at]); s = _state(pg, v)
+        _open(pg, v, L[at], settle=chan != 'колесо'); s = _state(pg, v)
         path = f"{sname} → відкрити «{L[at]}»"
         if s['cur'] != L[at]: flag('✗', 'порядок', f'відкрив «{L[at]}» — вікно показує «{s["cur"]}»', path); continue
         if chan == 'колесо':
