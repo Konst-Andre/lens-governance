@@ -2,7 +2,7 @@
 # живе доки: UI-кроки (HTML/CSS) комітить агент Claude Code. Дім — lens-governance:tools/claude-code/hooks/ (черга ядра HOOK-2 п.4).
 # «Огляд UI — ДО коміту, не після» (урок QR-Lens CC-5, 09.10.2026: review-remind нагадував після `commit && push` — зміна вже в проді;
 # агент перевірив поведінку, а не вигляд результату дії; мок тесту знав лише очікувані кінці → картка висіла двічі).
-#   gate  — PreToolUse (Bash з `git commit`): у репо коміту змінено .html/.htm/.css (проти HEAD, разом з новими файлами), а позначки
+#   gate  — PreToolUse (Bash з `git commit`): у репо коміту змінено .html/.htm/.css або файл примірки shots/**/fit_* (AE S127; проти HEAD, разом з новими файлами), а позначки
 #           огляду САМЕ ЦЬОГО диффу нема → deny з чек-листом. Будь-яка нова правка UI після позначки міняє дифф → знову deny.
 #   done  — `bash ui-review-gate.sh done "<що переглянуто>" [тека репо]` (відмова gate дає готову команду з текою репо коміту) → позначка /tmp/lens-uireview-<хеш диффу> (рядок ≥ 40 знаків:
 #           які стани, які теми, що бачить людина після дії). Самоствердження, але в потрібну мить і по конкретному диффу.
@@ -16,7 +16,7 @@ export HOOK_IN
 UI_GATE_SELF="$(readlink -f "${BASH_SOURCE[0]}")" python3 - "$mode" "$@" <<'PY'
 import json, sys, re, os, subprocess, hashlib, tempfile, shutil
 mode, args = sys.argv[1], sys.argv[2:]
-UI = ["*.html", "*.htm", "*.css"]
+UI = ["*.html", "*.htm", "*.css", ":(glob)**/shots/**/fit_*", ":(glob)shots/**/fit_*"]   # AE S127 (Konst: «чи можеш так завжди?»): накладка й знімальник примірки (fit_*.js / .py) — теж UI: примірку v1 з 7 вадами огляд ловив лише з доброї волі агента
 CHECK = ("чек-лист огляду (як користувач, а не лише тест поведінки). "
          "① стани й теми: кожен стан і кожна дія (порожньо · завантаження · помилка · успіх · після перезавантаження) — повний екран, світла тема цілком, потім темна; "
          "не лише кропи нового: нове ⟂ старе на тому ж екрані (стара кнопка поруч з новою дією); кожен новий елемент — ще й окремим кропом 1:1, не мініатюрою "
@@ -143,6 +143,9 @@ if mode == "selftest":
         say(gate(ev("git add -A && git commit -m x")) is not None, "новий .css (ще не в git) теж рахується → deny")
         r = subprocess.run(["bash", os.environ["UI_GATE_SELF"], "gate"], input=json.dumps(ev("git add -A && git commit -m x")), capture_output=True, text=True)
         say('"deny"' in r.stdout, "зуби: справжній виклик гачка (JSON через stdin, як від Claude Code) → deny")
+        os.makedirs(f"{tmp}/docs/shots/P9", exist_ok=True); open(f"{tmp}/docs/shots/P9/fit_x_v1.js", "w").write("1")
+        say(any("fit_x_v1.js" in f for f in ui_state(tmp)[0]), "зуби (AE S127): нова накладка примірки docs/shots/**/fit_* — теж UI, огляд до коміту")
+        os.remove(f"{tmp}/docs/shots/P9/fit_x_v1.js")
         os.remove(mark(hx))
         # done вимагає ui_lint на цьому диффі (HOOK-2.5)
         dn = lambda *a: subprocess.run(["bash", os.environ["UI_GATE_SELF"], "done", *a], capture_output=True, text=True)
