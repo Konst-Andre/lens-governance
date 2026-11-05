@@ -29,12 +29,21 @@
   M9 прилад без згадки — файл приладу (tools/ · .claude/ · .github/, не .md), чиє ім'я (без розширення) не згадує жоден живий .md.
      Чому (Konst AE S103: «чи знала б наступна сесія про все, що ми зробили?»): M5 ловить документ без файла, а файл без документа —
      ні; новий прилад, не вписаний у карту репо, наступний агент не знайде й збудує вдруге. Перший прогін 24.10: ядро 0, AE 2 справжні.
+  M10–M12 кукбук машиною (Konst AE S129: «машина, яка працює на нас»; замір 05.11.2026 — 132 рецепти, без дати джерела 88; черга ядра AUTO-1 (г)).
+     Рецепт — розділ «## A<N>.» / «## T<N>.» у файлі *cookbook*.md теки cookbook/; вік рядка — git blame --line-porcelain (час коміту), зведений
+     по розділу, не ручне поле (Mintlify «Documentation linting», червень 2026; blame line-porcelain — oneuptime 24.01.2026, звірено 05.11.2026).
+  M10 рецепт без дати джерела — лише свіжозмінений (≤ 14 днів): правиш рецепт — додай «джерело, ДД.ММ.РРРР»; старі 88 разом — шум
+     (hve-core documentation-maintenance: на зміні — лише змінені файли, повний прохід — окремо, 05.11.2026).
+  M10–M11 — лише рядки з відомим віком: обрізаний клон (shallow) дає граничний коміт на все старше → такі рядки не міряються.
+  M11 рецепт не чіпали > 180 днів → «звір зі світом» (платформи міняються; 180 — число агента S129, не замір; hve-core типово 90).
+  M12 посилання A<N> / T<N> у томах і індексі кукбука (не в лотку delta_running) на рецепт, якого нема й не названо «зарезерв…» поруч з номером.
 Лише ⚠ (не блокує): один рядок для env_check; адреси — --list.
   python3 doc_health.py [<репо>] [--list] | selftest
 """
 import os, re, subprocess, sys, tempfile
 
 M1_LINES, M2_KB, M3_KB, M4_KB = 200, 25, 16, 80
+M10_DAYS, M11_DAYS = 14, 180
 
 
 def files(root):
@@ -69,7 +78,46 @@ def scan(root):
     found += dead_sections(root)
     found += unchecked_rules(root)
     found += orphan_tools(root)
+    found += cookbook(root)
     return found
+
+
+REC = re.compile(r'(?m)^## ([AT]\d+)\.')
+DATED = re.compile(r'\b\d{2}\.\d{2}\.20\d{2}\b|\b20\d{2}-\d{2}-\d{2}\b')
+def cookbook(root, now=None):
+    """M10–M12: рецепти кукбука — свіжість (git blame) і посилання між рецептами."""
+    import time
+    now = now or time.time(); out = []
+    cb = [f for f in files(root) if '/cookbook/' in '/' + f and 'cookbook' in os.path.basename(f).lower()]
+    recs, reserved, refs = set(), set(), []
+    sp = subprocess.run(['git', 'rev-parse', '--git-path', 'shallow'], cwd=root, capture_output=True, text=True).stdout.strip()
+    sp = sp if os.path.isabs(sp) else os.path.join(root, sp)
+    shallow = set(open(sp).read().split()) if sp and os.path.isfile(sp) else set()   # граничні коміти обрізаного клону (AE S129: 52 коміти) — вік рядка з них невідомий
+    for f in cb:
+        txt = open(os.path.join(root, f), encoding='utf-8', errors='replace').read(); lines = txt.split('\n')
+        for m in re.finditer(r'\b([AT]\d+)\b\**\s*[—–-]\s*зарезерв', txt): reserved.add(m[1])
+        if re.search(r'cookbook_(\d|INDEX)', f):   # тома й індекс; лоток delta_running тримає кандидатів і старі номери свідомо
+            for i, l in enumerate(lines): refs += [(f, i + 1, r) for r in re.findall(r'\b([AT]\d{1,3})\b', l)]
+        heads = [(i, m[1]) for i, l in enumerate(lines) for m in [REC.match(l)] if m]
+        if not heads: continue
+        recs.update(k for _, k in heads)
+        bl = subprocess.run(['git', 'blame', '--root', '--line-porcelain', '--', f], cwd=root, capture_output=True, text=True).stdout
+        ts, cur = [], {}
+        for l in bl.split('\n'):   # блок рядка: шапка «<sha> …» · поля (committer-time) · «\t<текст>»
+            if l.startswith('\t'): ts.append(None if cur.get('s') in shallow else cur.get('t')); cur = {}
+            elif re.match(r'^[0-9a-f]{40} ', l): cur['s'] = l[:40]
+            elif l.startswith('committer-time '): cur['t'] = int(l.split()[1])
+        if len(ts) < len(lines) - 1: continue   # файл не в історії (новий, не закомічений) — свіжість не міряємо
+        ends = [i for i, l in enumerate(lines) if re.match(r'^#{1,2} ', l)] + [len(lines)]
+        for i, k in heads:
+            j = min(e for e in ends if e > i); body = '\n'.join(lines[i:j]); known = [t for t in ts[i:j] if t]
+            if not known: continue   # увесь рецепт — з граничного коміту: вік невідомий, не міряємо (хибне M10/M11 гірше за мовчання)
+            age = (now - max(known)) / 86400
+            if age > M11_DAYS: out.append(('M11', f, f'{k} не чіпали {age:.0f} дн. — звір зі світом (джерела, платформа)'))
+            elif age <= M10_DAYS and not DATED.search(body): out.append(('M10', f, f'{k} змінено {age:.0f} дн. тому, а дати джерела нема — «джерело, ДД.ММ.РРРР»'))
+    for f, n, r in refs:
+        if r not in recs and r not in reserved and recs: out.append(('M12', f, f'рядок {n}: {r} — такого рецепта нема'))
+    return out
 
 
 def orphan_tools(root):
@@ -171,21 +219,27 @@ def unchecked_rules(root):
 
 def line(root):
     f = scan(root)
+    sh = subprocess.run(['git', 'rev-parse', '--is-shallow-repository'], cwd=root, capture_output=True, text=True).stdout.strip() == 'true'
+    note = ' · ⓘ свіжість рецептів не міряна — клон обрізаний (git fetch --unshallow)' if sh and any('/cookbook/' in '/' + x for x in files(root)) else ''
+    if note: f = f + [('ⓘ', '', '')]
+    if f == [('ⓘ', '', '')]: return '✓', 'документи: ✓' + note
+    f = [x for x in f if x[0] != 'ⓘ']
     if not f: return '✓', f'документи: ✓ щосесійні ≤ {M1_LINES} рядків · старт ≤ {M2_KB} КБ · розділи ≤ {M3_KB} КБ · великі з маршрутом'
     by = {}
     for m, *_ in f: by[m] = by.get(m, 0) + 1
-    name = {'M1': 'щосесійні задовгі', 'M2': 'файли старту завеликі', 'M3': f'розділів > {M3_KB} КБ', 'M4': f'> {M4_KB} КБ без маршруту', 'M5': 'мертвих шляхів', 'M9': 'приладів без згадки', 'M6': 'черга відстала від самері', 'M7': 'мертвих адрес §', 'M8': 'правил без «Як перевірити»'}
+    name = {'M1': 'щосесійні задовгі', 'M2': 'файли старту завеликі', 'M3': f'розділів > {M3_KB} КБ', 'M4': f'> {M4_KB} КБ без маршруту', 'M5': 'мертвих шляхів', 'M9': 'приладів без згадки', 'M6': 'черга відстала від самері', 'M7': 'мертвих адрес §', 'M8': 'правил без «Як перевірити»', 'M10': 'свіжих рецептів без дати джерела', 'M11': f'рецептів > {M11_DAYS} дн. без звірки', 'M12': 'посилань на неіснуючий рецепт'}
     worst = max((x for x in f if x[0] == 'M3'), key=lambda x: float(re.search(r'(\d+) КБ', x[2])[1]), default=None)
-    return '⚠', 'документи: ' + ' · '.join(f'{name[m]} {n}' for m, n in sorted(by.items())) + (f' (найбільший — {worst[1]} {worst[2]})' if worst else '') + ' — деталі: doc_health.py --list'
+    return '⚠', 'документи: ' + ' · '.join(f'{name[m]} {n}' for m, n in sorted(by.items())) + (f' (найбільший — {worst[1]} {worst[2]})' if worst else '') + ' — деталі: doc_health.py --list' + note
 
 
 def selftest():
-    bad = 0
+    bad = 0; ENV = {}
     def repo(fs):
         d = tempfile.mkdtemp(prefix='dh-'); subprocess.run(['git', 'init', '-q'], cwd=d, check=True)
         for f, t in fs.items():
             os.makedirs(os.path.dirname(os.path.join(d, f)) or d, exist_ok=True); open(os.path.join(d, f), 'w').write(t)
-        subprocess.run(['git', 'add', '-A'], cwd=d, check=True); return d
+        subprocess.run(['git', 'add', '-A'], cwd=d, check=True)
+        subprocess.run(['git', '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 't', '--allow-empty'], cwd=d, check=True, env=dict(os.environ, **ENV)); return d
     sec = lambda kb: '## Розділ\n' + 'х' * (kb * 512) + '\n'   # кирилиця — 2 байти на знак
     Q = '## Відкрите\n| id | предмет | відкрито | умова |\n|---|---|---|---|\n| `AE-X` | x | 18.10.2026 | y |\n| `AE-Y` | y | 18.10.2026 | z |\n\n-----\n'
     cases = [('чисте репо → ✓', {'CLAUDE.md': 'x\n' * 50, 'lens/A.md': sec(4)}, '✓', ''),
@@ -216,9 +270,21 @@ def selftest():
     F = 'Кожне правило — **Правило** · **Чому** · **Як перевірити**.\n'
     cases += [('M8: форма оголошена, розділ з правилом без перевірки → ⚠', {'lens/F.md': F + '### 1 А\n**Правило.** x\n**Як перевірити.** y\n### 2 Б\n**Правило.** z\n'}, '⚠', 'правил без «Як перевірити» 1'),
               ('M8: без оголошеної форми · K2:n/a · перевірка є → ✓', {'lens/G.md': '### 1\n**Правило.** x\n', 'lens/F.md': F + '### 1\n**Правило.** x\n<!-- K2:n/a -->\n### 2\n**Правило.** y **Як перевірити:** z\n'}, '✓', '')]
+    C = 'kernel/cookbook/X_cookbook_1.md'
+    cases += [('M10: свіжий рецепт без дати джерела → ⚠', {C: '# Том\n## A1. Кнопка\nтекст без дати\n## A2. Поле\nджерело web.dev, 05.11.2026\n'}, '⚠', 'свіжих рецептів без дати джерела 1'),
+              ('M10–M12: дати є · посилання живе · A9 зарезервовано → ✓', {C: '# Том\n## A1. Кнопка\nпара — A2; A9 — зарезервований номер\n(2026-11-05)\n## A2. Поле\nweb.dev, 05.11.2026\n'}, '✓', ''),
+              ('M12: посилання на рецепт, якого нема → ⚠', {C: '# Том\n## A1. Кнопка\nдив. A77 · 05.11.2026\n'}, '⚠', 'посилань на неіснуючий рецепт 1')]
     for name, fs, want, part in cases:
         g, t = line(repo(fs)); ok = g == want and part in t
         print(('✓' if ok else '✗') + ' ' + name + ('' if ok else f' → {t}')); bad += not ok
+    ENV.update(GIT_AUTHOR_DATE='2025-01-01T00:00:00', GIT_COMMITTER_DATE='2025-01-01T00:00:00')
+    g, t = line(repo({'kernel/cookbook/X_cookbook_1.md': '# Том\n## A1. Кнопка\nweb.dev, 01.01.2025\n'})); ENV.clear(); ok = g == '⚠' and 'рецептів > 180 дн. без звірки 1' in t
+    print(('✓' if ok else '✗') + ' M11: рецепт не чіпали > 180 днів → ⚠' + ('' if ok else f' → {t}')); bad += not ok; cases.append(None)
+    src = repo({'kernel/cookbook/X_cookbook_1.md': '# Том\n## A1. Кнопка\nбез дати\n'}); open(os.path.join(src, 'n.txt'), 'w').write('x')
+    subprocess.run(['git', 'add', '-A'], cwd=src); subprocess.run(['git', '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 't2'], cwd=src)
+    d = tempfile.mkdtemp(prefix='dh-'); subprocess.run(['git', 'clone', '-q', '--depth', '1', 'file://' + src, d], check=True)
+    g, t = line(d); ok = 'свіжих рецептів' not in t and 'ⓘ свіжість рецептів не міряна' in t
+    print(('✓' if ok else '✗') + ' M10: обрізаний клон — рецепт з граничного коміту не міряється' + ('' if ok else f' → {t}')); bad += not ok; cases.append(None)
     print(f'selftest: {len(cases) - bad}/{len(cases)}'); return 1 if bad else 0
 
 

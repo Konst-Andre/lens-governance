@@ -58,6 +58,8 @@ print(("⚠ " + s + " — спершу виконати, розрізати аб
 PY
 
 # документи — ціна читання в Claude Code (DOC-1: щосесійні ≤ 200 рядків · старт ≤ 25 КБ · розділ ≤ 16 КБ · > 80 КБ з маршрутом); цілісність — гейт
+# свіжість рецептів (doc_health M10–M11) міряє git blame — на обрізаному клоні хмарної сесії (AE S129: 52 коміти) вона мовчить → добрати історію (≈ 800 комітів, секунди)
+[ "$(git rev-parse --is-shallow-repository 2>/dev/null)" = true ] && timeout 60 git fetch -q --unshallow origin 2>/dev/null
 python3 tools/claude-code/doc_health.py .
 python3 tools/claude-code/shots_check.py .   # примірка: ядро публічне — тека shots/ тут ✗ (знімки з реальними даними лише в приватному репо продукту)
 
