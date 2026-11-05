@@ -105,6 +105,11 @@ X" "open(…, 'w') у .py без пошуку → стоп"
   t 0 "$R/site.html" "<b>x</b>" "README примірок відкрито → тиша"
   rm -rf "$R" "/tmp/lens-ui-$S-shots"
   rm -f "/tmp/lens-ui-$S-step" "/tmp/lens-ui-$S-skips" "/tmp/lens-ui-$S-shots"
+  S="${S0}-skip"; rm -f /tmp/lens-ui-$S*
+  tb 1 "echo '<b>x</b>' > site/index.html" "AE S129: без кукбука й без skip → стоп (зуби)"
+  CLAUDE_CODE_SESSION_ID="$S" bash "$0" skip "правка лише тексту промпту в <script>, форма не змінюється" >/dev/null
+  tb 0 "echo '<b>x</b>' > site/index.html" "AE S129: skip «крок не вирішує форму» знімає і вимогу кукбука → тиша (хибне AE S101)"
+  rm -f /tmp/lens-ui-$S*; S=$S0
   rm -f "$Q" "/tmp/lens-ui-$S" "/tmp/lens-ui-$S-web"; echo "ui-guard selftest: $ok/$n"; [ "$ok" = "$n" ]; exit
 fi
 python3 -c '
@@ -199,6 +204,9 @@ if code:
             "як це роблять сьогодні, що в рецепті застаріло, чого ми не бачимо; зважити й скласти план — тоді код (тема → рецепт → інтернет → план; пошук про іншу тему цю не покриває)."}}, ensure_ascii=False))
         sys.exit(0)
 need = [x for x, f in (("кукбук", mark), ("пошук ззовні", web)) if not os.path.exists(f)]
+# AE S101 → S129 (кандидат журналу «Відкриті кандидати»): skip «крок не вирішує форму» (правка .html лише в тексті промпту в <script>) знімав пошук, а кукбук — ні → стоп.
+#   Крок, що не вирішує форму, рецепта теж не потребує; причина skip — у журналі -skips (той самий слід, що для пошуку).
+if os.path.exists(mark + "-step") and open(mark + "-step", encoding="utf-8").read().startswith("skip:"): need = []
 ui = re.compile(r"\.(html?|css)\b", re.I)
 if tool in ("Write", "Edit"):
     hit = bool(ui.search(str(ti.get("file_path", ""))))
