@@ -73,8 +73,10 @@ txt = open(sys.argv[1], encoding='utf-8', errors='replace').read()
 refs = set(re.findall(r'`([\w./-]+\.\w+):(\d+)(?:[–-]\d+)?`', txt)); bad = []
 for f, n in refs:
     p = f if os.path.isfile(f) else next((x for x in (os.path.join(r, f) for r in ('.', '..')) if os.path.isfile(x)), None)
-    if not p:   # коротке ім'я без теки — шукаємо серед файлів репо (лише однозначне)
-        c = [x for x in os.popen('git ls-files').read().split('\n') if x == f or x.endswith('/' + f)]; p = c[0] if len(c) == 1 else None
+    if not p:   # коротке ім'я без теки — шукаємо серед файлів репо і сусідніх репо (ядро поруч; лише однозначне). AE S129: рецепт ядра з аудиту AE рахувався «зламаним»
+        c = [x for d in ['.'] + sorted(x for x in (os.path.join('..', y) for y in os.listdir('..')) if os.path.isdir(os.path.join(x, '.git')) and os.path.realpath(x) != os.path.realpath('.'))
+             for x in (os.path.join(d, y) if d != '.' else y for y in os.popen(f'git -C "{d}" ls-files').read().split('\n') if y)
+             if x == f or x.endswith('/' + f)]; p = c[0] if len(c) == 1 else None
     if not p or int(n) > sum(1 for _ in open(p, encoding='utf-8', errors='replace')): bad.append(f'{f}:{n}')
 try:
     d = json.load(open(sys.argv[2], encoding='utf-8')); den = collections.Counter(x['tool_name'] for x in d.get('permission_denials') or [])
