@@ -249,7 +249,7 @@ def journal_health(k, today=None):
     today = today or dt.date.today()
     txt = open(k, encoding='utf-8').read()
     body = txt.split('## §1', 1)[1].split('\n## ', 1)[0] if '## §1' in txt else ''
-    rows = [l for l in body.splitlines() if re.match(r'^\| \d\d\.\d\d \|', l)]
+    rows = [l for l in body.splitlines() if re.match(r'^\| \d\d\.\d\d(?:\.\d{4})? \|', l)]   # AE S130: рядки пишуться «| 06.11.2026 |» — без року в шаблоні лічба була 0
     ages = []
     for l in rows:
         d, m = map(int, re.match(r'^\| (\d\d)\.(\d\d)', l).groups())
