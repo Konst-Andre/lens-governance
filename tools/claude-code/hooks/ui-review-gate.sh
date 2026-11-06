@@ -2,7 +2,7 @@
 # живе доки: UI-кроки (HTML/CSS) комітить агент Claude Code. Дім — lens-governance:tools/claude-code/hooks/ (черга ядра HOOK-2 п.4).
 # «Огляд UI — ДО коміту, не після» (урок QR-Lens CC-5, 09.10.2026: review-remind нагадував після `commit && push` — зміна вже в проді;
 # агент перевірив поведінку, а не вигляд результату дії; мок тесту знав лише очікувані кінці → картка висіла двічі).
-#   gate  — PreToolUse (Bash з `git commit`): у репо коміту змінено .html/.htm/.css або файл примірки shots/**/fit_* (AE S127; проти HEAD, разом з новими файлами), а позначки
+#   gate  — PreToolUse (Bash з `git commit`): у репо коміту змінено .html/.htm/.css, файл примірки shots/**/fit_* (AE S127) або JS поза tools/ з НОВИМ текстом людині (AE S133, UI-VOICE: рядок у лапках, ≥ 2 слова кирилицею; проти HEAD, разом з новими файлами), а позначки
 #           огляду САМЕ ЦЬОГО диффу нема → deny з чек-листом. Будь-яка нова правка UI після позначки міняє дифф → знову deny.
 #   done  — `bash ui-review-gate.sh done "<що переглянуто>" [тека репо]` (відмова gate дає готову команду з текою репо коміту) → позначка /tmp/lens-uireview-<хеш диффу> (рядок ≥ 40 знаків:
 #           які стани, які теми, що бачить людина після дії). Самоствердження, але в потрібну мить і по конкретному диффу.
@@ -39,13 +39,29 @@ def git(top, *a, raw=False):
     r = subprocess.run(["git", "-C", top, *a], capture_output=True)
     return r.stdout if raw else r.stdout.decode("utf-8", "replace").strip()
 
+# AE S133 (UI-VOICE, Konst: «щоб тексти були людяні — машина мусить бачити кожну зміну тексту людині»): ⚠-текст правил AE S132 пройшов повз,
+# бо гачок знав лише .html / .css. Тепер ще JS (.js / .mjs) поза tools/ · docs/ · test* · .claude/ · .github/, де ДОДАНИЙ рядок несе рядок у лапках
+# з двома й більше словами кирилицею (текст людині: повідомлення, підказка, порада). Коментарі зрізано; код без людського тексту — тиша.
+HUMAN = re.compile("['\"`][^'\"`\\n]*[А-ЯІЇЄҐа-яіїєґʼ’']{2,}[\\s,.:;—–-]+[А-ЯІЇЄҐа-яіїєґʼ’']{2,}[^'\"`\\n]*['\"`]")
+SKIP_JS = re.compile(r"(^|/)(tools|docs|tests?|\.claude|\.github)/")
+def human_js(top):
+    out = []
+    for f in sorted(set(git(top, "diff", "HEAD", "--name-only", "--", "*.js", "*.mjs").splitlines()) | set(git(top, "ls-files", "--others", "--exclude-standard", "--", "*.js", "*.mjs").splitlines())):
+        if not f or SKIP_JS.search(f): continue
+        p = os.path.join(top, f)
+        if not os.path.isfile(p): continue
+        tracked = bool(git(top, "ls-files", "--", f))
+        lines = [l[1:] for l in git(top, "diff", "-U0", "HEAD", "--", f).splitlines() if l.startswith("+") and not l.startswith("+++")] if tracked else open(p, encoding="utf-8", errors="replace").read().splitlines()
+        if any(HUMAN.search(re.sub(r"/\*.*?(\*/|$)|//.*$", "", l)) for l in lines): out.append(f)
+    return out
+
 def ui_state(top):   # (файли UI, хеш диффу) — дифф проти HEAD + нові неігноровані файли
     # видалення в теці примірки (shots/ — SHOTS.md: прийнята примірка прибирається) — не UI-правка: нічого переглядати (хибне QR 18.10, журнал гачків)
     drop = {l.split("\t", 1)[1] for l in git(top, "diff", "HEAD", "--name-status", "--", *UI).splitlines()
             if l.startswith("D\t") and re.search(r"(^|/)shots/", l.split("\t", 1)[1])}
     files = sorted((set(git(top, "diff", "HEAD", "--name-only", "--", *UI).splitlines()) - drop) |
                    set(git(top, "ls-files", "--others", "--exclude-standard", "--", *UI).splitlines()))
-    files = [f for f in files if f]
+    files = [f for f in files if f] + human_js(top)
     if not files: return [], None
     h = hashlib.sha1(git(top, "diff", "HEAD", "--", *files, raw=True))   # лише ці файли: видалення примірки не міняє хеш
     for f in git(top, "ls-files", "--others", "--exclude-standard", "--", *UI).splitlines():
@@ -170,6 +186,20 @@ if mode == "selftest":
         subprocess.run(["git", "-C", tmp, "rm", "-q", "-r", "shots/P2"], check=True); subprocess.run(["git", "-C", tmp, "commit", "-qm", "3"], check=True)
         say(not post(f"st{os.getpid()}c"), "сітка: коміт лише з видаленням примірки (shots/) → тиша (хибне AE S95)")
         os.remove(mark(hx))
+        # AE S133 (UI-VOICE): JS з текстом людині — теж UI; код без тексту, прилад у tools/, коментар — тиша
+        subprocess.run(["git", "-C", tmp, "checkout", "-q", "--", "."], check=True)
+        os.makedirs(f"{tmp}/site", exist_ok=True); os.makedirs(f"{tmp}/tools", exist_ok=True)
+        open(f"{tmp}/site/r.js", "w").write("const x = 1;\n"); open(f"{tmp}/tools/t.js", "w").write("const y = 1;\n")
+        subprocess.run(["git", "-C", tmp, "add", "-A"], check=True); subprocess.run(["git", "-C", tmp, "commit", "-qm", "js"], check=True)
+        open(f"{tmp}/site/r.js", "w").write("const x = 2;\n")
+        say(gate(ev("git add -A && git commit -m x")) is None, "JS без тексту людині → тиша")
+        open(f"{tmp}/site/r.js", "w").write("const x = 2; // 'текст для людини тут'\n")
+        say(gate(ev("git add -A && git commit -m x")) is None, "кирилиця лише в коментарі JS → тиша")
+        open(f"{tmp}/tools/t.js", "w").write("console.log('✓ усі перевірки пройшли');\n"); open(f"{tmp}/site/r.js", "w").write("const x = 1;\n")
+        say(gate(ev("git add -A && git commit -m x")) is None, "текст у приладі tools/*.js → тиша")
+        open(f"{tmp}/site/r.js", "w").write("const say = 'Ця фраза звернена до вас';\n")
+        say(gate(ev("git add -A && git commit -m x")) is not None, "зуби: JS поза tools/ з текстом людині (два слова кирилицею в лапках) → deny (AE S132: ⚠-текст правил пройшов повз)")
+        subprocess.run(["git", "-C", tmp, "checkout", "-q", "--", "."], check=True)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     print(f"─── ui-review-gate selftest: {n - bad}/{n} ───"); sys.exit(1 if bad else 0)
