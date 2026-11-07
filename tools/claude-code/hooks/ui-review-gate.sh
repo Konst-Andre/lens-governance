@@ -2,7 +2,7 @@
 # живе доки: UI-кроки (HTML/CSS) комітить агент Claude Code. Дім — lens-governance:tools/claude-code/hooks/ (черга ядра HOOK-2 п.4).
 # «Огляд UI — ДО коміту, не після» (урок QR-Lens CC-5, 09.10.2026: review-remind нагадував після `commit && push` — зміна вже в проді;
 # агент перевірив поведінку, а не вигляд результату дії; мок тесту знав лише очікувані кінці → картка висіла двічі).
-#   gate  — PreToolUse (Bash з `git commit`): у репо коміту змінено .html/.htm/.css, файл примірки shots/**/fit_* (AE S127) або JS поза tools/ з НОВИМ текстом людині (AE S133, UI-VOICE: рядок у лапках, ≥ 2 слова кирилицею; проти HEAD, разом з новими файлами), а позначки
+#   gate  — PreToolUse (Bash з `git commit`): у репо коміту змінено .html/.htm/.css, файл примірки shots/**/fit_* (AE S127) або JS (.js / .mjs) поза tools/ · docs/ · test/ · tests/ · .claude/ · .github/ з НОВИМ текстом людині (AE S133, UI-VOICE: рядок у лапках, ≥ 2 слова кирилицею; проти HEAD, разом з новими файлами), а позначки
 #           огляду САМЕ ЦЬОГО диффу нема → deny з чек-листом. Будь-яка нова правка UI після позначки міняє дифф → знову deny.
 #   done  — `bash ui-review-gate.sh done "<що переглянуто>" [тека репо]` (відмова gate дає готову команду з текою репо коміту) → позначка /tmp/lens-uireview-<хеш диффу> (рядок ≥ 40 знаків:
 #           які стани, які теми, що бачить людина після дії). Самоствердження, але в потрібну мить і по конкретному диффу.
@@ -17,6 +17,7 @@ UI_GATE_SELF="$(readlink -f "${BASH_SOURCE[0]}")" python3 - "$mode" "$@" <<'PY'
 import json, sys, re, os, subprocess, hashlib, tempfile, shutil
 mode, args = sys.argv[1], sys.argv[2:]
 UI = ["*.html", "*.htm", "*.css", ":(glob)**/shots/**/fit_*", ":(glob)shots/**/fit_*"]   # AE S127 (Konst: «чи можеш так завжди?»): накладка й знімальник примірки (fit_*.js / .py) — теж UI: примірку v1 з 7 вадами огляд ловив лише з доброї волі агента
+# ③ голос людині: AE S133, Konst «відчуття, що писав агент»; guide.yukon.ca «How to help people recover from a form error», 06.11.2026
 CHECK = ("чек-лист огляду (як користувач, а не лише тест поведінки). "
          "① стани й теми: кожен стан і кожна дія (порожньо · завантаження · помилка · успіх · після перезавантаження) — повний екран, світла тема цілком, потім темна; "
          "не лише кропи нового: нове ⟂ старе на тому ж екрані (стара кнопка поруч з новою дією); кожен новий елемент — ще й окремим кропом 1:1, не мініатюрою "
@@ -30,7 +31,7 @@ CHECK = ("чек-лист огляду (як користувач, а не ли�
          "③ ієрархія й текст: одна головна дія на екран, другорядне приглушити, а не головне роздути; вага кнопок: дія > другорядна дія > перехід — різна форма, не лише колір; "
          "другорядна кнопка — підйом матеріалу, не «примара» (біле на білому з тонкою рамкою читається як вимкнене); значок і текст в одній кнопці — на одній висоті (стрілку-символ шрифт ставить нижче — SVG); "
          "одна дія — один вигляд на всіх екранах (поставити поруч той самий елемент двох екранів: рамка, лінія на всю ширину, «Видалити»); "
-         "кнопка називає результат («Завантажити KPI», не «ОК»); текст «як кажуть люди», без жаргону — або прибрати, якщо зайвий; текст людині (порада, попередження, «i») — повними реченнями, як сказала б людина, що допомагає: що сталося · що зробити, звертання «ви», без стискання до телеграми («Речень із сумами… Напишіть дію без гривень» — так пише агент); еталон і пари «було → стало» — tools/claude-code/VOICE.md; чернетку — прочитати очима того, хто читатиме, і переписати раз (AE S133, Konst: «відчуття, що писав агент»; Yukon «help people recover from a form error», 06.11.2026); "
+         "кнопка називає результат («Завантажити KPI», не «ОК»); текст «як кажуть люди», без жаргону — або прибрати, якщо зайвий; текст людині (порада, попередження, «i») — повними реченнями, як сказала б людина, що допомагає: що сталося · що зробити, звертання «ви», без стискання до телеграми; еталон і пари «було → стало» — tools/claude-code/VOICE.md; чернетку — прочитати очима того, хто читатиме, і переписати раз; "
          "помилка — що сталося · чому · що робити (каже «скажи агенту» — поруч кнопка «Скопіювати для Claude» зі знімком збою: дія · відповідь сервера · номери · час · версія сторінки). "
          "④ стан, якого не досягти на здоровій системі (збій, «не стартував», порожньо), — Konst отримує спосіб побачити його сам: демо-режим за входом або прев'ю, посилання у звіті; «іди тестуй» без такого способу — не звіт. "
          "⑤ машинне (обрізання, прилипання, контраст, тап, ряд, iOS-зум, скрол, кромка, паритет тем — перелік — у шапці скрипта) — tools/claude-code/ui_lint.mjs, ✗ 0 у темах продукту — типово обидві, --themes light|dark для продукту з однією схемою")
@@ -40,7 +41,7 @@ def git(top, *a, raw=False):
     return r.stdout if raw else r.stdout.decode("utf-8", "replace").strip()
 
 # AE S133 (UI-VOICE, Konst: «щоб тексти були людяні — машина мусить бачити кожну зміну тексту людині»): ⚠-текст правил AE S132 пройшов повз,
-# бо гачок знав лише .html / .css. Тепер ще JS (.js / .mjs) поза tools/ · docs/ · test* · .claude/ · .github/, де ДОДАНИЙ рядок несе рядок у лапках
+# бо гачок знав лише .html / .css. Тепер ще JS (.js / .mjs) поза tools/ · docs/ · test/ · tests/ · .claude/ · .github/, де ДОДАНИЙ рядок несе рядок у лапках
 # з двома й більше словами кирилицею (текст людині: повідомлення, підказка, порада). Коментарі зрізано; код без людського тексту — тиша.
 HUMAN = re.compile("['\"`][^'\"`\\n]*[А-ЯІЇЄҐа-яіїєґʼ’']{2,}[\\s,.:;—–-]+[А-ЯІЇЄҐа-яіїєґʼ’']{2,}[^'\"`\\n]*['\"`]")
 SKIP_JS = re.compile(r"(^|/)(tools|docs|tests?|\.claude|\.github)/")
@@ -64,23 +65,31 @@ def ui_state(top):   # (файли UI, хеш диффу) — дифф прот�
     files = [f for f in files if f] + human_js(top)
     if not files: return [], None
     h = hashlib.sha1(git(top, "diff", "HEAD", "--", *files, raw=True))   # лише ці файли: видалення примірки не міняє хеш
-    for f in git(top, "ls-files", "--others", "--exclude-standard", "--", *UI).splitlines():
+    for f in git(top, "ls-files", "--others", "--exclude-standard", "--", *files).splitlines():   # нові (не в git) файли зі списку — і UI, і JS з текстом людині (аудит S134: новий JS після позначки не міняв хеш)
         p = os.path.join(top, f)
         if os.path.isfile(p): h.update(f.encode()); h.update(open(p, "rb").read())
     return files, h.hexdigest()
 
+GITC = r"^\s*(?:\w+=\S*\s+)*git\b(?:\s+-[cC]\s+\S+)*\s+commit\b"   # git … commit на початку команди (як commit-gate.sh)
 def mark(hx): return f"/tmp/lens-uireview-{hx}"
 
 def gate(d):
     if d.get("tool_name") != "Bash": return None
     cmd = str((d.get("tool_input") or {}).get("command", ""))
-    if not re.search(r"\bgit\b[^\n;&|]*\bcommit\b", cmd): return None
+    # тіла heredoc — текст, не команди (як у commit-gate.sh; аудит S134: «git commit» у heredoc давав хибну заборону)
+    L, keep, i = cmd.split("\n"), [], 0
+    while i < len(L):
+        keep.append(L[i]); m = re.search(r"<<-?\s*[\x22]?(?:\x27)?(\w+)(?:\x27)?[\x22]?", L[i]); i += 1
+        if m:
+            while i < len(L) and L[i].strip() != m.group(1): i += 1
+    cmd = "\n".join(keep)
+    if not any(re.match(GITC, s) for s in re.split(r"&&|\|\||;|\||\n", cmd)): return None
     cwd, dirs = d.get("cwd") or os.getcwd(), []
     for seg in re.split(r"&&|\|\||;|\n", cmd):   # тека коміту — як у commit-gate: останній cd перед ним, git -C, або cwd
         m = re.match(r"\s*cd\s+(\"[^\"]+\"|'[^']+'|\S+)", seg)
         if m:
             p = os.path.expanduser(m.group(1).strip("\"'")); cwd = p if os.path.isabs(p) else os.path.join(cwd, p)
-        if re.search(r"\bgit\b[^\n]*\bcommit\b", seg):
+        if re.match(GITC, seg):
             c = re.search(r"\bgit\s+-C\s+(\S+)", seg); dirs.append(os.path.join(cwd, c.group(1)) if c else cwd)
     bad = []
     for dd in dict.fromkeys(dirs):
@@ -200,6 +209,15 @@ if mode == "selftest":
         open(f"{tmp}/site/r.js", "w").write("const say = 'Ця фраза звернена до вас';\n")
         say(gate(ev("git add -A && git commit -m x")) is not None, "зуби: JS поза tools/ з текстом людині (два слова кирилицею в лапках) → deny (AE S132: ⚠-текст правил пройшов повз)")
         subprocess.run(["git", "-C", tmp, "checkout", "-q", "--", "."], check=True)
+        # аудит S134: новий (не доданий) JS з текстом людині ПІСЛЯ позначки → хеш міняється → deny
+        open(f"{tmp}/a.html", "w").write("<p>3</p>"); _, hx = ui_state(tmp); open(mark(hx), "w").write("x\n")
+        say(gate(ev("git add -A && git commit -m x")) is None, "позначка диффу .html → тиша")
+        open(f"{tmp}/site/n.js", "w").write("const t = 'Нова фраза для вас';\n")
+        say(gate(ev("git add -A && git commit -m x")) is not None, "зуби: новий JS з текстом людині після позначки → deny (аудит S134)")
+        os.remove(f"{tmp}/site/n.js")
+        say(gate(ev("python3 - <<'EOF'\nprint('git commit -m x')\nEOF")) is None, "«git commit» лише в тілі heredoc → не коміт, тиша (аудит S134)")
+        say(gate(ev("cd " + tmp + " && git -C . commit -am x")) is None, "git -C … commit з позначкою → тиша")
+        os.remove(mark(hx)); subprocess.run(["git", "-C", tmp, "checkout", "-q", "--", "."], check=True)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     print(f"─── ui-review-gate selftest: {n - bad}/{n} ───"); sys.exit(1 if bad else 0)

@@ -1,8 +1,8 @@
 #!/bin/bash
 # живе доки: сесії переїжджають у нові чати, а пам'ять — лише репо (профіль Konst «САМЕРІ»).
 # Дім — lens-governance:tools/claude-code/hooks/ (HOOK-3.2, бриф — archive/summaries/Lens_gov/Lens_kernel_BRIEF_HOOK-3.2_closed.md; «так» Konst 09.10.2026).
-# Подія UserPromptSubmit: у повідомленні Konst — команда переїзду («переїжджаємо» · «переїхати» · «переїдемо» · «нова / нову сесію» · «стартове повідомлення»; іменник «переїзд» — ні, це розповідь) →
-# tools/claude-code/handoff_check.py на кожне репо сесії (/home/user/*, де є sessions/) → additionalContext: рядки ✓/⚠/✗ + чек-лист
+# Подія UserPromptSubmit: у повідомленні Konst — команда переїзду («переїжджаємо» · «переїжджай…» · «переїхати» · «переїдемо» · «нова / нову сесію» · «стартове повідомлення»; іменник «переїзд» — ні, це розповідь) →
+# tools/claude-code/handoff_check.py на кожне репо сесії (/home/user/*, де є sessions/ чи docs/summary; без .git/lens-readonly) → additionalContext: рядки ✓/⚠/✗ + чек-лист
 # «очима нового агента». Повідомлення Konst не блокує. Тиша: перше повідомлення сесії (стартове саме містить «переїзд» — переїжджати
 # ще нема з чого) · повтор без нових комітів (позначка /tmp/lens-handoff-<session_id> = HEAD усіх репо) · помилка розбору.
 # Формат — code.claude.com/docs/en/hooks «UserPromptSubmit» (поле prompt; additionalContext ≤ 10 000 знаків), 09.10.2026.
@@ -81,7 +81,10 @@ def selftest():
              ('не тригер → тиша', D('Що там зі збіркою?', mid, 's2'), None),
              ('перше повідомлення сесії (стартове з «переїздом») → тиша', D('Гачок перевірки перед переїздом', first, 's3'), None),
              ('повтор без нових комітів → тиша', D('нова сесія', mid), None)]
-    bad = 0
+    import builtins; bad = 0; _p = builtins.print; N = [0]
+    def print(*a, **k):   # лічба перевірок — прогоном, не числом у коді (аудит S134: було «14/14» при 15 перевірках)
+        if a and isinstance(a[0], str) and a[0][:1] in '✓✗': N[0] += 1
+        _p(*a, **k)
     for name, d, want in cases:
         out = run(d, [t], t)
         ok = (out is None) if want is None else (out is not None and want in out and 'НОВОГО АГЕНТА' in out)
@@ -115,7 +118,7 @@ def selftest():
     ok = (len(r1) == 2 and not any('незакомічене' in x or 'самері' in x for x in r1)
           and len(r2) == 2 and any('самері' in x for x in r2) and any('docs/B.md' in x and 'README' not in x for x in r2) and not any('бриф a.md' in x for x in r2))
     print(('✓' if ok else '✗') + ' post: шум — те саме з іншим числом · незакомічене · самері < 3 → тиша; новий документ в «описах» і самері ≥ 3 → є'); bad += not ok
-    print(f'selftest: {14 - bad}/14'); return 1 if bad else 0
+    _p(f'selftest: {N[0] - bad}/{N[0]}'); return 1 if bad else 0
 
 POST_LAG = 3   # «самері відстає» після коміту — лише від стількох комітів (на кожен однорядковий коміт — шум; переїзд ловить усе)
 def post_filter(lines, mark):

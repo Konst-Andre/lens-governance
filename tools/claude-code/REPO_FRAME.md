@@ -175,8 +175,8 @@ Cloudflare Pages: тека виводу — будь-яка (`site/`, `public/`)
   **Не беремо** «план-режим на кожен крок» — у нас мікроскоп масштабується (дрібний крок — одним рядком).
 - **Anthropic, «How Claude remembers your project»** (code.claude.com/docs/en/memory, 02.10 · 04.10.2026): `CLAUDE.md` < 200 рядків,
   `@`-імпорти вантажаться щосесії. **Не беремо** імпорти для самері й черги — вони потрібні точково.
-- **Anthropic, «How Claude Code uses prompt caching»** (02.10.2026): зміна моделі — повне перечитування контексту; зміна effort
-  на Opus 5.5 / Sonnet 5.5 / Fable 5.1 з підпискою — кеш лишається. **Беремо:** модель обирати на старті, effort — перемикати.
+- **Anthropic, «How Claude Code uses prompt caching»** (code.claude.com/docs/en/prompt-caching, 07.11.2026): зміна моделі — повне перечитування контексту; зміна effort
+  на Opus 5.5 / Sonnet 5.5 / Haiku 5.5 / Fable 5.1 з підпискою чи API-ключем — кеш лишається (не на Bedrock / Vertex; Fable — з v2.1.260). **Беремо:** модель обирати на старті, effort — перемикати.
 - **Anthropic: «How Claude Code uses prompt caching» · «Explore the context window» («What survives compaction») · «Manage costs» («Why usage climbs in a long session») · «Model configuration» («auto-compact window»)** (code.claude.com/docs/en/prompt-caching · context-window · costs · model-config, 08.10.2026): стиснення замінює історію переказом; `CLAUDE.md` і пам'ять — з диска; кеш 1 год / 5 хв; `/compact` у паузі між задачами, `/clear` між різними задачами; розділ «Compact instructions» у `CLAUDE.md`. **Беремо** у §2-б і `CTX-1`. **Не беремо** «працювати в одній сесії до стиснення» — переїзд дешевший.
 - **ADR (M. Nygard; adr.github.io)** — рішення markdown-файлами поруч із кодом, витіснене не видаляється. **Беремо** у
   `DECISIONS.md`. **Не беремо** файл-на-рішення `0001-…` — один файл з номерами дешевший для читання агентом.
