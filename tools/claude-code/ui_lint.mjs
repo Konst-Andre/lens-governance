@@ -13,6 +13,7 @@
 // 10 дія в прокрутці · 11 кнопки ряду · 12 сирота · 13 злито · 14 однакові заголовки · 15 дата й час · 16 зливається (16-б край кнопки) · 17 паритет тем · 18 кромка · 19 картка-список · 20 вкладена прокрутка · 21 шапка в прокрутці · 22 емодзі в кнопці · 23 нативне вікно · 24 фон у рамці · 25 кант рветься · 26 поле губиться; поза probe — натискання (:active / JS pointerdown, touchstart).
 // 31 форма виділення · 32 пунктир < 3:1 · 22 емодзі-значок без підпису → ✗ · 33 різнобій списків — AE S94, 20.10.2026.
 // 34 пояснення під кнопкою (→ «i») · 35 наведення (ПК, ≥ 1024: нема або ледь видно; S107 — і «лише тінь < 0,12») — AE S96, 20.10.2026.
+// 45 кнопка-посилання (підкреслений текст у button / [role=button]) — пропуск Konst, AE S135, 07.11.2026.
 // 44 число-близнюк (те саме число ≥ 10 двічі в одній шапці: підпис ⟂ чип) — пропуск Konst, AE S113, 28.10.2026.
 // 43 список угорі (закритий base-select не flex — текст притиснутий догори; рецепт A117) — пропуск Konst, AE S107, 26.10.2026.
 // 42 знак не по центру (1–2 знаки чи один значок у маленькій кнопці / бейджі: «чорнило» зсунуте ≥ 1 px або ≥ 0,5 px впритул до краю — пікселем) — пропуск Konst, AE S102, 23.10.2026.
@@ -324,6 +325,12 @@ function probe() {
     const ground = el.parentElement && flatBg(el.parentElement); if (!ground) continue;
     const c = rgba(s['border' + k + 'Color']) || [0, 0, 0, 0], ratio = cr(blend(c, ground), ground);
     if (ratio < 3) add('✗', 'пунктир', el, `пунктирна межа керуючого ${ratio.toFixed(2)}:1 до тла (< 3:1) — ледь видно, що тут дія; темніший пунктир або суцільна межа`); }
+  // 45. кнопка з підкресленим текстом (пропуск Konst AE S135, 07.11.2026: «Повернути» в рядку «прибрано» — «підкреслення тексту критично недоречне й неприпустиме»):
+  //     button / [role=button] (не посилання a[href]) з text-decoration underline на собі чи на тексті всередині — читається як посилання, не як дія; кнопка родини — без підкреслення
+  //     (Carbon «Link» ⟂ «Button»: підкреслення — ознака переходу, carbondesignsystem.com, 07.11.2026).
+  for (const el of all) { if (!el.matches('button,[role=button]') || el.matches('a[href]')) continue;
+    const u = [el, ...el.querySelectorAll('*')].some(x => /underline/.test(getComputedStyle(x).textDecorationLine) && (x === el || x.textContent.trim()));
+    if (u) add('⚠', 'кнопка-посилання', el, 'текст кнопки підкреслено — читається як посилання, а не дія; кнопка родини без підкреслення (посилання — лише для переходу)'); }
   // 33. різнобій списків (пропуск агента AE S94, 20.10.2026 — Konst: «ти зробив власні випадайки для характеру й груп, а для “Додати” — ні; я ж не буду перечисляти всі пункти»):
   //     видимі select екрана з різним appearance (base-select ⟂ none ⟂ auto) — однорідне виглядає по-різному; меншість — ⚠. Рецепт — кукбук A117.
   { const sel = all.filter(e => e.tagName === 'SELECT' && e.getBoundingClientRect().width > 0), g = {};
@@ -470,6 +477,7 @@ const DEFECTS = {
   'фон у рамці': `<div class=card><button style="min-height:48px;width:160px;border:1px solid transparent;border-radius:14px;background:linear-gradient(180deg,#fff,#555)">Закрити</button></div>`,   // QR CC-15: бліда смуга знизу
   'кант рветься': `<div class=card><button style="min-height:48px;width:160px;border:1px solid;border-color:rgba(255,255,255,.5) rgba(255,255,255,.2) #000;border-radius:14px;background:#888">Закрити</button></div>`,   // QR CC-15: «коло, обрізане знизу»
   'поле губиться': `<div style="background:#0a0e14;padding:16px"><div style="background:#161c25;border:1px solid transparent;border-radius:10px;padding:8px"><input style="background:none;border:0;font-size:16px;color:#ccc;min-height:44px" value="пошук"></div></div>`,   // QR CC-15: поле без кільця на майже чорному
+  'кнопка-посилання': `<div class=card><button style="min-height:44px;padding:0 14px;border:0;background:none;color:#00577D;text-decoration:underline">Повернути</button></div>`,   // AE S135: «Повернути» підкреслено
   'натискання': `<div class=card><a href="#x" style="display:inline-block;padding:14px 18px">Відкрити звіт</a></div>`,
   'плашка в тон тла': `<div style="background:#FFFEF6;padding:16px"><div style="background:#FFF8D0;padding:10px;width:220px">Нурофен форте №12</div></div>`,   // AE S93: жовтий рядок на кремовому
   'панелі зливаються': `<div style="display:flex;height:100vh"><nav style="width:72px;background:#fff;border-right:1px solid #e7e7e7"></nav><section style="width:200px;background:#fff">Сценарії</section></div>`,   // AE S93: рейка й список
