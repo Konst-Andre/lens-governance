@@ -16,7 +16,22 @@ LENS_PRODUCTS=" EquipLens stock-check QR-Lens Drive-Lens PharmaLens KPI-Lens "  
 
 SHARED_TOOLS="doc_health.py shots_check.py"   # спільні інструменти ядра для env_check кожного репо (DOC-1, 10.10.2026; примірка — SHOTS.md, QR CC-9 11.10.2026: інструмент, про який продукт не знає, не працює). Виклик, не копія — копії розходяться (практика reusable workflows, earthly.dev · GitHub Docs, 11.10.2026)
 
-check() {
+# DOC-1 M1 (AE S134, Konst: «щоб інші проєкти отримали те саме, і неадаптовані теж»): вага CLAUDE.md — знаками, не лише рядками. frame_check проходить
+#   КОЖНЕ репо сесії на старті (і неадаптоване, чий env_check doc_health не кличе) — тому перевірка тут; поріг — той самий, що в doc_health (одне число).
+#   Світ (07.11.2026): поширена практика — рядки (`wc -l` у CI; tianpan.co 02.2026, getunblocked.com) — саме вона осліпла на рядках-абзацах.
+M1_CHARS=$(grep -oE '^M1_CHARS, M1_CAP = [0-9]+' "$(dirname "$0")/doc_health.py" 2>/dev/null | grep -oE '[0-9]+$'); M1_CHARS=${M1_CHARS:-20000}
+size() {   # вага CLAUDE.md: ⚠ і код 1, коли понад поріг
+  local d="${1%/}" n ch
+  [ -f "$d/CLAUDE.md" ] || return 0
+  n=$(basename "$(git -C "$d" rev-parse --show-toplevel 2>/dev/null || echo "$d")")
+  ch=$(python3 -c 'import sys;print(len(open(sys.argv[1],encoding="utf-8",errors="replace").read()))' "$d/CLAUDE.md" 2>/dev/null || echo 0)
+  [ "${ch:-0}" -gt "$M1_CHARS" ] || return 0
+  echo "⚠ $n: CLAUDE.md $ch знаків > $M1_CHARS — читається щосесії, довгий гірше виконується (DOC-1 M1; рядків може бути й мало — рядок-абзац) → довідку для частини репо — у .claude/rules/ з paths: (ADOPT.md 4-б)"; return 1
+}
+
+check() { local r1 r2; size "$1"; r1=$?; check_core "$1"; r2=$?; [ $r1 -eq 0 ] && return $r2 || return 1; }
+
+check_core() {
   local d="${1%/}" n miss=() kind
   n=$(basename "$(git -C "$d" rev-parse --show-toplevel 2>/dev/null || echo "$d")")
   [ -f "$d/CLAUDE.md" ] || { echo "⚠ $n не адаптоване: нема CLAUDE.md → ADOPT (lens-governance:tools/claude-code/ADOPT.md)"; return 1; }
@@ -106,6 +121,10 @@ if [ "${1:-}" = "--inject" ]; then
   t3=$(mktemp -d); mkdir -p "$t3/r"; printf 'Routes автономний: ядро `lens-governance` у сесії не підключається.\n' > "$t3/r/CLAUDE.md"; au1=$(check "$t3/r")
   printf 'Продукт автономний у рішеннях.\n' > "$t3/r/CLAUDE.md"; au0=$(check "$t3/r"); rm -rf "$t3"
   [[ "$au1" == *автономне* ]] && [[ "$au0" == *"не адаптоване"* ]] || { ok=1; echo "✗ inject автономне: $au1 | $au0" | cut -c1-200; }
+  # DOC-1 M1 (AE S134): CLAUDE.md 120 рядків по ~300 знаків — ⚠ «знаків», і в автономному теж (воно повертається раніше за перелік); 120 × ~100 — тиша
+  t4=$(mktemp -d); mkdir -p "$t4/r"; python3 -c 'print(("Routes автономний: ядро lens-governance у сесії не підключається. " + "ж" * 230 + "\n") * 120, end="")' > "$t4/r/CLAUDE.md"; big=$(check "$t4/r"); rc_big=$?
+  python3 -c 'print(("Routes автономний: ядро lens-governance у сесії не підключається. " + "ж" * 30 + "\n") * 120, end="")' > "$t4/r/CLAUDE.md"; small=$(check "$t4/r"); rc_small=$?; rm -rf "$t4"
+  [ $rc_big -eq 1 ] && [[ "$big" == *"знаків >"* ]] && [ $rc_small -eq 0 ] && [[ "$small" != *"знаків >"* ]] || { ok=1; echo "✗ inject вага CLAUDE.md: $big | $small" | cut -c1-300; }
   [ $ok -eq 0 ] && echo "✓ inject: повний — ✓, без CLAUDE.md — ⚠, без docs/AUDIT.md — ⚠ з назвою, черга списком — ⚠ CQ-1, черга таблицею — ✓, стара копія скрипта аудиту — ⚠ AUD-2, інтерфейс без «Дизайн-основа» — ⚠ UI-1, env_check без спільного інструмента — ⚠ з назвою, з ним — ✓, curl інструментів ядра з main — ⚠" || echo "✗ inject: детектор сліпий ($full | $gone | $part)"
   exit $ok
 fi
