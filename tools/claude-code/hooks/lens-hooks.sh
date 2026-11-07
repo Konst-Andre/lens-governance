@@ -6,7 +6,7 @@
 #   pre  | PreToolUse          — лише Write|Edit|Bash: бриф лише з шаблону (brief-guard, BRIEF-2); далі гачки по черзі, перший з відповіддю (deny/ask) перемагає; огляд UI до коміту (ui-review-gate, HOOK-2 п.4); нагадування (review-remind stand) — останнім
 #   post | PostToolUse         — лише Read|Bash|Grep|WebSearch|WebFetch: позначки (ui-guard mark: кукбук і пошук ззовні) + нагадування після коміту з UI (review-remind post)
 #   stop | Stop                — гачок пам'яті (memory-guard, HOOK-3), далі перевірка перед переїздом, коли його оголошує агент (handoff-remind stop, HOOK-3.2), далі «план без світу» (plan-web, HOOK-2.5)
-#   UserPromptSubmit           — перевірка пам'яті перед переїздом (handoff-remind, HOOK-3.2), інакше «пропуск, знайдений Konst» (konst-miss, HOOK-5): лише на слово-тригер (перевіряє Python: grep -i на кирилиці залежить від локалі; ~50 мс раз на повідомлення)
+#   UserPromptSubmit           — + маршрут для Konst (route-remind, AE S135 — додається до будь-якого) · перевірка пам'яті перед переїздом (handoff-remind, HOOK-3.2), інакше «пропуск, знайдений Konst» (konst-miss, HOOK-5): лише на слово-тригер (перевіряє Python: grep -i на кирилиці залежить від локалі; ~50 мс раз на повідомлення)
 #   SessionStart               — профіль Konst з репо (tools/claude-code/PROFILE.md) як контекст сесії, ЛИШЕ коли в середовищі LENS_PROFILE=1: спільний акаунт, де поле
 #                                профілю в налаштуваннях бачили б і чужі чати (слово Konst 18.10.2026, QR CC-18; ACCOUNT_MOVE.md п.1-б). Старт і повтор після стиснення (без matcher —
 #                                на всі source). Свій акаунт — профіль у налаштуваннях, змінну не ставити (інакше профіль двічі). Зуби: bash lens-hooks.sh profile-test
@@ -86,6 +86,12 @@ case "$ev" in
     run memory-guard.sh stop || run handoff-remind.sh stop || run plan-web.sh stop ;;
   prompt)   # перевірка перед переїздом (HOOK-3.2), інакше — аркуш середовища на прохання (ENV-1), інакше — «пропуск, знайдений Konst» (HOOK-5)
     o="$(run handoff-remind.sh "" || run env-remind.sh "" || run konst-miss.sh "")"
+    r="$(run route-remind.sh "")"   # AE S135 · маршрут для Konst — додається до будь-якого іншого гачка, не витісняє (route-remind.sh)
+    [ -n "$r" ] && o="$(python3 -c 'import json,sys
+a,b=sys.argv[1],sys.argv[2]
+if not a.strip(): print(b); sys.exit()
+x=json.loads(a); y=json.loads(b); h=x.setdefault("hookSpecificOutput",{"hookEventName":"UserPromptSubmit"})
+h["additionalContext"]=(h.get("additionalContext","")+"\n\n"+y["hookSpecificOutput"]["additionalContext"]).strip(); print(json.dumps(x,ensure_ascii=False))' "$o" "$r" 2>/dev/null || printf '%s' "$o")"
     pf="/tmp/lens-profile-part2-${sid:-nosession}"
     if [ "${LENS_PROFILE:-}" = 1 ] && [ -f "$pf" ]; then rm -f "$pf"; python3 "$h/profile_parts.py" 2 | python3 "$h/profile_parts.py" merge "$o"   # частина 2 профілю — у перше повідомлення після старту чи стиснення
     elif [ -n "$o" ]; then printf '%s\n' "$o"; fi ;;
