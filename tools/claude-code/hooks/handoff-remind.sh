@@ -6,6 +6,8 @@
 # «очима нового агента». Повідомлення Konst не блокує. Тиша: перше повідомлення сесії (стартове саме містить «переїзд» — переїжджати
 # ще нема з чого) · повтор без нових комітів (позначка /tmp/lens-handoff-<session_id> = HEAD усіх репо) · помилка розбору.
 # Формат — code.claude.com/docs/en/hooks «UserPromptSubmit» (поле prompt; additionalContext ≤ 10 000 знаків), 09.10.2026.
+# + HOOK-3.3 (Stop, пропуск Konst AE S136): відповідь-переїзд із «💡 Пропоную», а ні стартове в ній, ні §0 найновішого самері не мають рядка «💡 …» з її суттю → block
+#   («💡 чекає вироку Konst: …» — правило AE CLAUDE.md «Самері», Konst S135; щоб Konst не повертався в закриту сесію сказати «запиши»).
 # + Stop (bash handoff-remind.sh stop): переїзд оголошує АГЕНТ (стартове ```text чи «переїжджаємо» у відповіді) і є ✗ → decision: block (раз на стан HEAD; stop_hook_active → тиша).
 # Клон лише для читання (звірка іншого продукту) — `touch <репо>/.git/lens-readonly`: гачок його не перевіряє (AE S103).
 # + РЕВІЗІЯ (AE S109, слово Konst: «одним словом — щоб кожного разу не пояснювати»): «ревізія» · «звір пам'ять» · «звірка пам'яті» у повідомленні Konst →
@@ -102,6 +104,14 @@ def selftest():
                           ('Stop: «стартове повідомлення» в реченні, без блоку — не переїзд → тиша (хибне AE S93)', S('Стартове повідомлення оновлю в самері.', s='p5'), False)]:
         out = stop(d, [t], t); ok = (out is not None and '✗' in out) == want
         print(('✓' if ok else '✗') + ' ' + name); bad += not ok
+    # HOOK-3.3: 💡 на переїзді (пропуск Konst AE S136) — самері тестового репо без рядка 💡
+    IDEA = 'Переїжджаємо. ```text\nСтарт\n💡 чекає вироку Konst: нема\n```\n💡 **Пропоную:** зробити одну сторінку-мапу продукту простими словами з перевіреної карти.'
+    for name, d, want in [('Stop HOOK-3.3: переїзд + 💡, у стартовому «нема» → block', S(IDEA, s='i1'), True),
+                          ('Stop HOOK-3.3: 💡 записана в стартовому → тиша', S(IDEA.replace('нема', 'сторінку-мапу продукту простими словами'), s='i2'), False),
+                          ('Stop HOOK-3.3: «💡 Пропоную: ідей нема» → тиша', S('Переїжджаємо. ```text\nx\n```\n💡 Пропоную: ідей нема.', s='i3'), False),
+                          ('Stop HOOK-3.3: 💡 без переїзду → тиша', S('Готово. 💡 Пропоную: зробити одну сторінку-мапу продукту простими словами.', s='i4'), False)]:
+        out = stop(d, [t], t); ok = (out is not None and 'HOOK-3.3' in out) == want
+        print(('✓' if ok else '✗') + ' ' + name); bad += not ok
     open(os.path.join(r, '.git', 'lens-readonly'), 'w').close()
     ok = stop(S('Переїжджаємо. ```text\nСтарт: …\n```', s='p4'), [t], t) is None
     print(('✓' if ok else '✗') + ' Stop: клон лише для читання (.git/lens-readonly) → тиша (хибне AE S103)'); bad += not ok
@@ -153,6 +163,33 @@ def post(d, roots, mark_dir='/tmp'):
     return ("Гачок «пам'ять після коміту» (AE S109) — handoff_check знайшов нове:\n" + '\n'.join(new)[:4000] +
             "\n✗ — виправ наступним комітом; ⚠ — звір: опис не відстає від коду? рішення / прилад / правило мають дім?")
 
+PROP = re.compile(r'💡\s*\**\s*Пропоную\s*\**\s*:?\s*\**\s*(.+)', re.S)
+WORD = re.compile(r'[А-Яа-яЇїІіЄєҐґA-Za-z]{6,}')
+def latest_summary(r):
+    """Найновіше живе самері репо: не-Lens — docs/summary/*SUMMARY*.md, Lens — sessions/**/*summary*.md (за часом зміни)."""
+    xs = glob.glob(os.path.join(r, 'docs', 'summary', '*SUMMARY*.md')) + glob.glob(os.path.join(r, 'sessions', '**', '*summary*.md'), recursive=True)
+    return max(xs, key=os.path.getmtime) if xs else None
+def idea_missing(msg, rs):
+    """HOOK-3.3 (пропуск Konst AE S136): відповідь-переїзд із «💡 Пропоную», а ні стартове в ній, ні §0 найновішого самері не мають рядка «💡 …» з її суттю
+    (≥ 2 спільних слів від 6 літер з першого речення 💡) → суть 💡, інакше None. Правило — AE CLAUDE.md «Самері», «💡 на переїзді» (Konst S135)."""
+    m = PROP.search(msg)
+    if not m: return None
+    idea = m.group(1).strip()
+    if re.match(r'(ідей|нових)\s+нема', idea, re.I): return None   # чесне «ідей нема» — не 💡
+    first = re.split(r'(?<=[.!?])\s', idea, 1)[0][:400]
+    words = {w.lower() for w in WORD.findall(first)}
+    if len(words) < 2: return None
+    texts = [b for b in re.findall(r'```text(.*?)```', msg, re.S)]
+    for r in rs:
+        f = latest_summary(r)
+        if f:
+            t = open(f, encoding='utf-8').read(); i = t.find('§0'); texts.append(t[i:i + 12000] if i >= 0 else t[:12000])
+            j = t.find('```text'); texts.append(t[j:j + 8000] if j >= 0 else '')
+    for t in texts:
+        for line in t.splitlines():
+            if '💡' in line and len(words & {w.lower() for w in WORD.findall(line)}) >= 2: return None
+    return first[:200]
+
 def stop(d, roots, mark_dir='/tmp'):
     """Stop: переїзд оголошує агент (стартове чи «переїжджаємо» у відповіді) — є ✗ → block, щоб виправив до кінця ходу."""
     if d.get('stop_hook_active'): return None
@@ -160,6 +197,10 @@ def stop(d, roots, mark_dir='/tmp'):
     if not (STOP_TRIG.search(msg) or re.search(r'```text', msg)): return None   # AE S93 → S129: «стартове повідомлення» в реченні агента — не переїзд (хибне); переїзд — блок стартового чи «переїжджаємо»
     rs = repos(roots)
     if not rs: return None
+    gap = idea_missing(msg, rs)   # HOOK-3.3: 💡 з відповіді-переїзду не записана — блок щоразу (stop_hook_active рятує від кола)
+    if gap: return ("Гачок «💡 на переїзді» (HOOK-3.3, Stop): ти оголошуєш переїзд і даєш «💡 Пропоную: " + gap + "…», а ні стартове, ні §0 самері не мають рядка «💡 …» з нею.\n"
+                    "Запиши в самері §0 і в стартове рядок «💡 чекає вироку Konst: <суть> — не як прийняту» (AE CLAUDE.md «Самері», Konst S135), закоміть і запуш, тоді стартове. "
+                    "Konst не мусить повертатись у закриту сесію, щоб сказати «запиши».")
     mark = os.path.join(mark_dir, 'lens-handoff-stop-' + re.sub(r'\W', '', d.get('session_id') or 'x'))
     h = heads(rs)
     if os.path.exists(mark) and open(mark).read() == h: return None
