@@ -133,6 +133,7 @@ function probe() {
       else if (col) { const ws = R.map(x => Math.round(x.width)); if (Math.max(...ws) - Math.min(...ws) > 2) add('⚠', 'ряд', ks[0], `однакові елементи в стовпці різної ширини: ${ws.join('·')} px`); } } }
   // 10. дія в прокрутці (QR CC-7, пропуск Konst: у високому шіті «Закрити» ховалась під краєм прокрутки): остання кнопка прокручуваного блока — дія —
   //     видна повністю без прокрутки, інакше закріпити кнопки поза прокруткою. Рядок списку (≥ 3 однакових сусідів) — не судимо: обрізаний край списку — норма.
+  //     «Однакові» = той самий className і тег: стан рядка (вимкнено, вибрано) — атрибутом (data-off), не класом — інакше рядок випадає зі списку й дає хибний ✗ (QR CC-19, 09.11.2026).
   for (const sc of [...document.querySelectorAll('body *')].filter(e => /auto|scroll/.test(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + 2 && vis(e))) {
     // дія шіта = широка кнопка (≥ 60 % ширини блока), найнижча на екрані — не «остання в коді» (CSS order міняє порядок) і не кнопка рядка вмісту (кошик у картці)
     const q = sc.getBoundingClientRect(), bs = [...sc.querySelectorAll('button, a[href], [role=button]')].filter(vis).filter(b => b.getBoundingClientRect().width >= q.width * 0.6);
