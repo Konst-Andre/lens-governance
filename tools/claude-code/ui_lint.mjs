@@ -50,7 +50,10 @@ function probe() {
   const lum = ([r, g, b]) => { const f = x => { x /= 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
   const blend = (top, bot) => { const a = top[3]; return [top[0] * a + bot[0] * (1 - a), top[1] * a + bot[1] * (1 - a), top[2] * a + bot[2] * (1 - a), 1]; };
   // фон під елементом: знизу вгору до першого непрозорого; градієнт / картинка на шляху — «не виміряно» (чесно, без вигаданого числа)
-  const bgOf = el => { const st = []; for (let e = el; e; e = e.parentElement) { const s = getComputedStyle(e); if (s.backgroundImage !== 'none') return null; const c = rgba(s.backgroundColor); if (c && c[3] > 0) { st.push(c); if (c[3] >= 0.99) break; } }
+  // AE S137: тло, що малює псевдоелемент (повзунок сегмент-перемикача, підкладка) — CSS його під текстом не показує: непрозорий абсолютний ::before / ::after
+  //   на самому елементі чи предку → «не виміряно з CSS», міряє піксель (кільце), як градієнт. Було: білий підпис на синьому повзунку ::before → 1,15:1 ✗ (хибне)
+  const paints = e => ['::before', '::after'].some(ps => { const q = getComputedStyle(e, ps); return q.content !== 'none' && q.display !== 'none' && /absolute|fixed/.test(q.position) && (q.backgroundImage !== 'none' || (rgba(q.backgroundColor) || [0, 0, 0, 0])[3] > 0.5) && parseFloat(q.width) > 4 && parseFloat(q.height) > 4; });
+  const bgOf = el => { const st = []; for (let e = el; e; e = e.parentElement) { const s = getComputedStyle(e); if (s.backgroundImage !== 'none' || paints(e)) return null; const c = rgba(s.backgroundColor); if (c && c[3] > 0) { st.push(c); if (c[3] >= 0.99) break; } }
     let bg = [255, 255, 255, 1]; if (!st.length || st[st.length - 1][3] < 0.99) { const h = rgba(getComputedStyle(document.documentElement).backgroundColor); if (h && h[3] > 0) bg = h; }
     for (let i = st.length - 1; i >= 0; i--) bg = blend(st[i], bg); return bg; };
   const card = el => { for (let e = el.parentElement; e && e !== document.body; e = e.parentElement) { const s = getComputedStyle(e);
@@ -734,6 +737,11 @@ if (a[0] === 'selftest') {
   T.push(async () => { // AE S109: білий текст на синьому градієнті кнопки з дочірнім елементом — кільце довкола тексту → тиша (було 1,00:1 — кільце довкола рамки кнопки)
     const g = (await R(`<div class=card><button style="display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 14px;border:0;border-radius:999px;background:linear-gradient(180deg,#0E8CC6,#0071A3);color:#fff;font:600 15px system-ui">Усі<i style="font-style:normal;margin-left:5px">21</i></button></div>`, 'gradbtn')).filter(x => x.kind === 'контраст' && x.lvl === '✗');
     return [(!g.length ? '✓' : '✗') + ` білий на синьому градієнті кнопки → тиша (${g.map(x => x.msg).join(' | ') || '0'})`, !!g.length]; });
+  T.push(async () => { // AE S137: повзунок сегмент-перемикача — псевдоелемент ::before предка; білий підпис на синьому повзунку → тиша (піксель), на світлому → ✗ (зуби)
+    const seg = c => `<div class=card><style>.sg::before{content:"";position:absolute;z-index:-1;left:3px;top:3px;width:140px;height:38px;border-radius:999px;background:${c}}</style><div class=sg style="position:relative;isolation:isolate;display:inline-grid;grid-auto-flow:column;padding:3px;border-radius:999px;background:#F0EFEA"><button style="width:140px;min-height:38px;border:0;background:transparent;color:#fff;font:600 15px system-ui">Без замовлення</button><button style="width:140px;min-height:38px;border:0;background:transparent;color:#333;font:600 15px system-ui">Інше</button></div></div>`;
+    const [ok, bad] = await Promise.all([R(seg('linear-gradient(180deg,#0E8CC6,#0071A3)'), 'segok'), R(seg('#F4F4F2'), 'segbad')]);
+    const o = ok.some(x => x.kind === 'контраст' && x.lvl === '✗'), b = bad.some(x => x.kind === 'контраст' && x.lvl === '✗');
+    return [(!o && b ? '✓' : '✗') + ` білий підпис на повзунку-псевдоелементі: синій → тиша, світлий → контраст ✗ (${o} · ${b})`, !(!o && b)]; });
   T.push(async () => { // AE S109: випадне меню (role=menu, absolute) виходить за картку → «вилазить» мовчить; той самий блок без ролі — ✗ (зуби)
     const box = r => `<div class=card style="position:relative;height:60px"><div ${r} style="position:absolute;top:40px;left:20px;width:200px;height:160px;border-radius:12px;border:1px solid #ddd;background:#fff">Пункт</div></div>`;
     const [pm, pn] = await Promise.all([R(box('role=menu'), 'popmenu'), R(box(''), 'popnone')]);
