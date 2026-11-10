@@ -670,6 +670,7 @@ async function lint(target, states, width, theme, browser, scope = SCOPE) {
     //     від останнього → ✗. Причина в AE: позиція ставилась у «toggle», а браузер шле його вже після показу (MDN «Using the Popover API», 22.10.2026).
     //     Лік — ставити до показу (CSS anchor positioning: anchor() / position-area; Chrome «Introducing the popover API») або ховати до місця
     //     (visibility:hidden, доки «toggle» не поставив — так у AE). Справжні кадри, не примусовий стан — тому ✗.
+    //     AE S138: міряємо ЦЕНТР підказки — анімація появи з scale (A54) не стрибок; поріг 4 px лишається.
     {
       const pv = await p.evaluate(() => { const out = [];
         for (const b of document.querySelectorAll('[popovertarget]')) { const t = document.getElementById(b.getAttribute('popovertarget')); const r = b.getBoundingClientRect();
@@ -679,7 +680,7 @@ async function lint(target, states, width, theme, browser, scope = SCOPE) {
         return out; });
       for (let j = 0; j < pv.length; j++) {
         const fr = await p.evaluate(j => new Promise(done => { const b = document.querySelector(`[data-uil-pop="${j}"]`), t = document.getElementById(b.getAttribute('popovertarget')), fr = [];
-          const shot = () => { const r = t.getBoundingClientRect(), s = getComputedStyle(t); fr.push({ open: t.matches(':popover-open'), vis: s.visibility !== 'hidden' && +s.opacity > 0.05 && r.width > 0, x: Math.round(r.left), y: Math.round(r.top) }); };
+          const shot = () => { const r = t.getBoundingClientRect(), s = getComputedStyle(t); fr.push({ open: t.matches(':popover-open'), vis: s.visibility !== 'hidden' && +s.opacity > 0.05 && r.width > 0, x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }); };   /* центр, не кут: анімація появи scale(.97) навколо центру зсувала кут на ~5 px — хибний ✗ (AE S138, «i» «Пробна розмова»); справжній стрибок зсуває й центр */
           let n = 0; const tick = () => { shot(); if (++n < 8) requestAnimationFrame(tick); else { try { t.hidePopover(); } catch {} done(fr); } };
           b.click(); shot(); requestAnimationFrame(tick); }), j);
         const seen = fr.filter(f => f.open && f.vis);
