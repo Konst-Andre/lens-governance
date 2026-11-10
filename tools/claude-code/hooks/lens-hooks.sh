@@ -65,6 +65,8 @@ if [ "$ev" = start-test ]; then   # зуби FAB-1: пауза не дублює
   o="$(printf '{"session_id":"s7","source":"startup"}' | LENS_ENV_AUTO=0 LENS_PROFILE=1 LENS_REPOS_ROOT="$t/repos" LENS_ENV_DIR="$t" LENS_MARK_DIR="$t" bash "${BASH_SOURCE[0]}" SessionStart)"
   [ ! -e "$t/lens-env-s7.txt" ] && case "$o" in *'Частина 1/2'*) true;; *) false;; esac && echo "✓ вимикач LENS_ENV_AUTO=0: env_check не ганяється, профіль на місці" || { echo "✗ вимикач LENS_ENV_AUTO=0 не спрацював"; bad=1; }
   c="$(printf '{}' | bash "${BASH_SOURCE[0]}" PreCompact)"; n=${#c}; [ "$n" -gt 200 ] && [ "$n" -le 10000 ] && echo "✓ PreCompact: інструкції для переказу ($n знаків ≤ 10 000)" || { echo "✗ PreCompact: $n знаків"; bad=1; }
+  s="$(printf '{"session_id":"s6","last_assistant_message":"Готово, без рядка."}' | LENS_SHADOW_DIR="$t" bash "${BASH_SOURCE[0]}" Stop)"
+  [ -z "$s" ] && grep -q 'memory-line	no-line' "$t/lens-shadow-s6.tsv" 2>/dev/null && echo "✓ Stop: тінь memory-line записала вирок і нічого не заблокувала" || { echo "✗ тінь: вивід «$s», файл: $(cat "$t/lens-shadow-s6.tsv" 2>/dev/null | cut -c1-120)"; bad=1; }
   rm -rf "$t"; exit $bad
 fi
 if [ "$ev" = SessionStart ] || [ "$ev" = profile-test ]; then
@@ -128,6 +130,9 @@ case "$ev" in
     [ -n "$o1" ] && [ -n "$o2" ] && fire "review-remind+brief-guard" "$(python3 -c 'import json,sys; a,b=(json.loads(x)["hookSpecificOutput"] for x in sys.argv[1:3]); print(json.dumps({"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":a["additionalContext"]+"\n\n"+b["additionalContext"]}},ensure_ascii=False))' "$o1" "$o2")"
     [ -z "$o1" ] && [ -z "$o2" ] && [ "$tool" = Bash ] && { run handoff-remind.sh post || run env-remind.sh post; } ;;   # + пам'ять після коміту (AE S109): нові ✗ / ⚠ handoff_check   # коміт змінив аркуш середовища → запропонувати оновити (ENV-1)
   stop)   # перший з відповіддю перемагає: гачок пам'яті, перевірка перед переїздом (HOOK-3.2), «план без світу» (HOOK-2.5)
+    # тінь (FAB-1, 10.11.2026): кандидат на заміну memory-guard — перевірка рядка «пам'ять: …» проти стану git. Лише пише вирок у
+    #   /tmp/lens-shadow-<сесія>.tsv, нічого не друкує й не блокує; підсумок сесії — python3 memory_line.py tally <сесія> (рядком у журнал гачків)
+    printf '%s' "$in" | python3 "$h/memory_line.py" shadow "${sid:-nosession}" > /dev/null 2>&1
     run memory-guard.sh stop || run handoff-remind.sh stop || run plan-web.sh stop ;;
   prompt)   # перевірка перед переїздом (HOOK-3.2), інакше — аркуш середовища на прохання (ENV-1), інакше — «пропуск, знайдений Konst» (HOOK-5)
     o="$(run handoff-remind.sh "" || run env-remind.sh "" || run konst-miss.sh "")"
