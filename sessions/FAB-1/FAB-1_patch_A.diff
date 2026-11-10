@@ -1,0 +1,230 @@
+diff --git a/tools/claude-code/CLAUDE_CODE.md b/tools/claude-code/CLAUDE_CODE.md
+index 6753805..c333831 100644
+--- a/tools/claude-code/CLAUDE_CODE.md
++++ b/tools/claude-code/CLAUDE_CODE.md
+@@ -28,7 +28,8 @@
+ | `tools/claude-code/SHOTS.md` | **примірка** — UI-рішення наперед: варіанти на справжньому білді знімками + вибір Konst і чому в теці `shots/` продукту, доки код не в проді; життєвий цикл (примірка → обрано → у роботі → прийнято / відкинуто / застаріло), межі, переїзди; пара до `Lens_verdict_protocol.md` §2.4 |
+ | `tools/claude-code/ACCOUNT_MOVE.md` | переїзд на інший акаунт Claude: що переїжджає саме (репо), що руками один раз (профіль · GitHub · середовище: setup script v3, секрети, мережа · конектори · Project) і як перевірити | Konst: «новий / інший акаунт» |
+ | `tools/claude-code/MODELS.md` | моделі Claude у роботі Konst: яка де, холодний старт, еталон самері | обираєш модель для `claude -p` чи субагента |
+-| `tools/claude-code/frame_check.sh` | детектор «репо не адаптоване під каркас»: чого бракує за ролями `ADOPT.md` (ядро · продукт Lens · не-Lens · шлях В); **вага `CLAUDE.md`** — ⚠ понад поріг `doc_health` M1 (знаки, AE S134) для **кожного** репо сесії, і неадаптованого, і автономного (`ADOPT.md` 4-б); `--inject` — перевірка самого детектора | запускає `env_check` ядра по кожному репо сесії; руками — `bash <ядро>/tools/claude-code/frame_check.sh <тека>` · **PW-1** хук старту зашиває `playwright==N` → ⚠ (пара образу) · **PW-2** гейт, названий у `CLAUDE.md`, з ≥ 3 фіксованими паузами без `pw_quiet` → ⚠ (виняток — `pause-ok` з причиною; практика — eslint-plugin-playwright `no-wait-for-timeout`) — AE S103: канал, яким покращення ядра доходять до кожного продукту на старті його сесії · **автономне репо** (`CLAUDE.md`: «автономний» + «ядро … не підключається», як Routes) → ✓ без переліку — шум ⚠ привчає їх пропускати (AE S103) |
++| `tools/claude-code/frame_check.sh` | детектор «репо не адаптоване під каркас»: чого бракує за ролями `ADOPT.md` (ядро · продукт Lens · не-Lens · шлях В); **вага `CLAUDE.md`** — ⚠ понад поріг `doc_health` M1 (знаки, AE S134) для **кожного** репо сесії, і неадаптованого, і автономного (`ADOPT.md` 4-б); `--inject` — перевірка самого детектора | запускає `env_check` ядра по кожному репо сесії; руками — `bash <ядро>/tools/claude-code/frame_check.sh <тека>` · **PW-1** хук старту зашиває `playwright==N` → ⚠ (пара образу) · **PW-2** гейт, названий у `CLAUDE.md`, з ≥ 3 фіксованими паузами без `pw_quiet` → ⚠ (виняток — `pause-ok` з причиною; практика — eslint-plugin-playwright `no-wait-for-timeout`) — AE S103: канал, яким покращення ядра доходять до кожного продукту на старті його сесії · **хук і шаблон** (FAB-1, 10.11.2026): хук старту не зареєстрований у `.claude/settings.json` або без права запуску → ⚠; `CLAUDE.md` з незаповненого шаблону → ⚠ (раніше репо з самих шаблонів давало ✓) · **автономне репо** (`CLAUDE.md`: «автономний» + «ядро … не підключається», як Routes) → ✓ без переліку — шум ⚠ привчає їх пропускати (AE S103) |
++| `tools/claude-code/frame_init.sh` | **закладач каркаса** в нове не-Lens репо одним ходом (FAB-1, 10.11.2026): 10 файлів із шаблонів, назва продукту й дата підставлені, хук старту зареєстрований у `.claude/settings.json` і виконуваний, наприкінці — перелік незаповнених `<…>` і `frame_check`; наявного не перезаписує; продукт Lens (Р-7) — не вміє; зуби — `selftest` | заводиш нове репо: `bash tools/claude-code/frame_init.sh <тека> "<Продукт>"` |
+ | `tools/claude-code/VERSIONS.md` · `version_check.py` | версія застосунку **B · rev**: коли піднімати, хто вирішує; `version_check.py` — версія проти `origin/main` для `env_check` продукту | план кроку з рядком «версія: …» · заводиш `env_check` продукту з інтерфейсом |
+ | `tools/claude-code/profile_check.sh` | рядок «профіль: …» для `env_check`: звідки профіль у сесії (`LENS_PROFILE=1` + гачок старту ⟂ налаштування акаунта) | `env_check` ядра й продуктів (сам) |
+ | `tools/claude-code/shots_check.py` · `shots_same.py` | примірка: тека `shots/` за життєвим циклом `SHOTS.md` (у `SHARED_TOOLS`) · кроп примірки ⟂ кроп коду — «перенесено так само» | `env_check` (сам) · переносиш обрану примірку в код |
+@@ -65,7 +66,7 @@
+ 
+ ## Як користуватись
+ 
+-**Нове репо.** Прочитати `tools/claude-code/REPO_FRAME.md` → створити з шаблонів `CLAUDE.md`, `docs/REPO_LAYOUT.md`, `docs/CHERGA.md`, `docs/DECISIONS.md`,
++**Нове репо.** Прочитати `tools/claude-code/REPO_FRAME.md` → `bash tools/claude-code/frame_init.sh <тека> "<Продукт>"` (або руками) створити з шаблонів `CLAUDE.md`, `docs/REPO_LAYOUT.md`, `docs/CHERGA.md`, `docs/DECISIONS.md`,
+ `docs/ARCHITECTURE.md`, `docs/AUDIT.md`, `tools/env_check.sh`, `tools/audit_prompts.sh`, хук старту → перший аудит `CLAUDE.md` (клас 2: opus high + sonnet) → коміт.
+ 
+ **Наявне репо** (з Claude Code чи з claude.ai Project) — процедура `tools/claude-code/ADOPT.md`. Konst вставляє в сесію репо одне речення:
+@@ -109,7 +110,7 @@
+ | `hooks/plan-web.sh` | Stop | **«план без світу»** (`HOOK-2.5`, 10.10.2026, слово Konst: правило профілю «ПІДСИЛЕННЯ ІНТЕРНЕТОМ» модель рідко виконує — і не лише в UI): відповідь з планом / мікроскопом, а в цьому ході нема `WebSearch`/`WebFetch` і нема «практики не знайшов» → `decision: block`: пошукай (практика · беремо · не беремо + джерело з датою; для елемента UI — 2–3 варіанти на вибір Konst) або одним рядком — чому крок не вирішує форму. Раз на хід. Зуби: `selftest` + наживо через диспетчер | **Друге правило** (QR CC-15, 17.10.2026, слово Konst «кукбук — довідник, як інтернет»): план спирається на номер рецепта (A66, B3.2…) без рядка «рецепт ⟂ світ ⟂ замір → рішення» → block · 18.10.2026: «рецепт як закон» — рецептом вважається лише номер з індексу кукбуку (версія застосунку «B65.1» — не рецепт) |
+ | `hooks/env-remind.sh` + `env_drift.py` | UserPromptSubmit · Post `Bash` | **середовище ⟂ аркуш** (`ENV-1`, ідея й підсилення Konst 22.10.2026): на «дай налаштування середовища» / «setup script» — жива звірка `env_drift.py` (змінні — лише чи є · setup script ≡ §3 · мережа · профіль) + аркуш `tools/claude-code/ENVIRONMENT.md`, агент пропонує рівно ті рядки, яких бракує; коміт змінив аркуш → сам пропонує Konst оновити середовище; щостарту — рядок у `tools/env_check.sh`. Значення секретів не читаються. `selftest` 8/8 · `env_drift.py selftest` 6/6 |
+ | `hooks/profile_parts.py` | SessionStart · UserPromptSubmit (через диспетчер) | **профіль частинами ≤ 10 000 знаків** (22.10.2026, питання Konst): понад стелю Claude Code дає лише прев'ю 2 000 знаків; частина 1 — на старті, частина 2 — у перше повідомлення, після стиснення — знову; `profile_parts.py test` 6/6, `lens-hooks.sh profile-test` |
+-| `hooks/lens-hooks.sh` | — | **диспетчер**: setup script вказує лише на нього; новий гачок = рядок тут. **Setup script (v2 і v3, `HOOK-4`):** setup script реєструє 9 подій (SessionStart · UserPromptSubmit · PreToolUse · PostToolUse · PostToolUseFailure · Stop · SubagentStop · PreCompact · SessionEnd) без фільтра інструментів; фільтр — у диспетчері (bash, до Python): подія без гачка ~6 мс, інструмент поза фільтром ~13 мс, повний ланцюг ~140 мс (заміряно). Старі імена `pre · post · stop` працюють. Новий гачок = рядок у диспетчері; нова подія поза цими 9 — єдиний випадок, коли знову треба setup script · **SessionStart** (18.10.2026): при `LENS_PROFILE=1` у середовищі кладе `PROFILE.md` у контекст сесії (спільний акаунт — `ACCOUNT_MOVE.md` п.1-б); `bash lens-hooks.sh profile-test` |
++| `hooks/lens-hooks.sh` | — | **диспетчер**: setup script вказує лише на нього; новий гачок = рядок тут. **Setup script (v2 і v3, `HOOK-4`):** setup script реєструє 9 подій (SessionStart · UserPromptSubmit · PreToolUse · PostToolUse · PostToolUseFailure · Stop · SubagentStop · PreCompact · SessionEnd) без фільтра інструментів; фільтр — у диспетчері (bash, до Python): подія без гачка ~6 мс, інструмент поза фільтром ~13 мс, повний ланцюг ~140 мс (заміряно). Старі імена `pre · post · stop` працюють. Новий гачок = рядок у диспетчері; нова подія поза цими 9 — єдиний випадок, коли знову треба setup script · **SessionStart** (18.10.2026): при `LENS_PROFILE=1` у середовищі кладе `PROFILE.md` у контекст сесії (спільний акаунт — `ACCOUNT_MOVE.md` п.1-б); `bash lens-hooks.sh profile-test` · **старт без дублів і з перевіркою середовища** (FAB-1, 10.11.2026): на `resume` / `fork` профіль не повторюється (замір — 4 зайві копії частини 2 за 2,5 год); на `startup` диспетчер сам ганяє `tools/env_check.sh` кожного репо сесії, а рядки ⚠ / ✗ кладе в перше повідомлення (вимикач — змінна середовища `LENS_ENV_AUTO=0`); **PreCompact** — `hooks/compact_instructions.txt` як інструкції для переказу при стисненні (`CTX-1`); зуби — `bash lens-hooks.sh start-test` (8) |
+ 
+ - **Де діють.** Claude Code бере гачки з налаштувань **кореня сесії** і користувача (`~/.claude/settings.json`). У хмарній сесії з кількох репо корінь — `/home/user`, тож `.claude/settings.json` **репо не вантажиться** (і його `SessionStart` теж — звідси «у сесії з кількома репо — руками»). Налаштування користувача й кореня Claude Code підхоплює й посеред сесії (живі тести CC-2: HTML до індексу → відмова, після → дозвіл; коміт із підкинутим ✗ → відмова).
+ - **Як увімкнути назавжди** — setup script середовища (меню середовища → Edit → Setup script; поле «runs when a new session starts, before Claude Code launches»), разово; текст **v3** (запасне місце ядра — `/tmp/lens-governance`); нові гачки додаються в диспетчер ядра, setup script не чіпати:
+diff --git a/tools/claude-code/frame_check.sh b/tools/claude-code/frame_check.sh
+index 9eee2d7..689cb4a 100755
+--- a/tools/claude-code/frame_check.sh
++++ b/tools/claude-code/frame_check.sh
+@@ -50,6 +50,13 @@ check_core() {
+     for p in tools/env_check.sh .claude/hooks/session-start.sh tools/audit_prompts.sh docs/CHERGA.md docs/DECISIONS.md \
+              docs/ARCHITECTURE.md docs/REPO_LAYOUT.md docs/AUDIT.md docs/summary; do [ -e "$d/$p" ] || miss+=("$p"); done
+   fi
++  # FAB-1 (10.11.2026): файла хука мало — він мусить бути зареєстрований і виконуваний, а CLAUDE.md — заповнений. Прогін 10.11: репо з самих
++  #   незаповнених шаблонів давало «✓ каркас на місці»; файл, створений інструментом Write, має 644 → «Permission denied» (templates/session_start_template.sh).
++  if [ -f "$d/.claude/hooks/session-start.sh" ]; then
++    grep -q 'session-start.sh' "$d/.claude/settings.json" 2>/dev/null || miss+=(".claude/settings.json не реєструє хук старту (SessionStart → .claude/hooks/session-start.sh; рядок — templates/session_start_template.sh)")
++    [ -x "$d/.claude/hooks/session-start.sh" ] || miss+=(".claude/hooks/session-start.sh без права запуску — chmod +x")
++  fi
++  grep -qE '^# <Продукт>|<одне-два речення|<команда гейта>' "$d/CLAUDE.md" && miss+=("CLAUDE.md — шаблон не заповнено (лишились <Продукт> / <…>)")
+   # CQ-1 (05.10.2026): черга — таблиця з `id` і датою, інакше лічильник стелі (kernel/Lens_INDEX.md §5) її не бачить
+   local q; q=$(ls "$d"/kernel/Lens_governance_CHERGA.md "$d"/lens/*_CHERGA.md "$d"/docs/CHERGA.md 2>/dev/null | head -1)
+   if [ -n "$q" ]; then
+@@ -94,6 +101,7 @@ if [ "${1:-}" = "--inject" ]; then
+   for p in tools/env_check.sh .claude/hooks/session-start.sh tools/audit_prompts.sh docs/CHERGA.md docs/DECISIONS.md \
+            docs/ARCHITECTURE.md docs/REPO_LAYOUT.md docs/AUDIT.md; do : > "$t/repo/$p"; done
+   cp "$KDIR/../tools/claude-code/audit_prompts.sh" "$t/repo/tools/audit_prompts.sh"
++  echo '{"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh"}]}]}}' > "$t/repo/.claude/settings.json"; chmod +x "$t/repo/.claude/hooks/session-start.sh"
+   printf '## Відкрите\n\n| id | предмет | дата |\n|---|---|---|\n| `Ч-1` | x | 05.10.2026 |\n\n-----\n' > "$t/repo/docs/CHERGA.md"
+   echo x > "$t/repo/CLAUDE.md"; full=$(check "$t/repo"); rc_full=$?
+   rm "$t/repo/CLAUDE.md";     gone=$(check "$t/repo"); rc_gone=$?
+@@ -125,7 +133,14 @@ if [ "${1:-}" = "--inject" ]; then
+   t4=$(mktemp -d); mkdir -p "$t4/r"; python3 -c 'print(("Routes автономний: ядро lens-governance у сесії не підключається. " + "ж" * 230 + "\n") * 120, end="")' > "$t4/r/CLAUDE.md"; big=$(check "$t4/r"); rc_big=$?
+   python3 -c 'print(("Routes автономний: ядро lens-governance у сесії не підключається. " + "ж" * 30 + "\n") * 120, end="")' > "$t4/r/CLAUDE.md"; small=$(check "$t4/r"); rc_small=$?; rm -rf "$t4"
+   [ $rc_big -eq 1 ] && [[ "$big" == *"знаків >"* ]] && [ $rc_small -eq 0 ] && [[ "$small" != *"знаків >"* ]] || { ok=1; echo "✗ inject вага CLAUDE.md: $big | $small" | cut -c1-300; }
+-  [ $ok -eq 0 ] && echo "✓ inject: повний — ✓, без CLAUDE.md — ⚠, без docs/AUDIT.md — ⚠ з назвою, черга списком — ⚠ CQ-1, черга таблицею — ✓, стара копія скрипта аудиту — ⚠ AUD-2, інтерфейс без «Дизайн-основа» — ⚠ UI-1, env_check без спільного інструмента — ⚠ з назвою, з ним — ✓, curl інструментів ядра з main — ⚠" || echo "✗ inject: детектор сліпий ($full | $gone | $part)"
++  # FAB-1: хук без реєстрації — ⚠; без права запуску — ⚠; CLAUDE.md з незаповненого шаблону — ⚠; усе на місці — тиша про ці три
++  t5=$(mktemp -d); mkdir -p "$t5/r/.claude/hooks"; echo x > "$t5/r/CLAUDE.md"; echo 'echo ok' > "$t5/r/.claude/hooks/session-start.sh"; f0=$(check "$t5/r")
++  echo '{"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh"}]}]}}' > "$t5/r/.claude/settings.json"; f1=$(check "$t5/r")
++  chmod +x "$t5/r/.claude/hooks/session-start.sh"; f2=$(check "$t5/r")
++  printf '# <Продукт> — як працюємо\n**Що це.** <одне-два речення: продукт, для кого>\n' > "$t5/r/CLAUDE.md"; f3=$(check "$t5/r"); rm -rf "$t5"
++  [[ "$f0" == *"не реєструє хук"* ]] && [[ "$f0" == *"без права запуску"* ]] && [[ "$f1" != *"не реєструє хук"* ]] && [[ "$f1" == *"без права запуску"* ]] \
++    && [[ "$f2" != *"без права запуску"* ]] && [[ "$f2" != *"не заповнено"* ]] && [[ "$f3" == *"не заповнено"* ]] || { ok=1; printf "✗ inject FAB-1 (хук і шаблон):\n0 %s\n1 %s\n2 %s\n3 %s\n" "$f0" "$f1" "$f2" "$f3" | cut -c1-500; }
++  [ $ok -eq 0 ] && echo "✓ inject: повний — ✓, без CLAUDE.md — ⚠, без docs/AUDIT.md — ⚠ з назвою, черга списком — ⚠ CQ-1, черга таблицею — ✓, стара копія скрипта аудиту — ⚠ AUD-2, інтерфейс без «Дизайн-основа» — ⚠ UI-1, env_check без спільного інструмента — ⚠ з назвою, з ним — ✓, curl інструментів ядра з main — ⚠, хук без реєстрації чи права запуску — ⚠, CLAUDE.md з незаповненого шаблону — ⚠" || echo "✗ inject: детектор сліпий ($full | $gone | $part)"
+   exit $ok
+ fi
+ 
+diff --git a/tools/claude-code/frame_init.sh b/tools/claude-code/frame_init.sh
+new file mode 100755
+index 0000000..cb50658
+--- /dev/null
++++ b/tools/claude-code/frame_init.sh
+@@ -0,0 +1,38 @@
++#!/usr/bin/env bash
++# frame_init — закласти каркас Claude Code у нове не-Lens репо одним ходом (FAB-1, 10.11.2026).
++# Запуск:  bash <ядро>/tools/claude-code/frame_init.sh <тека репо> "<Продукт>"
++# живе доки: нові репо Konst заводяться під каркас Claude Code (tools/claude-code/REPO_FRAME.md). Продукт Lens (Р-7: lens/, sessions/) — не вміє, свідомо.
++# Нічого не перезаписує: наявний файл — «є, пропущено». Наприкінці — перелік незаповнених <…> і frame_check.
++# Зуби: bash frame_init.sh selftest — порожня тека → 10 файлів, хук виконуваний і зареєстрований; вдруге — нічого не перезаписано.
++set -euo pipefail
++if [ "${1:-}" = selftest ]; then
++  t=$(mktemp -d); mkdir "$t/r"; git -C "$t/r" init -q; bad=0; me="${BASH_SOURCE[0]}"
++  o1="$(bash "$me" "$t/r" "Демо" 2>&1)"; n=$(printf '%s\n' "$o1" | grep -c '^створено: ')
++  [ "$n" -eq 10 ] && echo "✓ порожня тека → створено 10 файлів" || { echo "✗ створено $n, чекали 10"; bad=1; }
++  [ -x "$t/r/.claude/hooks/session-start.sh" ] && grep -q 'session-start.sh' "$t/r/.claude/settings.json" && echo "✓ хук виконуваний і зареєстрований" || { echo "✗ хук не виконуваний або не зареєстрований"; bad=1; }
++  grep -q '^# Демо — як працюємо' "$t/r/CLAUDE.md" && ! grep -q '<дд.мм.рррр>' "$t/r/docs/CHERGA.md" && echo "✓ назву продукту й дату підставлено" || { echo "✗ підстановка не спрацювала"; bad=1; }
++  case "$o1" in *"не заповнено"*) echo "✓ frame_check після закладки нагадує заповнити шаблон";; *) echo "✗ frame_check не нагадав про незаповнений шаблон"; bad=1;; esac
++  echo "своє" > "$t/r/CLAUDE.md"; o2="$(bash "$me" "$t/r" "Демо" 2>&1)"
++  [ "$(cat "$t/r/CLAUDE.md")" = "своє" ] && ! printf '%s\n' "$o2" | grep -q '^створено: ' && echo "✓ повторний запуск нічого не перезаписав" || { echo "✗ повторний запуск щось перезаписав"; bad=1; }
++  rm -rf "$t"; exit $bad
++fi
++R="${1:?тека репо}"; P="${2:?назва продукту}"; K="$(cd "$(dirname "$0")" && pwd)"; T="$K/templates"; D="$(date +%d.%m.%Y)"
++put() {   # $1 — шаблон, $2 — ціль
++  [ -e "$R/$2" ] && { echo "є, пропущено: $2"; return 0; }
++  mkdir -p "$(dirname "$R/$2")"
++  sed -e "s/<Продукт>/$P/g" -e "s/<дд\.мм\.рррр>/$D/g" "$T/$1" > "$R/$2"; echo "створено: $2"
++}
++put CLAUDE_template.md            CLAUDE.md
++put REPO_LAYOUT_template.md       docs/REPO_LAYOUT.md
++put CHERGA_template.md            docs/CHERGA.md
++put DECISIONS_template.md         docs/DECISIONS.md
++put ARCHITECTURE_template.md      docs/ARCHITECTURE.md
++put AUDIT_template.md             docs/AUDIT.md
++put env_check_template.sh         tools/env_check.sh
++put session_start_template.sh     .claude/hooks/session-start.sh
++[ -e "$R/tools/audit_prompts.sh" ] || { cp "$K/audit_prompts.sh" "$R/tools/audit_prompts.sh"; echo "створено: tools/audit_prompts.sh (копія ядра як є)"; }
++mkdir -p "$R/docs/summary" "$R/archive"; [ -n "$(ls -A "$R/docs/summary")" ] || : > "$R/docs/summary/.gitkeep"
++[ -e "$R/.claude/settings.json" ] || { printf '%s\n' '{"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh"}]}]}}' > "$R/.claude/settings.json"; echo "створено: .claude/settings.json (реєстрація хука старту)"; }
++chmod +x "$R/.claude/hooks/session-start.sh" "$R/tools/env_check.sh"
++echo "— заповнити <…> (що лишилось порожнім):"; grep -rc '<[^<>|]\{2,\}>' "$R/CLAUDE.md" "$R/docs" "$R/tools/env_check.sh" 2>/dev/null | grep -v ':0$' | sed 's/^/   /' || true
++echo "— frame_check (⚠ «шаблон не заповнено» — очікувано, доки не заповниш <…> у CLAUDE.md):"; bash "$K/frame_check.sh" "$R" || true
+diff --git a/tools/claude-code/hooks/compact_instructions.txt b/tools/claude-code/hooks/compact_instructions.txt
+new file mode 100644
+index 0000000..269769a
+--- /dev/null
++++ b/tools/claude-code/hooks/compact_instructions.txt
+@@ -0,0 +1,9 @@
++У переказі збережи дослівно, не узагальнюючи:
++1. Відкритий крок: що робимо зараз, на якому підкроці зупинились, що далі. `id` пунктів черги й назву живого брифу.
++2. Кожне рішення Konst цієї сесії — його словами, з датою, і чи воно вже записане (файл і коміт). Незаписане познач «НЕ ЗАПИСАНО».
++3. Коміти сесії: хеш · репо · гілка · одне речення. HEAD кожного репо на цю мить.
++4. Файли, які правили в цій сесії, — повними шляхами з назвою репо.
++5. Що чекає Konst: ручні дії, вироки, кожна «💡 Пропоную» без відповіді.
++6. Числа замірів — разом із назвою приладу, що їх дав. Що лишилось не перевіреним.
++7. Гілка й правило гілки, якщо вони відрізняються від гілки, яку дало середовище.
++Не переказуй: вивід інструментів, вміст прочитаних файлів, тексти правил — CLAUDE.md і профіль прийдуть наново самі.
+diff --git a/tools/claude-code/hooks/lens-hooks.sh b/tools/claude-code/hooks/lens-hooks.sh
+index 751afad..7de4990 100755
+--- a/tools/claude-code/hooks/lens-hooks.sh
++++ b/tools/claude-code/hooks/lens-hooks.sh
+@@ -23,7 +23,7 @@ repo_hooks() {
+   for f in "$root"/*/.claude/hooks/session-start.sh; do
+     [ -f "$f" ] || continue; r="${f%/.claude/hooks/session-start.sh}"
+     [ "$r" = "${CLAUDE_PROJECT_DIR:-}" ] || [ "$r" = "$k" ] && continue
+-    ( cd "$r" && timeout 300 bash "$f" ) >> "${LENS_REPO_HOOKS_LOG:-/tmp/lens-repo-hooks.log}" 2>&1 || echo "$(date +%T) ✗ $f" >> "${LENS_REPO_HOOKS_LOG:-/tmp/lens-repo-hooks.log}"
++    ( cd "$r" && timeout 300 bash "$f" ) < /dev/null >> "${LENS_REPO_HOOKS_LOG:-/tmp/lens-repo-hooks.log}" 2>&1 || echo "$(date +%T) ✗ $f" >> "${LENS_REPO_HOOKS_LOG:-/tmp/lens-repo-hooks.log}"
+   done
+ }
+ if [ "$ev" = repo-hooks-test ]; then
+@@ -33,7 +33,42 @@ if [ "$ev" = repo-hooks-test ]; then
+   got="$(cat "$t/ran" 2>/dev/null | tr '\n' ' ')"; rm -rf "$t"
+   [ "$got" = "a " ] && { echo "✓ хук репо поза сесією запущено, свій репо сесії — ні"; exit 0; } || { echo "✗ repo_hooks: запущено «$got», чекали «a »"; exit 1; }
+ fi
++# env_check кожного репо сесії — сам, на старті (HOOK-2 (5), FAB-1 10.11.2026): у сесії з кількома репо його запускав агент руками, і стартове
++# щоразу це нагадувало. Тут — прогін у файл (SessionStart: стеля гачка 600 с; UserPromptSubmit — лише 30 с, code.claude.com/docs/en/hooks
++# «Common fields», 10.11.2026), а рядки ⚠ / ✗ кладе в контекст перше повідомлення (гілка prompt нижче). Зеленого не друкуємо — лише перелік репо.
++env_all() {   # $1 — ідентифікатор сесії
++  local root="${LENS_REPOS_ROOT:-/home/user}" r o="${LENS_ENV_DIR:-/tmp}/lens-env-${1:-nosession}.txt" bad names=""
++  [ "${LENS_ENV_AUTO:-1}" = 0 ] && return 0   # вимикач без правки коду: змінна середовища LENS_ENV_AUTO=0 → як раніше, env_check руками
++  : > "$o" 2>/dev/null || return 0
++  for r in "$root"/*/; do r="${r%/}"; [ -f "$r/tools/env_check.sh" ] || continue
++    [ -e "$r/.git/lens-readonly" ] && continue   # клон лише для читання (звірка іншого продукту) — не судимо, як handoff-remind
++    # тривога — рядок, що ПОЧИНАЄТЬСЯ з ⚠ / ✗, або несе «✗ N» з N > 0, «ПОРА», «треба pull», «розібратись»; підсумки на кшталт «✓19 · ⚠24 · ✗0» — не тривога
++    bad="$( (cd "$r" && timeout 180 bash tools/env_check.sh 2>&1) < /dev/null | grep -E '^[[:space:]]*(⚠|✗)|✗ ?[1-9]|ПОРА|треба pull|розібратись' | cut -c1-400 )"
++    names="$names $(basename "$r")"
++    [ -n "$bad" ] && printf '── %s ──\n%s\n' "$(basename "$r")" "$bad" >> "$o"
++  done
++  [ -n "$names" ] || { rm -f "$o"; return 0; }
++  awk '/^── /||!s[$0]++' "$o" > "$o.t" 2>/dev/null && mv "$o.t" "$o"   # однаковий рядок двох репо (спільний Cloudflare) — один раз
++  [ -s "$o" ] || printf 'env_check: ⚠ / ✗ нема (репо:%s)\n' "$names" >> "$o"
++}
++if [ "$ev" = start-test ]; then   # зуби FAB-1: пауза не дублює профіль · стиснення повторює · env_check у файл і в перше повідомлення · текст для стиснення
++  t=$(mktemp -d); mkdir -p "$t/repos/a/tools" "$t/repos/b/tools" "$t/repos/c"; bad=0
++  printf 'echo "база: ok"\necho "env: гейт ✓19 · ⚠24 · ✗0"\necho "⚠ тест: увага"\necho "✗ тест: червоне"\necho "гейт: ✓ 5 · ✗ 3 — глянь"\necho "⚠ спільне: хмара"\n' > "$t/repos/a/tools/env_check.sh"; printf 'echo "усе гаразд"\necho "⚠ спільне: хмара"\n' > "$t/repos/b/tools/env_check.sh"
++  go() { printf '{"session_id":"%s","source":"%s"}' "$1" "$2" | LENS_PROFILE=1 LENS_REPOS_ROOT="$t/repos" LENS_ENV_DIR="$t" LENS_MARK_DIR="$t" bash "${BASH_SOURCE[0]}" SessionStart; }
++  o="$(go s1 resume)";  [ -z "$o" ] && [ ! -e "$t/lens-profile-part2-s1" ] && echo "✓ пауза (resume): профілю й позначки частини 2 нема" || { echo "✗ resume: профіль або позначка є"; bad=1; }
++  o="$(go s2 fork)";    [ -z "$o" ] && [ ! -e "$t/lens-profile-part2-s2" ] && echo "✓ копія розмови (fork): так само" || { echo "✗ fork: профіль або позначка є"; bad=1; }
++  o="$(go s3 compact)"; case "$o" in *'Частина 1/2'*) [ -e "$t/lens-profile-part2-s3" ] && [ ! -e "$t/lens-env-s3.txt" ] && echo "✓ стиснення (compact): профіль повторено, env_check не ганяється" || { echo "✗ compact: позначки нема або env_check ганявся"; bad=1; };; *) echo "✗ compact: профілю нема"; bad=1;; esac
++  o="$(go s4 startup)"; case "$o" in *'Частина 1/2'*) grep -q '⚠ тест: увага' "$t/lens-env-s4.txt" 2>/dev/null && grep -q '✗ тест: червоне' "$t/lens-env-s4.txt" && grep -q '✗ 3 — глянь' "$t/lens-env-s4.txt" && ! grep -q 'база: ok' "$t/lens-env-s4.txt" && ! grep -q '⚠24' "$t/lens-env-s4.txt" && [ "$(grep -c 'спільне: хмара' "$t/lens-env-s4.txt")" = 1 ] && echo "✓ старт (startup): профіль + файл env_check — лише тривоги (підсумок «⚠24 · ✗0» мовчить, «✗ 3» — ні), однаковий рядок двох репо — раз" || { echo "✗ startup: файл env_check не той: $(tr '\n' '|' < "$t/lens-env-s4.txt" 2>/dev/null | cut -c1-200)"; bad=1; };; *) echo "✗ startup: профілю нема"; bad=1;; esac
++  p="$(printf '{"session_id":"s4","prompt":"працюємо"}' | LENS_PROFILE=1 LENS_REPOS_ROOT="$t/repos" LENS_ENV_DIR="$t" LENS_MARK_DIR="$t" bash "${BASH_SOURCE[0]}" UserPromptSubmit)"
++  case "$p" in *'Частина 2/2'*'✗ тест: червоне'*) [ ! -e "$t/lens-env-s4.txt" ] && echo "✓ перше повідомлення: частина 2 профілю + рядки env_check; файл спожито" || { echo "✗ файл env_check не спожито"; bad=1; };; *) echo "✗ перше повідомлення без рядків env_check: $(printf '%s' "$p" | cut -c1-160)"; bad=1;; esac
++  mkdir -p "$t/repos/a/.git"; : > "$t/repos/a/.git/lens-readonly"; printf 'echo "усе гаразд"\n' > "$t/repos/b/tools/env_check.sh"; o="$(go s5 startup)"; grep -q 'нема (репо: b)' "$t/lens-env-s5.txt" 2>/dev/null && echo "✓ усе зелене → один рядок «⚠ / ✗ нема (репо: …)»; клон лише для читання (з тривогами) не ганяється" || { echo "✗ зелений підсумок: $(cat "$t/lens-env-s5.txt" 2>/dev/null)"; bad=1; }
++  o="$(printf '{"session_id":"s7","source":"startup"}' | LENS_ENV_AUTO=0 LENS_PROFILE=1 LENS_REPOS_ROOT="$t/repos" LENS_ENV_DIR="$t" LENS_MARK_DIR="$t" bash "${BASH_SOURCE[0]}" SessionStart)"
++  [ ! -e "$t/lens-env-s7.txt" ] && case "$o" in *'Частина 1/2'*) true;; *) false;; esac && echo "✓ вимикач LENS_ENV_AUTO=0: env_check не ганяється, профіль на місці" || { echo "✗ вимикач LENS_ENV_AUTO=0 не спрацював"; bad=1; }
++  c="$(printf '{}' | bash "${BASH_SOURCE[0]}" PreCompact)"; n=${#c}; [ "$n" -gt 200 ] && [ "$n" -le 10000 ] && echo "✓ PreCompact: інструкції для переказу ($n знаків ≤ 10 000)" || { echo "✗ PreCompact: $n знаків"; bad=1; }
++  rm -rf "$t"; exit $bad
++fi
+ if [ "$ev" = SessionStart ] || [ "$ev" = profile-test ]; then
++  ss_in=""; [ "$ev" = SessionStart ] && ss_in="$(cat 2>/dev/null)"   # JSON події — читаємо ПЕРШИМ: хук репо міг би з'їсти stdin
+   [ "$ev" = SessionStart ] && repo_hooks
+   # профіль — двома частинами ≤ 10 000 знаків кожна (стеля additionalContext Claude Code; понад — лише прев'ю 2 000): 1 — тут, 2 — у перше повідомлення Konst (profile_parts.py)
+   prof() { [ "${LENS_PROFILE:-}" = 1 ] && [ -f "$h/../PROFILE.md" ] || return 0
+@@ -45,9 +80,19 @@ if [ "$ev" = SessionStart ] || [ "$ev" = profile-test ]; then
+     [ -z "$off" ] && echo "✓ без LENS_PROFILE → тиша (профіль — у полі налаштувань акаунта)" || { echo "✗ без LENS_PROFILE → профіль усе одно"; bad=1; }
+     exit $bad
+   fi
+-  ss_sid="$(cat 2>/dev/null | grep -o '"session_id" *: *"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/' | tr -cd 'A-Za-z0-9_-')"
+-  prof; [ "${LENS_PROFILE:-}" = 1 ] && { date +%H:%M > /tmp/lens-profile-loaded; : > "/tmp/lens-profile-part2-${ss_sid:-nosession}"; } 2>/dev/null; exit 0   # позначка для profile_check.sh (рядок «профіль» в env_check)
++  ss_sid="$(printf '%s' "$ss_in" | grep -o '"session_id" *: *"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/' | tr -cd 'A-Za-z0-9_-')"
++  ss_src="$(printf '%s' "$ss_in" | grep -o '"source" *: *"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/')"
++  # FAB-1 (10.11.2026): після паузи машини (resume) і при копії розмови (fork) профіль уже в розмові — позначку частини 2 не ставимо. Замір: за 2,5 год
++  #   сесії частина 2 прийшла 5 разів при одній частині 1 (4 дублі по 3 899 знаків). Після стиснення (compact) повтор потрібен — лишається.
++  #   source — code.claude.com/docs/en/hooks «SessionStart input» (startup · resume · clear · compact · fork), 10.11.2026.
++  case "$ss_src" in resume|fork) exit 0 ;; esac
++  case "$ss_src" in startup|"") env_all "${ss_sid:-nosession}" ;; esac
++  md="${LENS_MARK_DIR:-/tmp}"
++  prof; [ "${LENS_PROFILE:-}" = 1 ] && { date +%H:%M > /tmp/lens-profile-loaded; : > "$md/lens-profile-part2-${ss_sid:-nosession}"; } 2>/dev/null; exit 0   # позначка для profile_check.sh (рядок «профіль» в env_check)
+ fi
++# PreCompact (CTX-1, FAB-1 10.11.2026): stdout гачка Claude Code бере як інструкції для переказу при стисненні (code.claude.com/docs/en/hooks «PreCompact output»,
++#   10.11.2026; ≤ 10 000 знаків) — один файл ядра на всі репо замість розділу «Compact instructions» у кожному CLAUDE.md
++[ "$ev" = PreCompact ] && { cat > /dev/null; [ -f "$h/compact_instructions.txt" ] && cat "$h/compact_instructions.txt"; exit 0; }
+ case "$ev" in pre|PreToolUse) ev=pre;; post|PostToolUse) ev=post;; stop|Stop) ev=stop;; UserPromptSubmit) ev=prompt;; *) exit 0;; esac
+ in="$(cat)"
+ tool="$(printf '%s' "$in" | grep -o '"tool_name" *: *"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/')"
+@@ -92,7 +137,17 @@ a,b=sys.argv[1],sys.argv[2]
+ if not a.strip(): print(b); sys.exit()
+ x=json.loads(a); y=json.loads(b); h=x.setdefault("hookSpecificOutput",{"hookEventName":"UserPromptSubmit"})
+ h["additionalContext"]=(h.get("additionalContext","")+"\n\n"+y["hookSpecificOutput"]["additionalContext"]).strip(); print(json.dumps(x,ensure_ascii=False))' "$o" "$r" 2>/dev/null || printf '%s' "$o")"
+-    pf="/tmp/lens-profile-part2-${sid:-nosession}"
++    ef="${LENS_ENV_DIR:-/tmp}/lens-env-${sid:-nosession}.txt"   # FAB-1: ⚠ / ✗ env_check кожного репо, зібрані на старті (env_all) — раз, у перше повідомлення
++    if [ -s "$ef" ]; then
++      o="$(python3 -c 'import json,sys
++a=sys.argv[1]; e=open(sys.argv[2],encoding="utf-8",errors="replace").read()[:4000]
++txt="СТАН РЕПО НА СТАРТІ (env_check кожного репо сесії — прогнав гачок старту; тут лише рядки ⚠ / ✗, повний вивід — bash tools/env_check.sh у репо). Скажи про них Konst одразу після «що ти побачиш»:\n"+e
++try: x=json.loads(a) if a.strip() else {}
++except Exception: x={}
++h=x.setdefault("hookSpecificOutput",{"hookEventName":"UserPromptSubmit"}); h["additionalContext"]=(txt+"\n\n"+h.get("additionalContext","")).strip(); print(json.dumps(x,ensure_ascii=False))' "$o" "$ef" 2>/dev/null || printf '%s' "$o")"
++      rm -f "$ef"
++    fi
++    pf="${LENS_MARK_DIR:-/tmp}/lens-profile-part2-${sid:-nosession}"
+     if [ "${LENS_PROFILE:-}" = 1 ] && [ -f "$pf" ]; then rm -f "$pf"; python3 "$h/profile_parts.py" 2 | python3 "$h/profile_parts.py" merge "$o"   # частина 2 профілю — у перше повідомлення після старту чи стиснення
+     elif [ -n "$o" ]; then printf '%s\n' "$o"; fi ;;
+ esac
