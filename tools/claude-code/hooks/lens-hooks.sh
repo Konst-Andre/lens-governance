@@ -23,7 +23,7 @@ repo_hooks() {
   for f in "$root"/*/.claude/hooks/session-start.sh; do
     [ -f "$f" ] || continue; r="${f%/.claude/hooks/session-start.sh}"
     [ "$r" = "${CLAUDE_PROJECT_DIR:-}" ] || [ "$r" = "$k" ] && continue
-    ( cd "$r" && timeout 300 bash "$f" ) >> "${LENS_REPO_HOOKS_LOG:-/tmp/lens-repo-hooks.log}" 2>&1 || echo "$(date +%T) ✗ $f" >> "${LENS_REPO_HOOKS_LOG:-/tmp/lens-repo-hooks.log}"
+    ( cd "$r" && timeout 300 bash "$f" ) < /dev/null >> "${LENS_REPO_HOOKS_LOG:-/tmp/lens-repo-hooks.log}" 2>&1 || echo "$(date +%T) ✗ $f" >> "${LENS_REPO_HOOKS_LOG:-/tmp/lens-repo-hooks.log}"
   done
 }
 if [ "$ev" = repo-hooks-test ]; then
@@ -33,7 +33,42 @@ if [ "$ev" = repo-hooks-test ]; then
   got="$(cat "$t/ran" 2>/dev/null | tr '\n' ' ')"; rm -rf "$t"
   [ "$got" = "a " ] && { echo "✓ хук репо поза сесією запущено, свій репо сесії — ні"; exit 0; } || { echo "✗ repo_hooks: запущено «$got», чекали «a »"; exit 1; }
 fi
+# env_check кожного репо сесії — сам, на старті (HOOK-2 (5), FAB-1 10.11.2026): у сесії з кількома репо його запускав агент руками, і стартове
+# щоразу це нагадувало. Тут — прогін у файл (SessionStart: стеля гачка 600 с; UserPromptSubmit — лише 30 с, code.claude.com/docs/en/hooks
+# «Common fields», 10.11.2026), а рядки ⚠ / ✗ кладе в контекст перше повідомлення (гілка prompt нижче). Зеленого не друкуємо — лише перелік репо.
+env_all() {   # $1 — ідентифікатор сесії
+  local root="${LENS_REPOS_ROOT:-/home/user}" r o="${LENS_ENV_DIR:-/tmp}/lens-env-${1:-nosession}.txt" bad names=""
+  [ "${LENS_ENV_AUTO:-1}" = 0 ] && return 0   # вимикач без правки коду: змінна середовища LENS_ENV_AUTO=0 → як раніше, env_check руками
+  : > "$o" 2>/dev/null || return 0
+  for r in "$root"/*/; do r="${r%/}"; [ -f "$r/tools/env_check.sh" ] || continue
+    [ -e "$r/.git/lens-readonly" ] && continue   # клон лише для читання (звірка іншого продукту) — не судимо, як handoff-remind
+    # тривога — рядок, що ПОЧИНАЄТЬСЯ з ⚠ / ✗, або несе «✗ N» з N > 0, «ПОРА», «треба pull», «розібратись»; підсумки на кшталт «✓19 · ⚠24 · ✗0» — не тривога
+    bad="$( (cd "$r" && timeout 180 bash tools/env_check.sh 2>&1) < /dev/null | grep -E '^[[:space:]]*(⚠|✗)|✗ ?[1-9]|ПОРА|треба pull|розібратись' | cut -c1-400 )"
+    names="$names $(basename "$r")"
+    [ -n "$bad" ] && printf '── %s ──\n%s\n' "$(basename "$r")" "$bad" >> "$o"
+  done
+  [ -n "$names" ] || { rm -f "$o"; return 0; }
+  awk '/^── /||!s[$0]++' "$o" > "$o.t" 2>/dev/null && mv "$o.t" "$o"   # однаковий рядок двох репо (спільний Cloudflare) — один раз
+  [ -s "$o" ] || printf 'env_check: ⚠ / ✗ нема (репо:%s)\n' "$names" >> "$o"
+}
+if [ "$ev" = start-test ]; then   # зуби FAB-1: пауза не дублює профіль · стиснення повторює · env_check у файл і в перше повідомлення · текст для стиснення
+  t=$(mktemp -d); mkdir -p "$t/repos/a/tools" "$t/repos/b/tools" "$t/repos/c"; bad=0
+  printf 'echo "база: ok"\necho "env: гейт ✓19 · ⚠24 · ✗0"\necho "⚠ тест: увага"\necho "✗ тест: червоне"\necho "гейт: ✓ 5 · ✗ 3 — глянь"\necho "⚠ спільне: хмара"\n' > "$t/repos/a/tools/env_check.sh"; printf 'echo "усе гаразд"\necho "⚠ спільне: хмара"\n' > "$t/repos/b/tools/env_check.sh"
+  go() { printf '{"session_id":"%s","source":"%s"}' "$1" "$2" | LENS_PROFILE=1 LENS_REPOS_ROOT="$t/repos" LENS_ENV_DIR="$t" LENS_MARK_DIR="$t" bash "${BASH_SOURCE[0]}" SessionStart; }
+  o="$(go s1 resume)";  [ -z "$o" ] && [ ! -e "$t/lens-profile-part2-s1" ] && echo "✓ пауза (resume): профілю й позначки частини 2 нема" || { echo "✗ resume: профіль або позначка є"; bad=1; }
+  o="$(go s2 fork)";    [ -z "$o" ] && [ ! -e "$t/lens-profile-part2-s2" ] && echo "✓ копія розмови (fork): так само" || { echo "✗ fork: профіль або позначка є"; bad=1; }
+  o="$(go s3 compact)"; case "$o" in *'Частина 1/2'*) [ -e "$t/lens-profile-part2-s3" ] && [ ! -e "$t/lens-env-s3.txt" ] && echo "✓ стиснення (compact): профіль повторено, env_check не ганяється" || { echo "✗ compact: позначки нема або env_check ганявся"; bad=1; };; *) echo "✗ compact: профілю нема"; bad=1;; esac
+  o="$(go s4 startup)"; case "$o" in *'Частина 1/2'*) grep -q '⚠ тест: увага' "$t/lens-env-s4.txt" 2>/dev/null && grep -q '✗ тест: червоне' "$t/lens-env-s4.txt" && grep -q '✗ 3 — глянь' "$t/lens-env-s4.txt" && ! grep -q 'база: ok' "$t/lens-env-s4.txt" && ! grep -q '⚠24' "$t/lens-env-s4.txt" && [ "$(grep -c 'спільне: хмара' "$t/lens-env-s4.txt")" = 1 ] && echo "✓ старт (startup): профіль + файл env_check — лише тривоги (підсумок «⚠24 · ✗0» мовчить, «✗ 3» — ні), однаковий рядок двох репо — раз" || { echo "✗ startup: файл env_check не той: $(tr '\n' '|' < "$t/lens-env-s4.txt" 2>/dev/null | cut -c1-200)"; bad=1; };; *) echo "✗ startup: профілю нема"; bad=1;; esac
+  p="$(printf '{"session_id":"s4","prompt":"працюємо"}' | LENS_PROFILE=1 LENS_REPOS_ROOT="$t/repos" LENS_ENV_DIR="$t" LENS_MARK_DIR="$t" bash "${BASH_SOURCE[0]}" UserPromptSubmit)"
+  case "$p" in *'Частина 2/2'*'✗ тест: червоне'*) [ ! -e "$t/lens-env-s4.txt" ] && echo "✓ перше повідомлення: частина 2 профілю + рядки env_check; файл спожито" || { echo "✗ файл env_check не спожито"; bad=1; };; *) echo "✗ перше повідомлення без рядків env_check: $(printf '%s' "$p" | cut -c1-160)"; bad=1;; esac
+  mkdir -p "$t/repos/a/.git"; : > "$t/repos/a/.git/lens-readonly"; printf 'echo "усе гаразд"\n' > "$t/repos/b/tools/env_check.sh"; o="$(go s5 startup)"; grep -q 'нема (репо: b)' "$t/lens-env-s5.txt" 2>/dev/null && echo "✓ усе зелене → один рядок «⚠ / ✗ нема (репо: …)»; клон лише для читання (з тривогами) не ганяється" || { echo "✗ зелений підсумок: $(cat "$t/lens-env-s5.txt" 2>/dev/null)"; bad=1; }
+  o="$(printf '{"session_id":"s7","source":"startup"}' | LENS_ENV_AUTO=0 LENS_PROFILE=1 LENS_REPOS_ROOT="$t/repos" LENS_ENV_DIR="$t" LENS_MARK_DIR="$t" bash "${BASH_SOURCE[0]}" SessionStart)"
+  [ ! -e "$t/lens-env-s7.txt" ] && case "$o" in *'Частина 1/2'*) true;; *) false;; esac && echo "✓ вимикач LENS_ENV_AUTO=0: env_check не ганяється, профіль на місці" || { echo "✗ вимикач LENS_ENV_AUTO=0 не спрацював"; bad=1; }
+  c="$(printf '{}' | bash "${BASH_SOURCE[0]}" PreCompact)"; n=${#c}; [ "$n" -gt 200 ] && [ "$n" -le 10000 ] && echo "✓ PreCompact: інструкції для переказу ($n знаків ≤ 10 000)" || { echo "✗ PreCompact: $n знаків"; bad=1; }
+  rm -rf "$t"; exit $bad
+fi
 if [ "$ev" = SessionStart ] || [ "$ev" = profile-test ]; then
+  ss_in=""; [ "$ev" = SessionStart ] && ss_in="$(cat 2>/dev/null)"   # JSON події — читаємо ПЕРШИМ: хук репо міг би з'їсти stdin
   [ "$ev" = SessionStart ] && repo_hooks
   # профіль — двома частинами ≤ 10 000 знаків кожна (стеля additionalContext Claude Code; понад — лише прев'ю 2 000): 1 — тут, 2 — у перше повідомлення Konst (profile_parts.py)
   prof() { [ "${LENS_PROFILE:-}" = 1 ] && [ -f "$h/../PROFILE.md" ] || return 0
@@ -45,9 +80,19 @@ if [ "$ev" = SessionStart ] || [ "$ev" = profile-test ]; then
     [ -z "$off" ] && echo "✓ без LENS_PROFILE → тиша (профіль — у полі налаштувань акаунта)" || { echo "✗ без LENS_PROFILE → профіль усе одно"; bad=1; }
     exit $bad
   fi
-  ss_sid="$(cat 2>/dev/null | grep -o '"session_id" *: *"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/' | tr -cd 'A-Za-z0-9_-')"
-  prof; [ "${LENS_PROFILE:-}" = 1 ] && { date +%H:%M > /tmp/lens-profile-loaded; : > "/tmp/lens-profile-part2-${ss_sid:-nosession}"; } 2>/dev/null; exit 0   # позначка для profile_check.sh (рядок «профіль» в env_check)
+  ss_sid="$(printf '%s' "$ss_in" | grep -o '"session_id" *: *"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/' | tr -cd 'A-Za-z0-9_-')"
+  ss_src="$(printf '%s' "$ss_in" | grep -o '"source" *: *"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/')"
+  # FAB-1 (10.11.2026): після паузи машини (resume) і при копії розмови (fork) профіль уже в розмові — позначку частини 2 не ставимо. Замір: за 2,5 год
+  #   сесії частина 2 прийшла 5 разів при одній частині 1 (4 дублі по 3 899 знаків). Після стиснення (compact) повтор потрібен — лишається.
+  #   source — code.claude.com/docs/en/hooks «SessionStart input» (startup · resume · clear · compact · fork), 10.11.2026.
+  case "$ss_src" in resume|fork) exit 0 ;; esac
+  case "$ss_src" in startup|"") env_all "${ss_sid:-nosession}" ;; esac
+  md="${LENS_MARK_DIR:-/tmp}"
+  prof; [ "${LENS_PROFILE:-}" = 1 ] && { date +%H:%M > /tmp/lens-profile-loaded; : > "$md/lens-profile-part2-${ss_sid:-nosession}"; } 2>/dev/null; exit 0   # позначка для profile_check.sh (рядок «профіль» в env_check)
 fi
+# PreCompact (CTX-1, FAB-1 10.11.2026): stdout гачка Claude Code бере як інструкції для переказу при стисненні (code.claude.com/docs/en/hooks «PreCompact output»,
+#   10.11.2026; ≤ 10 000 знаків) — один файл ядра на всі репо замість розділу «Compact instructions» у кожному CLAUDE.md
+[ "$ev" = PreCompact ] && { cat > /dev/null; [ -f "$h/compact_instructions.txt" ] && cat "$h/compact_instructions.txt"; exit 0; }
 case "$ev" in pre|PreToolUse) ev=pre;; post|PostToolUse) ev=post;; stop|Stop) ev=stop;; UserPromptSubmit) ev=prompt;; *) exit 0;; esac
 in="$(cat)"
 tool="$(printf '%s' "$in" | grep -o '"tool_name" *: *"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/')"
@@ -92,7 +137,17 @@ a,b=sys.argv[1],sys.argv[2]
 if not a.strip(): print(b); sys.exit()
 x=json.loads(a); y=json.loads(b); h=x.setdefault("hookSpecificOutput",{"hookEventName":"UserPromptSubmit"})
 h["additionalContext"]=(h.get("additionalContext","")+"\n\n"+y["hookSpecificOutput"]["additionalContext"]).strip(); print(json.dumps(x,ensure_ascii=False))' "$o" "$r" 2>/dev/null || printf '%s' "$o")"
-    pf="/tmp/lens-profile-part2-${sid:-nosession}"
+    ef="${LENS_ENV_DIR:-/tmp}/lens-env-${sid:-nosession}.txt"   # FAB-1: ⚠ / ✗ env_check кожного репо, зібрані на старті (env_all) — раз, у перше повідомлення
+    if [ -s "$ef" ]; then
+      o="$(python3 -c 'import json,sys
+a=sys.argv[1]; e=open(sys.argv[2],encoding="utf-8",errors="replace").read()[:4000]
+txt="СТАН РЕПО НА СТАРТІ (env_check кожного репо сесії — прогнав гачок старту; тут лише рядки ⚠ / ✗, повний вивід — bash tools/env_check.sh у репо). Скажи про них Konst одразу після «що ти побачиш»:\n"+e
+try: x=json.loads(a) if a.strip() else {}
+except Exception: x={}
+h=x.setdefault("hookSpecificOutput",{"hookEventName":"UserPromptSubmit"}); h["additionalContext"]=(txt+"\n\n"+h.get("additionalContext","")).strip(); print(json.dumps(x,ensure_ascii=False))' "$o" "$ef" 2>/dev/null || printf '%s' "$o")"
+      rm -f "$ef"
+    fi
+    pf="${LENS_MARK_DIR:-/tmp}/lens-profile-part2-${sid:-nosession}"
     if [ "${LENS_PROFILE:-}" = 1 ] && [ -f "$pf" ]; then rm -f "$pf"; python3 "$h/profile_parts.py" 2 | python3 "$h/profile_parts.py" merge "$o"   # частина 2 профілю — у перше повідомлення після старту чи стиснення
     elif [ -n "$o" ]; then printf '%s\n' "$o"; fi ;;
 esac

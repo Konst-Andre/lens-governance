@@ -50,6 +50,13 @@ check_core() {
     for p in tools/env_check.sh .claude/hooks/session-start.sh tools/audit_prompts.sh docs/CHERGA.md docs/DECISIONS.md \
              docs/ARCHITECTURE.md docs/REPO_LAYOUT.md docs/AUDIT.md docs/summary; do [ -e "$d/$p" ] || miss+=("$p"); done
   fi
+  # FAB-1 (10.11.2026): файла хука мало — він мусить бути зареєстрований і виконуваний, а CLAUDE.md — заповнений. Прогін 10.11: репо з самих
+  #   незаповнених шаблонів давало «✓ каркас на місці»; файл, створений інструментом Write, має 644 → «Permission denied» (templates/session_start_template.sh).
+  if [ -f "$d/.claude/hooks/session-start.sh" ]; then
+    grep -q 'session-start.sh' "$d/.claude/settings.json" 2>/dev/null || miss+=(".claude/settings.json не реєструє хук старту (SessionStart → .claude/hooks/session-start.sh; рядок — templates/session_start_template.sh)")
+    [ -x "$d/.claude/hooks/session-start.sh" ] || miss+=(".claude/hooks/session-start.sh без права запуску — chmod +x")
+  fi
+  grep -qE '^# <Продукт>|<одне-два речення|<команда гейта>' "$d/CLAUDE.md" && miss+=("CLAUDE.md — шаблон не заповнено (лишились <Продукт> / <…>)")
   # CQ-1 (05.10.2026): черга — таблиця з `id` і датою, інакше лічильник стелі (kernel/Lens_INDEX.md §5) її не бачить
   local q; q=$(ls "$d"/kernel/Lens_governance_CHERGA.md "$d"/lens/*_CHERGA.md "$d"/docs/CHERGA.md 2>/dev/null | head -1)
   if [ -n "$q" ]; then
@@ -94,6 +101,7 @@ if [ "${1:-}" = "--inject" ]; then
   for p in tools/env_check.sh .claude/hooks/session-start.sh tools/audit_prompts.sh docs/CHERGA.md docs/DECISIONS.md \
            docs/ARCHITECTURE.md docs/REPO_LAYOUT.md docs/AUDIT.md; do : > "$t/repo/$p"; done
   cp "$KDIR/../tools/claude-code/audit_prompts.sh" "$t/repo/tools/audit_prompts.sh"
+  echo '{"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh"}]}]}}' > "$t/repo/.claude/settings.json"; chmod +x "$t/repo/.claude/hooks/session-start.sh"
   printf '## Відкрите\n\n| id | предмет | дата |\n|---|---|---|\n| `Ч-1` | x | 05.10.2026 |\n\n-----\n' > "$t/repo/docs/CHERGA.md"
   echo x > "$t/repo/CLAUDE.md"; full=$(check "$t/repo"); rc_full=$?
   rm "$t/repo/CLAUDE.md";     gone=$(check "$t/repo"); rc_gone=$?
@@ -125,7 +133,14 @@ if [ "${1:-}" = "--inject" ]; then
   t4=$(mktemp -d); mkdir -p "$t4/r"; python3 -c 'print(("Routes автономний: ядро lens-governance у сесії не підключається. " + "ж" * 230 + "\n") * 120, end="")' > "$t4/r/CLAUDE.md"; big=$(check "$t4/r"); rc_big=$?
   python3 -c 'print(("Routes автономний: ядро lens-governance у сесії не підключається. " + "ж" * 30 + "\n") * 120, end="")' > "$t4/r/CLAUDE.md"; small=$(check "$t4/r"); rc_small=$?; rm -rf "$t4"
   [ $rc_big -eq 1 ] && [[ "$big" == *"знаків >"* ]] && [ $rc_small -eq 0 ] && [[ "$small" != *"знаків >"* ]] || { ok=1; echo "✗ inject вага CLAUDE.md: $big | $small" | cut -c1-300; }
-  [ $ok -eq 0 ] && echo "✓ inject: повний — ✓, без CLAUDE.md — ⚠, без docs/AUDIT.md — ⚠ з назвою, черга списком — ⚠ CQ-1, черга таблицею — ✓, стара копія скрипта аудиту — ⚠ AUD-2, інтерфейс без «Дизайн-основа» — ⚠ UI-1, env_check без спільного інструмента — ⚠ з назвою, з ним — ✓, curl інструментів ядра з main — ⚠" || echo "✗ inject: детектор сліпий ($full | $gone | $part)"
+  # FAB-1: хук без реєстрації — ⚠; без права запуску — ⚠; CLAUDE.md з незаповненого шаблону — ⚠; усе на місці — тиша про ці три
+  t5=$(mktemp -d); mkdir -p "$t5/r/.claude/hooks"; echo x > "$t5/r/CLAUDE.md"; echo 'echo ok' > "$t5/r/.claude/hooks/session-start.sh"; f0=$(check "$t5/r")
+  echo '{"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh"}]}]}}' > "$t5/r/.claude/settings.json"; f1=$(check "$t5/r")
+  chmod +x "$t5/r/.claude/hooks/session-start.sh"; f2=$(check "$t5/r")
+  printf '# <Продукт> — як працюємо\n**Що це.** <одне-два речення: продукт, для кого>\n' > "$t5/r/CLAUDE.md"; f3=$(check "$t5/r"); rm -rf "$t5"
+  [[ "$f0" == *"не реєструє хук"* ]] && [[ "$f0" == *"без права запуску"* ]] && [[ "$f1" != *"не реєструє хук"* ]] && [[ "$f1" == *"без права запуску"* ]] \
+    && [[ "$f2" != *"без права запуску"* ]] && [[ "$f2" != *"не заповнено"* ]] && [[ "$f3" == *"не заповнено"* ]] || { ok=1; printf "✗ inject FAB-1 (хук і шаблон):\n0 %s\n1 %s\n2 %s\n3 %s\n" "$f0" "$f1" "$f2" "$f3" | cut -c1-500; }
+  [ $ok -eq 0 ] && echo "✓ inject: повний — ✓, без CLAUDE.md — ⚠, без docs/AUDIT.md — ⚠ з назвою, черга списком — ⚠ CQ-1, черга таблицею — ✓, стара копія скрипта аудиту — ⚠ AUD-2, інтерфейс без «Дизайн-основа» — ⚠ UI-1, env_check без спільного інструмента — ⚠ з назвою, з ним — ✓, curl інструментів ядра з main — ⚠, хук без реєстрації чи права запуску — ⚠, CLAUDE.md з незаповненого шаблону — ⚠" || echo "✗ inject: детектор сліпий ($full | $gone | $part)"
   exit $ok
 fi
 
