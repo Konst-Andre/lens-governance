@@ -24,6 +24,7 @@ import json, os, re, subprocess, sys, tempfile, glob
 STOP_TRIG = re.compile(r"переїжджаємо|переїжджай\w*", re.I)   # Stop: лише оголошення агента, не згадка слова
 REV = re.compile(r"\bревізі[яюї]\b|\bзвір\w*\s+пам.?ят\w*|\bзвірк\w+\s+пам.?ят\w*", re.I)   # ревізія пам'яті без переїзду (AE S109)
 TRIG = re.compile(r"переїжджаємо|переїжджай\w*|переїхати|переїдемо|стартов\w+\s+повідомлен\w*|\bнов[ау]\s+сесі[яю]\b", re.I)   # лише команди: «переїжджаємо / переїхати / стартове / нову сесію»; іменник «переїзд» — розповідь (тричі хибне 10.10), «переїжджає» — опис (G6 «переїжджає в скрипт», хибне 10.10 QR CC-7) — журнал гачків §1
+STARTER = re.compile(r'старт|самері|summary', re.I)   # ознака стартового в блоці text (AE S139: чернетка промпту Fable в ```text давала хибний переїзд)
 HC = os.environ['HC']
 
 def repos(roots):
@@ -101,6 +102,7 @@ def selftest():
                           ('Stop: звичайна відповідь → тиша', S('Готово, коміт abc.', s='p2'), False),
                           ('Stop: «переїжджає» в описі (межа G6 переїжджає в скрипт) → тиша', S('Стара межа G6 переїжджає в новий скрипт.', s='p4'), False),
                           ('Stop: повтор через гачок (stop_hook_active) → тиша', S('```text\nx\n```', True, 'p3'), False),
+                          ('Stop: блок text — промпт моделі, не стартове → тиша (хибне AE S139)', S('Чернетка промпту:\n```text\nYou are an auditor. Read files.\n```', s='p6'), False),
                           ('Stop: «стартове повідомлення» в реченні, без блоку — не переїзд → тиша (хибне AE S93)', S('Стартове повідомлення оновлю в самері.', s='p5'), False)]:
         out = stop(d, [t], t); ok = (out is not None and '✗' in out) == want
         print(('✓' if ok else '✗') + ' ' + name); bad += not ok
@@ -109,6 +111,7 @@ def selftest():
     for name, d, want in [('Stop HOOK-3.3: переїзд + 💡, у стартовому «нема» → block', S(IDEA, s='i1'), True),
                           ('Stop HOOK-3.3: 💡 записана в стартовому → тиша', S(IDEA.replace('нема', 'сторінку-мапу продукту простими словами'), s='i2'), False),
                           ('Stop HOOK-3.3: «💡 Пропоную: ідей нема» → тиша', S('Переїжджаємо. ```text\nx\n```\n💡 Пропоную: ідей нема.', s='i3'), False),
+                          ('Stop HOOK-3.3: 💡 + блок text з промптом (не стартове) → тиша (хибне AE S139)', S('Промпт:\n```text\nYou are an auditor.\n```\n💡 **Пропоную:** зробити одну сторінку-мапу продукту простими словами.', s='i5'), False),
                           ('Stop HOOK-3.3: 💡 без переїзду → тиша', S('Готово. 💡 Пропоную: зробити одну сторінку-мапу продукту простими словами.', s='i4'), False)]:
         out = stop(d, [t], t); ok = (out is not None and 'HOOK-3.3' in out) == want
         print(('✓' if ok else '✗') + ' ' + name); bad += not ok
@@ -194,7 +197,7 @@ def stop(d, roots, mark_dir='/tmp'):
     """Stop: переїзд оголошує агент (стартове чи «переїжджаємо» у відповіді) — є ✗ → block, щоб виправив до кінця ходу."""
     if d.get('stop_hook_active'): return None
     msg = d.get('last_assistant_message') or ''
-    if not (STOP_TRIG.search(msg) or re.search(r'```text', msg)): return None   # AE S93 → S129: «стартове повідомлення» в реченні агента — не переїзд (хибне); переїзд — блок стартового чи «переїжджаємо»
+    if not (STOP_TRIG.search(msg) or any(STARTER.search(b) for b in re.findall(r'```text(.*?)```', msg, re.S))): return None   # AE S139: блок text — стартове, лише коли в ньому «старт» / «самері» (промпт моделі в блоці text — не переїзд)   # AE S93 → S129: «стартове повідомлення» в реченні агента — не переїзд (хибне); переїзд — блок стартового чи «переїжджаємо»
     rs = repos(roots)
     if not rs: return None
     gap = idea_missing(msg, rs)   # HOOK-3.3: 💡 з відповіді-переїзду не записана — блок щоразу (stop_hook_active рятує від кола)

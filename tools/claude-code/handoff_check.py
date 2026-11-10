@@ -120,7 +120,7 @@ def check_repo(repo, now=None):
     grep = f'session_{tail}' if tail else 'Claude-Session'
     after = git(repo, 'log', '--format=%h', f'--grep={grep}', f'{last}..HEAD') if last else ''
     n = len(after.split()) if after else 0
-    owns = (not tail) or bool(git(repo, 'log', '--format=%h', f'--grep=session_{tail}', '--', sum_dir(repo) + '/'))
+    owns = (not tail) or bool(git(repo, 'log', '--format=%h', f'--grep=session_{tail}', '--', os.path.dirname(sm) + '/'))   # тека самого самері, не вся sessions/: AE S139 — тека sessions/FAB-1/ давала хибне ✗ «самері ядра відстає»
     if n and is_kernel and not owns:
         L.append(('ⓘ', f'самері ядра веде сесія ядра; коміти цієї сесії тут — {n}: вони мають бути в самері репо продукту (Lens_governance_protocol.md:139)'))
     elif n:
@@ -351,6 +351,15 @@ def selftest():
         open(os.path.join(r, 'docs/summary/P_SUMMARY_2026-10-18.md'), 'w').write(summary)
         sh(r, 'git', 'add', '-A'); sh(r, 'git', 'commit', '-qm', 'самері\n\nClaude-Session: https://claude.ai/code/session_T')
         return r
+    def mk_k():   # ядро: самері в sessions/Lens_gov/ від сесії ядра; сесія продукту комітить робочу теку sessions/FAB-1/ (AE S139)
+        d = tempfile.mkdtemp(prefix='hc-'); r = os.path.join(d, 'lens-governance'); os.makedirs(os.path.join(r, 'sessions/Lens_gov')); os.makedirs(os.path.join(r, 'kernel'))
+        sh(r, 'git', 'init', '-q'); sh(r, 'git', 'config', 'user.email', 't@t'); sh(r, 'git', 'config', 'user.name', 't')
+        open(os.path.join(r, 'CLAUDE.md'), 'w').write('x'); open(os.path.join(r, 'kernel/K.md'), 'w').write('x')
+        open(os.path.join(r, 'sessions/Lens_gov/Lens_governance_session_summary_X.md'), 'w').write('# S\n## §0 ВІДКРИТЕ\n- далі\n## Стартове\n```text\nСтарт\n```\n')
+        sh(r, 'git', 'add', '-A'); sh(r, 'git', 'commit', '-qm', 'самері\n\nClaude-Session: https://claude.ai/code/session_OLD')
+        os.makedirs(os.path.join(r, 'sessions/FAB-1')); open(os.path.join(r, 'sessions/FAB-1/FAB-1_README.md'), 'w').write('x')
+        sh(r, 'git', 'add', '-A'); sh(r, 'git', 'commit', '-qm', 'тека\n\nClaude-Session: https://claude.ai/code/session_T')
+        return r
     good_nl = '# S\n## §0 ВІДКРИТЕ\n- далі `docs/CHERGA.md`; правила — CLAUDE.md\n## §6 Стартове\n```text\nСтарт: docs/CHERGA.md → docs/summary/P_SUMMARY_2026-10-18.md\n```\n'
     good = '# S\n## §0 ВІДКРИТЕ\n- далі `lens/A.md` §0 «Коротко»; правила — CLAUDE.md\n## §6 Стартове\n```text\nСтарт: lens/A.md → sessions/P_session_summary_X.md\n```\n'
     os.environ['CLAUDE_CODE_REMOTE_SESSION_ID'] = 'cse_T'
@@ -382,6 +391,7 @@ def selftest():
         ('бриф за шаблоном, код після нього → ⚠ «відстає» (BRIEF-2)', mk(good, {'lens/X_brief.md': '# X\n## §0 Коротко\n- **Стан:** a\n- **Далі:** b\n- **Чекає Konst:** c\n'}, code_after=True), 'відстає'),
         ('бриф за шаблоном, після нього лише коміт даних (.json · фото) → без «відстає» (AE S120)', mk(good, {'lens/X_brief.md': '# X\n## §0 Коротко\n- **Стан:** a\n- **Далі:** b\n- **Чекає Konst:** c\n'}, data_after=True), '!відстає'),
         ('не-Lens: самері без стартового → ✗', mk_nl(good_nl.split('## §6')[0]), 'стартове повідомлення нема'),
+        ('ядро: коміт сесії продукту в sessions/FAB-1/, самері — sessions/Lens_gov/ → ⓘ, не ✗ «відстає» (хибне AE S139)', mk_k(), '!самері відстає'),
     ]
     bad = 0
     for name, r, want in cases:
