@@ -3,6 +3,8 @@
 
 # Lens Stage-Bench — device-simulator harness · MANIFEST (canonical blueprint)
 
+> ⚠ **Відстає від практики (звірка AE S139, 11.11.2026):** файл писано під «намальований телефон» (StockCheck, Lens PWA). Прилади останнього місяця тут ще не описані — пауза = сигнал (`tools/claude-code/pw_quiet.py`; §8.10 — урок S139), повний прогін гейтів і зуби (`AE-Simulator:tools/gates_v1.sh` · `AE-Simulator:tools/teeth_v1.py`), тестувальник (`tools/tester/TESTER.md`), профіль ПК (`tools/claude-code/ui_lint.mjs` №18). Для ПК і приладів Playwright — спершу ці файли, маніфест — для стенда-телефону.
+
 > **Звідки:** StockCheck `island-harness v1→v2`, device-pick Konst 21.07.2026: клас стенду *намальований телефон у реальному масштабі + повний інтерактивний інструмент + стилізовані згортувані панелі важелів* дав «наче тестую на реальному девайсі» (теза — «Проблема» нижче). Метод, не пристрій → канонізується без device-тесту (wsd 14.19 lesson 3).
 >
 > **Роль файлу (де-роздута мета Konst):** цей файл = **єдина точка правди для bench/harness-тулінгу**,
