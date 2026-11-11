@@ -56,6 +56,11 @@ def _order(pg, v):
     return ids.filter((c, i) => c && ids.indexOf(c) === i && ok(c)); }}""")
 
 
+# AE S139 (AE-PWQ): межа очікування сигналу (клік готовий · вікно відкрите) — 15 с, не 5: під паралельним gates_v1 клік чекав готовності довше 5 с → хибне ✗
+#   «не відкрився». Це межа сигналу, не пауза: зелений прогін не довшає (у Playwright типово — 30 с; playwright.dev, page.wait_for_timeout — «inherently flaky», 11.11.2026)
+WAIT = int(__import__('os').environ.get('VIEWER_WAIT_MS', '15000'))
+
+
 def _cur(pg, v):
   return pg.evaluate(f"() => {v['current']}")
 
@@ -64,12 +69,12 @@ def _open(pg, v, cid, settle=True):
   # відкрити на позиції cid так, як людина: клік по елементу переліку → (кнопка «Збільшити», якщо є) → вікно
   pg.evaluate(f"""(c) => {{ const idf = {v['id']}; document.querySelectorAll('[data-vw-t],[data-vw-opener]').forEach(e => {{ e.removeAttribute('data-vw-t'); e.removeAttribute('data-vw-opener'); }});
     const e = [...document.querySelectorAll({_js(v['items'])})].find(e => e.getClientRects().length && !e.closest('dialog') && idf(e) === c); if (e) e.setAttribute('data-vw-t', '1'); }}""", cid)
-  pg.locator('[data-vw-t]').first.click(timeout=5000)
+  pg.locator('[data-vw-t]').first.click(timeout=WAIT)
   if v.get('opener'):
-    pg.wait_for_function(f"() => !!document.querySelector({_js(v['opener'])})", timeout=5000, polling=100)
-    o = pg.locator(v['opener']).first; o.evaluate("e => e.setAttribute('data-vw-opener', '1')"); o.click(timeout=5000)
+    pg.wait_for_function(f"() => !!document.querySelector({_js(v['opener'])})", timeout=WAIT, polling=100)
+    o = pg.locator(v['opener']).first; o.evaluate("e => e.setAttribute('data-vw-opener', '1')"); o.click(timeout=WAIT)
   else: pg.evaluate("() => { const e = document.querySelector('[data-vw-t]'); if (e) e.setAttribute('data-vw-opener', '1'); }")
-  pg.wait_for_function(f"() => !!document.querySelector({_js(v['dialog'])})", timeout=5000, polling=100)
+  pg.wait_for_function(f"() => !!document.querySelector({_js(v['dialog'])})", timeout=WAIT, polling=100)
   # AE S127: settle=False — канал «колесо» крутить одразу, як вікно відкрилось: вікно з морфом (View Transitions, 0,3 с) губило колесо, поки йшла
   #   анімація (дослід: 0 мс — 0 з 8, 500 мс — 8 з 8); «тиша» анімації не бачить, тож пауза тут ховала ваду через раз — переглядач мусить брати колесо з першої миті
   if settle: pg.wait_for_timeout(300)
