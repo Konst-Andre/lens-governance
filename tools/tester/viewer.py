@@ -67,9 +67,15 @@ def _cur(pg, v):
 
 def _open(pg, v, cid, settle=True):
   # відкрити на позиції cid так, як людина: клік по елементу переліку → (кнопка «Збільшити», якщо є) → вікно
-  pg.evaluate(f"""(c) => {{ const idf = {v['id']}; document.querySelectorAll('[data-vw-t],[data-vw-opener]').forEach(e => {{ e.removeAttribute('data-vw-t'); e.removeAttribute('data-vw-opener'); }});
-    const e = [...document.querySelectorAll({_js(v['items'])})].find(e => e.getClientRects().length && !e.closest('dialog') && idf(e) === c); if (e) e.setAttribute('data-vw-t', '1'); }}""", cid)
-  pg.locator('[data-vw-t]').first.click(timeout=WAIT)
+  # AE S139 (AE-PWQ): дані доїжджають після старту стану → сторінка перемальовує перелік, позначка data-vw-t лишається на старому елементі, клік чекає
+  #   неіснуючого до межі (✗ «не відкрився», а поруч той самий стан — «видимих 0»). Локатор Playwright сам бере свіжий елемент (playwright.dev/python/docs/locators,
+  #   11.11.2026), а позначка — ні: позначити наново й клікнути, до 3 спроб; третя невдача — справжнє ✗.
+  for _t in range(3):
+    pg.evaluate(f"""(c) => {{ const idf = {v['id']}; document.querySelectorAll('[data-vw-t],[data-vw-opener]').forEach(e => {{ e.removeAttribute('data-vw-t'); e.removeAttribute('data-vw-opener'); }});
+      const e = [...document.querySelectorAll({_js(v['items'])})].find(e => e.getClientRects().length && !e.closest('dialog') && idf(e) === c); if (e) e.setAttribute('data-vw-t', '1'); }}""", cid)
+    try: pg.locator('[data-vw-t]').first.click(timeout=WAIT // 3); break
+    except Exception:
+      if _t == 2: raise
   if v.get('opener'):
     pg.wait_for_function(f"() => !!document.querySelector({_js(v['opener'])})", timeout=WAIT, polling=100)
     o = pg.locator(v['opener']).first; o.evaluate("e => e.setAttribute('data-vw-opener', '1')"); o.click(timeout=WAIT)
