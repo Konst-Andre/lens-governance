@@ -10,7 +10,7 @@
 //          <repo>/.ui-lint-accept — відомі вади, прийняті Konst: рядок «вид | шматок адреси елемента | причина · дата» → ⓘ (не блокує, але друкується щоразу).
 //          node ui_lint.mjs selftest — зуби: сторінка з підкинутими вадами (кожна мусить дати свій рядок) і чиста (0).
 // Перевірки: 1 скрол убік · 2 обрізано · 3 прилипло / вилазить · 4 контраст (4-б — на градієнті пікселем знімка) · 5 шрифт · 6 тап, без назви, iOS-зум · 7 накладання · 8 ряд · 9 текст (сміття, жаргон) ·
-// 10 дія в прокрутці · 11 кнопки ряду · 12 сирота · 13 злито · 14 однакові заголовки · 15 дата й час · 16 зливається (16-б край кнопки) · 17 паритет тем · 18 кромка · 19 картка-список · 20 вкладена прокрутка · 21 шапка в прокрутці · 22 емодзі в кнопці · 23 нативне вікно · 24 фон у рамці · 25 кант рветься · 26 поле губиться; поза probe — натискання (:active / JS pointerdown, touchstart).
+// 10 дія в прокрутці · 11 кнопки ряду · 12 сирота · 13 злито · 14 однакові заголовки · 15 дата й час · 16 зливається (16-б край кнопки) · 17 паритет тем · 18 кромка (шіт — мобільний; ПК ≥ 1024: панель без маски · маска топить смугу · кромка на липкій шапці — UIL-18) · 19 картка-список · 20 вкладена прокрутка · 21 шапка в прокрутці · 22 емодзі в кнопці · 23 нативне вікно · 24 фон у рамці · 25 кант рветься · 26 поле губиться; поза probe — натискання (:active / JS pointerdown, touchstart).
 // 31 форма виділення · 32 пунктир < 3:1 · 22 емодзі-значок без підпису → ✗ · 33 різнобій списків — AE S94, 20.10.2026.
 // 34 пояснення під кнопкою (→ «i») · 35 наведення (ПК, ≥ 1024: нема або ледь видно; S107 — і «лише тінь < 0,12») — AE S96, 20.10.2026.
 // 45 кнопка-посилання (підкреслений текст у button / [role=button]) — пропуск Konst, AE S135, 07.11.2026.
@@ -217,7 +217,18 @@ function probe() {
   for (const sc of all.filter(e => /auto|scroll/.test(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + 40)) {
     let fx = false; for (let e = sc.parentElement; e; e = e.parentElement) if (getComputedStyle(e).position === 'fixed') { fx = true; break; }
     const m = getComputedStyle(sc).maskImage || getComputedStyle(sc).webkitMaskImage || 'none';
-    if (fx && m === 'none') add('⚠', 'кромка', sc, `прокрутка в шіті без кромки: схована частина ${sc.scrollHeight - sc.clientHeight} px, маски нема — підказати «нижче ще є» (кукбук A109)`); }
+    if (fx && m === 'none') add('⚠', 'кромка', sc, `прокрутка в шіті без кромки: схована частина ${sc.scrollHeight - sc.clientHeight} px, маски нема — підказати «нижче ще є» (кукбук A109)`);
+    // 18-ПК (UIL-18, AE S136–S139, «так» Konst): профіль ПК (вікно ≥ 1024 px) — панелі, колонки, інспектори; позначка «ПК» у тексті, щоб не змішувались з мобільним
+    if (innerWidth < 1024 || fx || sc === document.scrollingElement || sc === document.body || sc.clientHeight < 120) continue;
+    const sbw = sc.offsetWidth - sc.clientWidth - (parseFloat(getComputedStyle(sc).borderLeftWidth) || 0) - (parseFloat(getComputedStyle(sc).borderRightWidth) || 0);
+    if (m === 'none') { add('⚠', 'кромка', sc, `ПК: прокрутка панелі без кромки — схована частина ${sc.scrollHeight - sc.clientHeight} px, маски нема (кукбук A109; з липкими заголовками груп досить нижньої)`); continue; }
+    // маска не відрізняє вміст від класичної смуги (Windows) — смуга тоне; ліки — другий непрозорий шар над смугою (tw-fade README · pqina.nl, 11.11.2026; AE EDGE --sbw)
+    const layers = (m.match(/gradient\(/g) || []).length;
+    if (sbw > 0 && layers < 2) add('⚠', 'кромка', sc, `ПК: маска топить смугу прокрутки (смуга ${Math.round(sbw)} px під тим самим градієнтом) — другий непрозорий шар маски над смугою (кукбук A109, AE EDGE --sbw)`);
+    const first = m.split(/\),\s*(?=(?:-webkit-)?linear-gradient)/)[0];   // перший шар — градієнт на вміст
+    const topFade = /^linear-gradient\((?:(?:to bottom|180deg),\s*)?(?:rgba\(0, 0, 0, 0\)|transparent)/.test(first);
+    const stick = topFade && [...sc.querySelectorAll('*')].find(e => getComputedStyle(e).position === 'sticky' && Math.abs(e.getBoundingClientRect().top - sc.getBoundingClientRect().top) < 4 && e.offsetHeight > 0);
+    if (stick) add('⚠', 'кромка', stick, 'ПК: верхня кромка тане на липкій шапці — шапка має лишатись чіткою: кромку — нижче шапки або шапку поза прокруткою (кукбук A109 «анти»)'); }
   // 22. емодзі в кнопці (пропуск Konst QR CC-12, 14.10.2026: «▶ рух» на iPhone став кольоровою картинкою-емодзі серед SVG-іконок): символ з Extended_Pictographic у тексті кнопки чи посилання
   for (const el of all.filter(e => /^(BUTTON|A)$/.test(e.tagName) || e.getAttribute('role') === 'button')) { const t = [...el.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join('');
     const m = t.match(/\p{Extended_Pictographic}/u); if (!m) continue;
@@ -701,7 +712,7 @@ async function lint(target, states, width, theme, browser, scope = SCOPE) {
 //   --themes light|dark — продукт з однією схемою (AE: prefers-color-scheme у сайті нема, темний прохід = копія світлого). Типово — обидві.
 //   browser — спільний (самоперевірка: один запуск Chromium на всі сторінки замість запуску на кожну).
 async function run(target, states, width, { browser, scope = SCOPE, themes = THEMES } = {}) {
-  const own = !browser; const b = browser || await (await pw()).chromium.launch();
+  const own = !browser; const b = browser || await (await pw()).chromium.launch(width >= 1024 ? { ignoreDefaultArgs: ['--hide-scrollbars'] } : {});   // UIL-18: ПК — зі смугою прокрутки, як на Windows (Playwright типово ховає; AE S138)
   const out = { light: [], dark: [] };
   if (SERIAL) for (const t of themes) out[t] = await lint(target, states, width, t, b, scope);   // --serial — діагностика (wsd 1.21 п.3; як Playwright --workers=1): паралельний дав ✗, послідовний ні → вада під навантаженням
   else await Promise.all(themes.map(async t => { out[t] = await lint(target, states, width, t, b, scope); }));
@@ -763,9 +774,24 @@ if (a[0] === 'selftest') {
   for (const [k, html] of Object.entries(DEFECTS)) T.push(async () => {
     const hit = (await R(html, 'd' + Object.keys(DEFECTS).indexOf(k), k.trim() === 'наведення' ? 1280 : 390, k.trim() === 'чуже правило' ? '.isl' : '')).some(x => x.kind === k.trim() && x.lvl !== 'ⓘ');
     return [(hit ? '✓' : '✗') + ` підкинуто «${k}» → спіймано`, !hit]; });
+  // UIL-18 (AE S139): профіль ПК — 1920 зі смугою прокрутки (окремий браузер без --hide-scrollbars; як на Windows); мобільна ширина — тиша
+  const BP = await (await pw()).chromium.launch({ ignoreDefaultArgs: ['--hide-scrollbars'] });
+  const RP = (html, n, width = 1920) => run(page(html, n), [], width, { browser: BP }).then(r => [...r.light, ...r.dark]);
+  const rows = Array.from({ length: 30 }, (_, i) => `<p style="margin:0;padding:10px">Рядок ${i + 1}</p>`).join('');
+  const box = (st, inner = rows) => `<div style="margin:40px;width:420px;height:300px;overflow-y:auto;${st}">${inner}</div>`;
+  const two = 'mask:linear-gradient(#000 calc(100% - 40px),transparent) 0 0/calc(100% - 15px) 100% no-repeat,linear-gradient(#000,#000) 100% 0/15px 100% no-repeat;-webkit-mask:linear-gradient(#000 calc(100% - 40px),transparent) 0 0/calc(100% - 15px) 100% no-repeat,linear-gradient(#000,#000) 100% 0/15px 100% no-repeat';
+  const one = '-webkit-mask-image:linear-gradient(#000 calc(100% - 40px),transparent);mask-image:linear-gradient(#000 calc(100% - 40px),transparent)';
+  const topm = 'mask:linear-gradient(transparent,#000 28px) 0 0/calc(100% - 15px) 100% no-repeat,linear-gradient(#000,#000) 100% 0/15px 100% no-repeat;-webkit-mask:linear-gradient(transparent,#000 28px) 0 0/calc(100% - 15px) 100% no-repeat,linear-gradient(#000,#000) 100% 0/15px 100% no-repeat';
+  const K = (r, rx) => r.filter(x => x.kind === 'кромка' && rx.test(x.msg));
+  T.push(async () => { const [a1, a2, a3, a4, a5] = await Promise.all([RP(box(''), 'pc-none'), RP(box(one), 'pc-one'), RP(box(two), 'pc-two'),
+      RP(box(topm, `<h3 style="position:sticky;top:0;margin:0;background:#fff;padding:8px">Група</h3>${rows}`), 'pc-stick'), RP(box(''), 'pc-mob', 390)]);
+    const c = [K(a1, /^ПК: прокрутка панелі без кромки/).length > 0, K(a2, /топить смугу/).length > 0, K(a3, /^ПК:/).length === 0, K(a4, /липкій шапці/).length > 0, K(a5, /^ПК:/).length === 0];
+    const nm = ['без маски → ⚠', 'один шар зі смугою → ⚠', 'два шари (AE EDGE) → тиша', 'верхня кромка на липкій шапці → ⚠', '390 — профіль мобільного, ПК мовчить'];
+    const miss = nm.filter((_, i) => !c[i]);
+    return [(miss.length ? '✗' : '✓') + ` №18 профіль ПК (UIL-18): ${c.filter(Boolean).length}/5${miss.length ? ' — не так: ' + miss.join(' · ') : ''}`, !!miss.length]; });
   const out = new Array(T.length); let next = 0;
   await Promise.all(Array.from({ length: Math.min(4, T.length) }, async () => { while (next < T.length) { const j = next++; out[j] = await T[j](); } }));
-  await B.close(); let bad = 0; for (const [line, b] of out) { console.log(line); bad += b; }
+  await B.close(); await BP.close(); let bad = 0; for (const [line, b] of out) { console.log(line); bad += b; }
   console.log(`─── ui_lint selftest: ${T.length - bad}/${T.length} · ${Math.round((Date.now() - t0) / 1000)} с ───`); process.exit(bad ? 1 : 0);
 }
 if (!a[0]) { console.log('node ui_lint.mjs <url|файл> [--state "<js>"]… [--repo <тека>] [--width 390] [--height 844] [--themes light|dark|both] [--serial] [--json] | selftest'); process.exit(2); }
