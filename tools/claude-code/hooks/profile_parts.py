@@ -52,7 +52,7 @@ def merge(p2, other):
                        "additionalContext": p2 + ("\n\n" + ctx[:max(room, 0)] if ctx else "")}}, ensure_ascii=False)
 
 
-VER = re.compile(r"> версія: \*\*v\d+\*\* · \d\d\.\d\d\.\d{4} · аудит класу 2 — \d\d\.\d\d\.\d{4}")
+VER = re.compile(r"> версія: \*\*v\d+\*\* · \d\d\.\d\d\.\d{4} · аудит класу 2 — (?:\d\d\.\d\d\.\d{4}|борг)")   # «борг» — аудит ще не пройдено (AE S142: дату не вигадувати)
 
 
 def version_ok(t):
