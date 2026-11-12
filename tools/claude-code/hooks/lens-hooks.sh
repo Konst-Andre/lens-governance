@@ -54,7 +54,7 @@ env_all() {   # $1 — ідентифікатор сесії
 if [ "$ev" = start-test ]; then   # зуби FAB-1: пауза не дублює профіль · стиснення повторює · env_check у файл і в перше повідомлення · текст для стиснення
   t=$(mktemp -d); mkdir -p "$t/repos/a/tools" "$t/repos/b/tools" "$t/repos/c"; bad=0
   printf 'echo "база: ok"\necho "env: гейт ✓19 · ⚠24 · ✗0"\necho "⚠ тест: увага"\necho "✗ тест: червоне"\necho "гейт: ✓ 5 · ✗ 3 — глянь"\necho "⚠ спільне: хмара"\n' > "$t/repos/a/tools/env_check.sh"; printf 'echo "усе гаразд"\necho "⚠ спільне: хмара"\n' > "$t/repos/b/tools/env_check.sh"
-  go() { printf '{"session_id":"%s","source":"%s"}' "$1" "$2" | LENS_PROFILE=1 LENS_REPOS_ROOT="$t/repos" LENS_ENV_DIR="$t" LENS_MARK_DIR="$t" bash "${BASH_SOURCE[0]}" SessionStart; }
+  go() { printf '{"session_id":"%s","source":"%s"}' "$1" "$2" | LENS_PROFILE=1 LENS_REPOS_ROOT="$t/repos" LENS_ENV_DIR="$t" LENS_MARK_DIR="$t" LENS_SKILLS_DIR="$t/skills" bash "${BASH_SOURCE[0]}" SessionStart; }
   o="$(go s1 resume)";  [ -z "$o" ] && [ ! -e "$t/lens-profile-part2-s1" ] && echo "✓ пауза (resume): профілю й позначки частини 2 нема" || { echo "✗ resume: профіль або позначка є"; bad=1; }
   o="$(go s2 fork)";    [ -z "$o" ] && [ ! -e "$t/lens-profile-part2-s2" ] && echo "✓ копія розмови (fork): так само" || { echo "✗ fork: профіль або позначка є"; bad=1; }
   o="$(go s3 compact)"; case "$o" in *'Частина 1/2'*) [ -e "$t/lens-profile-part2-s3" ] && [ ! -e "$t/lens-env-s3.txt" ] && echo "✓ стиснення (compact): профіль повторено, env_check не ганяється" || { echo "✗ compact: позначки нема або env_check ганявся"; bad=1; };; *) echo "✗ compact: профілю нема"; bad=1;; esac
@@ -62,8 +62,10 @@ if [ "$ev" = start-test ]; then   # зуби FAB-1: пауза не дублює
   p="$(printf '{"session_id":"s4","prompt":"працюємо"}' | LENS_PROFILE=1 LENS_REPOS_ROOT="$t/repos" LENS_ENV_DIR="$t" LENS_MARK_DIR="$t" bash "${BASH_SOURCE[0]}" UserPromptSubmit)"
   case "$p" in *'Частина 2/2'*'✗ тест: червоне'*) [ ! -e "$t/lens-env-s4.txt" ] && echo "✓ перше повідомлення: частина 2 профілю + рядки env_check; файл спожито" || { echo "✗ файл env_check не спожито"; bad=1; };; *) echo "✗ перше повідомлення без рядків env_check: $(printf '%s' "$p" | cut -c1-160)"; bad=1;; esac
   mkdir -p "$t/repos/a/.git"; : > "$t/repos/a/.git/lens-readonly"; printf 'echo "усе гаразд"\n' > "$t/repos/b/tools/env_check.sh"; o="$(go s5 startup)"; grep -q 'нема (репо: b)' "$t/lens-env-s5.txt" 2>/dev/null && echo "✓ усе зелене → один рядок «⚠ / ✗ нема (репо: …)»; клон лише для читання (з тривогами) не ганяється" || { echo "✗ зелений підсумок: $(cat "$t/lens-env-s5.txt" 2>/dev/null)"; bad=1; }
-  o="$(printf '{"session_id":"s7","source":"startup"}' | LENS_ENV_AUTO=0 LENS_PROFILE=1 LENS_REPOS_ROOT="$t/repos" LENS_ENV_DIR="$t" LENS_MARK_DIR="$t" bash "${BASH_SOURCE[0]}" SessionStart)"
+  o="$(printf '{"session_id":"s7","source":"startup"}' | LENS_ENV_AUTO=0 LENS_PROFILE=1 LENS_REPOS_ROOT="$t/repos" LENS_ENV_DIR="$t" LENS_MARK_DIR="$t" LENS_SKILLS_DIR="$t/skills" bash "${BASH_SOURCE[0]}" SessionStart)"
   [ ! -e "$t/lens-env-s7.txt" ] && case "$o" in *'Частина 1/2'*) true;; *) false;; esac && echo "✓ вимикач LENS_ENV_AUTO=0: env_check не ганяється, профіль на місці" || { echo "✗ вимикач LENS_ENV_AUTO=0 не спрацював"; bad=1; }
+  rm -rf "$t/skills"; o="$(go s8 startup)"; case "$o" in *'"reloadSkills": true'*'Частина 1/2'*|*'Частина 1/2'*'"reloadSkills": true'*) [ -f "$t/skills/night/SKILL.md" ] && echo "✓ навички ядра: скопійовано в теку навичок, reloadSkills у тому ж JSON, що й профіль" || { echo "✗ навички: файла нема"; bad=1; };; *) echo "✗ навички: reloadSkills нема у виводі"; bad=1;; esac
+  o="$(go s9 startup)"; case "$o" in *reloadSkills*) echo "✗ навички без змін → reloadSkills зайвий"; bad=1;; *'Частина 1/2'*) echo "✓ навички без змін → без reloadSkills, профіль на місці";; *) echo "✗ навички без змін: профілю нема"; bad=1;; esac
   c="$(printf '{}' | bash "${BASH_SOURCE[0]}" PreCompact)"; n=${#c}; [ "$n" -gt 200 ] && [ "$n" -le 10000 ] && echo "✓ PreCompact: інструкції для переказу ($n знаків ≤ 10 000)" || { echo "✗ PreCompact: $n знаків"; bad=1; }
   s="$(printf '{"session_id":"s6","last_assistant_message":"Готово, без рядка."}' | LENS_SHADOW_DIR="$t" bash "${BASH_SOURCE[0]}" Stop)"
   [ -z "$s" ] && grep -q 'memory-line	no-line' "$t/lens-shadow-s6.tsv" 2>/dev/null && echo "✓ Stop: тінь memory-line записала вирок і нічого не заблокувала" || { echo "✗ тінь: вивід «$s», файл: $(cat "$t/lens-shadow-s6.tsv" 2>/dev/null | cut -c1-120)"; bad=1; }
@@ -90,7 +92,13 @@ if [ "$ev" = SessionStart ] || [ "$ev" = profile-test ]; then
   case "$ss_src" in resume|fork) exit 0 ;; esac
   case "$ss_src" in startup|"") env_all "${ss_sid:-nosession}" ;; esac
   md="${LENS_MARK_DIR:-/tmp}"
-  prof; [ "${LENS_PROFILE:-}" = 1 ] && { date +%H:%M > /tmp/lens-profile-loaded; : > "$md/lens-profile-part2-${ss_sid:-nosession}"; } 2>/dev/null; exit 0   # позначка для profile_check.sh (рядок «профіль» в env_check)
+  # AE S141 (В-351, «так» Konst на /night): навички ядра (tools/claude-code/skills/*/SKILL.md) → ~/.claude/skills/; навички репо в хмарній сесії
+  #   з кількома репо самі не вантажаться (тека сесії — не репо; code.claude.com/docs/en/skills «Where skills live», 12.11.2026) → копія + reloadSkills
+  #   (hooks «Reload skills that a hook installs»: без нього навичка, записана гачком, може не з'явитися до першого повідомлення). Ключ — у той самий JSON.
+  rs=0; for d in "$h"/../skills/*/; do [ -f "$d/SKILL.md" ] || continue; sd="${LENS_SKILLS_DIR:-$HOME/.claude/skills}/$(basename "$d")"
+    cmp -s "$d/SKILL.md" "$sd/SKILL.md" 2>/dev/null || { mkdir -p "$sd" && cp "$d/SKILL.md" "$sd/SKILL.md" && rs=1; }; done 2>/dev/null
+  if [ "$rs" = 1 ]; then o="$(prof)"; [ -n "$o" ] || o='{"hookSpecificOutput":{"hookEventName":"SessionStart"}}'; printf '%s' "$o" | python3 -c 'import json,sys; d=json.load(sys.stdin); d["hookSpecificOutput"]["reloadSkills"]=True; print(json.dumps(d,ensure_ascii=False))'
+  else prof; fi; [ "${LENS_PROFILE:-}" = 1 ] && { date +%H:%M > /tmp/lens-profile-loaded; : > "$md/lens-profile-part2-${ss_sid:-nosession}"; } 2>/dev/null; exit 0   # позначка для profile_check.sh (рядок «профіль» в env_check)
 fi
 # PreCompact (CTX-1, FAB-1 10.11.2026): stdout гачка Claude Code бере як інструкції для переказу при стисненні (code.claude.com/docs/en/hooks «PreCompact output»,
 #   10.11.2026; ≤ 10 000 знаків) — один файл ядра на всі репо замість розділу «Compact instructions» у кожному CLAUDE.md

@@ -711,7 +711,7 @@ iPad тику не має · iOS 17.4–17.x: switch є, тику нема (мо
 
 **Рішення — патерн «tip-popover»** (Apple TipKit, iOS 17 / WWDC 2023 «Make features discoverable with TipKit»):
 - бульбашка `position:absolute` під заголовком, **поверх** вмісту — нічого не зсуває; стрілка (`::before`, повернутий квадрат) — на «i» через `--ax`;
-- поява 220 мс `cubic-bezier(.2,.9,.25,1)`: `opacity 0→1`, `translateY(-6px) scale(.96) → none`, `transform-origin` — від стрілки; зникнення 140 мс `ease-in`;
+- **іменований виняток з драбини A57** (вирок Konst AE S141: значення device-locked, у драбину не вписуємо): поява 220 мс `cubic-bezier(.2,.9,.25,1)`: `opacity 0→1`, `translateY(-6px) scale(.96) → none`, `transform-origin` — від стрілки; зникнення 140 мс `ease-in`;
 - `will-change: transform, opacity; contain: layout paint`; тінь — помірна (велике розмиття на DPR 3 дороге);
 - одна відкрита; дотик будь-де (`pointerdown`, capture) — закрити; повторний дотик «i» — закрити;
 - `prefers-reduced-motion: reduce` — без анімації (показ / сховати).
