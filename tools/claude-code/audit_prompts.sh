@@ -10,7 +10,8 @@
 # Запуск:  bash tools/audit_prompts.sh <1|2> <файл> [<файл> …]      (шлях — від кореня репо, у якому лежить файл)
 # Файл — лише в теці репо: дочірній claude -p не читає /tmp і скретчпад батька (доступ відхилено → аудит порожній; QR CC-9, 11.10.2026).
 #          Розділ великого тому — витяг у <репо>/.audit_tmp/, після аудиту теку прибрати (репо ядра публічне; untracked-тека дає ✗ гейта --gov).
-# Звіти:   $AUDIT_OUT (за замовчуванням /tmp/audit)/<ім'я>.<модель>.txt (+ .json — сирий вивід) — у репо не комітяться.
+# Звіти:   $AUDIT_OUT (за замовчуванням /tmp/audit)/<репо>__<шлях>__<час UTC>.<модель>.txt (+ .json — сирий вивід) + реєстр MANIFEST.tsv — у репо не комітяться;
+#          наявний звіт не перезаписується ніколи (S140: CLAUDE.md ядра й продукту раніше писали в один файл).
 # Проходи — ПО ЧЕРЗІ (opus першим); перша відповідь з «limit» або помилкою — стоп, решта не запускається.
 # Вартість кожного проходу ($, токени, хвилини) — у підсумку → у колонку «проходи» журналу аудиту.
 # Аудит нічого не міняє. Синтез робить агент: знахідка обох моделей — висока впевненість; однієї — звірити грепом;
@@ -44,10 +45,14 @@ if [ "${AUDIT_WORLD:-1}" != 0 ]; then
     [ "$kd" != "$(pwd -P)" ] && world+=(--add-dir "$kd")
   fi
 fi
-total=0
+total=0; MADE=()
 for f in "$@"; do
-  n=$(echo "$f" | tr '/' '_')
+  # S140 (Konst: «щоб жодна чернетка аудиту не затерла іншу»): ім'я звіту = репо + шлях + час. Раніше — лише шлях: CLAUDE.md ядра і продукту
+  # писали в один /tmp/audit/CLAUDE.md.<модель>.txt, повторний прогін затирав попередній. Тепер новий файл щоразу; наявний — не перезаписується.
+  repo=$(basename "$(git -C "$(dirname "$(realpath "$f")")" rev-parse --show-toplevel 2>/dev/null || pwd -P)")
+  n="${repo}__$(echo "$f" | tr '/' '_')__$(date -u +%Y%m%dT%H%M%SZ)"
   for m in $models; do
+    while [ -e "$OUT/$n.$m.json" ] || [ -e "$OUT/$n.$m.txt" ]; do n="${n}_"; done   # той самий час — суфікс, не перезапис
     eff="--effort high"   # sonnet теж high: 06.10 на wsd знайшов ядро знахідок opus за пів ціни; без --effort думав у 7 разів менше
     timeout 1500 claude -p --model "$m" $eff "${world[@]}" --output-format json "/doctor prompt-audit $(realpath "$f") — аудитуй лише цей файл (повний шлях); інші CLAUDE.md у контексті — не обсяг" > "$OUT/$n.$m.json" 2> "$OUT/$n.$m.err"   # stderr окремо: попередження CLI (06.10: «Ignoring … permissions») ламали JSON
     line=$(python3 - "$OUT/$n.$m.json" "$OUT/$n.$m.txt" <<'PY'
@@ -66,6 +71,7 @@ print(('ERR ' if bad else 'OK ') + f"${d.get('total_cost_usd', 0):.2f} · вхі
 PY
 )
     echo "$f · $m → $OUT/$n.$m.txt · ${line#* }"
+    MADE+=("$OUT/$n.$m.txt")
     # докази: кожне `файл:рядок` у звіті — файл є, рядок існує (детермінована перевірка; пошук роздуває хибні — HALLMARK 2026)
     python3 - "$OUT/$n.$m.txt" "$OUT/$n.$m.json" <<'PY'
 import re, sys, os, json, collections
@@ -100,4 +106,7 @@ PY
     case "$line" in ERR*) echo "СТОП: помилка або ліміт — решту проходів не запущено (сумарно \$$total)"; exit 1;; esac
   done
 done
+# реєстр пакета (S140): кожен звіт — рядком у $OUT/MANIFEST.tsv; кінець — перелік цього запуску (порожній звіт — ✗)
+for x in "${MADE[@]:-}"; do [ -n "$x" ] || continue; s=$(wc -c < "$x" 2>/dev/null || echo 0)
+  printf '%s\t%s\t%s\n' "$(date -u +%FT%TZ)" "$x" "$s" >> "$OUT/MANIFEST.tsv"; [ "$s" -gt 200 ] && echo "  ✓ $x ($s Б)" || echo "  ✗ $x — порожній або нема"; done
 echo "сумарно: \$$total (еквівалент API; на підписці — частка квоти)"
