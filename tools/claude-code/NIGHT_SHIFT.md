@@ -25,7 +25,7 @@
 
 ## 3. Пороги — ліміт, контекст, час
 
-Заміри — перед **кожним** кроком: ліміти — `list_events` (власна сесія, `kinds: ["rate_limit_event"]`, остання подія → `rate_limit_info.unifiedWindows.<вікно>.utilization` і `resetsAt`); контекст — `get_session` → `external_metadata.context_usage`. Ціна кроку — різниця замірів до й після; записується в рядок кроку самері §1 («5 год 0,31 → 0,36 · тиждень 0,80 → 0,81»).
+Заміри — перед **кожним** кроком: ліміти — `list_events` (власна сесія, `kinds: ["rate_limit_event"]`, остання подія → `rate_limit_info.unifiedWindows.<вікно>.utilization` і `resetsAt`); контекст — `get_session` → `external_metadata.context_usage`, межа автостиснення — там же `autocompact_state.threshold` (AE S141: 901 600). Ціна кроку — різниця замірів до й після; записується в рядок кроку самері §1 («5 год 0,31 → 0,36 · тиждень 0,80 → 0,81»).
 
 | що | поріг (типово; Konst може назвати інший у слові) | дія |
 |---|---|---|
