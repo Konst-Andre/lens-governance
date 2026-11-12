@@ -70,8 +70,12 @@ def verdict(n, now, event):
         return f"контекст {k(ctx)} · {ctx * 100 // n['w']}% вікна {k(n['w'])} · ревізія на {k(n['r'])} · стиснень у сесії {n['comp']} (ctx_watch)" + cap(n)
     return None
 
-def newest():
-    fs = glob.glob(os.path.expanduser('~/.claude/projects/*/*.jsonl'))
+def newest(home='~'):
+    # S141: найновіший журнал — не обов'язково свій: дочірній `claude -p` (аудит) пише свій у ту саму теку → чужі числа (108 тис. і 0 стиснень
+    #   замість 243 тис. і 1). Свій — за CLAUDE_CODE_SESSION_ID (= ім'я файла журналу, звірено 12.11.2026); нема — найновіший.
+    sid = os.environ.get('CLAUDE_CODE_SESSION_ID', '')
+    own = glob.glob(os.path.expanduser(f'{home}/.claude/projects/*/{sid}.jsonl')) if sid else []
+    fs = own or glob.glob(os.path.expanduser(f'{home}/.claude/projects/*/*.jsonl'))
     return max(fs, key=os.path.getmtime) if fs else ''
 
 def line(path):
@@ -130,7 +134,11 @@ def selftest():
     o = hook({'hook_event_name': 'SessionStart', 'source': 'compact', 'transcript_path': p})
     case('SessionStart compact: «№ 1», «371 тис. → 14 тис.», пороги, вимога рядка «стиснення N»', all(x in o for x in ('№ 1', '371 тис. → 14 тис.', 'ревізія на 325 тис.', 'стиснення N')))
     case('SessionStart startup — тиша', hook({'hook_event_name': 'SessionStart', 'source': 'startup', 'transcript_path': p}) == '')
-    print(f'─── ctx_watch selftest: {19 - bad}/19 ───'); return 1 if bad else 0
+    h = f'{d}/home'; os.makedirs(f'{h}/.claude/projects/p1'); os.makedirs(f'{h}/.claude/projects/p2')
+    open(f'{h}/.claude/projects/p1/OWN.jsonl', 'w').write('x'); time.sleep(0.01); open(f'{h}/.claude/projects/p2/CHILD.jsonl', 'w').write('x')
+    os.environ['CLAUDE_CODE_SESSION_ID'] = 'OWN'
+    case('рядок руками: свій журнал за CLAUDE_CODE_SESSION_ID, не новіший чужий (аудит claude -p)', newest(h).endswith('OWN.jsonl'))
+    print(f'─── ctx_watch selftest: {20 - bad}/20 ───'); return 1 if bad else 0
 
 if __name__ == '__main__':
     cmd = sys.argv[1] if len(sys.argv) > 1 else 'hook'
