@@ -17,9 +17,12 @@
 CLOUDFLARE_API_TOKEN=<токен Cloudflare — у Konst>
 CLOUDFLARE_ACCOUNT_ID=<id акаунта Cloudflare — у Konst>
 LENS_PROFILE=1
+CLAUDE_CODE_AUTO_COMPACT_WINDOW=450000
 ```
 
 - `LENS_PROFILE=1` — профіль з репо (`tools/claude-code/PROFILE.md`) кладе гачок старту. **З 22.10.2026 — і на своєму акаунті** (рішення `ACC-1`, `tools/claude-code/ACCOUNT_MOVE.md`): у полі акаунта тоді лише ядро (6 рядків).
+- `CLAUDE_CODE_AUTO_COMPACT_WINDOW=450000` — межа автостиснення 450 тис. токенів (типово в хмарі ≈ 900 тис.); одна на день і ніч; перевірка — `get_session` → `autocompact_state.threshold` (AE S141, В-351; `tools/claude-code/CLAUDE_CODE.md` «Ревізія → `/compact`»).
+- Навички ядра (`/night`) ставить не setup script, а диспетчер `hooks/lens-hooks.sh` на старті (`tools/claude-code/skills/`).
 - `GH_TOKEN` руками не ставити: доступ до GitHub дає під'єднаний GitHub (п.3б там же).
 
 ## 3 · Setup script (поле «Setup script»), v3
