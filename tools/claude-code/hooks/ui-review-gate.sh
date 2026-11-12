@@ -34,7 +34,8 @@ CHECK = ("чек-лист огляду (як користувач, а не ли�
          "кнопка називає результат («Завантажити KPI», не «ОК»); текст «як кажуть люди», без жаргону — або прибрати, якщо зайвий; текст людині (порада, попередження, «i») — повними реченнями, як сказала б людина, що допомагає: що сталося · що зробити, звертання «ви», без стискання до телеграми; еталон і пари «було → стало» — tools/claude-code/VOICE.md; чернетку — прочитати очима того, хто читатиме, і переписати раз; "
          "помилка — що сталося · чому · що робити (каже «скажи агенту» — поруч кнопка «Скопіювати для Claude» зі знімком збою: дія · відповідь сервера · номери · час · версія сторінки). "
          "④ стан, якого не досягти на здоровій системі (збій, «не стартував», порожньо), — Konst отримує спосіб побачити його сам: демо-режим за входом або прев'ю, посилання у звіті; «іди тестуй» без такого способу — не звіт. "
-         "⑤ машинне (обрізання, прилипання, контраст, тап, ряд, iOS-зум, скрол, кромка, паритет тем — перелік — у шапці скрипта) — tools/claude-code/ui_lint.mjs, ✗ 0 у темах продукту — типово обидві, --themes light|dark для продукту з однією схемою")
+         "⑤ машинне (обрізання, прилипання, контраст, тап, ряд, iOS-зум, скрол, кромка, паритет тем — перелік — у шапці скрипта) — tools/claude-code/ui_lint.mjs, ✗ 0 у темах продукту — типово обидві, --themes light|dark для продукту з однією схемою. "
+         "⑥ рух (transition · animation · пружина · requestAnimationFrame) — кліп MP4 у чат (SendUserFile) + смуга кадрів очима агента: python3 tools/claude-code/clip.py <сценарій.json> <тека> (Konst AE S140); done вимагає --clip <файл.mp4> або --no-clip \"<чому, ≥ 30 знаків>\".")
 
 def git(top, *a, raw=False):
     r = subprocess.run(["git", "-C", top, *a], capture_output=True)
@@ -69,6 +70,16 @@ def ui_state(top):   # (файли UI, хеш диффу) — дифф прот�
         p = os.path.join(top, f)
         if os.path.isfile(p): h.update(f.encode()); h.update(open(p, "rb").read())
     return files, h.hexdigest()
+
+MOTION = re.compile(r"\btransition\s*:|@keyframes|\banimation(-name)?\s*:|requestAnimationFrame|\.animate\(|--spring|\bspring\b|will-change\s*:\s*transform", re.I)
+def motion_in(top, files):   # рух у ДОДАНИХ рядках диффу (і в нових файлах) — Konst AE S140: рух показується кліпом, не знімком
+    add = [l[1:] for l in git(top, "diff", "HEAD", "--unified=0", "--", *files).splitlines() if l.startswith("+") and not l.startswith("+++")]
+    for f in git(top, "ls-files", "--others", "--exclude-standard", "--", *files).splitlines():
+        pth = os.path.join(top, f)
+        if os.path.isfile(pth):
+            try: add += open(pth, encoding="utf-8", errors="ignore").read().splitlines()
+            except OSError: pass
+    return any(MOTION.search(l) for l in add)
 
 GITC = r"^\s*(?:\w+=\S*\s+)*git\b(?:\s+-[cC]\s+\S+)*\s+commit\b"   # git … commit на початку команди (як commit-gate.sh)
 def mark(hx): return f"/tmp/lens-uireview-{hx}"
@@ -120,8 +131,9 @@ if mode == "hash":   # для ui_lint: той самий хеш диффу UI, �
 def lint_mark(hx): return f"/tmp/lens-uilint-{hx}"
 
 if mode == "done":
-    nolint = args[args.index("--no-lint") + 1] if "--no-lint" in args and args.index("--no-lint") + 1 < len(args) else None
-    rest = [a for i, a in enumerate(args) if a != "--no-lint" and not (i > 0 and args[i - 1] == "--no-lint")]
+    opt = lambda k: args[args.index(k) + 1] if k in args and args.index(k) + 1 < len(args) else None
+    nolint, clip, noclip = opt("--no-lint"), opt("--clip"), opt("--no-clip")
+    rest = [a for i, a in enumerate(args) if a not in ("--no-lint", "--clip", "--no-clip") and not (i > 0 and args[i - 1] in ("--no-lint", "--clip", "--no-clip"))]
     note = rest[0] if rest else ""
     top = git(rest[1] if len(rest) > 1 else os.getcwd(), "rev-parse", "--show-toplevel")
     if len(note) < 40: print("✗ рядок огляду < 40 знаків — назви стани, теми й що бачить людина після дії"); sys.exit(1)
@@ -134,7 +146,16 @@ if mode == "done":
         ul = os.path.join(os.path.dirname(os.path.dirname(os.environ.get("UI_GATE_SELF", "x/x"))), "ui_lint.mjs")
         print(f"✗ ui_lint цього диффу ({hx[:8]}) не пройдено: node {ul} <url|файл> [--state \"<js>\"]… --repo {top} → ✗ 0 у темах продукту — типово обидві, --themes light|dark для продукту з однією схемою (старі ✗, що були до правки, — `--baseline <файл>`: перший прогін ДО правки записує базу, блокує лише нове); "
               f"сторінку не запустити — done \"<огляд>\" {top} --no-lint \"<чому, ≥ 30 знаків>\""); sys.exit(1)
-    open(mark(hx), "w").write(note + ("" if lint else f"\n[без ui_lint: {nolint}]") + "\n" + "\n".join(files) + "\n")
+    # ⑥ рух — кліп (Konst AE S140): дифф додає рух → кліп MP4 існує (> 10 КБ) або причина без кліпу
+    cliprec = ""
+    if motion_in(top, files):
+        cp = clip and (clip if os.path.isabs(clip) else os.path.join(top, clip))
+        if cp and os.path.isfile(cp) and cp.endswith(".mp4") and os.path.getsize(cp) > 10000: cliprec = f"\n[кліп: {clip}]"
+        elif noclip and len(noclip) >= 30: cliprec = f"\n[без кліпу: {noclip}]"
+        else:
+            print(f"✗ у диффі є рух (transition · animation · пружина), кліпу нема: python3 tools/claude-code/clip.py <сценарій.json> <тека> → MP4 у чат (SendUserFile), "
+                  f"тоді done \"<огляд>\" {top} --clip <файл.mp4>; кліп не має сенсу — --no-clip \"<чому, ≥ 30 знаків>\""); sys.exit(1)
+    open(mark(hx), "w").write(note + ("" if lint else f"\n[без ui_lint: {nolint}]") + cliprec + "\n" + "\n".join(files) + "\n")
     print(f"✓ позначка огляду {hx[:8]} · {os.path.basename(top)}: {', '.join(files)}" + ("" if lint else " · ⚠ без ui_lint — причина записана")); sys.exit(0)
 
 if mode == "selftest":
@@ -181,6 +202,14 @@ if mode == "selftest":
         r = dn(note, tmp, "--no-lint", "коротко"); say(r.returncode == 1, "зуби: --no-lint без причини (< 30 знаків) → ✗")
         r = dn(note, tmp, "--no-lint", "CSS листа, сторінки в браузері немає — лише шаблон"); say(r.returncode == 0 and "без ui_lint" in open(mark(hx)).read(), "--no-lint з причиною → ✓, причина в позначці")
         os.remove(mark(hx))
+        # ⑥ рух → кліп (Konst AE S140)
+        open(f"{tmp}/m.css", "w").write(".r{transition:transform .3s}"); files, hx = ui_state(tmp); open(lint_mark(hx), "w").write("✗0")
+        if os.path.exists(mark(hx)): os.remove(mark(hx))   # позначка минулого прогону з тим самим хешем
+        r = dn(note, tmp); say(r.returncode == 1 and "кліп" in r.stdout and not os.path.exists(mark(hx)), "зуби: дифф з рухом без кліпу → ✗")
+        open(f"{tmp}/c.mp4", "wb").write(b"0" * 20000)
+        r = dn(note, tmp, "--clip", f"{tmp}/c.mp4"); say(r.returncode == 0 and "[кліп:" in open(mark(hx)).read(), "дифф з рухом + --clip <mp4> → ✓, кліп у позначці")
+        os.remove(mark(hx)); r = dn(note, tmp, "--no-clip", "рух лише ховер кольору — кліп нічого не покаже"); say(r.returncode == 0, "--no-clip з причиною → ✓"); os.remove(mark(hx)); os.remove(lint_mark(hx))
+        os.remove(f"{tmp}/m.css"); os.remove(f"{tmp}/c.mp4")
         # сітка review-remind post: UI-коміт без позначки → озивається; з позначкою на ці файли → тиша (без дубля)
         rr = os.path.join(os.path.dirname(os.environ["UI_GATE_SELF"]), "review-remind.sh")
         post = lambda sid: subprocess.run(["bash", rr, "post"], input=json.dumps({"tool_name": "Bash", "session_id": sid, "cwd": tmp, "tool_input": {"command": "git commit -am x"}}), capture_output=True, text=True).stdout
