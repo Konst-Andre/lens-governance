@@ -8,7 +8,7 @@ Read · Write · Edit і `cat` / `head` одного файла, НЕ на Grep 
 
 Як: PreToolUse (диспетчер lens-hooks.sh, `pre`). Ціль виклику — file_path (Edit · Write), path / pattern (Grep · Glob) або шляхи в команді Bash.
 Ціль під `paths:` правила, а правило в цій сесії ще не приходило → additionalContext з текстом правила (раз на сесію; ≤ 9 000 знаків — стеля
-гачка 10 000). Read файла під `paths:` або самого правила — Claude Code вантажить правило сам → лише позначка, без дубля.
+гачка 10 000). Read файла під `paths:` або самого правила, і Bash, що є лише `cat` / `head` одного файла, — Claude Code вантажить правило сам → лише позначка, без дубля.
 Позначки — /tmp/lens-rules-<сесія>-<хеш правила>; стиснення стирає їх (диспетчер, SessionStart source=compact) — переказ правила не несе.
 Блокувати не блокує (правило — контекст, не заборона). Подія InstructionsLoaded точніша, але setup script її не реєструє — не беремо.
   python3 rules-guard.py pre < подія.json   |   python3 rules-guard.py selftest
@@ -63,6 +63,10 @@ def targets(d):
     return [os.path.normpath(os.path.join(cwd, x)) for x in c if x], tool
 
 
+# Bash, що є лише `cat` / `head` ОДНОГО файла (можна з `cd X &&`): Claude Code вантажить правило сам («a Bash command that counts as a read,
+# such as cat or head on a single file» — code.claude.com/docs/en/memory, 12.11.2026) → лише позначка, без дубля (S142, замість InstructionsLoaded)
+NATIVE = re.compile(r'\s*(?:cd\s+[^\s;&|]+\s*&&\s*)?(?:cat|head)(?:\s+-n\s*\d+|\s+-\d+)?\s+[^\s;&|<>*]+\s*')
+
 def mark(sid, rule): return os.path.join(MARK, f'lens-rules-{sid}-{hashlib.md5(rule.encode()).hexdigest()[:10]}')
 
 
@@ -76,7 +80,7 @@ def pre(d):
             m = mark(sid, p)
             hit = os.path.abspath(t) == os.path.abspath(p) or any(g.match(rel) or g.match(rel.rstrip('/') + '/x') for g in gl)
             if not hit or os.path.exists(m) or p in due: continue
-            if tool == 'Read': open(m, 'w').close(); continue   # Claude Code вантажить правило сам (path_glob_match); Read самого правила — теж
+            if tool == 'Read' or NATIVE.fullmatch(str((d.get('tool_input') or {}).get('command', '')) if tool == 'Bash' else '-'): open(m, 'w').close(); continue   # Claude Code вантажить правило сам (path_glob_match); Read самого правила — теж
             due[p] = (os.path.relpath(p, r), rel, body.strip(), m)
     # кілька правил на тих самих шляхах (AE: site/ — editor-worker · gates · ui, разом > стелі): цілим — від найменшого, доки влазить;
     # решта — вказівник «прочитай Read», без позначки: повторюється, доки агент не прочитає (S142, наживо — ui.md обрізався б)
@@ -108,6 +112,8 @@ def selftest():
              ('Bash поза paths (tools/x.py) → тиша', lambda: run('Bash', {'command': 'python3 tools/x.py'}, 's6') == ''),
              ('позначку стерто (стиснення) → знову текст', lambda: (os.remove(mark('s1', f'{d}/.claude/rules/ui.md')), 'Одна мова' in run('Edit', {'file_path': f'{d}/site/index.html'}))[1]),
              ('два правила, разом > стелі: менше — цілим, більше — вказівник; Read великого → далі тиша', lambda: (open(f'{d}/.claude/rules/big.md', 'w').write('---\npaths:\n  - "site/**"\n---\n' + 'ж' * 9500), (lambda o: 'Одна мова' in o and '`.claude/rules/big.md` (9500' in o)(run('Edit', {'file_path': f'{d}/site/index.html'}, 's8')) and 'big.md' in run('Edit', {'file_path': f'{d}/site/index.html'}, 's8') and (run('Read', {'file_path': f'{d}/.claude/rules/big.md'}, 's8') == '') and run('Edit', {'file_path': f'{d}/site/index.html'}, 's8') == '')[1]),
+             ('Bash «cat site/index.html» (один файл) → тиша, потім Edit → тиша (Claude Code вантажить сам)', lambda: run('Bash', {'command': 'cat site/index.html'}, 's9') == '' and run('Edit', {'file_path': f'{d}/site/index.html'}, 's9') == ''),
+             ('Bash «cat site/index.html | grep x» → текст (не чисте читання)', lambda: 'Одна мова' in run('Bash', {'command': 'cat site/index.html | grep x'}, 's10')),
              ('правило без paths — не чіпає', lambda: 'без paths' not in run('Edit', {'file_path': f'{d}/site/index.html'}, 's7'))]
     bad = 0
     for n, f in cases:
