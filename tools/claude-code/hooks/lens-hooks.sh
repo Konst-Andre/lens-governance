@@ -14,6 +14,11 @@
 # Ціна: подія без гачка й інструмент поза фільтром — лише bash, без Python (заміряно 09.10: подія без гачка ~6 мс, інструмент поза фільтром ~13 мс; повний ланцюг ~140 мс — як у CLAUDE_CODE.md).
 h="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ev="$1"
+mrg() {   # AE S141: два виводи гачків (JSON hookSpecificOutput) → один; additionalContext — через порожній рядок; подія — з першого
+  [ -z "$1" ] && { printf '%s' "$2"; return; }; [ -z "$2" ] && { printf '%s' "$1"; return; }
+  python3 -c 'import json,sys
+x=json.loads(sys.argv[1]); y=json.loads(sys.argv[2]); h=x.setdefault("hookSpecificOutput",{}); h["additionalContext"]=(h.get("additionalContext","")+"\n\n"+y["hookSpecificOutput"]["additionalContext"]).strip(); print(json.dumps(x,ensure_ascii=False))' "$1" "$2" 2>/dev/null || printf '%s' "$1"
+}
 # Хуки старту репо сесії (AE S90 18.10.2026): у сесії з кількома репо Claude Code бере налаштування лише з кореня (/home/user), і
 # <репо>/.claude/hooks/session-start.sh не запускається — інструменти гейтів (Playwright, валідатор) тихо відсутні. Диспетчер кличе їх
 # сам: кожен репо, крім свого репо сесії (його кличе Claude Code) і ядра; вивід — у журнал (SessionStart чекає JSON), змінні — через
@@ -69,6 +74,19 @@ if [ "$ev" = start-test ]; then   # зуби FAB-1: пауза не дублює
   c="$(printf '{}' | bash "${BASH_SOURCE[0]}" PreCompact)"; n=${#c}; [ "$n" -gt 200 ] && [ "$n" -le 10000 ] && echo "✓ PreCompact: інструкції для переказу ($n знаків ≤ 10 000)" || { echo "✗ PreCompact: $n знаків"; bad=1; }
   s="$(printf '{"session_id":"s6","last_assistant_message":"Готово, без рядка."}' | LENS_SHADOW_DIR="$t" bash "${BASH_SOURCE[0]}" Stop)"
   [ -z "$s" ] && grep -q 'memory-line	no-line' "$t/lens-shadow-s6.tsv" 2>/dev/null && echo "✓ Stop: тінь memory-line записала вирок і нічого не заблокувала" || { echo "✗ тінь: вивід «$s», файл: $(cat "$t/lens-shadow-s6.tsv" 2>/dev/null | cut -c1-120)"; bad=1; }
+  # AE S141 (В-352): ctx_watch у трьох місцях — після коміту · повідомлення Konst · після стиснення; кожне — один чинний JSON
+  python3 -c 'import json,sys
+u=lambda c:{"input_tokens":2,"cache_read_input_tokens":c-1002,"cache_creation_input_tokens":1000,"cache_creation":{"ephemeral_1h_input_tokens":1000}}
+r=[{"type":"assistant","timestamp":"2099-01-01T00:00:00Z","message":{"id":"m1","content":[],"usage":u(330000)}},{"type":"system","subtype":"compact_boundary","compactMetadata":{"trigger":"auto","preTokens":371723,"postTokens":14494}}]
+open(sys.argv[1],"w").write(json.dumps(r[0])+"\n"); open(sys.argv[2],"w").write("\n".join(json.dumps(x) for x in r)+"\n")' "$t/big.jsonl" "$t/cmp.jsonl"
+  ok() { printf '%s' "$1" | python3 -c 'import json,sys; d=json.loads(sys.stdin.read()); a=d["hookSpecificOutput"]["additionalContext"]; sys.exit(0 if all(x in a for x in sys.argv[1:]) else 1)' "${@:2}" 2>/dev/null; }
+  e="CLAUDE_CODE_AUTO_COMPACT_WINDOW=450000 CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=92"
+  o="$(printf '{"session_id":"c1","hook_event_name":"PostToolUse","tool_name":"Bash","tool_input":{"command":"git commit -m x"},"transcript_path":"%s"}' "$t/big.jsonl" | env $e LENS_ROOT="$t/none" bash "${BASH_SOURCE[0]}" PostToolUse)"
+  ok "$o" "⚠ контекст 330 тис." "ревізія на 325 тис." && echo "✓ ctx_watch після коміту: 330 тис. → ⚠ одним JSON" || { echo "✗ ctx_watch після коміту: «$(printf '%s' "$o" | cut -c1-120)»"; bad=1; }
+  o="$(printf '{"session_id":"c2","hook_event_name":"UserPromptSubmit","prompt":"далі","transcript_path":"%s"}' "$t/big.jsonl" | env $e LENS_REPOS_ROOT="$t/repos" LENS_ENV_DIR="$t" LENS_MARK_DIR="$t" bash "${BASH_SOURCE[0]}" UserPromptSubmit)"
+  ok "$o" "⚠ контекст 330 тис." && echo "✓ ctx_watch на повідомлення Konst: ⚠ у контексті" || { echo "✗ ctx_watch на повідомлення: «$(printf '%s' "$o" | cut -c1-120)»"; bad=1; }
+  o="$(printf '{"session_id":"c3","hook_event_name":"SessionStart","source":"compact","transcript_path":"%s"}' "$t/cmp.jsonl" | env $e LENS_PROFILE=1 LENS_REPOS_ROOT="$t/repos" LENS_ENV_DIR="$t" LENS_MARK_DIR="$t" LENS_SKILLS_DIR="$t/skills" bash "${BASH_SOURCE[0]}" SessionStart)"
+  ok "$o" "Частина 1/2" "371 тис. → 14 тис." && echo "✓ ctx_watch після стиснення: «371 тис. → 14 тис.» і профіль в одному JSON" || { echo "✗ ctx_watch після стиснення: «$(printf '%s' "$o" | tail -c 160)»"; bad=1; }
   rm -rf "$t"; exit $bad
 fi
 if [ "$ev" = SessionStart ] || [ "$ev" = profile-test ]; then
@@ -97,8 +115,9 @@ if [ "$ev" = SessionStart ] || [ "$ev" = profile-test ]; then
   #   (hooks «Reload skills that a hook installs»: без нього навичка, записана гачком, може не з'явитися до першого повідомлення). Ключ — у той самий JSON.
   rs=0; for d in "$h"/../skills/*/; do [ -f "$d/SKILL.md" ] || continue; sd="${LENS_SKILLS_DIR:-$HOME/.claude/skills}/$(basename "$d")"
     cmp -s "$d/SKILL.md" "$sd/SKILL.md" 2>/dev/null || { mkdir -p "$sd" && cp "$d/SKILL.md" "$sd/SKILL.md" && rs=1; }; done 2>/dev/null
-  if [ "$rs" = 1 ]; then o="$(prof)"; [ -n "$o" ] || o='{"hookSpecificOutput":{"hookEventName":"SessionStart"}}'; printf '%s' "$o" | python3 -c 'import json,sys; d=json.load(sys.stdin); d["hookSpecificOutput"]["reloadSkills"]=True; print(json.dumps(d,ensure_ascii=False))'
-  else prof; fi; [ "${LENS_PROFILE:-}" = 1 ] && { date +%H:%M > /tmp/lens-profile-loaded; : > "$md/lens-profile-part2-${ss_sid:-nosession}"; } 2>/dev/null; exit 0   # позначка для profile_check.sh (рядок «профіль» в env_check)
+  o="$(prof)"; [ "$ss_src" = compact ] && o="$(mrg "$o" "$(printf '%s' "$ss_in" | python3 "$h/ctx_watch.py" hook 2>/dev/null)")"   # AE S141 (В-352): після стиснення — рядок «контекст · стиснення на · ревізія на»
+  if [ "$rs" = 1 ]; then [ -n "$o" ] || o='{"hookSpecificOutput":{"hookEventName":"SessionStart"}}'; printf '%s' "$o" | python3 -c 'import json,sys; d=json.load(sys.stdin); d["hookSpecificOutput"]["reloadSkills"]=True; print(json.dumps(d,ensure_ascii=False))'
+  elif [ -n "$o" ]; then printf '%s\n' "$o"; fi; [ "${LENS_PROFILE:-}" = 1 ] && { date +%H:%M > /tmp/lens-profile-loaded; : > "$md/lens-profile-part2-${ss_sid:-nosession}"; } 2>/dev/null; exit 0   # позначка для profile_check.sh (рядок «профіль» в env_check)
 fi
 # PreCompact (CTX-1, FAB-1 10.11.2026): stdout гачка Claude Code бере як інструкції для переказу при стисненні (code.claude.com/docs/en/hooks «PreCompact output»,
 #   10.11.2026; ≤ 10 000 знаків) — один файл ядра на всі репо замість розділу «Compact instructions» у кожному CLAUDE.md
@@ -133,10 +152,14 @@ case "$ev" in
     printf '%s' "$in" | bash "$h/ui-guard.sh" mark 2>/dev/null
     # після коміту — два нагадування можуть збігтись (огляд UI · бриф, BRIEF-2 19.10.2026): одне повідомлення, обидва тексти
     o1="$(printf '%s' "$in" | bash "$h/review-remind.sh" post 2>/dev/null)"; o2="$(printf '%s' "$in" | bash "$h/brief-guard.sh" post 2>/dev/null)"
-    [ -n "$o1" ] && [ -z "$o2" ] && fire review-remind "$o1"
-    [ -z "$o1" ] && [ -n "$o2" ] && fire brief-guard "$o2"
-    [ -n "$o1" ] && [ -n "$o2" ] && fire "review-remind+brief-guard" "$(python3 -c 'import json,sys; a,b=(json.loads(x)["hookSpecificOutput"] for x in sys.argv[1:3]); print(json.dumps({"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":a["additionalContext"]+"\n\n"+b["additionalContext"]}},ensure_ascii=False))' "$o1" "$o2")"
-    [ -z "$o1" ] && [ -z "$o2" ] && [ "$tool" = Bash ] && { run handoff-remind.sh post || run env-remind.sh post; } ;;   # + пам'ять після коміту (AE S109): нові ✗ / ⚠ handoff_check   # коміт змінив аркуш середовища → запропонувати оновити (ENV-1)
+    po=""   # AE S141: вивід збирається в одне повідомлення — після коміту до нього додається рядок ctx_watch (один JSON на подію)
+    [ -n "$o1" ] && [ -z "$o2" ] && po="$(fire review-remind "$o1")"
+    [ -z "$o1" ] && [ -n "$o2" ] && po="$(fire brief-guard "$o2")"
+    [ -n "$o1" ] && [ -n "$o2" ] && po="$(fire "review-remind+brief-guard" "$(python3 -c 'import json,sys; a,b=(json.loads(x)["hookSpecificOutput"] for x in sys.argv[1:3]); print(json.dumps({"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":a["additionalContext"]+"\n\n"+b["additionalContext"]}},ensure_ascii=False))' "$o1" "$o2")")"
+    [ -z "$o1" ] && [ -z "$o2" ] && [ "$tool" = Bash ] && po="$(run handoff-remind.sh post || run env-remind.sh post)"
+    # AE S141 (В-352): після кожного `git commit` — ctx_watch: ⚠, коли контекст ≥ порога ревізії (крок нічної зміни закінчується комітом, а повідомлень Konst уночі нема)
+    c=""; [ "$tool" = Bash ] && c="$(printf '%s' "$in" | python3 "$h/ctx_watch.py" hook 2>/dev/null)"; [ -n "$c" ] && po="$(mrg "$po" "$(fire ctx-watch "$c")")"
+    [ -n "$po" ] && printf '%s\n' "$po" ;;   # + пам'ять після коміту (AE S109): нові ✗ / ⚠ handoff_check   # коміт змінив аркуш середовища → запропонувати оновити (ENV-1)
   stop)   # перший з відповіддю перемагає: гачок пам'яті, перевірка перед переїздом (HOOK-3.2), «план без світу» (HOOK-2.5)
     # тінь (FAB-1, 10.11.2026): кандидат на заміну memory-guard — перевірка рядка «пам'ять: …» проти стану git. Лише пише вирок у
     #   /tmp/lens-shadow-<сесія>.tsv, нічого не друкує й не блокує; підсумок сесії — python3 memory_line.py tally <сесія> (рядком у журнал гачків)
@@ -150,6 +173,7 @@ a,b=sys.argv[1],sys.argv[2]
 if not a.strip(): print(b); sys.exit()
 x=json.loads(a); y=json.loads(b); h=x.setdefault("hookSpecificOutput",{"hookEventName":"UserPromptSubmit"})
 h["additionalContext"]=(h.get("additionalContext","")+"\n\n"+y["hookSpecificOutput"]["additionalContext"]).strip(); print(json.dumps(x,ensure_ascii=False))' "$o" "$r" 2>/dev/null || printf '%s' "$o")"
+    c="$(printf '%s' "$in" | python3 "$h/ctx_watch.py" hook 2>/dev/null)"; [ -n "$c" ] && o="$(mrg "$o" "$(fire ctx-watch "$c")")"   # AE S141 (В-352): контекст ≥ порогів ревізії / кеш холодний
     ef="${LENS_ENV_DIR:-/tmp}/lens-env-${sid:-nosession}.txt"   # FAB-1: ⚠ / ✗ env_check кожного репо, зібрані на старті (env_all) — раз, у перше повідомлення
     if [ -s "$ef" ]; then
       o="$(python3 -c 'import json,sys

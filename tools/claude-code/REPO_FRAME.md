@@ -35,7 +35,7 @@
 | `@шлях` у `CLAUDE.md` (без бектиків) | старт сесії, файл **цілком**, до 4 рівнів вкладення | лише для того, що потрібне щосесії; вказівник на файл — у бектиках (`` `шлях` ``): назва, не імпорт (code.claude.com/docs/en/memory, 04.10.2026) |
 
 Модель сесії й заповнення контексту — заміряні: `get_session` (сервер `claude-code-remote`, без `session_id`) →
-`session_context.model` · `effort_level` · `external_metadata.context_usage`.
+`session_context.model` · `effort_level`; заповнення контексту — `python3 <ядро>/tools/claude-code/hooks/ctx_watch.py line` (`context_usage` відстає, AE S141).
 
 ### 2-б. Стиснення контексту і кеш (`CTX-1`; документація 08.10.2026 + замір QR-Lens CC-2)
 
