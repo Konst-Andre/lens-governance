@@ -12,7 +12,7 @@ LENS_PROFILE=1 сесії бачили лише прев'ю. Кожен рядо
   python3 profile_parts.py merge '<json>' — stdin: частина 2; аргумент: вивід інших гачків prompt (може бути порожнім) → один JSON
   python3 profile_parts.py test           — зуби: обидві частини ≤ CAP, разом ≡ повному тексту, різ по рядку
 """
-import json, os, sys
+import json, os, re, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PROFILE = os.path.join(HERE, "..", "PROFILE.md")
@@ -52,6 +52,16 @@ def merge(p2, other):
                        "additionalContext": p2 + ("\n\n" + ctx[:max(room, 0)] if ctx else "")}}, ensure_ascii=False)
 
 
+VER = re.compile(r"> версія: \*\*v\d+\*\* · \d\d\.\d\d\.\d{4} · аудит класу 2 — \d\d\.\d\d\.\d{4}")
+
+
+def version_ok(t):
+    """AE S141 (аудит пакет 1, обидві моделі; 5-й раз): історія версій росте в шапці. Рядок версії до першої «. » —
+    лише «**vN** · дата · аудит класу 2 — дата»; історія — kernel/Lens_AUDIT.md і git log."""
+    v = [l for l in t.splitlines() if l.startswith("> версія:")]
+    return len(v) == 1 and bool(VER.fullmatch(v[0].split(". ", 1)[0]))
+
+
 def test():
     t, bad = full(), 0
     p1, p2 = part(1, t), part(2, t)
@@ -61,6 +71,8 @@ def test():
               ("разом ≡ повному профілю (нічого не загублено)", a + b == t),
               ("різ — по межі рядка", a.endswith("\n") or not b),
               ("зуби: профіль 25 000 знаків → частина 2 понад стелю ловиться", len(part(2, "x\n" * 12500)) > CAP - 1500),
+              ("рядок версії — лише поточна версія (без історії в шапці)", version_ok(t)),
+              ("зуби: історія в рядку версії ловиться", not version_ok(t.replace("> версія: **v", "> версія: **v0** · 01.01.2026 (стара) · **v", 1))),
               ("merge: частина 2 + інший гачок → один JSON, обидва тексти", "ІНШЕ" in merge("P2", json.dumps({"hookSpecificOutput": {"additionalContext": "ІНШЕ"}})))]
     for name, ok in checks:
         bad += not ok; print(("✓ " if ok else "✗ ") + name)
