@@ -41,6 +41,17 @@
   M10–M11 — лише рядки з відомим віком: обрізаний клон (shallow) дає граничний коміт на все старше → такі рядки не міряються.
   M11 рецепт не чіпали > 180 днів → «звір зі світом» (платформи міняються; 180 — число агента S129, не замір; hve-core типово 90).
   M12 посилання A<N> / T<N> у томах і індексі кукбука (не в лотку delta_running) на рецепт, якого нема й не названо «зарезерв…» поруч з номером.
+  M13 копія між щосесійними файлами — те саме речення (≥ 3 спільні послідовності по 5 слів, тобто ≥ 7 слів поспіль) у двох різних файлах,
+     що приходять у кожну сесію: профіль (блок text у tools/claude-code/PROFILE.md) · CLAUDE.md ядра · CLAUDE.md репо · .claude/rules/*.md без
+     `paths:`; у ядрі ще й шаблон tools/claude-code/templates/CLAUDE_template.md (з нього народжуються нові CLAUDE.md). Дім — загальніший файл
+     (профіль → CLAUDE.md ядра → репо); свідомий виняток — `<!-- copy-ok: причина -->` у тому ж рядку. Плюс: правило з `paths:`, на яке не
+     вказує CLAUDE.md репо → ⚠ (вантажиться лише на Read · Write · Edit і `cat` / `head` одного файла, не на Grep — code.claude.com/docs/en/memory,
+     12.11.2026; агент, що лише грепає, правила не отримає). Ядра поруч нема (../lens-governance, /tmp/lens-governance, $LENS_KERNEL) → ⓘ, не ✓.
+     Чому (Konst AE S142: «дивно, що ми цього раніше не помічали»): Fable FAB-1 10.11 знайшов правило аудиту в 6 місцях і «іншу модель» у 5
+     (sessions/FAB-1/FAB-1_frame.md Б1 · Б3 · Б4) — рецепт дав, приладу ні; за 2 дні нічого не внесено, а CLAUDE.md AE переріс 20 тис. знаків.
+     Практика — w-shingling (Broder; «Mining of Massive Datasets» гл. 3: шингл 5–9 слів, менший дає хибні збіги — infolab.stanford.edu/~ullman/mmds/ch3.pdf,
+     12.11.2026); беремо шингли без minhash / LSH — файлів кілька, пряме порівняння миттєве. 5 — замір 12.11 на ядрі й AE:
+     8 слів ловив 7 копій, 5 — 21, хибних серед них 0 (переглянуто кожну); перефразоване правило не ловиться — і не має.
 Лише ⚠ (не блокує): один рядок для env_check; адреси — --list.
   python3 doc_health.py [<репо>] [--list] | selftest
 """
@@ -85,8 +96,57 @@ def scan(root):
     found += unchecked_rules(root)
     found += orphan_tools(root)
     found += cookbook(root)
+    found += copies(root)
     return found
 
+
+SH_N, SH_MIN = 5, 3
+def _kernel(root):
+    none = os.environ.get('LENS_KERNEL') == 'none'   # selftest: детерміновано — лише саме репо
+    for k in ((root,) if none else (os.environ.get('LENS_KERNEL', ''), root, os.path.join(root, '..', 'lens-governance'), '/tmp/lens-governance')):
+        if k and os.path.isfile(os.path.join(k, 'tools/claude-code/PROFILE.md')): return os.path.realpath(k)
+    return None
+
+def _units(path, text_block=False):
+    """(номер рядка, рядок) — без блоків коду; профіль — лише вміст блоку ```text."""
+    out, code = [], False
+    for i, l in enumerate(open(path, encoding='utf-8', errors='replace').read().split('\n'), 1):
+        if l.startswith('```'):
+            code = not code; continue
+        if code == text_block: out.append((i, l))
+    return out
+
+def _sh(l):
+    w = re.findall(r'\w+', re.sub(r'<!--.*?-->', '', l).lower())
+    return {' '.join(w[i:i + SH_N]) for i in range(len(w) - SH_N + 1)}
+
+def copies(root):
+    """M13: копії між файлами, що приходять у кожну сесію (правила — шапка файла)."""
+    k = _kernel(root); found = []
+    own = os.path.realpath(root) == k
+    src = []   # (ранг дому: менший — загальніший, ім'я, шлях, профіль?)
+    if k:
+        src += [(0, 'профіль', os.path.join(k, 'tools/claude-code/PROFILE.md'), True), (1, 'CLAUDE.md ядра', os.path.join(k, 'CLAUDE.md'), False)]
+        if own: src.append((2, 'шаблон CLAUDE.md', os.path.join(k, 'tools/claude-code/templates/CLAUDE_template.md'), False))
+    top_p = os.path.join(root, 'CLAUDE.md'); top = open(top_p, encoding='utf-8').read() if os.path.isfile(top_p) else ''
+    if not own and top: src.append((2, 'CLAUDE.md', top_p, False))
+    rd = os.path.join(root, '.claude', 'rules')
+    for f in sorted(os.listdir(rd)) if os.path.isdir(rd) else []:
+        if not f.endswith('.md'): continue
+        t = open(os.path.join(rd, f), encoding='utf-8').read()
+        if re.match(r'---\n(?:.*\n)*?paths:', t):
+            if f not in top: found.append(('M13', f'.claude/rules/{f}', 'правило з paths: — на нього не вказує CLAUDE.md (вантажиться лише на Read · Edit · cat, не на Grep)'))
+        else: src.append((2, f'.claude/rules/{f}', os.path.join(rd, f), False))
+    U = [(r, n, [(i, _sh(l)) for i, l in _units(p, prof) if 'copy-ok' not in l]) for r, n, p, prof in src if os.path.isfile(p)]
+    for a in range(len(U)):
+        for b in range(a + 1, len(U)):
+            (ra, na, ua), (rb, nb, ub) = U[a], U[b]
+            if not own and rb < 2: continue   # профіль ⟂ CLAUDE.md ядра — справа сесії ядра, не продукту
+            for i, sa in ub:
+                best = max(((len(sa & sb), j) for j, sb in ua if sa & sb), default=(0, 0))
+                if best[0] >= SH_MIN: found.append(('M13', f'{nb}:{i}', f'копія {na}:{best[1]} ({best[0]} збігів по {SH_N} слів) — дім: {na}, тут — вказівник'))
+    if not k: found.append(('ⓘ', '', 'ядра поруч нема — копії з профілем і CLAUDE.md ядра не міряно'))
+    return found
 
 REC = re.compile(r'(?m)^## ([AT]\d+)\.')
 PREC = re.compile(r'\*\*Прецедент')   # внутрішнє джерело — наш випадок (продукт · batch / сесія), не зовнішня сторінка: дата не обов'язкова (Konst AE S129, варіант Б — A45)
@@ -228,19 +288,18 @@ def line(root):
     f = scan(root)
     sh = subprocess.run(['git', 'rev-parse', '--is-shallow-repository'], cwd=root, capture_output=True, text=True).stdout.strip() == 'true'
     note = ' · ⓘ свіжість рецептів не міряна — клон обрізаний (git fetch --unshallow)' if sh and any('/cookbook/' in '/' + x for x in files(root)) else ''
-    if note: f = f + [('ⓘ', '', '')]
-    if f == [('ⓘ', '', '')]: return '✓', 'документи: ✓' + note
+    note += ''.join(' · ⓘ ' + x[2] for x in f if x[0] == 'ⓘ' and x[2])
     f = [x for x in f if x[0] != 'ⓘ']
-    if not f: return '✓', f'документи: ✓ щосесійні ≤ {M1_LINES} рядків і {M1_CHARS} знаків · старт ≤ {M2_KB} КБ · розділи ≤ {M3_KB} КБ · великі з маршрутом'
+    if not f: return '✓', f'документи: ✓ щосесійні ≤ {M1_LINES} рядків і {M1_CHARS} знаків · старт ≤ {M2_KB} КБ · розділи ≤ {M3_KB} КБ · великі з маршрутом · копій нема' + note
     by = {}
     for m, *_ in f: by[m] = by.get(m, 0) + 1
-    name = {'M1': 'щосесійні задовгі', 'M2': 'файли старту завеликі', 'M3': f'розділів > {M3_KB} КБ', 'M4': f'> {M4_KB} КБ без маршруту', 'M5': 'мертвих шляхів', 'M9': 'приладів без згадки', 'M6': 'черга відстала від самері', 'M7': 'мертвих адрес §', 'M8': 'правил без «Як перевірити»', 'M10': 'свіжих рецептів без дати джерела', 'M11': f'рецептів > {M11_DAYS} дн. без звірки', 'M12': 'посилань на неіснуючий рецепт'}
+    name = {'M1': 'щосесійні задовгі', 'M2': 'файли старту завеликі', 'M3': f'розділів > {M3_KB} КБ', 'M4': f'> {M4_KB} КБ без маршруту', 'M5': 'мертвих шляхів', 'M9': 'приладів без згадки', 'M6': 'черга відстала від самері', 'M7': 'мертвих адрес §', 'M8': 'правил без «Як перевірити»', 'M10': 'свіжих рецептів без дати джерела', 'M11': f'рецептів > {M11_DAYS} дн. без звірки', 'M13': 'копій між щосесійними', 'M12': 'посилань на неіснуючий рецепт'}
     worst = max((x for x in f if x[0] == 'M3'), key=lambda x: float(re.search(r'(\d+) КБ', x[2])[1]), default=None)
     return '⚠', 'документи: ' + ' · '.join(f'{name[m]} {n}' for m, n in sorted(by.items())) + (f' (найбільший — {worst[1]} {worst[2]})' if worst else '') + ' — деталі: doc_health.py --list' + note
 
 
 def selftest():
-    bad = 0; ENV = {}
+    bad = 0; ENV = {}; os.environ['LENS_KERNEL'] = 'none'
     def repo(fs):
         d = tempfile.mkdtemp(prefix='dh-'); subprocess.run(['git', 'init', '-q'], cwd=d, check=True)
         for f, t in fs.items():
@@ -284,6 +343,15 @@ def selftest():
               ('M10–M12: дати є · посилання живе · A9 зарезервовано → ✓', {C: '# Том\n## A1. Кнопка\nпара — A2; A9 — зарезервований номер\n(2026-11-05)\n## A2. Поле\nweb.dev, 05.11.2026\n'}, '✓', ''),
               ('M10: рецепт з «**Прецедент:**» (наш випадок) без дати → ✓ (Konst S129, варіант Б)', {C: '# Том\n## A1. Кнопка\nтекст\n**Прецедент:** Drive Lens Batch 26.\n'}, '✓', ''),
               ('M12: посилання на рецепт, якого нема → ⚠', {C: '# Том\n## A1. Кнопка\nдив. A77 · 05.11.2026\n'}, '⚠', 'посилань на неіснуючий рецепт 1')]
+    S = 'перед будь-якою правкою покажи план мікроскоп і дочекайся слова так від konst'
+    PR = {'tools/claude-code/PROFILE.md': '# Профіль\n```text\n· ' + S + '\n```\n'}
+    R = '---\npaths:\n  - "site/**"\n---\nправило\n'
+    cases += [('M13: речення профілю дослівно в CLAUDE.md ядра → ⚠', dict(PR, **{'CLAUDE.md': '- ' + S.capitalize() + '.\n'}), '⚠', 'копій між щосесійними 1'),
+              ('M13: те саме правило іншими словами → ✓', dict(PR, **{'CLAUDE.md': '- план і мікроскоп показати до правки; чекати згоди konst\n'}), '✓', ''),
+              ('M13: дослівно, але з <!-- copy-ok: причина --> → ✓', dict(PR, **{'CLAUDE.md': '- ' + S + ' <!-- copy-ok: тест -->\n'}), '✓', ''),
+              ('M13: правило з paths:, на яке не вказує CLAUDE.md → ⚠', {'CLAUDE.md': 'x\n', '.claude/rules/ui.md': R}, '⚠', 'копій між щосесійними 1'),
+              ('M13: правило з paths: і вказівник у CLAUDE.md → ✓', {'CLAUDE.md': 'UI — `.claude/rules/ui.md`\n', '.claude/rules/ui.md': R}, '✓', ''),
+              ('M13: ядра нема → ⓘ, не мовчазне ✓', {'CLAUDE.md': 'x\n'}, '✓', 'ⓘ ядра поруч нема')]
     for name, fs, want, part in cases:
         g, t = line(repo(fs)); ok = g == want and part in t
         print(('✓' if ok else '✗') + ' ' + name + ('' if ok else f' → {t}')); bad += not ok
