@@ -94,7 +94,7 @@ if [ "$ev" = SessionStart ] || [ "$ev" = profile-test ]; then
 fi
 # PreCompact (CTX-1, FAB-1 10.11.2026): stdout гачка Claude Code бере як інструкції для переказу при стисненні (code.claude.com/docs/en/hooks «PreCompact output»,
 #   10.11.2026; ≤ 10 000 знаків) — один файл ядра на всі репо замість розділу «Compact instructions» у кожному CLAUDE.md
-[ "$ev" = PreCompact ] && { cat > /dev/null; [ -f "$h/compact_instructions.txt" ] && cat "$h/compact_instructions.txt"; exit 0; }
+[ "$ev" = PreCompact ] && { LENS_HOOKS="$h" bash "$h/precompact_guard.sh"; exit $?; }   # AE S140 (FAB-2, «так» Konst): сторож «ревізія → /compact» — ручне стиснення з незакоміченим / незапушеним → вихід 2 (зупинено), авто — ніколи; інструкції переказу + факти git — його stdout
 case "$ev" in pre|PreToolUse) ev=pre;; post|PostToolUse) ev=post;; stop|Stop) ev=stop;; UserPromptSubmit) ev=prompt;; *) exit 0;; esac
 in="$(cat)"
 tool="$(printf '%s' "$in" | grep -o '"tool_name" *: *"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/')"
