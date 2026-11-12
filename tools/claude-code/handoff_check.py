@@ -114,6 +114,13 @@ def check_repo(repo, now=None):
     s0, st = section(text, r'^## §0'), starter(text)
     L.append(('✓' if s0 else '✗', f'{sm}: §0 ' + ('є' if s0 else 'нема (заголовок «## §0 …»)')))
     L.append(('✓' if st else '✗', 'стартове повідомлення ' + ('є (блок text)' if st else 'нема — блок ```text у самері')))
+    # (1-б) номер рішення двічі (AE S140: Fable і Opus паралельно в main взяли той самий В-348 — rebase злив обидва без конфлікту)
+    for dp in ('docs/DECISIONS.md', 'lens/DECISIONS.md'):
+        fp = os.path.join(repo, dp)
+        if not os.path.isfile(fp): continue
+        nums = re.findall(r'^- \*\*([ВB]-\d+)\*\*', open(fp, encoding='utf-8').read(), re.M)
+        dup = sorted({x for x in nums if nums.count(x) > 1})
+        if dup: L.append(('✗', f'{dp}: номер рішення двічі — {", ".join(dup)} (паралельні сесії взяли той самий; новіший → наступний вільний, посилання — теж)'))
     # (2) самері не відстає — логіка QR-Lens:tools/env_check.sh «самері відстає»
     last = git(repo, 'log', '-1', '--format=%H', '--', sm)
     tail = mine_tail()
@@ -370,6 +377,7 @@ def selftest():
         ('мертвий lens/X.md → ✗', mk(good.replace('правила — CLAUDE.md', 'план `lens/X.md`')), 'мертві шляхи'),
         ('адреса без https:// (dash.cloudflare.com/…) — не шлях → тиша', mk(good.replace('правила — CLAUDE.md', 'посилання dash.cloudflare.com/?to=/:account/x')), None),
         ('мертвий шлях у «Коротко» плану → ✗', mk(good, {'lens/A.md': '## 0. Коротко\n- `lens/Gone.md`\n'}), 'мертві шляхи'),
+        ('номер рішення двічі (В-348 ×2, AE S140) → ✗', mk(good, {'lens/DECISIONS.md': '- **В-348** · a\n- **В-348** · b\n- **В-347** · c\n'}), 'номер рішення двічі'),
         ('коміт агента після самері → ✗', mk(good, commit_after=True), 'самері відстає'),
         ('«цей коміт» у §0 → ⚠', mk(good.replace('- далі', '- цей коміт; далі')), '§0 має «цей коміт»'),
         ('нове самері ще не в коміті → бере його (без стартового → ✗)', mk(good, {'sessions/P_session_summary_Y.md': '## §0 В\n- `lens/A.md`\n'}, new_after=True), 'P_session_summary_Y'),
