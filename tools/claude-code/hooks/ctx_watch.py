@@ -10,11 +10,13 @@
 #     (AE S141): W 1 млн → 901 600 · W 450 тис. → 395 600 (effective_window 430 000).
 #   поріг ревізії R = T − найбільший крок − 15 000 (ціна самої ревізії). Крок — приріст контексту між двома `git commit` після останнього стиснення,
 #     не менше 55 000 (найбільший крок AE S141 — 55 400). Ⓘ «на межі предмета» — від min(250 000, R − 70 000).
-# Вироки: тиша · ⓘ межа предмета · ⚠ ревізія зараз · ⚠ кеш холодний (пауза > TTL при контексті ≥ 250 тис.: перший запит перепише кеш).
+# Вироки: на повідомлення Konst — завжди рядок «контекст · % вікна · ревізія на · стиснень у сесії» (з нього маркер, В-353) або ⓘ межа предмета · ⚠ ревізія зараз ·
+#   ⚠ кеш холодний (пауза > TTL при ≥ 250 тис.); після коміту — лише ⚠; лік стиснень (compact_boundary) ≥ 2 / ≥ 3 → вимога переїзду (вдень · вночі).
 # Запуск: echo '<json гачка>' | python3 ctx_watch.py hook   ·   python3 ctx_watch.py line [журнал]   ·   python3 ctx_watch.py selftest
 import datetime, glob, json, os, sys, time, tempfile
 
 RESERVE_OUT, STEP_MIN, REV_COST, SOFT, TTL_S = 20_000, 55_000, 15_000, 250_000, 3600
+CAP_DAY, CAP_NIGHT = 2, 3   # стиснень на сесію до переїзду: вдень · у нічну зміну (В-353, `tools/claude-code/CLAUDE_CODE.md` «Скільки стиснень»)
 
 def limits(env=os.environ):
     w = int(env.get('CLAUDE_CODE_AUTO_COMPACT_WINDOW') or 1_000_000); pct = int(env.get('CLAUDE_AUTOCOMPACT_PCT_OVERRIDE') or 92)
@@ -24,11 +26,11 @@ def ctx_of(u): return u.get('input_tokens', 0) + u.get('cache_creation_input_tok
 
 def read(path):
     """→ (останній запит (час, usage) | None, найбільший крок між комітами після останнього стиснення)."""
-    last, commits, seen = None, [], set(); read.boundary = {}
+    last, commits, seen = None, [], set(); read.boundary = {}; read.comp = 0
     for ln in open(path, encoding='utf-8', errors='replace'):
         try: r = json.loads(ln)
         except ValueError: continue
-        if r.get('subtype') == 'compact_boundary': last, commits, read.boundary = None, [], r.get('compactMetadata') or {}; continue
+        if r.get('subtype') == 'compact_boundary': last, commits, read.boundary = None, [], r.get('compactMetadata') or {}; read.comp += 1; continue
         if r.get('isSidechain'): continue
         m = r.get('message') if isinstance(r.get('message'), dict) else {}
         u = m.get('usage')
@@ -43,7 +45,13 @@ def read(path):
 def numbers(path, env=os.environ):
     last, step = read(path) if path and os.path.exists(path) else (None, 0)
     w, t = limits(env); step = max(step, STEP_MIN); r = t - step - REV_COST
-    return dict(last=last, ctx=ctx_of(last[1]) if last else 0, w=w, t=t, r=r, soft=min(SOFT, r - 70_000), step=step)
+    return dict(last=last, ctx=ctx_of(last[1]) if last else 0, w=w, t=t, r=r, soft=min(SOFT, r - 70_000), step=step, comp=getattr(read, 'comp', 0) if last or path else 0)
+
+def cap(n):
+    c = n['comp']
+    if c >= CAP_NIGHT: return f" · ⚠ стиснень {c} ≥ {CAP_NIGHT} — переїзд: вдень на найближчій межі предмета, вночі — на межі кроку (ревізія → ранковий звіт → стоп)"
+    if c >= CAP_DAY: return f" · стиснень {c} — вдень переїзд на найближчій межі предмета (вночі — до {CAP_NIGHT})"
+    return ''
 
 def verdict(n, now, event):
     if not n['last']: return None
@@ -55,9 +63,11 @@ def verdict(n, now, event):
     if event == 'UserPromptSubmit' and gap > ttl and ctx >= SOFT:
         return f"⚠ кеш холодний (пауза {gap / 60:.0f} хв > {ttl // 60}) · контекст {k(ctx)} — перший запит перепише його весь. Ревізію зроблено → нова сесія зі стартового; ні → коротка ревізія → /compact {tail}"
     if ctx >= n['r']:
-        return f"⚠ контекст {k(ctx)} ≥ порога ревізії — зараз: ревізія (усе в коміти, самері §0) → вдень запропонуй Konst /compact, вночі — далі за NIGHT_SHIFT §3 {tail}"
+        return f"⚠ контекст {k(ctx)} ≥ порога ревізії — зараз: ревізія (усе в коміти, самері §0) → вдень запропонуй Konst /compact, вночі — далі за NIGHT_SHIFT §3 {tail}" + cap(n)
     if event == 'UserPromptSubmit' and ctx >= n['soft']:
-        return f"ⓘ контекст {k(ctx)} — на найближчій межі предмета: ревізія → /compact {tail}"
+        return f"ⓘ контекст {k(ctx)} — на найближчій межі предмета: ревізія → /compact {tail}" + cap(n)
+    if event == 'UserPromptSubmit':   # В-353: рядок щоповідомлення — маркер навантаження береться з нього, без окремого виклику інструмента
+        return f"контекст {k(ctx)} · {ctx * 100 // n['w']}% вікна {k(n['w'])} · ревізія на {k(n['r'])} · стиснень у сесії {n['comp']} (ctx_watch)" + cap(n)
     return None
 
 def newest():
@@ -66,7 +76,7 @@ def newest():
 
 def line(path):
     n = numbers(path); k = lambda x: f'{x // 1000} тис.'
-    return f"контекст {k(n['ctx'])} · {n['ctx'] * 100 // n['w']}% вікна {k(n['w'])} · стиснення на {k(n['t'])} · ревізія на {k(n['r'])} (найбільший крок {k(n['step'])})"
+    return f"контекст {k(n['ctx'])} · {n['ctx'] * 100 // n['w']}% вікна {k(n['w'])} · стиснення на {k(n['t'])} · ревізія на {k(n['r'])} (найбільший крок {k(n['step'])}) · стиснень у сесії {n['comp']}"
 
 def hook(inp, now=None):
     ev = inp.get('hook_event_name') or 'UserPromptSubmit'
@@ -75,8 +85,8 @@ def hook(inp, now=None):
     if ev == 'SessionStart':
         if inp.get('source') != 'compact': return ''
         b, k = getattr(read, 'boundary', {}), lambda x: f'{x // 1000} тис.'
-        v = (f"Після стиснення ({b.get('trigger', '?')}): контекст {k(b.get('preTokens', 0))} → {k(b.get('postTokens', 0))} · " if b else 'Після стиснення: ') + \
-            f"наступне стиснення на {k(n['t'])}, ревізія на {k(n['r'])} (ctx_watch). Перша відповідь — звір переказ із самері §0 і допиши в §1 рядок «стиснення N: переказ ✓ / що загубив»."
+        v = (f"Після стиснення № {n['comp']} ({b.get('trigger', '?')}): контекст {k(b.get('preTokens', 0))} → {k(b.get('postTokens', 0))} · " if b else 'Після стиснення: ') + \
+            f"наступне стиснення на {k(n['t'])}, ревізія на {k(n['r'])} (ctx_watch). Перша відповідь — звір переказ із самері §0 і допиши в §1 рядок «стиснення N: переказ ✓ / що загубив»." + cap(n)
     else: v = verdict(n, now or time.time(), ev)
     return json.dumps({'hookSpecificOutput': {'hookEventName': ev, 'additionalContext': v}}, ensure_ascii=False) if v else ''
 
@@ -97,14 +107,19 @@ def selftest():
          limits(E)[1] == 395_600 and limits({'CLAUDE_AUTOCOMPACT_PCT_OVERRIDE': '92'})[1] == 901_600)
     os.environ.update(E)
     v = lambda p, ev='UserPromptSubmit', ago=0: verdict(numbers(p), T0 + ago, ev)
-    case('120 тис. — тиша', v(tr('a', [a(120_000)])) is None)
+    case('120 тис., повідомлення Konst — інформаційний рядок (маркер без виклику інструмента)', (v(tr('a', [a(120_000)])) or '').startswith('контекст 120 тис. · 26% вікна'))
+    case('120 тис. після коміту — тиша', v(tr('a2', [a(120_000)]), 'PostToolUse') is None)
     case('260 тис. — ⓘ межа предмета', (v(tr('b', [a(260_000)])) or '').startswith('ⓘ'))
     case('330 тис. (> 395,6 − 55 − 15 = 325,6) — ⚠ ревізія зараз', (v(tr('c', [a(330_000)])) or '').startswith('⚠ контекст'))
     p = tr('d', [a(100_000, commit=True), a(190_000, commit=True), a(300_000)])
     case('крок 90 тис. між комітами → поріг ревізії 290,6 тис.; 300 тис. — ⚠', numbers(p)['r'] == 290_600 and (v(p) or '').startswith('⚠ контекст'))
     p = tr('e', [a(100_000, commit=True), a(300_000, commit=True), {'type': 'system', 'subtype': 'compact_boundary'}, a(110_000, commit=True), a(120_000)])
-    case('після стиснення кроки рахуються наново; 120 тис. — тиша', numbers(p)['step'] == STEP_MIN and v(p) is None)
-    case('відповідь субагента (isSidechain) не рахується', v(tr('f', [a(120_000), a(390_000, side=True)])) is None)
+    case('після стиснення кроки рахуються наново; 120 тис. — без ⚠', numbers(p)['step'] == STEP_MIN and not (v(p) or '').startswith('⚠'))
+    case('відповідь субагента (isSidechain) не рахується', (v(tr('f', [a(120_000), a(390_000, side=True)])) or '').startswith('контекст 120 тис.'))
+    B = {'type': 'system', 'subtype': 'compact_boundary'}
+    case('2 стиснення — «переїзд на межі предмета»', 'стиснень 2 — вдень переїзд' in (v(tr('n', [a(300_000), B, a(300_000), B, a(120_000)])) or ''))
+    case('3 стиснення — ⚠ переїзд і вночі', '⚠ стиснень 3' in (v(tr('o', [B, B, B, a(120_000)])) or ''))
+    case('1 стиснення — без вимоги переїзду', 'переїзд' not in (v(tr('q', [B, a(120_000)])) or 'переїзд'))
     case('300 тис., пауза 70 хв — ⚠ кеш холодний', (v(tr('g', [a(300_000, ago=4200)])) or '').startswith('⚠ кеш холодний'))
     case('кеш 5 хв (кредити), пауза 6 хв — ⚠ кеш холодний', (v(tr('h', [a(300_000, ago=360, h1=False)])) or '').startswith('⚠ кеш холодний'))
     case('після коміту (PostToolUse): ⓘ мовчить, ⚠ каже', v(tr('i', [a(260_000)]), 'PostToolUse') is None and (v(tr('j', [a(330_000)]), 'PostToolUse') or '').startswith('⚠'))
@@ -113,9 +128,9 @@ def selftest():
     case('журналу нема — тиша', hook({'transcript_path': f'{d}/none.jsonl'}) == '')
     p = tr('m', [a(370_000), {'type': 'system', 'subtype': 'compact_boundary', 'compactMetadata': {'trigger': 'auto', 'preTokens': 371_723, 'postTokens': 14_494}}])
     o = hook({'hook_event_name': 'SessionStart', 'source': 'compact', 'transcript_path': p})
-    case('SessionStart compact: «371 тис. → 14 тис.», пороги, вимога рядка «стиснення N»', all(x in o for x in ('371 тис. → 14 тис.', 'ревізія на 325 тис.', 'стиснення N')))
+    case('SessionStart compact: «№ 1», «371 тис. → 14 тис.», пороги, вимога рядка «стиснення N»', all(x in o for x in ('№ 1', '371 тис. → 14 тис.', 'ревізія на 325 тис.', 'стиснення N')))
     case('SessionStart startup — тиша', hook({'hook_event_name': 'SessionStart', 'source': 'startup', 'transcript_path': p}) == '')
-    print(f'─── ctx_watch selftest: {15 - bad}/15 ───'); return 1 if bad else 0
+    print(f'─── ctx_watch selftest: {19 - bad}/19 ───'); return 1 if bad else 0
 
 if __name__ == '__main__':
     cmd = sys.argv[1] if len(sys.argv) > 1 else 'hook'
