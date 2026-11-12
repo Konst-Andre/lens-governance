@@ -168,6 +168,19 @@ def check(top, cmd):
         if not os.path.isfile(os.path.join(top, 'kernel/Lens_validate.py')) and not re.search(r'ядро:\s*\S', cmd):
             bad.append(f'новий прилад ({", ".join(os.path.basename(f) for f in tools)}) — у повідомленні коміту бракує рядка «ядро: …»: кандидат для інших продуктів '
                        f'(→ реєстр «Прилади продуктів» у lens-governance:tools/claude-code/CLAUDE_CODE.md, тим самим ходом) чи ні — й чому')
+    # 11. нова копія між щосесійними файлами (doc_health M13; S142, 💡 «так» Konst): коміт правки CLAUDE.md · профілю · шаблону · rules/*.md,
+    #     що лишає в ЗМІНЕНОМУ файлі копію загальнішого шару → ✗ одразу, а не на старті наступної сесії. Свідомий виняток — <!-- copy-ok: … -->
+    inst = {f for f in changed if f in ('CLAUDE.md', 'tools/claude-code/PROFILE.md', 'tools/claude-code/templates/CLAUDE_template.md') or re.match(r'\.claude/rules/[^/]+\.md$', f)}
+    if inst:
+        try:
+            sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__)))); import doc_health as dh
+            own = os.path.isfile(os.path.join(top, 'tools/claude-code/PROFILE.md'))
+            nm = {'CLAUDE.md ядра' if own else 'CLAUDE.md': 'CLAUDE.md', 'профіль': 'tools/claude-code/PROFILE.md', 'шаблон CLAUDE.md': 'tools/claude-code/templates/CLAUDE_template.md'}
+            for m, where, what in dh.copies(top):
+                if m != 'M13': continue
+                fn = where.rsplit(':', 1)[0]; fn = nm.get(fn, fn)
+                if fn in inst: bad.append(f'копія між щосесійними файлами (doc_health M13): {where} — {what}. Залиш вказівник на дім або познач <!-- copy-ok: причина -->')
+        except Exception: pass   # прилад ядра недоступний — сторож мовчить, M13 скаже на старті
     # 10. шапка наявного приладу змінилась, карта — ні (AE S104)
     head_re = re.compile(r'(Запуск|Usage|Вихід|живе доки)\s*:', re.I)
     for f in sorted(changed - added):
@@ -268,6 +281,15 @@ def selftest():
         g('rm', '-rq', 'tools', 'docs'); g('-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'clean')
         open(d + '/stray.txt', 'w').write('x')
         say(check(d, 'git add lens/a.md && git commit -m x') == [], 'нестежений файл, якого команда не додає → тиша (у коміт не піде)')
+        # 11 · нова копія між щосесійними файлами (S142)
+        S = 'перед будь-якою правкою покажи план мікроскоп і дочекайся слова так від konst'
+        os.environ['LENS_KERNEL'] = 'none'; os.makedirs(d + '/tools/claude-code/templates', exist_ok=True)
+        open(d + '/tools/claude-code/PROFILE.md', 'w').write('```text\n· ' + S + '\n```\n'); g('add', 'tools/claude-code/PROFILE.md'); g('-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'p')
+        open(d + '/CLAUDE.md', 'w').write('- ' + S + '\n')
+        say(any('M13' in x for x in check(d, "git add -A && git commit -m 'ядро: ні'")), 'CLAUDE.md з дослівною копією профілю → ✗ M13 (S142)')
+        open(d + '/CLAUDE.md', 'w').write('- ' + S + ' <!-- copy-ok: тест -->\n')
+        say(not any('M13' in x for x in check(d, "git add -A && git commit -m 'ядро: ні'")), 'та сама копія з copy-ok → тиша')
+        os.environ.pop('LENS_KERNEL', None)
     finally:
         shutil.rmtree(d)
     print(f'─── commit_files selftest: {ok}/{n} ───')

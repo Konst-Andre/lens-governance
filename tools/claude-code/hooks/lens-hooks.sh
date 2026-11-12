@@ -107,6 +107,7 @@ if [ "$ev" = SessionStart ] || [ "$ev" = profile-test ]; then
   # FAB-1 (10.11.2026): після паузи машини (resume) і при копії розмови (fork) профіль уже в розмові — позначку частини 2 не ставимо. Замір: за 2,5 год
   #   сесії частина 2 прийшла 5 разів при одній частині 1 (4 дублі по 3 899 знаків). Після стиснення (compact) повтор потрібен — лишається.
   #   source — code.claude.com/docs/en/hooks «SessionStart input» (startup · resume · clear · compact · fork), 10.11.2026.
+  [ "$ss_src" = compact ] && rm -f "${LENS_MARK_DIR:-/tmp}/lens-rules-${ss_sid:-nosession}-"* 2>/dev/null   # S142: переказ не несе правил з paths: — rules-guard дасть їх знову
   case "$ss_src" in resume|fork) exit 0 ;; esac
   case "$ss_src" in startup|"") env_all "${ss_sid:-nosession}" ;; esac
   md="${LENS_MARK_DIR:-/tmp}"
@@ -142,11 +143,14 @@ except Exception: print(0)' 2>/dev/null)"
 run() { out="$(printf '%s' "$in" | bash "$h/$1" $2 2>/dev/null)"; [ -n "$out" ] && { fire "${1%.sh}" "$out"; return 0; }; return 1; }
 case "$ev" in
   pre)
-    case "$tool" in Write|Edit|Bash) ;; *) exit 0;; esac
+    # S142 (Konst: «50 на 50, що агент знайде ui.md»): правило з paths: — текстом у контекст, коли виклик зачіпає його шляхи (rules-guard.py);
+    #   Read · Grep · Glob — лише сторож правил; Write · Edit · Bash — він останнім, щоб не затулити гачки, що блокують
+    case "$tool" in Write|Edit|Bash) ;; Read|Grep|Glob) o="$(printf '%s' "$in" | python3 "$h/rules-guard.py" pre 2>/dev/null)"; [ -n "$o" ] && fire rules-guard "$o"; exit 0;; *) exit 0;; esac
     for g in "brief-guard.sh pre" "ui-guard.sh check" "commit-gate.sh" "ui-review-gate.sh gate" "review-remind.sh stand"; do
       read -r f a <<<"$g"
       run "$f" "$a" && exit 0
-    done ;;
+    done
+    o="$(printf '%s' "$in" | python3 "$h/rules-guard.py" pre 2>/dev/null)"; [ -n "$o" ] && fire rules-guard "$o"; exit 0 ;;
   post)
     case "$tool" in Read|Bash|Grep|WebSearch|WebFetch) ;; *) exit 0;; esac
     printf '%s' "$in" | bash "$h/ui-guard.sh" mark 2>/dev/null
