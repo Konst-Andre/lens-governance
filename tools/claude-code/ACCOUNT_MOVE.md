@@ -24,7 +24,7 @@
 
 ## Перевірка, що все на місці (агент, перша сесія на новому акаунті)
 
-- профіль (лише 1-б): `bash tools/claude-code/hooks/lens-hooks.sh profile-test` → 2 × ✓, а в контексті сесії є блок «ПРОФІЛЬ KONST (з репо ядра…)»;
+- профіль (лише 1-б): `bash tools/claude-code/hooks/lens-hooks.sh profile-test` → кожен рядок ✓, жодного ✗, а в контексті сесії є блок «ПРОФІЛЬ KONST (з репо ядра…)»;
 
 - `bash tools/env_check.sh` у репо проєкту → рядок `env:` — `github=200` · `cloudflare` · `CLOUDFLARE_API_TOKEN=так` · `GH_TOKEN=так`;
 - гачки живі: `ls ~/.claude/settings.json` і `bash <ядро>/tools/claude-code/hooks/handoff-remind.sh selftest`;
