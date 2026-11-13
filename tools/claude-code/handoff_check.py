@@ -229,11 +229,23 @@ def check_repo(repo, now=None):
     return name, L
 
 
+def hook_crashes(sid, path=None):
+    """Падіння гачків цієї сесії: диспетчер пише stderr гачків у /tmp/lens-hook-errors-<сесія>.log, гачки друкують traceback замість тиші.
+    Є «Traceback» → ✗ з останнім рядком помилки (виправити гачок + тест, рядок «пропуск» у журналі гачків)."""
+    f = path or f'/tmp/lens-hook-errors-{sid}.log'
+    if not os.path.isfile(f): return []
+    t = open(f, encoding='utf-8', errors='replace').read()
+    n = t.count('Traceback (most recent call last)')
+    if not n: return []
+    last = [l for l in t.splitlines() if re.match(r'^\w*(Error|Exception)\b', l)][-1:] or ['?']
+    return [('✗', f'гачки падали {n} раз(и) — останнє: {last[0][:160]} → {f}; виправ гачок + тест, рядок «пропуск» у журналі гачків, тоді очисти файл')]
+
 def hooks_journal(repos):
     """HOOK-5: спрацювання гачків цієї сесії (/tmp/lens-hooks-<сесія>.tsv, пише диспетчер) мають вердикти в журналі ядра."""
     sid = re.sub(r'[^A-Za-z0-9_-]', '', os.environ.get('CLAUDE_CODE_SESSION_ID', ''))
     log = f'/tmp/lens-hooks-{sid}.tsv' if sid else ''
-    if not log or not os.path.isfile(log): return [('ⓘ', 'журнал гачків: спрацювань цієї сесії не записано (лог диспетчера порожній)')]
+    crash = hook_crashes(sid)   # AE S143: впалий гачок мовчить — без цього рядка падіння виглядає як «нема що сказати»
+    if not log or not os.path.isfile(log): return crash + [('ⓘ', 'журнал гачків: спрацювань цієї сесії не записано (лог диспетчера порожній)')]
     rows = [l.split('\t') for l in open(log, encoding='utf-8', errors='replace') if l.strip()]
     by = {}
     for r in rows:
@@ -245,8 +257,8 @@ def hooks_journal(repos):
     msg = 'гачки цієї сесії спрацювали: ' + ' · '.join(f'{h} {n}' for h, n in sorted(by.items()))
     if not k: return [('⚠', msg + ' — журнал гачків не знайдено (ядра нема ні поруч, ні в /tmp/lens-governance): склонувати ядро й записати вердикти')]
     seen = tail and ('session_' + tail[:8]) in open(k, encoding='utf-8').read()
-    if seen: return [('✓', msg + ' — вердикти в журналі гачків є')]
-    return [('✗', msg + f' — вердиктів нема: розібрати (справжнє · хибне · дубль · пропуск) у tools/claude-code/hooks/HOOK_JOURNAL.md §1, ідентифікатор `session_{tail[:8] if tail else "?"}`; хибне чи пропуск — виправити гачок + тест')]
+    if seen: return crash + [('✓', msg + ' — вердикти в журналі гачків є')]
+    return crash + [('✗', msg + f' — вердиктів нема: розібрати (справжнє · хибне · дубль · пропуск) у tools/claude-code/hooks/HOOK_JOURNAL.md §1, ідентифікатор `session_{tail[:8] if tail else "?"}`; хибне чи пропуск — виправити гачок + тест')]
 
 # Ріст журналу (Konst 10.10: «хто контролює, наскільки виріс файл?»): §1 — лише живі рядки (≤ 30 дн.), рядок — коротко (деталь — у коміті),
 # файл ≤ 24 КБ (читається точково, але §0 + свіжий §1 — за один погляд). Старше → ротація в теку journal/ поруч, лічильники — у §0.
@@ -489,6 +501,9 @@ def selftest():
               ('revision: той самий HEAD удруге (once) → тиша', t2 == ''),
               ('gate: незакомічене → ✗; чисте → нічого', any('незакомічене' in x for x in gate(rd)) and not any('незакомічене' in x for x in gate(rg))),
               ('gate: клон лише для читання (.git/lens-readonly) не судиться', gate(ro) == [])]
+    ef = os.path.join(rg, 'err.log'); open(ef, 'w').write('DeprecationWarning: x\n')
+    c0 = hook_crashes('x', ef); open(ef, 'a').write('Traceback (most recent call last):\n  File "h"\nKeyError: \'tool_input\'\n'); c1 = hook_crashes('x', ef)
+    rcases.append(('гачок впав (Traceback у журналі помилок) → ✗ з KeyError; лише попередження → тиша (AE S143)', c0 == [] and c1 and c1[0][0] == '✗' and 'KeyError' in c1[0][1]))
     os.environ.pop('LENS_REV_MARK')
     for name, ok in rcases:
         print(('✓' if ok else '✗') + ' ' + name); bad += not ok

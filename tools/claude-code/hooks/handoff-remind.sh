@@ -20,7 +20,7 @@ mode="${1:-run}"
 [ "$mode" = selftest ] && HOOK_IN="{}" || HOOK_IN="$(cat)"
 export HOOK_IN HC="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/handoff_check.py"
 python3 - "$mode" <<'PY'
-import json, os, re, subprocess, sys, tempfile, glob
+import json, os, re, subprocess, sys, tempfile, glob, time
 STOP_TRIG = re.compile(r"переїжджаємо|переїжджай\w*", re.I)   # Stop: лише оголошення агента, не згадка слова
 REV = re.compile(r"\bревізі[яюї]\b|\bзвір\w*\s+пам.?ят\w*|\bзвірк\w+\s+пам.?ят\w*", re.I)   # ревізія пам'яті без переїзду (AE S109)
 TRIG = re.compile(r"переїжджаємо|переїжджай\w*|переїхати|переїдемо|стартов\w+\s+повідомлен\w*|\bнов[ау]\s+сесі[яю]\b", re.I)   # лише команди: «переїжджаємо / переїхати / стартове / нову сесію»; іменник «переїзд» — розповідь (тричі хибне 10.10), «переїжджає» — опис (G6 «переїжджає в скрипт», хибне 10.10 QR CC-7) — журнал гачків §1
@@ -101,14 +101,31 @@ def selftest():
     ok = run(D('боюсь, що в новій сесії агент нічого не зрозуміє, а гачок перед переїздом перевіряє документи. Бо переїзд це по суті кінець сесії', mid, 's5'), [t], t) is None
     print(('✓' if ok else '✗') + ' «в новій сесії» · «перед переїздом» у розповіді (хибне 09.10) → тиша'); bad += not ok
     S = lambda m, a=False, s='p1': {'last_assistant_message': m, 'stop_hook_active': a, 'session_id': s}
-    for name, d, want in [('Stop: агент дає стартове, є ✗ → block', S('Переїжджаємо. ```text\nСтарт: …\n```'), True),
+    # REV-2 (AE S143): ревізія при переїзді — машиною. Свої коміти — за трейлером тестової сесії T
+    os.environ['CLAUDE_CODE_REMOTE_SESSION_ID'] = 'cse_T'; rm = os.environ['LENS_REV_MARK']
+    open(os.path.join(r, 'tool.py'), 'w').write('x'); sh('git', 'add', '-A'); sh('git', 'commit', '-qm', 'прилад\n\nClaude-Session: https://claude.ai/code/session_T')
+    hh = subprocess.run(['git', '-C', r, 'log', '-1', '--format=%h', '--abbrev=7'], capture_output=True, text=True).stdout.strip()
+    TB = '| що | дім | коміт |\n|---|---|---|\n| прилад | tool.py | ' + hh + ' |\n'
+    MV = 'Переїжджаємо. ```text\nСтарт: …\n```\n'
+    if os.path.exists(rm): os.remove(rm)
+    o = stop(S(MV + TB, s='v1'), [t], t); ok = o is not None and 'REV-2' in o and 'ревізії після останнього коміту не було' in o
+    print(('✓' if ok else '✗') + ' Stop REV-2: стартове без мітки ревізії → block'); bad += not ok
+    open(rm, 'w').close(); os.utime(rm, (time.time() - 99999, time.time() - 99999))
+    o = stop(S(MV + TB, s='v2'), [t], t); ok = o is not None and 'ревізії після останнього коміту' in o
+    print(('✓' if ok else '✗') + ' Stop REV-2: мітка старша за останній коміт → block'); bad += not ok
+    open(rm, 'w').close()
+    o = stop(S(MV, s='v3'), [t], t); ok = o is not None and 'таблиці ревізії' in o and hh in o
+    print(('✓' if ok else '✗') + ' Stop REV-2: свіжа мітка, без таблиці й без коміту сесії → block з обома'); bad += not ok
+    o = stop(S(MV + TB, s='v4'), [t], t); ok = o is None or 'REV-2' not in o
+    print(('✓' if ok else '✗') + ' Stop REV-2: свіжа мітка + таблиця + кожен коміт сесії → пропускає'); bad += not ok
+    for name, d, want in [('Stop: агент дає стартове, є ✗ → block', S(MV + TB), True),
                           ('Stop: звичайна відповідь → тиша', S('Готово, коміт abc.', s='p2'), False),
                           ('Stop: «переїжджає» в описі (межа G6 переїжджає в скрипт) → тиша', S('Стара межа G6 переїжджає в новий скрипт.', s='p4'), False),
                           ('Stop: повтор через гачок (stop_hook_active) → тиша', S('```text\nx\n```', True, 'p3'), False),
                           ('Stop: блок text — промпт моделі, не стартове → тиша (хибне AE S139)', S('Чернетка промпту:\n```text\nYou are an auditor. Read files.\n```', s='p6'), False),
                           ('Stop: блок text — завдання іншій сесії («гачок старту», «самері … §0»), не стартове → тиша (хибне AE S140)', S('Текст для Fable:\n```text\nПрофіль — з репо ядра (гачок старту).\nЗАВДАННЯ: docs/fab/FAB2_TASK.md.\nКонтекст: самері docs/summary/X.md §0.\n```', s='p7'), False),
                           ('Stop: «стартове повідомлення» в реченні, без блоку — не переїзд → тиша (хибне AE S93)', S('Стартове повідомлення оновлю в самері.', s='p5'), False)]:
-        out = stop(d, [t], t); ok = (out is not None and '✗' in out) == want
+        out = stop(d, [t], t); ok = (out is not None and 'HOOK-3.2' in out) == want
         print(('✓' if ok else '✗') + ' ' + name); bad += not ok
     # HOOK-3.3: 💡 на переїзді (пропуск Konst AE S136) — самері тестового репо без рядка 💡
     IDEA = 'Переїжджаємо. ```text\nСтарт\n💡 чекає вироку Konst: нема\n```\n💡 **Пропоную:** зробити одну сторінку-мапу продукту простими словами з перевіреної карти.'
@@ -199,6 +216,39 @@ def idea_missing(msg, rs):
             if '💡' in line and len(words & {w.lower() for w in WORD.findall(line)}) >= 2: return None
     return first[:200]
 
+TABLE = re.compile(r'\|\s*що\s*\|\s*дім\s*\|\s*коміт\s*\|', re.I)   # заголовок таблиці ревізії «що · дім · коміт»
+def rev_mark():
+    sid = re.sub(r'\W', '', os.environ.get('CLAUDE_CODE_SESSION_ID') or os.environ.get('CLAUDE_CODE_REMOTE_SESSION_ID') or 'x')
+    return os.environ.get('LENS_REV_MARK') or f'/tmp/lens-revision-{sid}'   # та сама мітка, що handoff_check.py rev_mark()
+def session_commits(r):
+    """Коміти цієї сесії (трейлер Claude-Session ≡ CLAUDE_CODE_REMOTE_SESSION_ID), крім тих, що правили самері: вони записані самим комітом."""
+    sid = os.environ.get('CLAUDE_CODE_REMOTE_SESSION_ID', ''); tail = sid.split('_', 1)[1] if '_' in sid else ''
+    if not tail: return []
+    out = subprocess.run(['git', '-C', r, 'log', '--format=%h', '--abbrev=7', f'--grep=session_{tail}'], capture_output=True, text=True).stdout.split()
+    keep = []
+    for h in out:
+        fs = subprocess.run(['git', '-C', r, 'show', '--name-only', '--format=', h], capture_output=True, text=True).stdout.split()
+        if any(re.search(r'(^docs/summary/|^sessions/.*summary)', f, re.I) for f in fs): continue   # коміт правив самері — записаний ним самим (свій хеш у самері вписати не може)
+        keep.append(h)
+    return keep
+def rev_gap(msg, rs):
+    """REV-2 (Konst AE S143: «ревізія при переїзді — машиною, щоб моя ревізія = твоя»): відповідь-переїзд пропускається, лише коли
+    (а) мітка ревізії (handoff_check.py revision) свіжіша за останній коміт репо сесії; (б) у відповіді є таблиця «що · дім · коміт»;
+    (в) кожен коміт сесії (крім тих, що правили самері) згаданий у відповіді або в самері репо. Звірка з фактами git, не з заявою агента
+    (практика: Stop-гачок, що перевіряє стан, а не слова — codingwithroby «The Stop Hook That Won't Let Claude Lie to You», 13.11.2026)."""
+    gaps = []
+    m = rev_mark(); last = max((int(subprocess.run(['git', '-C', r, 'log', '-1', '--format=%ct'], capture_output=True, text=True).stdout.strip() or 0) for r in rs), default=0)
+    if not os.path.exists(m) or os.path.getmtime(m) < last:
+        gaps.append('ревізії після останнього коміту не було → python3 lens-governance/tools/claude-code/handoff_check.py revision (✗ — виправ, коміт, push, ще раз)')
+    if not TABLE.search(msg):
+        gaps.append('у відповіді нема таблиці ревізії «| що | дім | коміт |» — кожне рішення · прилад · правило сесії з домом і комітом')
+    mem = msg + ''.join(open(f, encoding='utf-8').read() for f in filter(None, (latest_summary(r) for r in rs)))
+    miss = [f'{os.path.basename(r)} {h}' for r in rs for h in session_commits(r) if h not in mem]
+    if miss:
+        gaps.append(f'коміти сесії без запису ні в таблиці, ні в самері — {len(miss)}: ' + ' · '.join(miss[:10]) + (' …' if len(miss) > 10 else '')
+                    + ' → кожен у таблицю (що · дім) або рядком §1 самері')
+    return gaps
+
 def stop(d, roots, mark_dir='/tmp'):
     """Stop: переїзд оголошує агент (стартове чи «переїжджаємо» у відповіді) — є ✗ → block, щоб виправив до кінця ходу."""
     if d.get('stop_hook_active'): return None
@@ -210,6 +260,10 @@ def stop(d, roots, mark_dir='/tmp'):
     if gap: return ("Гачок «💡 на переїзді» (HOOK-3.3, Stop): ти оголошуєш переїзд і даєш «💡 Пропоную: " + gap + "…», а ні стартове, ні §0 самері не мають рядка «💡 …» з нею.\n"
                     "Запиши в самері §0 і в стартове рядок «💡 чекає вироку Konst: <суть> — не як прийняту» (AE CLAUDE.md «Самері», Konst S135), закоміть і запуш, тоді стартове. "
                     "Konst не мусить повертатись у закриту сесію, щоб сказати «запиши».")
+    rg = rev_gap(msg, rs)   # REV-2: ревізія при переїзді — машиною (блок щоразу; stop_hook_active рятує від кола)
+    if rg: return ("Гачок «ревізія при переїзді» (REV-2, Stop): ти даєш стартове, а ревізія не доведена —\n· " + '\n· '.join(rg) +
+                   "\nЗроби ревізію з виводу handoff_check (не з пам'яті), закоміть, запуш і дай у відповіді таблицю «що · дім · коміт», тоді стартове. "
+                   "Якщо це не переїзд — одним рядком скажи це й заверши.")
     mark = os.path.join(mark_dir, 'lens-handoff-stop-' + re.sub(r'\W', '', d.get('session_id') or 'x'))
     h = heads(rs)
     if os.path.exists(mark) and open(mark).read() == h: return None
@@ -224,12 +278,12 @@ mode = sys.argv[1]
 if mode == 'selftest': sys.exit(selftest())
 if mode == 'post':
     try: out = post(json.loads(os.environ.get('HOOK_IN') or '{}'), ['/home/user'])
-    except Exception: out = None
+    except Exception: __import__('traceback').print_exc(); out = None
     if out: print(json.dumps({'hookSpecificOutput': {'hookEventName': 'PostToolUse', 'additionalContext': out}}, ensure_ascii=False))
     sys.exit(0)
 if mode == 'stop':
     try: out = stop(json.loads(os.environ.get('HOOK_IN') or '{}'), ['/home/user'])
-    except Exception: out = None
+    except Exception: __import__('traceback').print_exc(); out = None
     if out: print(json.dumps({'decision': 'block', 'reason': out}, ensure_ascii=False))
     sys.exit(0)
 try:
@@ -237,7 +291,7 @@ try:
     roots = ['/home/user']
     out = run(d, roots)
 except Exception:
-    out = None
+    __import__('traceback').print_exc(); out = None
 if out:
     print(json.dumps({'hookSpecificOutput': {'hookEventName': 'UserPromptSubmit', 'additionalContext': out}}, ensure_ascii=False))
 PY

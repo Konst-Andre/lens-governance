@@ -50,7 +50,7 @@ sys.path.insert(0, os.environ.get("H", ""))
 try:
     import commit_files
 except Exception:
-    commit_files = None
+    __import__('traceback').print_exc(); commit_files = None   # AE S143: без нього сторож коміту слабшає мовчки — тепер слід у журналі помилок
 for dd in dict.fromkeys(dirs):
     top = subprocess.run(["git", "-C", dd, "rev-parse", "--show-toplevel"], capture_output=True, text=True).stdout.strip()
     if not top: continue

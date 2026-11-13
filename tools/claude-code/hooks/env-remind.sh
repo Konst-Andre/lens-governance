@@ -73,6 +73,6 @@ def selftest():
 if sys.argv[1] == 'selftest': sys.exit(selftest())
 ev = 'PostToolUse' if sys.argv[1] == 'post' else 'UserPromptSubmit'
 try: out = (post if ev == 'PostToolUse' else run)(json.loads(os.environ.get('HOOK_IN') or '{}'))
-except Exception: out = None
+except Exception: __import__('traceback').print_exc(); out = None
 if out: print(json.dumps({'hookSpecificOutput': {'hookEventName': ev, 'additionalContext': out}}, ensure_ascii=False))
 PY

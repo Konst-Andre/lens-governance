@@ -138,4 +138,4 @@ if __name__ == '__main__':
     a = sys.argv[1:]
     if a and a[0] == 'selftest': sys.exit(selftest())
     try: pre(json.load(sys.stdin))
-    except Exception: pass   # сторож не ламає виклик
+    except Exception: __import__('traceback').print_exc();   # сторож не ламає виклик, але падіння — у журнал помилок

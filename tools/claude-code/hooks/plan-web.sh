@@ -49,6 +49,7 @@ def verdict(d):
                 f"({rc[0]}), а рядка синтезу нема. Допиши рядком: «рецепт ⟂ світ ⟂ замір → рішення» — що каже рецепт, що каже пошук, "
                 "що показав замір цього екрана, і що беремо / де робимо краще за рецепт (тоді онови рецепт). Рецепт згаданий лише як довідка — «рецепт не стосується: …».")
     if SKIP.search(msg): return None
+    if not d.get('transcript_path'): return None   # AE S143: без шляху до розмови — тиша, не падіння (журнал помилок гачків)
     L = [json.loads(l) for l in open(os.path.expanduser(d['transcript_path']), encoding='utf-8') if l.strip()]
     idx = [i for i, x in enumerate(L) if real_user(x)]
     for x in L[(idx[-1] if idx else 0):]:
@@ -91,6 +92,6 @@ if sys.argv[1] == 'selftest': sys.exit(selftest())
 try:
     out = verdict(json.loads(os.environ.get('HOOK_IN') or '{}'))
 except Exception:
-    out = None
+    __import__('traceback').print_exc(); out = None
 if out: print(json.dumps({'decision': 'block', 'reason': out}, ensure_ascii=False))
 PY

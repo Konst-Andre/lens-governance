@@ -127,6 +127,7 @@ case "$ev" in pre|PreToolUse) ev=pre;; post|PostToolUse) ev=post;; stop|Stop) ev
 in="$(cat)"
 tool="$(printf '%s' "$in" | grep -o '"tool_name" *: *"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/')"
 sid="$(printf '%s' "$in" | grep -o '"session_id" *: *"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/' | tr -cd 'A-Za-z0-9_-')"
+E="/tmp/lens-hook-errors-${sid:-nosession}.log"   # AE S143: падіння гачка — не тиша; stderr гачків сюди, handoff_check рахує «Traceback» → ✗ (було 2>/dev/null: впалий гачок виглядав як «нема що сказати»)
 # журнал спрацювань (HOOK-5, 10.10.2026): кожна відповідь гачка — рядок у /tmp/lens-hooks-<сесія>.tsv (час · подія · гачок · суть);
 # на переїзді handoff_check рахує їх і вимагає вердикти в tools/claude-code/hooks/HOOK_JOURNAL.md (справжнє · хибне · дубль · пропуск)
 fire() {   # $1 — гачок, $2 — його вивід (не порожній)
@@ -140,29 +141,29 @@ except Exception: print(0)' 2>/dev/null)"
   printf '%s\t%s\t%s\t%s\n' "$(date -u +%FT%TZ)" "$ev" "$1" "$(printf '%s' "$2" | tr '\n\t' '  ' | sed 's/"permissionDecisionReason": *"//;s/"reason": *"//;s/"additionalContext": *"//' | cut -c1-200)" >> "/tmp/lens-hooks-${sid:-nosession}.tsv" 2>/dev/null
   printf '%s\n' "$2"
 }
-run() { out="$(printf '%s' "$in" | bash "$h/$1" $2 2>/dev/null)"; [ -n "$out" ] && { fire "${1%.sh}" "$out"; return 0; }; return 1; }
+run() { out="$(printf '%s' "$in" | bash "$h/$1" $2 2>>"$E")"; [ -n "$out" ] && { fire "${1%.sh}" "$out"; return 0; }; return 1; }
 case "$ev" in
   pre)
     # S142 (Konst: «50 на 50, що агент знайде ui.md»): правило з paths: — текстом у контекст, коли виклик зачіпає його шляхи (rules-guard.py);
     #   Read · Grep · Glob — лише сторож правил; Write · Edit · Bash — він останнім, щоб не затулити гачки, що блокують
-    case "$tool" in Write|Edit|Bash) ;; Read|Grep|Glob) o="$(printf '%s' "$in" | python3 "$h/rules-guard.py" pre 2>/dev/null)"; [ -n "$o" ] && fire rules-guard "$o"; exit 0;; *) exit 0;; esac
+    case "$tool" in Write|Edit|Bash) ;; Read|Grep|Glob) o="$(printf '%s' "$in" | python3 "$h/rules-guard.py" pre 2>>"$E")"; [ -n "$o" ] && fire rules-guard "$o"; exit 0;; *) exit 0;; esac
     for g in "brief-guard.sh pre" "ui-guard.sh check" "commit-gate.sh" "ui-review-gate.sh gate" "review-remind.sh stand"; do
       read -r f a <<<"$g"
       run "$f" "$a" && exit 0
     done
-    o="$(printf '%s' "$in" | python3 "$h/rules-guard.py" pre 2>/dev/null)"; [ -n "$o" ] && fire rules-guard "$o"; exit 0 ;;
+    o="$(printf '%s' "$in" | python3 "$h/rules-guard.py" pre 2>>"$E")"; [ -n "$o" ] && fire rules-guard "$o"; exit 0 ;;
   post)
     case "$tool" in Read|Bash|Grep|WebSearch|WebFetch) ;; *) exit 0;; esac
-    printf '%s' "$in" | bash "$h/ui-guard.sh" mark 2>/dev/null
+    printf '%s' "$in" | bash "$h/ui-guard.sh" mark 2>>"$E"
     # після коміту — два нагадування можуть збігтись (огляд UI · бриф, BRIEF-2 19.10.2026): одне повідомлення, обидва тексти
-    o1="$(printf '%s' "$in" | bash "$h/review-remind.sh" post 2>/dev/null)"; o2="$(printf '%s' "$in" | bash "$h/brief-guard.sh" post 2>/dev/null)"
+    o1="$(printf '%s' "$in" | bash "$h/review-remind.sh" post 2>>"$E")"; o2="$(printf '%s' "$in" | bash "$h/brief-guard.sh" post 2>>"$E")"
     po=""   # AE S141: вивід збирається в одне повідомлення — після коміту до нього додається рядок ctx_watch (один JSON на подію)
     [ -n "$o1" ] && [ -z "$o2" ] && po="$(fire review-remind "$o1")"
     [ -z "$o1" ] && [ -n "$o2" ] && po="$(fire brief-guard "$o2")"
     [ -n "$o1" ] && [ -n "$o2" ] && po="$(fire "review-remind+brief-guard" "$(python3 -c 'import json,sys; a,b=(json.loads(x)["hookSpecificOutput"] for x in sys.argv[1:3]); print(json.dumps({"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":a["additionalContext"]+"\n\n"+b["additionalContext"]}},ensure_ascii=False))' "$o1" "$o2")")"
     [ -z "$o1" ] && [ -z "$o2" ] && [ "$tool" = Bash ] && po="$(run handoff-remind.sh post || run env-remind.sh post)"
     # AE S141 (В-352): після кожного `git commit` — ctx_watch: ⚠, коли контекст ≥ порога ревізії (крок нічної зміни закінчується комітом, а повідомлень Konst уночі нема)
-    c=""; [ "$tool" = Bash ] && c="$(printf '%s' "$in" | python3 "$h/ctx_watch.py" hook 2>/dev/null)"; [ -n "$c" ] && po="$(mrg "$po" "$(fire ctx-watch "$c")")"
+    c=""; [ "$tool" = Bash ] && c="$(printf '%s' "$in" | python3 "$h/ctx_watch.py" hook 2>>"$E")"; [ -n "$c" ] && po="$(mrg "$po" "$(fire ctx-watch "$c")")"
     [ -n "$po" ] && printf '%s\n' "$po" ;;   # + пам'ять після коміту (AE S109): нові ✗ / ⚠ handoff_check   # коміт змінив аркуш середовища → запропонувати оновити (ENV-1)
   stop)   # перший з відповіддю перемагає: гачок пам'яті, перевірка перед переїздом (HOOK-3.2), «план без світу» (HOOK-2.5)
     # тінь (FAB-1, 10.11.2026): кандидат на заміну memory-guard — перевірка рядка «пам'ять: …» проти стану git. Лише пише вирок у
@@ -177,7 +178,7 @@ a,b=sys.argv[1],sys.argv[2]
 if not a.strip(): print(b); sys.exit()
 x=json.loads(a); y=json.loads(b); h=x.setdefault("hookSpecificOutput",{"hookEventName":"UserPromptSubmit"})
 h["additionalContext"]=(h.get("additionalContext","")+"\n\n"+y["hookSpecificOutput"]["additionalContext"]).strip(); print(json.dumps(x,ensure_ascii=False))' "$o" "$r" 2>/dev/null || printf '%s' "$o")"
-    c="$(printf '%s' "$in" | python3 "$h/ctx_watch.py" hook 2>/dev/null)"; [ -n "$c" ] && o="$(mrg "$o" "$(fire ctx-watch "$c")")"   # AE S141 (В-352): контекст ≥ порогів ревізії / кеш холодний
+    c="$(printf '%s' "$in" | python3 "$h/ctx_watch.py" hook 2>>"$E")"; [ -n "$c" ] && o="$(mrg "$o" "$(fire ctx-watch "$c")")"   # AE S141 (В-352): контекст ≥ порогів ревізії / кеш холодний
     ef="${LENS_ENV_DIR:-/tmp}/lens-env-${sid:-nosession}.txt"   # FAB-1: ⚠ / ✗ env_check кожного репо, зібрані на старті (env_all) — раз, у перше повідомлення
     if [ -s "$ef" ]; then
       o="$(python3 -c 'import json,sys

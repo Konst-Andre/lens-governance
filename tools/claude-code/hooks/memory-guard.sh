@@ -51,6 +51,7 @@ def real_user(x):
 
 def verdict(d):
     if d.get('stop_hook_active'): return None
+    if not d.get('transcript_path'): return None   # AE S143: без шляху до розмови — тиша, не падіння (журнал помилок гачків)
     L = [json.loads(l) for l in open(os.path.expanduser(d['transcript_path']), encoding='utf-8') if l.strip()]
     idx = [i for i, x in enumerate(L) if real_user(x)]
     if not idx: return None
@@ -138,5 +139,5 @@ try:
     r = verdict(json.loads(os.environ.get('HOOK_IN') or '{}'))
     if r: print(json.dumps({'decision': 'block', 'reason': r}, ensure_ascii=False))
 except Exception:
-    pass
+    __import__('traceback').print_exc();
 PY

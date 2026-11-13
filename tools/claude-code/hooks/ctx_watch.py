@@ -102,7 +102,7 @@ def hook(inp, now=None):
     if ev == 'SessionStart':
         if inp.get('source') != 'compact': return ''
         b, k = getattr(read, 'boundary', {}), lambda x: f'{x // 1000} тис.'
-        v = (f"Після стиснення № {n['comp']} ({b.get('trigger', '?')}): контекст {k(b.get('preTokens', 0))} → {k(b.get('postTokens', 0))} · " if b else 'Після стиснення: ') + \
+        v = (f"Після стиснення № {n['comp']} ({b.get('trigger', '?')}): контекст {k(b.get('preTokens', 0))} → {k(b.get('postTokens', 0))} (лише переказ; з системою, правилами й профілем — більше, справжнє число — у рядку ctx_watch після першої відповіді; AE S143: застосунок показав 88 тис.) · " if b else 'Після стиснення: ') + \
             f"наступне стиснення на {k(n['t'])}, ревізія на {k(n['r'])} (ctx_watch). Перша відповідь — звір переказ із самері §0 і допиши в §1 рядок «стиснення N: переказ ✓ / що загубив»." + cap(n)
         try: os.remove(_hc().rev_mark())   # REV-1: мітка «ревізію зроблено» — до стиснення; після нього для ручного /compact потрібна нова
         except (OSError, ImportError): pass
