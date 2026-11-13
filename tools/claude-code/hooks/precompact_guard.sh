@@ -70,11 +70,14 @@ Claude-Session: https://claude.ai/code/session_TESTSID" && git push -q origin HE
   ( cd "$t/w/repoA" && git push -q origin HEAD 2>/dev/null ); e=$(run manual); say $([ "$e" = 0 ] && echo 1) "запушено → 0"
   touch "$t/w/repoA/.git/lens-readonly"; echo y > "$t/w/repoA/z"; e=$(run manual); say $([ "$e" = 0 ] && echo 1) "клон лише для читання (lens-readonly) не судиться → 0"
   # S143 (тест Konst): `/compact` пройшов, бо обгортка в ~/.claude/settings.json закінчувалась «|| true» і ковтала вихід 2. Тест — справжнім шляхом виклику:
-  printf '#!/bin/bash\nexit 2\n' > "$t/fake.sh"
+  # команда з settings.json (шаблон §3 ENVIRONMENT.md і живий) → обгортка ~/.claude/lens-hooks.sh → підставний диспетчер з виходом 2
+  printf '#!/bin/bash\nexit 2\n' > "$t/fake.sh"; sed -n "/^cat > ~\/.claude\/lens-hooks.sh <<'SH'/,/^SH$/p" "$(dirname "$me")/../ENVIRONMENT.md" | sed '1d;$d' > "$t/wrap.sh"
   for s in "$(dirname "$me")/../ENVIRONMENT.md" "$HOME/.claude/settings.json"; do [ -f "$s" ] || continue
-    c="$(grep -o '"PreCompact":\[{"hooks":\[{"type":"command","command":"[^"]*"' "$s" | sed 's/.*"command":"//; s/"$//')"
-    [ -n "$c" ] || continue; e=$(bash -c "${c//\/home\/user\/lens-governance\/tools\/claude-code\/hooks\/lens-hooks.sh/$t/fake.sh}" </dev/null >/dev/null 2>&1; echo $?)
-    say "$([ "$e" = 2 ] && echo 1)" "обгортка PreCompact ($(basename "$s")) пропускає вихід 2 — «/compact» справді зупиняється"; done
+    for ev in PreCompact Stop; do c="$(grep -o "\"$ev\":\[{\"hooks\":\[{\"type\":\"command\",\"command\":\"[^\"]*\"" "$s" | sed 's/.*"command":"//; s/"$//')"
+      w="$t/wrap.sh"; [ "$(basename "$s")" = settings.json ] && w="$HOME/.claude/lens-hooks.sh"
+      e=$(LENS_HOOKS_SH="$t/fake.sh" bash -c "${c//\~\/.claude\/lens-hooks.sh/$w}" </dev/null >/dev/null 2>&1; echo $?)
+      want=0; [ $ev = PreCompact ] && want=2
+      say "$([ -n "$c" ] && [ "$e" = $want ] && echo 1)" "обгортка $ev ($(basename "$s")): вихід диспетчера 2 → $want ($([ $want = 2 ] && echo '«/compact» справді зупиняється' || echo 'збій гачка Konst не блокує'))"; done; done
   echo "─── precompact_guard selftest: $([ $bad = 0 ] && echo 11+обгортки || echo є ✗) ───"; return $bad
 }
 if [ "${1:-}" = selftest ]; then selftest; else guard; fi

@@ -25,17 +25,38 @@ CLAUDE_CODE_AUTO_COMPACT_WINDOW=450000
 - Навички ядра (`/night`) ставить не setup script, а диспетчер `hooks/lens-hooks.sh` на старті (`tools/claude-code/skills/`).
 - `GH_TOKEN` руками не ставити: доступ до GitHub дає під'єднаний GitHub (п.3б там же).
 
-## 3 · Setup script (поле «Setup script»), v3
+## 3 · Setup script (поле «Setup script»), v4 (13.11.2026: обгортка у файлі, PreCompact пропускає вихід 2; рядки ≤ 200 байт — межа поля)
 
 ```bash
-# Гачки Lens v3 (09.10.2026): 9 подій → диспетчер ядра; ядро — серед репо сесії або в /tmp/lens-governance (гачки діють і в сесії лише з продуктом)
-pip install -q shellcheck-py 2>/dev/null || true   # shellcheck для сторожа коміту (commit_files.py п.8), 22.10.2026
-[ -d /home/user/lens-governance ] || [ -d /tmp/lens-governance ] || git clone -q --depth 1 https://github.com/Konst-Andre/lens-governance /tmp/lens-governance || true
+# Гачки Lens v4 (13.11.2026): 9 подій → обгортка ~/.claude/lens-hooks.sh → диспетчер ядра
+# Ядро — серед репо сесії або в /tmp/lens-governance (гачки діють і в сесії лише з продуктом)
+pip install -q shellcheck-py 2>/dev/null || true   # shellcheck для сторожа коміту, 22.10.2026
+K=https://github.com/Konst-Andre/lens-governance
+[ -d /home/user/lens-governance ] || [ -d /tmp/lens-governance ] || git clone -q --depth 1 $K /tmp/lens-governance || true
 mkdir -p ~/.claude
+# Обгортка: збій гачка не блокує Konst (вихід 0), крім PreCompact — його вихід 2 = «стиснення зупинено» (AE S143)
+cat > ~/.claude/lens-hooks.sh <<'SH'
+f=${LENS_HOOKS_SH:-/home/user/lens-governance/tools/claude-code/hooks/lens-hooks.sh}
+[ -f "$f" ] || f=/tmp/lens-governance/tools/claude-code/hooks/lens-hooks.sh
+[ -f "$f" ] || exit 0
+bash "$f" "$1"; e=$?
+[ "$1" = PreCompact ] && exit $e
+exit 0
+SH
 cat > ~/.claude/settings.json <<'JSON'
-{"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"f=/home/user/lens-governance/tools/claude-code/hooks/lens-hooks.sh; [ -f $f ] || f=/tmp/lens-governance/tools/claude-code/hooks/lens-hooks.sh; [ -f $f ] && bash $f SessionStart || true"}]}],"UserPromptSubmit":[{"hooks":[{"type":"command","command":"f=/home/user/lens-governance/tools/claude-code/hooks/lens-hooks.sh; [ -f $f ] || f=/tmp/lens-governance/tools/claude-code/hooks/lens-hooks.sh; [ -f $f ] && bash $f UserPromptSubmit || true"}]}],"PreToolUse":[{"hooks":[{"type":"command","command":"f=/home/user/lens-governance/tools/claude-code/hooks/lens-hooks.sh; [ -f $f ] || f=/tmp/lens-governance/tools/claude-code/hooks/lens-hooks.sh; [ -f $f ] && bash $f PreToolUse || true"}]}],"PostToolUse":[{"hooks":[{"type":"command","command":"f=/home/user/lens-governance/tools/claude-code/hooks/lens-hooks.sh; [ -f $f ] || f=/tmp/lens-governance/tools/claude-code/hooks/lens-hooks.sh; [ -f $f ] && bash $f PostToolUse || true"}]}],"PostToolUseFailure":[{"hooks":[{"type":"command","command":"f=/home/user/lens-governance/tools/claude-code/hooks/lens-hooks.sh; [ -f $f ] || f=/tmp/lens-governance/tools/claude-code/hooks/lens-hooks.sh; [ -f $f ] && bash $f PostToolUseFailure || true"}]}],"Stop":[{"hooks":[{"type":"command","command":"f=/home/user/lens-governance/tools/claude-code/hooks/lens-hooks.sh; [ -f $f ] || f=/tmp/lens-governance/tools/claude-code/hooks/lens-hooks.sh; [ -f $f ] && bash $f Stop || true"}]}],"SubagentStop":[{"hooks":[{"type":"command","command":"f=/home/user/lens-governance/tools/claude-code/hooks/lens-hooks.sh; [ -f $f ] || f=/tmp/lens-governance/tools/claude-code/hooks/lens-hooks.sh; [ -f $f ] && bash $f SubagentStop || true"}]}],"PreCompact":[{"hooks":[{"type":"command","command":"f=/home/user/lens-governance/tools/claude-code/hooks/lens-hooks.sh; [ -f $f ] || f=/tmp/lens-governance/tools/claude-code/hooks/lens-hooks.sh; [ -f $f ] || exit 0; bash $f PreCompact"}]}],"SessionEnd":[{"hooks":[{"type":"command","command":"f=/home/user/lens-governance/tools/claude-code/hooks/lens-hooks.sh; [ -f $f ] || f=/tmp/lens-governance/tools/claude-code/hooks/lens-hooks.sh; [ -f $f ] && bash $f SessionEnd || true"}]}]}}
+{"hooks":{
+"SessionStart":[{"hooks":[{"type":"command","command":"bash ~/.claude/lens-hooks.sh SessionStart"}]}],
+"UserPromptSubmit":[{"hooks":[{"type":"command","command":"bash ~/.claude/lens-hooks.sh UserPromptSubmit"}]}],
+"PreToolUse":[{"hooks":[{"type":"command","command":"bash ~/.claude/lens-hooks.sh PreToolUse"}]}],
+"PostToolUse":[{"hooks":[{"type":"command","command":"bash ~/.claude/lens-hooks.sh PostToolUse"}]}],
+"PostToolUseFailure":[{"hooks":[{"type":"command","command":"bash ~/.claude/lens-hooks.sh PostToolUseFailure"}]}],
+"Stop":[{"hooks":[{"type":"command","command":"bash ~/.claude/lens-hooks.sh Stop"}]}],
+"SubagentStop":[{"hooks":[{"type":"command","command":"bash ~/.claude/lens-hooks.sh SubagentStop"}]}],
+"PreCompact":[{"hooks":[{"type":"command","command":"bash ~/.claude/lens-hooks.sh PreCompact"}]}],
+"SessionEnd":[{"hooks":[{"type":"command","command":"bash ~/.claude/lens-hooks.sh SessionEnd"}]}]
+}}
 JSON
-```
+
 
 ## 4 · Інструменти, які ставить setup script
 
