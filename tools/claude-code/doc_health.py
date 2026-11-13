@@ -54,6 +54,11 @@
      переглянуто): шингл 5 і поріг 4 — 8 справжніх, 0 хибних; поріг 3 — ще 2 справжніх і 2 хибних (усталений зворот «у звіті одразу після «що ти
      побачиш»» — 7 слів; перелік тих самих шляхів-вказівників); порівняння трьох способів на стані «до» (294c7c5): звичайні слова · поріг 4 — 14 справжніх, 0 хибних;
      бектик одним словом · поріг 3 — 3–4 хибних і 4 пропуски; заглушка замість бектика — губить копії, де код щільно в тексті. Перефраз і збіг ≤ 7 слів не ловить.
+  M14 копія щосесійного шару (як у M13) у будь-якому документі репо (.md з git ls-files) — ⚠: шар і так приходить щосесії, тут вказівник.
+  M15 дослівний дубль між двома документами — ⓘ у рядку (старий борг; дім — назвати одному), перелік — --list. Обидва — без знімків і журналів
+     (SNAP: самері, аудит, рішення, черга, журнал гачків, файли з датою в імені, archive/ · sessions/ · site/), без `коду`, шляхів і заголовків
+     (вказівник на дім — не копія). Сторож коміту commit_files п. 12 — ✗ на нову копію в доданих рядках. Замір 13.11 (AE S143): ядро — M14 8 · M15 65,
+     AE — M14 6 · M15 38; хибні до зрізу шляхів — 12 (усі «`шлях` «розділ»»), після — 0 у вибірці 9 з 14. Konst AE S143: «думав, що він працює на весь репо».
 Лише ⚠ (не блокує): один рядок для env_check; адреси — --list.
   python3 doc_health.py [<репо>] [--list] | selftest
 """
@@ -99,6 +104,7 @@ def scan(root):
     found += orphan_tools(root)
     found += cookbook(root)
     found += copies(root)
+    found += spread(root)
     return found
 
 
@@ -148,6 +154,66 @@ def copies(root):
                 best = max(((len(sa & sb), j) for j, sb in ua if sa & sb), default=(0, 0))
                 if best[0] >= SH_MIN: found.append(('M13', f'{nb}:{i}', f'копія {na}:{best[1]} ({best[0]} збігів по {SH_N} слів) — дім: {na}, тут — вказівник'))
     if not k: found.append(('ⓘ', '', 'ядра поруч нема — копії з профілем і CLAUDE.md ядра не міряно'))
+    return found
+
+# M14 · M15 (AE S143, Konst: «думав, що він працює на весь репозиторій — і на продукт, і на ядро»): M13 бачив лише щосесійні файли, а копії профілю
+# в REPO_FRAME.md і CLAUDE_CODE.md знайшов лише аудит за $25. Тепер — кожен документ репо (.md з git ls-files), крім знімків і журналів, де цитата — норма.
+# Практика: mdsmith MDS037 (pkg.go.dev/github.com/jeduden/mdsmith, 04.2026; звірено 13.11.2026) — ті самі 5-слівні шматки з нормалізацією; MinHash / LSH не беремо
+# (корпус малий, прохід 0,2 с), поріг «80 % абзацу» — теж ні: шукаємо дослівний фрагмент ≥ 8 слів усередині різних рядків, не абзац-двійник.
+SNAP = re.compile(r'(^|/)(archive|sessions|node_modules|\.audit_tmp|site|docs/(summary|audit|fab|e2e)|hooks/journal)/'   # історія · звіти · дані Олі
+                  r'|(AUDIT|DECISIONS|CHERGA|HOOK_JOURNAL|_HISTORY|_INDEX|_delta_running)[^/]*\.md$|SUMMARY|summary'
+                  r'|20\d\d-\d\d-\d\d|(^|/)review_v\d+\.md$')   # дата в імені — знімок дня, не правило; review_vN — нотатки огляду примірки
+def _docs(root):
+    out = subprocess.run(['git', '-c', 'core.quotePath=false', 'ls-files', '--', '*.md'], cwd=root, capture_output=True, text=True).stdout.split('\n')
+    return [f for f in out if f and not SNAP.search(f)]
+
+def _layers(root):
+    """Щосесійні шари (як у M13): профіль · CLAUDE.md ядра · CLAUDE.md репо · .claude/rules без paths:. (ім'я, шлях, профіль?)"""
+    k = _kernel(root); own = k and os.path.realpath(root) == k; L = []
+    if k: L += [('профіль', os.path.join(k, 'tools/claude-code/PROFILE.md'), True), ('CLAUDE.md ядра', os.path.join(k, 'CLAUDE.md'), False)]
+    if not own and os.path.isfile(os.path.join(root, 'CLAUDE.md')): L.append(('CLAUDE.md', os.path.join(root, 'CLAUDE.md'), False))
+    rd = os.path.join(root, '.claude', 'rules')
+    for f in sorted(os.listdir(rd)) if os.path.isdir(rd) else []:
+        p = os.path.join(rd, f)
+        if f.endswith('.md') and not re.match(r'---\n(?:.*\n)*?paths:', open(p, encoding='utf-8').read()): L.append((f'.claude/rules/{f}', p, False))
+    return [x for x in L if os.path.isfile(x[1])]
+
+def _shp(l):
+    """Шматки для M14 · M15: без `коду в бектиках`, шляхів і заголовків — посилання на дім і є бажаний вказівник, не копія (калібрування AE S143:
+    «`tools/claude-code/templates/AUDIT_template.md` «Коли і скільки»» у 4 файлах давало хибне M14)."""
+    if l.lstrip().startswith('#'): return set()
+    return _sh(re.sub(r'`[^`]*`|\S*[\w-]/\S*|\S+\.(md|py|sh|mjs|js|json|html)\b', ' ', l))
+
+def spread(root, only=None):
+    """M14 — копія щосесійного шару в будь-якому документі репо (⚠: шар і так у контексті щосесії — тут вказівник).
+    M15 — дослівний дубль між двома документами (ⓘ у рядку старту, перелік — --list: старий борг, дім — назвати одному з двох).
+    only = {файл: {номери рядків}} — лише ці рядки (сторож коміту: додані рядки диффу)."""
+    import collections
+    lay = _layers(root); lp = {os.path.realpath(p) for _, p, _ in lay}
+    idx = collections.defaultdict(set)
+    for n, p, prof in lay:
+        for i, l in _units(p, prof):
+            if 'copy-ok' not in l:
+                for s in _shp(l): idx[s].add((n, i))
+    docs = [f for f in _docs(root) if os.path.realpath(os.path.join(root, f)) not in lp]
+    U = {f: [(i, _shp(l)) for i, l in _units(os.path.join(root, f)) if 'copy-ok' not in l] for f in docs if os.path.isfile(os.path.join(root, f))}
+    di = collections.defaultdict(set)
+    for f, us in U.items():
+        for i, sh in us:
+            for s in sh: di[s].add((f, i))
+    found = []
+    for f, us in U.items():
+        if only is not None and f not in only: continue
+        for i, sh in us:
+            if only is not None and i not in only[f]: continue
+            c = collections.Counter(h for s in sh for h in idx.get(s, ()))
+            if c and c.most_common(1)[0][1] >= SH_MIN:
+                (n, j), m = c.most_common(1)[0]
+                found.append(('M14', f'{f}:{i}', f'копія {n}:{j} ({m} збігів по {SH_N} слів) — шар і так приходить щосесії: тут вказівник або <!-- copy-ok: причина -->')); continue
+            d = collections.Counter(h for s in sh if len(di[s]) <= 30 for h in di[s] if h[0] != f)   # > 30 місць — шаблонна фраза, не копія правила
+            if d and d.most_common(1)[0][1] >= SH_MIN:
+                (g, j), m = d.most_common(1)[0]
+                if only is not None or (f, i) < (g, j): found.append(('M15', f'{f}:{i}', f'дубль {g}:{j} ({m} збігів по {SH_N} слів) — одне правило, один дім: другому — вказівник'))
     return found
 
 REC = re.compile(r'(?m)^## ([AT]\d+)\.')
@@ -291,11 +357,13 @@ def line(root):
     sh = subprocess.run(['git', 'rev-parse', '--is-shallow-repository'], cwd=root, capture_output=True, text=True).stdout.strip() == 'true'
     note = ' · ⓘ свіжість рецептів не міряна — клон обрізаний (git fetch --unshallow)' if sh and any('/cookbook/' in '/' + x for x in files(root)) else ''
     note += ''.join(' · ⓘ ' + x[2] for x in f if x[0] == 'ⓘ' and x[2])
-    f = [x for x in f if x[0] != 'ⓘ']
+    m15 = sum(x[0] == 'M15' for x in f)
+    if m15: note += f' · ⓘ дублів між документами {m15} (M15 — doc_health.py --list)'
+    f = [x for x in f if x[0] not in ('ⓘ', 'M15')]
     if not f: return '✓', f'документи: ✓ щосесійні ≤ {M1_LINES} рядків і {M1_CHARS} знаків · старт ≤ {M2_KB} КБ · розділи ≤ {M3_KB} КБ · великі з маршрутом · копій нема' + note
     by = {}
     for m, *_ in f: by[m] = by.get(m, 0) + 1
-    name = {'M1': 'щосесійні задовгі', 'M2': 'файли старту завеликі', 'M3': f'розділів > {M3_KB} КБ', 'M4': f'> {M4_KB} КБ без маршруту', 'M5': 'мертвих шляхів', 'M9': 'приладів без згадки', 'M6': 'черга відстала від самері', 'M7': 'мертвих адрес §', 'M8': 'правил без «Як перевірити»', 'M10': 'свіжих рецептів без дати джерела', 'M11': f'рецептів > {M11_DAYS} дн. без звірки', 'M13': 'копій між щосесійними', 'M12': 'посилань на неіснуючий рецепт'}
+    name = {'M1': 'щосесійні задовгі', 'M2': 'файли старту завеликі', 'M3': f'розділів > {M3_KB} КБ', 'M4': f'> {M4_KB} КБ без маршруту', 'M5': 'мертвих шляхів', 'M9': 'приладів без згадки', 'M6': 'черга відстала від самері', 'M7': 'мертвих адрес §', 'M8': 'правил без «Як перевірити»', 'M10': 'свіжих рецептів без дати джерела', 'M11': f'рецептів > {M11_DAYS} дн. без звірки', 'M13': 'копій між щосесійними', 'M14': 'копій щосесійного шару в документах', 'M12': 'посилань на неіснуючий рецепт'}
     worst = max((x for x in f if x[0] == 'M3'), key=lambda x: float(re.search(r'(\d+) КБ', x[2])[1]), default=None)
     return '⚠', 'документи: ' + ' · '.join(f'{name[m]} {n}' for m, n in sorted(by.items())) + (f' (найбільший — {worst[1]} {worst[2]})' if worst else '') + ' — деталі: doc_health.py --list' + note
 
@@ -355,6 +423,11 @@ def selftest():
               ('M13: правило з paths: і вказівник у CLAUDE.md → ✓', {'CLAUDE.md': 'UI — `.claude/rules/ui.md`\n', '.claude/rules/ui.md': R}, '✓', ''),
               ('M13: спільний зворот 7 слів у різних правилах → ✓', dict(PR, **{'CLAUDE.md': '- тривога cloudflare у звіті одразу після «що ти побачиш» першою\n', 'tools/claude-code/PROFILE.md': '```text\n· рядки frame_check у звіті одразу після «що ти побачиш» з пропозицією\n```\n'}), '✓', ''),
               ('M13: ядра нема → ⓘ, не мовчазне ✓', {'CLAUDE.md': 'x\n'}, '✓', 'ⓘ ядра поруч нема')]
+    cases += [('M14: речення профілю дослівно в документі репо (не щосесійному) → ⚠', dict(PR, **{'tools/G.md': '- ' + S + '\n'}), '⚠', 'копій щосесійного шару в документах 1'),
+              ('M14: те саме в знімку (самері, журнал, файл з датою) → ✓', dict(PR, **{'docs/summary/P_SUMMARY_2026-11-13.md': '- ' + S + '\n', 'docs/AUDIT.md': S + '\n', 'docs/e/R_2026-11-13.md': S + '\n'}), '✓', ''),
+              ('M14: лише вказівник-шлях на дім (`tools/claude-code/PROFILE.md` «ЦИКЛ») → ✓', dict(PR, **{'tools/G.md': '- цикл — `tools/claude-code/PROFILE.md` «ЦИКЛ ПЛАНУВАННЯ», тут не повторюємо\n'}), '✓', ''),
+              ('M14: дослівно з <!-- copy-ok: причина --> → ✓', dict(PR, **{'tools/G.md': '- ' + S + ' <!-- copy-ok: повна версія -->\n'}), '✓', ''),
+              ('M15: те саме речення у двох документах → ⓘ (не ⚠: старий борг)', {'tools/A.md': '- кожен крок звіряти з журналом рішень і писати причину в коміт\n', 'tools/B.md': 'кожен крок звіряти з журналом рішень і писати причину в коміт\n'}, '✓', 'ⓘ дублів між документами 1')]
     for name, fs, want, part in cases:
         g, t = line(repo(fs)); ok = g == want and part in t
         print(('✓' if ok else '✗') + ' ' + name + ('' if ok else f' → {t}')); bad += not ok

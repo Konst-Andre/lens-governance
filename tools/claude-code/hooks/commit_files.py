@@ -34,6 +34,9 @@
      від приладу. Правка тіла без шапки — тиша (шапку міняють, коли міняється що міряє чи як кликати). Подія: AE S104 — описи змінених приладів
      двічі за сесію правились руками. Практика: перевірка за диффом рядків використання → документ у тому ж коміті (borghei «doc-drift-detector»,
      bjornmelin «docs-align», 24.10.2026); хмарні ШІ-сервіси звірки (DriftGuard) не беремо — потрібна локальна перевірка до коміту.
+  11. нова копія між щосесійними файлами (doc_health M13) у зміненому CLAUDE.md · профілі · шаблоні · rules/*.md (AE S142).
+  12. нова копія в ДОДАНИХ рядках будь-якого .md репо, крім знімків і журналів (doc_health M14 — копія щосесійного шару ·
+     M15 — дубль іншого документа; AE S143). Старий борг файла не блокує; свідомий виняток — <!-- copy-ok: причина --> у рядку.
 Не беремо з pre-commit-hooks: пробіли й кінці файлів (шум у диффах даних), no-commit-to-branch (ми свідомо комітимо в main),
 submodules (їх нема).
 
@@ -181,6 +184,21 @@ def check(top, cmd):
                 fn = where.rsplit(':', 1)[0]; fn = nm.get(fn, fn)
                 if fn in inst: bad.append(f'копія між щосесійними файлами (doc_health M13): {where} — {what}. Залиш вказівник на дім або познач <!-- copy-ok: причина -->')
         except Exception: pass   # прилад ядра недоступний — сторож мовчить, M13 скаже на старті
+    # 12. нова копія в будь-якому документі репо (doc_health M14 · M15; AE S143, Konst: «щоб працював на весь репозиторій — і на продукт, і на ядро»):
+    #     лише ДОДАНІ рядки змінених .md (старий борг чужих комітів не блокує — він на старті ⚠ M14 / ⓘ M15); знімки й журнали — поза (SNAP).
+    mds = [f for f in changed if f.endswith('.md')]
+    if mds:
+        try:
+            sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__)))); import doc_health as dh
+            only = {}
+            for f in mds:
+                if dh.SNAP.search(f): continue
+                diff = subprocess.run(['git', '-C', top, 'diff', '-U0', 'HEAD', '--', f], capture_output=True, text=True).stdout
+                if not diff: diff = '@@ -0,0 +1,%d @@' % len(open(os.path.join(top, f), encoding='utf-8', errors='replace').read().split('\n'))   # новий файл
+                only[f] = {n for a, b in re.findall(r'^@@ [^+]*\+(\d+)(?:,(\d+))? @@', diff, re.M) for n in range(int(a), int(a) + int(b if b != '' else 1))}
+            for m, where, what in dh.spread(top, only) if only else []:
+                bad.append(f'нова копія в документі (doc_health {m}): {where} — {what}')
+        except Exception: pass   # прилад ядра недоступний — сторож мовчить, M14 скаже на старті
     # 10. шапка наявного приладу змінилась, карта — ні (AE S104)
     head_re = re.compile(r'(Запуск|Usage|Вихід|живе доки)\s*:', re.I)
     for f in sorted(changed - added):
@@ -289,6 +307,17 @@ def selftest():
         say(any('M13' in x for x in check(d, "git add -A && git commit -m 'ядро: ні'")), 'CLAUDE.md з дослівною копією профілю → ✗ M13 (S142)')
         open(d + '/CLAUDE.md', 'w').write('- ' + S + ' <!-- copy-ok: тест -->\n')
         say(not any('M13' in x for x in check(d, "git add -A && git commit -m 'ядро: ні'")), 'та сама копія з copy-ok → тиша')
+        # 12 · нова копія в документі репо (AE S143)
+        g('add', '-A'); g('-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'c')
+        os.makedirs(d + '/tools/x', exist_ok=True); open(d + '/tools/x/G.md', 'w').write('# Г\nсвоє правило приладу\n')
+        g('add', '-A'); g('-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'g')
+        open(d + '/tools/x/G.md', 'a').write('- ' + S + '\n')
+        say(any('M14' in x for x in check(d, "git add -A && git commit -m 'ядро: ні'")), 'документ репо: доданий рядок — копія профілю → ✗ M14 (AE S143)')
+        g('add', '-A'); g('-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'old')
+        open(d + '/tools/x/G.md', 'a').write('- інший рядок без копії\n')
+        say(not any('M14' in x for x in check(d, "git add -A && git commit -m 'ядро: ні'")), 'стара копія в файлі, доданий рядок чистий → тиша (борг — на старті)')
+        os.makedirs(d + '/docs/summary', exist_ok=True); open(d + '/docs/summary/P_SUMMARY_2026-11-13.md', 'w').write('- ' + S + '\n')
+        say(not any('M14' in x for x in check(d, "git add -A && git commit -m 'ядро: ні'")), 'копія в самері (знімок) → тиша')
         os.environ.pop('LENS_KERNEL', None)
     finally:
         shutil.rmtree(d)
