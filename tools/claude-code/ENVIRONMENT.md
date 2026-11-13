@@ -20,7 +20,7 @@ LENS_PROFILE=1
 CLAUDE_CODE_AUTO_COMPACT_WINDOW=450000
 ```
 
-- `LENS_PROFILE=1` — профіль з репо (`tools/claude-code/PROFILE.md`) кладе гачок старту. **З 22.10.2026 — і на своєму акаунті** (рішення `ACC-1`, `tools/claude-code/ACCOUNT_MOVE.md`): у полі акаунта тоді лише ядро (6 рядків).
+- `LENS_PROFILE=1` — профіль з репо (`tools/claude-code/PROFILE.md`) кладе гачок старту. **З 22.10.2026 — і на своєму акаунті** (рішення `ACC-1`, `tools/claude-code/ACCOUNT_MOVE.md`): у полі акаунта тоді лише ядро (6 рядків). <!-- copy-ok: перелік змінних; дім рішення — ACCOUNT_MOVE.md ACC-1 -->
 - `CLAUDE_CODE_AUTO_COMPACT_WINDOW=450000` — **лише руками в Settings** (з сесії `update_environment` відхиляє: змінна керує сесією; AE S141) — межа автостиснення 450 тис. токенів (типово в хмарі 1 млн); стиснення спрацьовує на 92 % від (межа − 20 тис.) = 395,6 тис. — 92 ставить платформа (`CLAUDE_AUTOCOMPACT_PCT_OVERRIDE`, у змінних середовища його нема); одна на день і ніч; діє з перезапуску процесу Claude Code (AE S141 — уже в тій самій сесії); перевірка — `get_session` → `autocompact_state.threshold`, контекст — `hooks/ctx_watch.py line` (AE S141, В-351; `tools/claude-code/CLAUDE_CODE.md` «Ревізія → `/compact`»).
 - Навички ядра (`/night`) ставить не setup script, а диспетчер `hooks/lens-hooks.sh` на старті (`tools/claude-code/skills/`).
 - `GH_TOKEN` руками не ставити: доступ до GitHub дає під'єднаний GitHub (п.3б там же).

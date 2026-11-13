@@ -139,7 +139,7 @@ fresh_days=30
 ```bash
 if [ -f "$K/tools/cloudflare/cf_budget.sh" ]; then bash "$K/tools/cloudflare/cf_budget.sh"; else echo "cloudflare: — (ядра поруч нема: $K)"; fi
 ```
-(`K` — клон ядра поруч, як у шаблоні; клон кладе setup script v3 у кожну сесію.) Скрипт — з клону, не `curl … | bash`: це зайвий
+(`K` — клон ядра поруч, як у шаблоні; клон кладе setup script v3 у кожну сесію.) Скрипт — з клону, не `curl … | bash`: це зайвий <!-- copy-ok: дім правила — ADOPT.md (setup script з клону) -->
 віддалений код (в auto-режимі класифікатор його відхилив, AE S90 18.10.2026), а на 404 `bash` отримує порожній вхід і виходить з 0 — збій мовчить.
 
 Плюс абзац у `CLAUDE.md` репо (зразок — `tools/claude-code/templates/CLAUDE_template.md`): рядки `cloudflare:` і `⚠` в `env_check` —

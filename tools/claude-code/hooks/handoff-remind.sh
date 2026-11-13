@@ -26,6 +26,9 @@ REV = re.compile(r"\bревізі[яюї]\b|\bзвір\w*\s+пам.?ят\w*|\bз
 TRIG = re.compile(r"переїжджаємо|переїжджай\w*|переїхати|переїдемо|стартов\w+\s+повідомлен\w*|\bнов[ау]\s+сесі[яю]\b", re.I)   # лише команди: «переїжджаємо / переїхати / стартове / нову сесію»; іменник «переїзд» — розповідь (тричі хибне 10.10), «переїжджає» — опис (G6 «переїжджає в скрипт», хибне 10.10 QR CC-7) — журнал гачків §1
 STARTER = re.compile(r'(?im)^\s*старт\w*\s*:')   # ознака стартового в блоці text — рядок «СТАРТ:» / «Старт:» (є в стартових AE і ядра). AE S139: промпт моделі давав хибний переїзд; AE S140: текст завдання для Fable («гачок старту», «самері … §0») — теж (хибне), тому вже не «старт|самері» будь-де
 HC = os.environ['HC']
+NARR = re.compile(r'(?:\bдо|\bпісля|\bбез|\bперед|\bвід|\bщодо|\bпро)\s+$', re.I)   # «стиснення до ревізії» — розповідь, не команда (хибне AE S143: повний прохід на слово в розповіді)
+def is_rev(pr):
+    return any(not NARR.search(pr[max(0, m.start() - 12):m.start()]) for m in REV.finditer(pr))
 
 def repos(roots):
     out = []
@@ -48,7 +51,7 @@ def first_prompt(tp):
     return True
 
 def run(d, roots, mark_dir='/tmp'):
-    pr = d.get('prompt') or ''; rev = bool(REV.search(pr)) and not TRIG.search(pr)
+    pr = d.get('prompt') or ''; rev = is_rev(pr) and not TRIG.search(pr)
     if not (TRIG.search(pr) or rev): return None
     if first_prompt(d.get('transcript_path') or ''): return None
     rs = repos(roots)
@@ -122,6 +125,8 @@ def selftest():
     os.remove(os.path.join(r, '.git', 'lens-readonly'))   # далі — звичайне репо сесії
     ok = (lambda o: o is not None and 'ревізія' in o)(run(D('зроби ревізію? ні — просто ревізія пам\'яті, будь ласка', mid, 'r1'), [t], t))
     print(('✓' if ok else '✗') + ' «ревізія пам\'яті» → контекст ревізії (без переїзду)'); bad += not ok
+    ok = run(D('навмисно спробувати стиснення до ревізії; після ревізії — далі; без ревізії не можна', mid, 'r2'), [t], t) is None and is_rev('Далі — ревізія') and is_rev('зроби ревізію перед стисненням')
+    print(('✓' if ok else '✗') + ' «до / після / без ревізії» у розповіді → тиша; «ревізія», «зроби ревізію» → так (хибне AE S143)'); bad += not ok
     P = lambda c, s='q1': {'tool_input': {'command': c}, 'session_id': s}
     o1 = post(P('cd x && git commit -qm x'), [t], t); o2 = post(P('git commit -qm y'), [t], t); o3 = post(P('git status'), [t], t); o4 = post(P("echo '{\"command\":\"git commit -m x\"}' | bash h.sh", 'q2'), [t], t)
     ok = o1 is not None and '✗' in o1 and o2 is None and o3 is None and o4 is None
