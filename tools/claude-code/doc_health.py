@@ -198,10 +198,16 @@ def spread(root, only=None, old=None):
                 for s in _shp(l): idx[s].add((n, i))
     docs = [f for f in _docs(root) if os.path.realpath(os.path.join(root, f)) not in lp]
     U = {f: [(i, _shp(l)) for i, l in _units(os.path.join(root, f)) if 'copy-ok' not in l] for f in docs if os.path.isfile(os.path.join(root, f))}
+    SN = {f: {i for i, l in _units(os.path.join(root, f)) if re.match(r'\s*(?:[-*]\s+)?\*{0,2}S\d{2,3}\b|\|\s*\d{2}\.\d{2}(?:\.\d{4})?\s*\|', l)} for f in U}   # записи-знімки (див. нижче)
+    # шапка (рядки до першого «## ») — з шаблону (BRIEF_template: «живе доки · читається коли · дім»), однакова в усіх брифах: для M15 не дубль правила
+    #   (AE S143: 14 із 44; практика — jscpd пропускає шаблонні блоки маркером чи регуляркою, front matter — окремо: jscpd README 4.x, cspell #3456, 13.11.2026)
+    # запис-знімок у тілі (рядок сесії «- **S112 (28.10)…» · рядок журналу рішень «| 06.11 | …») — історія, як файли SNAP, не правило: для M15 не дубль (AE S143: 15 із 31)
+    hd = {f: next((n for n, l in enumerate(open(os.path.join(root, f), encoding='utf-8', errors='replace'), 1) if l.startswith('## ')), 0) for f in U}
     di = collections.defaultdict(set)
     for f, us in U.items():
         for i, sh in us:
-            for s in sh: di[s].add((f, i))
+            if i >= hd[f] and i not in SN[f]:
+                for s in sh: di[s].add((f, i))
     found = []
     for f, us in U.items():
         if only is not None and f not in only: continue
@@ -212,6 +218,7 @@ def spread(root, only=None, old=None):
             if c and c.most_common(1)[0][1] >= SH_MIN:
                 (n, j), m = c.most_common(1)[0]
                 found.append(('M14', f'{f}:{i}', f'копія {n}:{j} ({m} збігів по {SH_N} слів) — шар і так приходить щосесії: тут вказівник або <!-- copy-ok: причина -->')); continue
+            if i < hd[f] or i in SN[f]: continue   # шапка й запис-знімок — не M15 (M14 вище їх судить)
             d = collections.Counter(h for s in sh if len(di[s]) <= 30 for h in di[s] if h[0] != f)   # > 30 місць — шаблонна фраза, не копія правила
             if d and d.most_common(1)[0][1] >= SH_MIN:
                 (g, j), m = d.most_common(1)[0]
@@ -433,6 +440,16 @@ def selftest():
     for name, fs, want, part in cases:
         g, t = line(repo(fs)); ok = g == want and part in t
         print(('✓' if ok else '✗') + ' ' + name + ('' if ok else f' → {t}')); bad += not ok
+    H = '> живе доки: пункт відкритий; закрито — файл переноситься в архів брифів\n'
+    r1 = [x for x in spread(repo({'docs/A_brief.md': '# A\n' + H + '## §0\nа\n', 'docs/B_brief.md': '# B\n' + H + '## §0\nб\n'})) if x[0] == 'M15']
+    r2 = [x for x in spread(repo({'docs/A_brief.md': '# A\n## §0\n' + H, 'docs/B_brief.md': '# B\n## §0\n' + H})) if x[0] == 'M15']
+    ok = not r1 and len(r2) == 1; bad += not ok; cases.append(None)
+    R = 'робот бере діючу речовину з розділу склад сторінки коли рядка нема\n'
+    r3 = [x for x in spread(repo({'docs/A_brief.md': '## §1\n- **S113 (28.10):** ' + R, 'docs/B_brief.md': '## §1\n| 06.11 | ' + R}))if x[0] == 'M15']
+    r4 = [x for x in spread(repo({'docs/A_brief.md': '## §1\n- **Крок 7:** ' + R, 'docs/B_brief.md': '## §1\n| 7.11 | ' + R})) if x[0] == 'M15']
+    ok = not r3 and len(r4) == 1; bad += not ok; cases.append(None)
+    print(('✓' if ok else '✗') + ' M15: запис-знімок («- **S113 (28.10)…» · «| 06.11 |») — не дубль; звичайний пункт і номер перевірки «| 7.11 |» — дубль (AE S143)' + ('' if ok else f' → {r3} {r4}'))
+    print(('✓' if ok else '✗') + ' M15: шапка з шаблону (до першого «## ») — не дубль; те саме речення в тілі — дубль (AE S143)' + ('' if ok else f' → {r1} {r2}'))
     ENV.update(GIT_AUTHOR_DATE='2025-01-01T00:00:00', GIT_COMMITTER_DATE='2025-01-01T00:00:00')
     g, t = line(repo({'kernel/cookbook/X_cookbook_1.md': '# Том\n## A1. Кнопка\nweb.dev, 01.01.2025\n'})); ENV.clear(); ok = g == '⚠' and 'рецептів > 180 дн. без звірки 1' in t
     print(('✓' if ok else '✗') + ' M11: рецепт не чіпали > 180 днів → ⚠' + ('' if ok else f' → {t}')); bad += not ok; cases.append(None)
