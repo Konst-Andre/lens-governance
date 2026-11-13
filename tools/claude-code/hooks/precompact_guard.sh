@@ -9,7 +9,7 @@
 #            (5) при блоці лишає позначку — наступний UserPromptSubmit каже агентові «Konst пробував стиснути: зроби ревізію».
 # Помилка самого гачка (вихід не 0 і не 2) стиснення не зупиняє — так влаштовано Claude Code (hooks «Exit code output»): сторож відмовляє «у відкрите».
 # Запуск: echo '{"trigger":"manual","custom_instructions":null}' | LENS_ROOT=/home/user LENS_HOOKS=<тека гачків> bash precompact_guard.sh
-#         bash precompact_guard.sh selftest     → 11 випадків на тимчасовому репо
+#         bash precompact_guard.sh selftest     → 11 випадків на тимчасовому репо + обгортка PreCompact (шаблон ENVIRONMENT.md і живий ~/.claude/settings.json)
 set -u
 guard() {
   local root="${LENS_ROOT:-/home/user}" hooks="${LENS_HOOKS:-.}" sid="${CLAUDE_CODE_REMOTE_SESSION_ID:-}" in trig ci facts="" dirty="" r n hd b cm
@@ -69,6 +69,12 @@ Claude-Session: https://claude.ai/code/session_TESTSID" && git push -q origin HE
   ( cd "$t/w/repoA" && git add new && git commit -qm c2 ); e=$(run manual); say $([ "$e" = 2 ] && grep -q "не-на-GitHub" "$t/err" && echo 1) "закомічено, не запушено + manual → 2"
   ( cd "$t/w/repoA" && git push -q origin HEAD 2>/dev/null ); e=$(run manual); say $([ "$e" = 0 ] && echo 1) "запушено → 0"
   touch "$t/w/repoA/.git/lens-readonly"; echo y > "$t/w/repoA/z"; e=$(run manual); say $([ "$e" = 0 ] && echo 1) "клон лише для читання (lens-readonly) не судиться → 0"
-  echo "─── precompact_guard selftest: $([ $bad = 0 ] && echo 11/11 || echo є ✗) ───"; return $bad
+  # S143 (тест Konst): `/compact` пройшов, бо обгортка в ~/.claude/settings.json закінчувалась «|| true» і ковтала вихід 2. Тест — справжнім шляхом виклику:
+  printf '#!/bin/bash\nexit 2\n' > "$t/fake.sh"
+  for s in "$(dirname "$me")/../ENVIRONMENT.md" "$HOME/.claude/settings.json"; do [ -f "$s" ] || continue
+    c="$(grep -o '"PreCompact":\[{"hooks":\[{"type":"command","command":"[^"]*"' "$s" | sed 's/.*"command":"//; s/"$//')"
+    [ -n "$c" ] || continue; e=$(bash -c "${c//\/home\/user\/lens-governance\/tools\/claude-code\/hooks\/lens-hooks.sh/$t/fake.sh}" </dev/null >/dev/null 2>&1; echo $?)
+    say "$([ "$e" = 2 ] && echo 1)" "обгортка PreCompact ($(basename "$s")) пропускає вихід 2 — «/compact» справді зупиняється"; done
+  echo "─── precompact_guard selftest: $([ $bad = 0 ] && echo 11+обгортки || echo є ✗) ───"; return $bad
 }
 if [ "${1:-}" = selftest ]; then selftest; else guard; fi
