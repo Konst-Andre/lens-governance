@@ -15,6 +15,10 @@ python3 - "$mode" <<'PY'
 import json, os, re, subprocess, sys
 ASK = re.compile(r"(?<![\w'’])(дай|давай|видай|скинь|покажи|надішли|відтвор\w*|налаштуй)\b[^.?!\n]{0,40}(середовищ\w*|environment)", re.I)
 SCRIPT = re.compile(r"setup[ -]?script|сетап[ -]?скрипт", re.I)
+# «setup script» — прохання лише з дієсловом видачі поруч або коротким повідомленням; у довгому стартовому
+# («тест … (setup script v4 в обох середовищах)») — згадка, тиша (хибне AE S144, 13.11.2026).
+SCRIPT_ASK = re.compile(r"(?<![\w'’])(дай|давай|видай|скинь|покажи|надішли|онови|встав)\w*\b[^.?!\n]{0,40}(setup[ -]?script|сетап[ -]?скрипт)", re.I)
+SHORT = 200
 
 HOOKS = os.path.dirname(os.path.abspath(os.environ.get('HOOK_SELF', '.')))
 
@@ -40,7 +44,7 @@ def post(d):
 
 def run(d):
     p = d.get('prompt') or ''
-    if not (ASK.search(p) or SCRIPT.search(p)): return None
+    if not (ASK.search(p) or SCRIPT_ASK.search(p) or (SCRIPT.search(p) and len(p) <= SHORT)): return None
     rep = drift()
     return ((("Жива звірка середовища з аркушем (env_drift.py):\n" + rep + "\n") if rep else '') +
             "Konst просить налаштування середовища: видай аркуш tools/claude-code/ENVIRONMENT.md ядра (для Routes — Routes:tools/ENVIRONMENT.md) "
@@ -54,7 +58,9 @@ def selftest():
              ('«відтвори середовище» → нагадування', 'відтвори середовище Routes', True),
              ('питання про вибір середовища → тиша', 'яке середовище обрати для сесії?', False),
              ('звичайне доручення → тиша', 'роби крок 2, делегую', False),
-             ('«середовище» без видачі → тиша', 'у середовищі ядра все працює', False)]
+             ('«середовище» без видачі → тиша', 'у середовищі ядра все працює', False),
+             ('«setup script?» коротко → нагадування', 'що зараз у setup script?', True),
+             ('стартове зі згадкою setup script → тиша', 'НАСТУПНИЙ ХІД: (1) тест сторожа /compact за самері п. 4-б (setup script v4 в обох середовищах); ' + 'контекст. ' * 30, False)]
     bad = 0
     for name, p, want in cases:
         ok = (run({'prompt': p}) is not None) == want; bad += not ok; print(('✓ ' if ok else '✗ ') + name)
