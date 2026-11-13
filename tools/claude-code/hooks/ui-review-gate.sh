@@ -45,7 +45,7 @@ def git(top, *a, raw=False):
 # бо гачок знав лише .html / .css. Тепер ще JS (.js / .mjs) поза tools/ · docs/ · test/ · tests/ · .claude/ · .github/, де ДОДАНИЙ рядок несе рядок у лапках
 # з двома й більше словами кирилицею (текст людині: повідомлення, підказка, порада). Коментарі зрізано; код без людського тексту — тиша.
 HUMAN = re.compile("['\"`][^'\"`\\n]*[А-ЯІЇЄҐа-яіїєґʼ’']{2,}[\\s,.:;—–-]+[А-ЯІЇЄҐа-яіїєґʼ’']{2,}[^'\"`\\n]*['\"`]")
-SKIP_JS = re.compile(r"(^|/)(tools|docs|tests?|\.claude|\.github)/")
+SKIP_JS = re.compile(r"^(tools|docs|tests?|\.claude|\.github)/")   # від кореня репо: `site/tools/ae_rules.js` — текст людині, не прилад (аудит AE S143 А1; раніше (^|/) пропускав його)
 def human_js(top):
     out = []
     for f in sorted(set(git(top, "diff", "HEAD", "--name-only", "--", "*.js", "*.mjs").splitlines()) | set(git(top, "ls-files", "--others", "--exclude-standard", "--", "*.js", "*.mjs").splitlines())):
@@ -235,6 +235,9 @@ if mode == "selftest":
         say(gate(ev("git add -A && git commit -m x")) is None, "кирилиця лише в коментарі JS → тиша")
         open(f"{tmp}/tools/t.js", "w").write("console.log('✓ усі перевірки пройшли');\n"); open(f"{tmp}/site/r.js", "w").write("const x = 1;\n")
         say(gate(ev("git add -A && git commit -m x")) is None, "текст у приладі tools/*.js → тиша")
+        os.makedirs(f"{tmp}/site/tools", exist_ok=True); open(f"{tmp}/site/tools/rules.js", "w").write("const m = 'Додайте назву позиції';\n")
+        say(gate(ev("git add -A && git commit -m x")) is not None, "зуби (AE S143 А1): текст людині в site/tools/*.js (не прилад кореня) → огляд")
+        subprocess.run(["git", "-C", tmp, "rm", "-q", "--cached", "site/tools/rules.js"], capture_output=True); os.remove(f"{tmp}/site/tools/rules.js")
         open(f"{tmp}/site/r.js", "w").write("const say = 'Ця фраза звернена до вас';\n")
         say(gate(ev("git add -A && git commit -m x")) is not None, "зуби: JS поза tools/ з текстом людині (два слова кирилицею в лапках) → deny (AE S132: ⚠-текст правил пройшов повз)")
         subprocess.run(["git", "-C", tmp, "checkout", "-q", "--", "."], check=True)
