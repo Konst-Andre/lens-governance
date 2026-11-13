@@ -29,7 +29,7 @@
 | правило wsd за номером (`1.x`, `12.x`) | `kernel/wsd/Work_Standard.md` — «Зміст» і маршрут |
 | веду канон: куди записати, правка вічного файла | `kernel/wsd/Lens_governance_protocol.md` («Зміст» · К1/К2 і INTAKE · 12.11 · 12.15–12.20) |
 | **час для брифу** — пункт черги тягнеться 2+ сесії · рядок черги > 2000 знаків · рішення одного пункту в ≥ 3 місцях (черга · самері · план · чат) | бриф `<id>_brief.md` з `tools/claude-code/templates/BRIEF_template.md` (з прополкою джерел; ядро — `kernel/Lens_<id>_brief.md`); агент створює сам, не чекаючи Konst. Машина нагадує: `handoff_check` (8)/(9) на переїзді, гачок `brief-guard` на запис і коміт |
-| питання з варіантами, форма 💡, двійне пояснення | `kernel/Lens_PROFILE.md` §7 (`13.1`–`13.3`) |
+| питання з варіантами, двійне пояснення (`13.1`–`13.3`) | `kernel/Lens_PROFILE.md` §7; форма 💡 — профіль «ЗВІТ» (одна на обидві двері; §7 — історія форми) |
 | **рух / анімація** — будую, правлю чи планую рух; порт екрана (рядок «інвентар руху»); **закрив екран чи функцію з інтерфейсом** (будь-який продукт: PWA, веб) — сам пропоную Konst наступний крок руху: інвентар — завжди, план руху — коли екрани фази готові (Konst AE S103) | рецепти — кукбук том 5 через `kernel/cookbook/Lens_cookbook_INDEX.md`; метод (інвентар → фаза «дизайн і рух» → прилад `motion_lint`) і стан приладу — бриф `kernel/Lens_MOTION-1_brief.md`. `ui_lint` рух **не судить** — лише статичні кадри |
 | **пишу текст людині** — порада, попередження, «i», порожній стан, помилка, рядок стану (будь-який продукт) | `tools/claude-code/VOICE.md` — чотири питання читача й пари «було → стало»; огляд UI ③ вимагає його й на JS з текстом людині (Konst AE S133: «щоб не схоже на опис інструменту») |
 | зовнішній візуальний ефект · скло й острівець | `kernel/Lens_fx_candidates.md` · `kernel/Lens_glass_FINDINGS.md` |
@@ -42,7 +42,7 @@
 | переїзд на інший акаунт Claude («новий / інший / резервний акаунт») — сам продиктуй Konst список | `tools/claude-code/ACCOUNT_MOVE.md` |
 | архівне джерело · рішення переїзду продуктів (`Р-N`) | греп по `archive/` (перейменування — `kernel/Lens_ARCHIVE_INDEX.md` §3-б) · `kernel/Lens_REPO_LAYOUT.md` §4-б |
 
-**Двері Project** (`kernel/Lens_INDEX.md` §0 — двоє дверей, правила спільні, механіка різна): `kernel/Lens_PROJECT_instruction.md` · `kernel/Lens_NEWPROJECT_bootstrap.md` · `kernel/Lens_start.py` · `tools/CHAT_TOOLS.md` · `tools/ADAPT.md` · `tools/lens-gh/` — **живі** (claude.ai Project працює: Lens PWA та ін.), не архівуються; у Claude Code не читати, лише коли правиш саме двері Project (тоді інструкція Project — тим самим ходом). **Правило ядра, що спирається на механіку чату Claude** (`present_files`, `ask_user_input_v0`, `/mnt/…`, project_knowledge_search, квиток / конектор): суть правила діє, механіка — відповідник Claude Code (файл у репо + коміт · AskUserQuestion · греп по клону · `git`).
+**Двері Project** (`kernel/Lens_INDEX.md` §0 — двоє дверей, правила спільні, механіка різна): `kernel/Lens_PROJECT_instruction.md` · `kernel/Lens_NEWPROJECT_bootstrap.md` · `kernel/Lens_start.py` · `tools/CHAT_TOOLS.md` · `tools/ADAPT.md` · `tools/lens-gh/` — **живі** (Project — у запасі, повернення — профіль «ДВЕРІ»), не архівуються; у Claude Code не читати, лише коли правиш саме двері Project (тоді інструкція Project — тим самим ходом). **Правило ядра, що спирається на механіку чату Claude** (`present_files`, `ask_user_input_v0`, `/mnt/…`, project_knowledge_search, квиток / конектор): суть правила діє, механіка — відповідник Claude Code (файл у репо + коміт · AskUserQuestion · греп по клону · `git`).
 
 ## Знахідка з іншого репо → сюди (wsd 1.19)
 
@@ -62,4 +62,4 @@
 
 ## Аудит правил і інша модель
 
-Правило аудиту й «іншої моделі» — у профілі (АУДИТ ПРАВИЛ · ІНША МОДЕЛЬ, там же формула); ліміти перед запуском — `tools/claude-code/CLAUDE_CODE.md` «Вікно ліміту». Тут — лише ядрове: скрипт `bash tools/claude-code/audit_prompts.sh <1|2> <файл>…` (клас 2 — цей файл і профіль); журнал — `kernel/Lens_AUDIT.md`. Fable — за кредити, тобто реальні кошти (support.claude.com «Claude Fable models on your plan», 02.09.2026; Konst S103).
+Правило аудиту й «іншої моделі» — у профілі (АУДИТ ПРАВИЛ · ІНША МОДЕЛЬ, там же формула); ліміти перед запуском — `tools/claude-code/CLAUDE_CODE.md` «Вікно ліміту». Тут — лише ядрове: скрипт `bash tools/claude-code/audit_prompts.sh <1|2> <файл>…` (клас 2 — цей файл і профіль); журнал — `kernel/Lens_AUDIT.md`. Fable на Pro — за кредити, тобто реальні кошти; на Max — до половини тижневого ліміту в плані (support.claude.com «Claude Fable models on your plan», 13.11.2026; Konst S103).
