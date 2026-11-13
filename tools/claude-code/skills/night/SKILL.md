@@ -1,7 +1,7 @@
 ---
 # живе доки: діє tools/claude-code/NIGHT_SHIFT.md; ставить у ~/.claude/skills/ диспетчер ядра (hooks/lens-hooks.sh, SessionStart)
 name: night
-description: Нічна зміна Konst — агент працює сам за планом самері §0, поки Konst спить. Викликає лише Konst командою /night (або словом «нічна зміна»); модель сама не вмикає.
+description: Нічна зміна Konst — агент працює сам за планом самері §0, поки Konst спить. Викликає лише Konst командою /night; слово «нічна зміна» веде агента на NIGHT_SHIFT.md, не на цей скіл.
 disable-model-invocation: true
 ---
 Konst увімкнув **нічну зміну** командою `/night`. Аргументи (план, пороги, «до ранку», «з аудитом»): $ARGUMENTS

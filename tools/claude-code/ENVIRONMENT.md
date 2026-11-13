@@ -9,12 +9,12 @@
 ## 1 · Назва і мережа
 
 - **Назва:** `Lens` (будь-яка; вона лише для вибору в меню під полем повідомлення).
-- **Мережа:** Trusted, плюс доступ до Cloudflare API, npm і PyPI (`tools/claude-code/ACCOUNT_MOVE.md` п.3в).
+- **Мережа:** Limited, «Allow package managers» (npm, PyPI) + дозволений хост `api.cloudflare.com` (рівень «Trusted» у діалозі тепер відкривається як Limited з package managers — code.claude.com/docs/en/cloud-environments, 13.11.2026) (`tools/claude-code/ACCOUNT_MOVE.md` п.3в).
 
 ## 2 · Змінні середовища (поле «Environment variables», по рядку `НАЗВА=значення`, без лапок)
 
 ```text
-CLOUDFLARE_API_TOKEN=<токен Cloudflare — у Konst>
+CLOUDFLARE_API_TOKEN=<токен Cloudflare — у Konst>   # змінна, не Network secret: значення потрібне скриптам усередині сесії (env_check, cf_budget, env_drift); середовище — особисте
 CLOUDFLARE_ACCOUNT_ID=<id акаунта Cloudflare — у Konst>
 LENS_PROFILE=1
 CLAUDE_CODE_AUTO_COMPACT_WINDOW=450000
@@ -43,4 +43,4 @@ JSON
 
 ## Перевірка після відтворення (перша сесія)
 
-`bash tools/env_check.sh` з кореня ядра → рядки `env:` (`CLOUDFLARE_API_TOKEN=так`) і `профіль: з репо (LENS_PROFILE=1) ✓`; `bash tools/claude-code/hooks/lens-hooks.sh profile-test` → 2 × ✓.
+`bash tools/env_check.sh` з кореня ядра → рядки `env:` (`CLOUDFLARE_API_TOKEN=так`) і `профіль: з репо (LENS_PROFILE=1) ✓`; `bash tools/claude-code/hooks/lens-hooks.sh profile-test` → усі рядки ✓, жодного ✗.
