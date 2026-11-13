@@ -68,12 +68,16 @@ def run_one(f, timeout=TIMEOUT):
     return True, n
 
 
+FLAKY = []   # AE S143: 2 з 28 червоніли в 1 прогоні з 4 (git у тимчасовому репо, вихід 128). Практика: повтор — лише видимий, «зелений з повтору» = плаваючий,
+#   рахується окремо й чекає ліків (shiplight.ai «mitigate test flakiness» · oneuptime.com «Quarantine flaky tests», 28.07.2026; перевірено 13.11.2026)
 def run(files, missing=()):
     t0, fails = time.time(), [f'{os.path.relpath(m, TOOLS)}: гачок без selftest — допиши режим selftest (чек-лист нового гачка, CLAUDE_CODE.md «Гачки»)' for m in missing]
     n = 0
     for f in files:
         ok, msg = run_one(f); n += 1
-        if not ok: fails.append(msg)
+        if not ok:
+            if run_one(f)[0]: FLAKY.append(f'{os.path.basename(f)}: плаваючий — червоний, з повтору зелений; знайти причину ({msg[:140]})'); continue
+            fails.append(msg)
     return fails, n, time.time() - t0
 
 
@@ -86,10 +90,12 @@ def main(a):
         files, missing = discover()
         fails, n, dt = run(files, missing)
         head = f'selftest усіх гачків і приладів ядра: {n - len([x for x in fails if "без selftest" not in x])}/{n} · {dt:.0f} с · {time.strftime("%H:%M")}'
-        txt = '\n'.join([head] + ['✗ ' + x for x in fails])
-        try: open(log_path(), 'w', encoding='utf-8').write(txt + '\n')
+        txt = '\n'.join([head] + ['✗ ' + x for x in fails] + ['⚠ ' + x for x in FLAKY])
+        try:
+            open(log_path(), 'w', encoding='utf-8').write(txt + '\n')
+            os.utime(log_path(), (time.time() - dt, time.time() - dt))   # час журналу = ПОЧАТОК прогону: файл, виправлений під час прогону, перевіряється заново
         except OSError: pass
-        print(txt if fails else head); return 1 if fails else 0
+        print(txt if fails or FLAKY else head); return 1 if fails else 0
     if a[0] == 'bg':
         if os.environ.get('LENS_NO_SELFTEST'): return 0   # запобіжник кола й на рівні самого запускача
         subprocess.Popen([sys.executable, os.path.abspath(__file__), 'all'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
@@ -104,8 +110,16 @@ def main(a):
     if a[0] == 'report':
         try: t = open(log_path(), encoding='utf-8').read().splitlines()
         except OSError: return 0
+        when = os.path.getmtime(log_path())
         for l in t[1:]:
-            if l.startswith('✗'): print(l)
+            if l.startswith('⚠'): print(l); continue
+            if not l.startswith('✗'): continue
+            n = l[2:].split(' ', 1)[0].rstrip(':'); f = next((os.path.join(d, n) for d in (HERE, TOOLS) if os.path.isfile(os.path.join(d, n))), None)
+            if f and os.path.getmtime(f) > when and has_test(f):   # файл змінено після прогону — старий ✗ не вірити, перевірити заново (AE S143: ✗ від навмисно зламаного plan-web)
+                ok, msg = run_one(f)
+                if ok: continue
+                l = '✗ ' + msg
+            print(l)
         return 0
     if a[0] == 'selftest':
         return selftest()
@@ -119,6 +133,7 @@ def selftest():
     W(os.path.join(h, 'red.sh'), '[ "$1" = selftest ] && { echo "✗ зламано"; echo "red: 2/3"; exit 0; }\n')
     W(os.path.join(h, 'crash.py'), 'import sys\nif sys.argv[1:] == ["selftest"]: raise KeyError("transcript_path")\n')
     W(os.path.join(h, 'notest.sh'), 'echo гачок\n')
+    W(os.path.join(h, 'flaky.sh'), 'f=$(dirname "$0")/.once; [ "$1" = selftest ] && { [ -e "$f" ] && { echo "flaky: 1/1"; exit 0; }; touch "$f"; echo "flaky: 0/1"; exit 1; }\n')
     files, missing = discover((h,))
     global HERE; old = HERE; HERE = h
     try: files, missing = discover((h,))
@@ -128,10 +143,21 @@ def selftest():
              ('«2/3» при виході 0 → ✗ (не вірити коду виходу)', not res.get('red.sh', (True,))[0]),
              ('падіння Python (KeyError) → ✗ з назвою помилки', not res.get('crash.py', (True,))[0] and 'вихід 1' in res['crash.py'][1]),
              ('гачок без selftest → у списку дірок', [os.path.basename(m) for m in missing] == ['notest.sh'])]
+    ob = os.path.join(h, '.once')
+    if os.path.exists(ob): os.remove(ob)   # перший прохід discover уже «зіпсував» плаваючий — почати з червоного
+    fl, _, _ = run([os.path.join(h, 'flaky.sh')])
+    cases.append(('плаваючий (червоний, з повтору зелений) → не ✗, а ⚠ «плаваючий» (практика: повтор лише видимий)', fl == [] and any('flaky.sh' in x for x in FLAKY)))
     os.environ['LENS_SELFTEST_LOG'] = os.path.join(d, 'log')
     W(os.environ['LENS_SELFTEST_LOG'], 'selftest …: 1/2\n✗ red.sh selftest: вихід 0 · ✗ зламано\n')
     r = subprocess.run([sys.executable, os.path.abspath(__file__), 'report'], capture_output=True, text=True, env=os.environ)
     cases.append(('report: лише рядки ✗ з журналу прогону', r.stdout.strip() == '✗ red.sh selftest: вихід 0 · ✗ зламано'))
+    W(os.environ['LENS_SELFTEST_LOG'], 'selftest …\n✗ green.sh selftest: вихід 1 · старий збій\n'); os.utime(os.environ['LENS_SELFTEST_LOG'], (1, 1))
+    global TOOLS; ot = TOOLS; HERE, TOOLS = h, h
+    try:
+        import io, contextlib; buf = io.StringIO()
+        with contextlib.redirect_stdout(buf): main(['report'])
+    finally: HERE, TOOLS = old, ot
+    cases.append(('report: файл виправлено після прогону → перевірено заново, старий ✗ зник', buf.getvalue().strip() == ''))
     bad = 0
     for name, ok in cases:
         print(('✓ ' if ok else '✗ ') + name); bad += not ok

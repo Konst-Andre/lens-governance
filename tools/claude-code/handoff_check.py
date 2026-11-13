@@ -246,7 +246,7 @@ def hooks_journal(repos):
     log = f'/tmp/lens-hooks-{sid}.tsv' if sid else ''
     sta = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'hooks', 'selftest_all.py')   # AE S143: фоновий прогін усіх selftest зі старту
     red = subprocess.run([sys.executable, sta, 'report'], capture_output=True, text=True).stdout.splitlines() if os.path.isfile(sta) else []
-    crash = [('✗', 'selftest: ' + l.lstrip('✗ ')) for l in red if l.startswith('✗')] + hook_crashes(sid)   # AE S143: впалий гачок мовчить — без цього рядка падіння виглядає як «нема що сказати»
+    crash = [(l[0], 'selftest: ' + l[2:]) for l in red if l[:1] in '✗⚠'] + hook_crashes(sid)   # ⚠ — плаваючий тест   # AE S143: впалий гачок мовчить — без цього рядка падіння виглядає як «нема що сказати»
     if not log or not os.path.isfile(log): return crash + [('ⓘ', 'журнал гачків: спрацювань цієї сесії не записано (лог диспетчера порожній)')]
     rows = [l.split('\t') for l in open(log, encoding='utf-8', errors='replace') if l.strip()]
     by = {}
