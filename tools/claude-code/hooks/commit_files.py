@@ -190,13 +190,15 @@ def check(top, cmd):
     if mds:
         try:
             sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__)))); import doc_health as dh
-            only = {}
+            only, old = {}, {}
             for f in mds:
                 if dh.SNAP.search(f): continue
                 diff = subprocess.run(['git', '-C', top, 'diff', '-U0', 'HEAD', '--', f], capture_output=True, text=True).stdout
                 if not diff: diff = '@@ -0,0 +1,%d @@' % len(open(os.path.join(top, f), encoding='utf-8', errors='replace').read().split('\n'))   # новий файл
+                prev = subprocess.run(['git', '-C', top, 'show', 'HEAD:' + f], capture_output=True, text=True).stdout
+                old[f] = {x for l in prev.split('\n') for x in dh._shp(l)}
                 only[f] = {n for a, b in re.findall(r'^@@ [^+]*\+(\d+)(?:,(\d+))? @@', diff, re.M) for n in range(int(a), int(a) + int(b if b != '' else 1))}
-            for m, where, what in dh.spread(top, only) if only else []:
+            for m, where, what in dh.spread(top, only, old) if only else []:
                 bad.append(f'нова копія в документі (doc_health {m}): {where} — {what}')
         except Exception: pass   # прилад ядра недоступний — сторож мовчить, M14 скаже на старті
     # 10. шапка наявного приладу змінилась, карта — ні (AE S104)
@@ -316,6 +318,11 @@ def selftest():
         g('add', '-A'); g('-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'old')
         open(d + '/tools/x/G.md', 'a').write('- інший рядок без копії\n')
         say(not any('M14' in x for x in check(d, "git add -A && git commit -m 'ядро: ні'")), 'стара копія в файлі, доданий рядок чистий → тиша (борг — на старті)')
+        g('add', '-A'); g('-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'o2')
+        t = open(d + '/tools/x/G.md').read().replace(S, S + ' і ще кілька нових слів у кінці')
+        open(d + '/tools/x/G.md', 'w').write(t)
+        say(not any('M14' in x for x in check(d, "git add -A && git commit -m 'ядро: ні'")), 'правка старого рядка зі старою копією → тиша (хибне AE S143: нова лише та копія, якої не було на HEAD)')
+        g('checkout', '--', 'tools/x/G.md')
         os.makedirs(d + '/docs/summary', exist_ok=True); open(d + '/docs/summary/P_SUMMARY_2026-11-13.md', 'w').write('- ' + S + '\n')
         say(not any('M14' in x for x in check(d, "git add -A && git commit -m 'ядро: ні'")), 'копія в самері (знімок) → тиша')
         os.environ.pop('LENS_KERNEL', None)

@@ -184,10 +184,11 @@ def _shp(l):
     if l.lstrip().startswith('#'): return set()
     return _sh(re.sub(r'`[^`]*`|\S*[\w-]/\S*|\S+\.(md|py|sh|mjs|js|json|html)\b', ' ', l))
 
-def spread(root, only=None):
+def spread(root, only=None, old=None):
     """M14 — копія щосесійного шару в будь-якому документі репо (⚠: шар і так у контексті щосесії — тут вказівник).
     M15 — дослівний дубль між двома документами (ⓘ у рядку старту, перелік — --list: старий борг, дім — назвати одному з двох).
-    only = {файл: {номери рядків}} — лише ці рядки (сторож коміту: додані рядки диффу)."""
+    only = {файл: {номери рядків}} — лише ці рядки (сторож коміту: додані рядки диффу); old = {файл: шматки файла на HEAD} — рахуються лише
+    шматки, яких у файлі ще не було (правка старого рядка зі старим дублем — не нова копія; хибне AE S143 на власному коміті)."""
     import collections
     lay = _layers(root); lp = {os.path.realpath(p) for _, p, _ in lay}
     idx = collections.defaultdict(set)
@@ -206,6 +207,7 @@ def spread(root, only=None):
         if only is not None and f not in only: continue
         for i, sh in us:
             if only is not None and i not in only[f]: continue
+            if old and f in old: sh = sh - old[f]
             c = collections.Counter(h for s in sh for h in idx.get(s, ()))
             if c and c.most_common(1)[0][1] >= SH_MIN:
                 (n, j), m = c.most_common(1)[0]
