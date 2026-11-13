@@ -12,11 +12,19 @@
 #     не менше 55 000 (найбільший крок AE S141 — 55 400). Ⓘ «на межі предмета» — від min(250 000, R − 70 000).
 # Вироки: на повідомлення Konst — завжди рядок «контекст · % вікна · ревізія на · стиснень у сесії» (з нього маркер, В-353) або ⓘ межа предмета · ⚠ ревізія зараз ·
 #   ⚠ кеш холодний (пауза > TTL при ≥ 250 тис.); після коміту — лише ⚠; лік стиснень (compact_boundary) ≥ 2 / ≥ 3 → вимога переїзду (вдень · вночі).
+# Ліміти (В-364 п. 2 AE, «так» Konst з підсиленням 13.11.2026): до рядка на повідомлення Konst — «ліміти ЧЧ:ХХ: 5 год X · тиждень Y (сесія: +…)».
+#   Джерело — лише результати list_events (rate_limit_event) у журналі сесії: гачок сам лімітів не бачить, тому це ОСТАННІЙ ЗАМІР агента з часом, не «живі» цифри;
+#   замір > 60 хв або вікно 5 год уже скинулось → «зміряй», старих цифр не показує; «сесія» — різниця від першого заміру в тому ж вікні (ціна кроку — різницею);
+#   стиснення не губить (той самий журнал); пороги нічної зміни — NIGHT_SHIFT.md §3, тут не дублюються. Звірено AE S144: list_events 0,10 · 0,25 о 00:33 ≡ застосунок «Використання» 10 % · 25 % о 00:27.
+# Після стиснення (AE S144): перше повідомлення Konst ще без відповіді агента → рядок «≈ переказ + постійна база» замість тиші (база — BASE).
 # Запуск: echo '<json гачка>' | python3 ctx_watch.py hook   ·   python3 ctx_watch.py line [журнал]   ·   python3 ctx_watch.py selftest
 import datetime, glob, json, os, sys, time, tempfile
 
 RESERVE_OUT, STEP_MIN, REV_COST, SOFT, TTL_S = 20_000, 55_000, 15_000, 250_000, 3600
-CAP_DAY, CAP_NIGHT = 2, 3   # стиснень на сесію до переїзду: вдень · у нічну зміну (В-353, `tools/claude-code/CLAUDE_CODE.md` «Скільки стиснень»)
+CAP_DAY, CAP_NIGHT = 2, 3
+STALE_S = 3600     # В-364 п. 2 (б): замір лімітів старший за годину — «зміряй»
+BASE = 80_000      # постійна база контексту (AE S144, застосунок «Використання» після стиснення № 2: 95,5 тис. = інструменти MCP 35,2 · системні 20,8 · CLAUDE.md двох репо 11,5 ·
+                   #   навички 5,6 · системний промпт 5,6 · інструкції MCP 1,5 + переказ і профіль ≈ 15; відкладені інструменти (108 тис.) у вікно не входять)   # стиснень на сесію до переїзду: вдень · у нічну зміну (В-353, `tools/claude-code/CLAUDE_CODE.md` «Скільки стиснень»)
 
 def limits(env=os.environ):
     w = int(env.get('CLAUDE_CODE_AUTO_COMPACT_WINDOW') or 1_000_000); pct = int(env.get('CLAUDE_AUTOCOMPACT_PCT_OVERRIDE') or 92)
@@ -42,10 +50,52 @@ def read(path):
     step = max([b - a for a, b in zip(commits, commits[1:]) if b > a] + [0])
     return last, step
 
+def ts_of(iso): return datetime.datetime.fromisoformat(iso.replace('Z', '+00:00')).timestamp()
+
+def rates(path):
+    """В-364 п. 2 (а): заміри лімітів з результатів list_events у журналі → [(час, 5 год, скид 5 год, тиждень, скид тижня)], упорядковано за ЧАСОМ ПОДІЇ
+    (не за порядком у журналі: list_events з курсором повертає старі події пізніше за нові — AE S144)."""
+    out = {}
+    try:
+        for ln in open(path, encoding='utf-8', errors='replace'):
+            if 'unifiedWindows' not in ln: continue   # швидкий відсів: журнал — мегабайти
+            try: r = json.loads(ln)
+            except ValueError: continue
+            if r.get('type') != 'user' or r.get('isSidechain'): continue
+            for c in (r.get('message') or {}).get('content') or []:
+                if not isinstance(c, dict) or c.get('type') != 'tool_result': continue
+                cc = c.get('content'); texts = [x.get('text', '') for x in cc if isinstance(x, dict)] if isinstance(cc, list) else [str(cc)]
+                for t in texts:
+                    try: data = (json.loads(t).get('ccr') or {}).get('data') or []
+                    except (ValueError, AttributeError): continue
+                    for e in data:
+                        i = ((e.get('rate_limit_event') or {}).get('internal_anthropic_catchall') or {}).get('rate_limit_info') or {}
+                        w = i.get('unifiedWindows') or {}; f, s = w.get('five_hour') or {}, w.get('seven_day') or {}
+                        if 'utilization' in f and 'utilization' in s and e.get('created_at'):
+                            out[e['created_at']] = (ts_of(e['created_at']), f['utilization'], f.get('resetsAt', 0), s['utilization'], s.get('resetsAt', 0))
+    except OSError: return []
+    return sorted(out.values())
+
+def kyiv(t):
+    try:
+        from zoneinfo import ZoneInfo; return datetime.datetime.fromtimestamp(t, ZoneInfo('Europe/Kyiv')).strftime('%H:%M')
+    except Exception: return datetime.datetime.fromtimestamp(t, datetime.timezone.utc).strftime('%H:%M UTC')
+
+def lim(path, now):
+    """Хвіст рядка: останній замір лімітів (київський час) і різниця за сесію — або «зміряй»."""
+    rs = rates(path) if path and os.path.exists(path) else []
+    if not rs: return ' · ліміти: заміру нема — list_events kinds ["rate_limit_event"]'
+    t, f, fr, s, sr = rs[-1]; d = lambda x: f'{x:.2f}'.replace('.', ',')
+    if now >= fr > 0: return f' · ліміти: замір {kyiv(t)} застарів (вікно 5 год скинулось о {kyiv(fr)}) — зміряй (list_events)'
+    if now - t > STALE_S: return f' · ліміти: замір {kyiv(t)} застарів ({(now - t) / 60:.0f} хв) — зміряй (list_events)'
+    w5 = [x for x in rs if x[2] == fr][0][1]; w7 = [x for x in rs if x[4] == sr][0][3]
+    return f' · ліміти {kyiv(t)}: 5 год {d(f)} · тиждень {d(s)} (сесія: тиждень +{d(s - w7)}; це вікно 5 год +{d(f - w5)}; скид 5 год {kyiv(fr)})'
+
 def numbers(path, env=os.environ):
     last, step = read(path) if path and os.path.exists(path) else (None, 0)
     w, t = limits(env); step = max(step, STEP_MIN); r = t - step - REV_COST
-    return dict(last=last, ctx=ctx_of(last[1]) if last else 0, w=w, t=t, r=r, soft=min(SOFT, r - 70_000), step=step, comp=getattr(read, 'comp', 0) if last or path else 0)
+    return dict(last=last, ctx=ctx_of(last[1]) if last else 0, w=w, t=t, r=r, soft=min(SOFT, r - 70_000), step=step, comp=getattr(read, 'comp', 0) if last or path else 0,
+                post=(getattr(read, 'boundary', {}) or {}).get('postTokens', 0) if path else 0)
 
 def cap(n):
     c = n['comp']
@@ -54,7 +104,11 @@ def cap(n):
     return ''
 
 def verdict(n, now, event):
-    if not n['last']: return None
+    if not n['last']:   # AE S144: перше повідомлення після стиснення — відповіді ще нема; було тихо, Konst дивився в застосунок
+        if event == 'UserPromptSubmit' and n['comp'] and n['post']:
+            e = n['post'] + BASE
+            return f"контекст ≈ {e // 1000} тис. (переказ {n['post'] // 1000} + постійна база ≈ {BASE // 1000}; точне — після першої відповіді) · {e * 100 // n['w']}% вікна {n['w'] // 1000} тис. · ревізія на {n['r'] // 1000} тис. · стиснень у сесії {n['comp']} (ctx_watch)" + cap(n)
+        return None
     ctx, u = n['ctx'], n['last'][1]
     gap = now - datetime.datetime.fromisoformat(n['last'][0].replace('Z', '+00:00')).timestamp()
     ttl = TTL_S if (u.get('cache_creation') or {}).get('ephemeral_1h_input_tokens', 0) or not u.get('cache_creation_input_tokens') else 300
@@ -80,7 +134,7 @@ def newest(home='~'):
 
 def line(path):
     n = numbers(path); k = lambda x: f'{x // 1000} тис.'
-    return f"контекст {k(n['ctx'])} · {n['ctx'] * 100 // n['w']}% вікна {k(n['w'])} · стиснення на {k(n['t'])} · ревізія на {k(n['r'])} (найбільший крок {k(n['step'])}) · стиснень у сесії {n['comp']}"
+    return f"контекст {k(n['ctx'])} · {n['ctx'] * 100 // n['w']}% вікна {k(n['w'])} · стиснення на {k(n['t'])} · ревізія на {k(n['r'])} (найбільший крок {k(n['step'])}) · стиснень у сесії {n['comp']}" + lim(path, time.time())
 
 def _hc():
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__)))); import handoff_check; return handoff_check
@@ -102,13 +156,14 @@ def hook(inp, now=None):
     if ev == 'SessionStart':
         if inp.get('source') != 'compact': return ''
         b, k = getattr(read, 'boundary', {}), lambda x: f'{x // 1000} тис.'
-        v = (f"Після стиснення № {n['comp']} ({b.get('trigger', '?')}): контекст {k(b.get('preTokens', 0))} → {k(b.get('postTokens', 0))} (лише переказ; з системою, правилами й профілем — більше, справжнє число — у рядку ctx_watch після першої відповіді; AE S143: застосунок показав 88 тис.) · " if b else 'Після стиснення: ') + \
+        v = (f"Після стиснення № {n['comp']} ({b.get('trigger', '?')}): контекст {k(b.get('preTokens', 0))} → {k(b.get('postTokens', 0))} (лише переказ; разом із постійною базою ≈ {k(b.get('postTokens', 0) + BASE)}, точне — у рядку ctx_watch після першої відповіді) · " if b else 'Після стиснення: ') + \
             f"наступне стиснення на {k(n['t'])}, ревізія на {k(n['r'])} (ctx_watch). Перша відповідь — звір переказ із самері §0 і допиши в §1 рядок «стиснення N: переказ ✓ / що загубив»." + cap(n)
         try: os.remove(_hc().rev_mark())   # REV-1: мітка «ревізію зроблено» — до стиснення; після нього для ручного /compact потрібна нова
         except (OSError, ImportError): pass
     else:
         v = verdict(n, now or time.time(), ev)
         if v and v.startswith(('⚠ контекст', '⚠ кеш холодний')): v += revise()   # REV-1: на порозі — та сама ревізія, що й на слово Konst (і вночі: після коміту)
+        if ev == 'UserPromptSubmit' and os.path.exists(inp.get('transcript_path') or ''): v = (v or 'ctx_watch') + lim(inp.get('transcript_path', ''), now or time.time())   # В-364 п. 2: ліміти — лише на повідомлення Konst, не після коміту
     return json.dumps({'hookSpecificOutput': {'hookEventName': ev, 'additionalContext': v}}, ensure_ascii=False) if v else ''
 
 def selftest():
@@ -170,7 +225,24 @@ def selftest():
     hook({'hook_event_name': 'SessionStart', 'source': 'compact', 'transcript_path': p})
     case('після стиснення мітку ревізії знято (ручний /compact знову вимагатиме ревізію)', not os.path.exists(f'{d}/revmark'))
     os.remove('/tmp/lens-ctxrev-REVTEST')
-    print(f'─── ctx_watch selftest: {24 - bad}/24 ───'); return 1 if bad else 0
+    # В-364 п. 2 (AE S144): ліміти з результатів list_events у журналі
+    def le(*evs, sid=False):   # evs: (секунд до T0, 5 год, скид 5 год, тиждень)
+        data = [{'created_at': iso(T0 - ago), 'rate_limit_event': {'internal_anthropic_catchall': {'rate_limit_info': {'unifiedWindows': {
+                 'five_hour': {'utilization': f5, 'resetsAt': r5}, 'seven_day': {'utilization': w7, 'resetsAt': T0 + 9 * 86400}}}}}} for ago, f5, r5, w7 in evs]
+        return {'type': 'user', 'isSidechain': sid, 'message': {'role': 'user', 'content': [{'type': 'tool_result', 'content': [{'type': 'text', 'text': json.dumps({'ccr': {'data': data}})}]}]}}
+    R5 = T0 + 3 * 3600; os.environ['LENS_ROOT'] = f'{d}/empty'
+    L = lambda rows, ago=0: hook({'transcript_path': tr('lim', rows)}, T0 + ago)
+    o = L([le((7200, 0.01, R5, 0.18)), a(120_000), le((600, 0.12, R5, 0.25)), le((9000, 0.0, R5, 0.17))])
+    case('ліміти: найновіший замір за часом події (не за порядком у журналі — курсор повертає старі пізніше); сесія — від першого заміру того ж вікна',
+         '5 год 0,12 · тиждень 0,25' in o and 'тиждень +0,08' in o and 'це вікно 5 год +0,12' in o)
+    case('замір старший за 60 хв — «зміряй», старих цифр нема', 'застарів (70 хв)' in (o := L([a(120_000), le((4200, 0.3, R5, 0.2))])) and '0,30' not in o)
+    case('вікно 5 год уже скинулось — «зміряй»', 'вікно 5 год скинулось' in L([a(120_000), le((600, 0.3, T0 - 60, 0.2))]))
+    case('заміру нема — підказка list_events', 'заміру нема' in L([a(120_000)]))
+    case('замір субагента (isSidechain) не рахується', 'заміру нема' in L([a(120_000), le((60, 0.5, R5, 0.5), sid=True)]))
+    case('після коміту ліміти не друкуються (шум уночі)', 'ліміти' not in (hook({'hook_event_name': 'PostToolUse', 'tool_input': {'command': 'git commit -m y'}, 'transcript_path': tr('lc', [a(330_000), le((60, 0.1, R5, 0.2))])}, T0) or ''))
+    o = hook({'transcript_path': tr('pc', [a(300_000), {'type': 'system', 'subtype': 'compact_boundary', 'compactMetadata': {'trigger': 'manual', 'preTokens': 300_000, 'postTokens': 16_000}}])}, T0)
+    case('перше повідомлення після стиснення (відповіді ще нема) — «≈ 96 тис.» замість тиші', 'контекст ≈ 96 тис.' in o and 'точне — після першої відповіді' in o)
+    print(f'─── ctx_watch selftest: {31 - bad}/31 ───'); return 1 if bad else 0
 
 if __name__ == '__main__':
     cmd = sys.argv[1] if len(sys.argv) > 1 else 'hook'
