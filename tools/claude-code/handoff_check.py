@@ -240,6 +240,8 @@ def hook_crashes(sid, path=None):
     last = [l for l in t.splitlines() if re.match(r'^\w*(Error|Exception)\b', l)][-1:] or ['?']
     return [('✗', f'гачки падали {n} раз(и) — останнє: {last[0][:160]} → {f}; виправ гачок + тест, рядок «пропуск» у журналі гачків, тоді очисти файл')]
 
+INFO_HOOKS = {'ctx-watch'}   # рядок лічильника контексту щоходу — інформація, вердикту не потребує (AE S144)
+
 def hooks_journal(repos):
     """HOOK-5: спрацювання гачків цієї сесії (/tmp/lens-hooks-<сесія>.tsv, пише диспетчер) мають вердикти в журналі ядра."""
     sid = re.sub(r'[^A-Za-z0-9_-]', '', os.environ.get('CLAUDE_CODE_SESSION_ID', ''))
@@ -258,8 +260,13 @@ def hooks_journal(repos):
     tail = mine_tail()
     msg = 'гачки цієї сесії спрацювали: ' + ' · '.join(f'{h} {n}' for h, n in sorted(by.items()))
     if not k: return [('⚠', msg + ' — журнал гачків не знайдено (ядра нема ні поруч, ні в /tmp/lens-governance): склонувати ядро й записати вердикти')]
-    seen = tail and ('session_' + tail[:8]) in open(k, encoding='utf-8').read()
-    if seen: return crash + [('✓', msg + ' — вердикти в журналі гачків є')]
+    # AE S144: раніше один рядок сесії давав ✓ усім гачкам — handoff-remind ×2 після першого запису пройшов без вердикту.
+    # Тепер кожен гачок, що спрацював, має бути названий у рядку цієї сесії; INFO_HOOKS — лічильники, не рішення.
+    key = 'session_' + tail[:8] if tail else None
+    mine = [l for l in open(k, encoding='utf-8').read().splitlines() if key and key in l]
+    miss = [h for h in sorted(by) if h not in INFO_HOOKS and not any(h in l for l in mine)]
+    if not miss: return crash + [('✓', msg + ' — вердикти в журналі гачків є')]
+    if mine: return crash + [('✗', msg + f' — без вердикту: {", ".join(miss)} (рядки сесії `{key}` є, але цих гачків не названо) — дописати в tools/claude-code/hooks/HOOK_JOURNAL.md §1')]
     return crash + [('✗', msg + f' — вердиктів нема: розібрати (справжнє · хибне · дубль · пропуск) у tools/claude-code/hooks/HOOK_JOURNAL.md §1, ідентифікатор `session_{tail[:8] if tail else "?"}`; хибне чи пропуск — виправити гачок + тест')]
 
 # Ріст журналу (Konst 10.10: «хто контролює, наскільки виріс файл?»): §1 — лише живі рядки (≤ 30 дн.), рядок — коротко (деталь — у коміті),
@@ -471,8 +478,12 @@ def selftest():
     d = tempfile.mkdtemp(prefix='hj-'); prod = os.path.join(d, 'Prod'); os.makedirs(prod); jd = os.path.join(d, 'lens-governance/tools/claude-code/hooks'); os.makedirs(jd)
     os.environ['CLAUDE_CODE_SESSION_ID'] = 'hjtest' + str(os.getpid()); log = f"/tmp/lens-hooks-{os.environ['CLAUDE_CODE_SESSION_ID']}.tsv"
     open(log, 'w').write('2026-10-10T00:00:00Z\tprompt\thandoff-remind\tx\n')
-    jcases = [('журнал ядра поруч з рядком сесії → ✓', '| 10.10 | `session_T` | x |\n', '✓'), ('журнал ядра поруч без рядка → ✗', '| 10.10 | `session_Z` | x |\n', '✗')]
-    for name, body, want in jcases:
+    jcases = [('журнал ядра поруч з рядком сесії → ✓', '| 10.10 | `session_T` | `handoff-remind` | x |\n', '✓', 'handoff-remind'),
+              ('журнал ядра поруч без рядка → ✗', '| 10.10 | `session_Z` | x |\n', '✗', 'handoff-remind'),
+              ('рядок сесії є, але гачка в ньому нема → ✗ (дірка AE S144)', '| 10.10 | `session_T` | `env-remind` | x |\n', '✗', 'handoff-remind\nx\tprompt\tenv-remind'),
+              ('спрацював лише ctx-watch → ✓ без рядка', '| 10.10 | `session_Z` | x |\n', '✓', 'ctx-watch')]
+    for name, body, want, hooks in jcases:
+        open(log, 'w').write(''.join(f'2026-10-10T00:00:00Z\tprompt\t{h.split(chr(9))[-1]}\tx\n' for h in hooks.split('\n')))
         open(os.path.join(jd, 'HOOK_JOURNAL.md'), 'w').write(body)
         got = hooks_journal([prod])[0][0]; ok = got == want
         print(('✓' if ok else '✗') + ' ' + name); bad += not ok
