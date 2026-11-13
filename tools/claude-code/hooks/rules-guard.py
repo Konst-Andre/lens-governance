@@ -51,6 +51,16 @@ def root_of(path):
     return None
 
 
+PATH = r'(?<![\w$])((?:\.{1,2}/|/)?[\w.-]+(?:/[\w.*-]+)+/?)'
+QPATH = r'[\'"]((?:\.{1,2}/|/)?[\w.-]+(?:/[\w.*-]+)+/?)[\'"]'
+HEREDOC = r'<<-?\s*[\'"]?(\w+)[\'"]?[^\n]*\n(.*?)(?:\n\1\b|$)'
+MSG = r'(?:^|\s)-m\s+("(?:[^"\\]|\\.)*"|\'[^\']*\')'
+def mention(cmd):
+    # Bash: прибрати шляхи, що лише ЗГАДАНІ в тексті (AE S143, хибне: heredoc, що правив самері, назвав `site/tools/ae_rules.js` → ~10 тис. знаків
+    # правил без роботи з файлом). Тіло heredoc — лише шляхи цілим рядком у лапках ('x/y' · "x/y" — як open(...) / Path(...)); повідомлення -m "…" — геть.
+    cmd = re.sub(HEREDOC, lambda m: '\n' + ' '.join(re.findall(QPATH, m.group(2))), cmd, flags=re.S)
+    return re.sub(MSG, ' ', cmd)
+
 def targets(d):
     ti = d.get('tool_input') or {}; cwd = d.get('cwd') or os.getcwd(); tool = d.get('tool_name', '')
     if tool in ('Edit', 'Write', 'Read', 'NotebookEdit'): c = [ti.get('file_path') or ti.get('notebook_path') or '']
@@ -58,7 +68,7 @@ def targets(d):
     elif tool == 'Bash':
         cmd = str(ti.get('command', ''))
         cd = re.findall(r'(?:^|&&|;)\s*cd\s+([^\s;&|]+)', cmd); cwd = os.path.join(cwd, cd[-1]) if cd else cwd   # «cd X && …» — шляхи від X
-        c = re.findall(r'(?<![\w$])((?:\.{1,2}/|/)?[\w.-]+(?:/[\w.*-]+)+/?)', cmd)
+        c = re.findall(PATH, mention(cmd))
     else: c = []
     return [os.path.normpath(os.path.join(cwd, x)) for x in c if x], tool
 
@@ -114,6 +124,9 @@ def selftest():
              ('два правила, разом > стелі: менше — цілим, більше — вказівник; Read великого → далі тиша', lambda: (open(f'{d}/.claude/rules/big.md', 'w').write('---\npaths:\n  - "site/**"\n---\n' + 'ж' * 9500), (lambda o: 'Одна мова' in o and '`.claude/rules/big.md` (9500' in o)(run('Edit', {'file_path': f'{d}/site/index.html'}, 's8')) and 'big.md' in run('Edit', {'file_path': f'{d}/site/index.html'}, 's8') and (run('Read', {'file_path': f'{d}/.claude/rules/big.md'}, 's8') == '') and run('Edit', {'file_path': f'{d}/site/index.html'}, 's8') == '')[1]),
              ('Bash «cat site/index.html» (один файл) → тиша, потім Edit → тиша (Claude Code вантажить сам)', lambda: run('Bash', {'command': 'cat site/index.html'}, 's9') == '' and run('Edit', {'file_path': f'{d}/site/index.html'}, 's9') == ''),
              ('Bash «cat site/index.html | grep x» → текст (не чисте читання)', lambda: 'Одна мова' in run('Bash', {'command': 'cat site/index.html | grep x'}, 's10')),
+             ('Bash heredoc, що лише згадує шлях у тексті → тиша (AE S143, хибне)', lambda: run('Bash', {'command': "python3 - <<'PY'\ns = 'правка: див. `site/index.html` і site/a.js'\nPY"}, 's11') == ''),
+             ('Bash heredoc з open(шлях у лапках) → текст (правка файла через python)', lambda: 'Одна мова' in run('Bash', {'command': "python3 - <<'PY'\nopen('site/index.html','w').write('x')\nPY"}, 's12')),
+             ('Bash git commit -m «… шлях …» → тиша (згадка в повідомленні)', lambda: run('Bash', {'command': 'git add docs/a.md && git commit -m "правка поруч із site/index.html"'}, 's13') == ''),
              ('правило без paths — не чіпає', lambda: 'без paths' not in run('Edit', {'file_path': f'{d}/site/index.html'}, 's7'))]
     bad = 0
     for n, f in cases:
