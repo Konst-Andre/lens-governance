@@ -60,6 +60,16 @@ for dd in dict.fromkeys(dirs):
         except Exception:
             cf = []
         if cf: bad.append(os.path.basename(top) + " — файли коміту: " + " · ".join(cf[:6]))
+    sta = top + "/tools/claude-code/hooks/selftest_all.py"   # AE S143: змінив гачок чи прилад ядра → його selftest до коміту, машиною
+    if os.path.exists(sta):
+        ch = [l[3:].split(" -> ")[-1].strip().strip(chr(34)) for l in subprocess.run(["git", "-C", top, "status", "--porcelain"], capture_output=True, text=True).stdout.splitlines()]
+        ch = [top + "/" + x for x in ch if x.startswith("tools/claude-code/") and x.endswith((".sh", ".py"))]
+        if ch:
+            try:
+                st = subprocess.run(["python3", sta, "files", *ch], capture_output=True, text=True, timeout=170)
+                if st.returncode: bad.append(os.path.basename(top) + " — selftest змінених гачків: " + " · ".join(st.stdout.split(chr(10))[:3]))
+            except subprocess.TimeoutExpired:
+                bad.append(os.path.basename(top) + " — selftest змінених гачків не встиг за 170 с: прожени руками python3 tools/claude-code/hooks/selftest_all.py files …")
     if os.path.exists(top + "/kernel/Lens_validate.py"):
         run = ["python3", top + "/kernel/Lens_validate.py", "--gov", top]
     elif glob.glob(top + "/lens/*_INDEX.md") and kern:

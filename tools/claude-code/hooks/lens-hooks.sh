@@ -56,7 +56,7 @@ env_all() {   # $1 — ідентифікатор сесії
   awk '/^── /||!s[$0]++' "$o" > "$o.t" 2>/dev/null && mv "$o.t" "$o"   # однаковий рядок двох репо (спільний Cloudflare) — один раз
   [ -s "$o" ] || printf 'env_check: ⚠ / ✗ нема (репо:%s)\n' "$names" >> "$o"
 }
-if [ "$ev" = start-test ]; then   # зуби FAB-1: пауза не дублює профіль · стиснення повторює · env_check у файл і в перше повідомлення · текст для стиснення
+if [ "$ev" = start-test ]; then export LENS_NO_SELFTEST=1   # AE S143: старти тесту не запускають фоновий прогін усіх selftest (було 9 процесів)   # зуби FAB-1: пауза не дублює профіль · стиснення повторює · env_check у файл і в перше повідомлення · текст для стиснення
   t=$(mktemp -d); mkdir -p "$t/repos/a/tools" "$t/repos/b/tools" "$t/repos/c"; bad=0
   printf 'echo "база: ok"\necho "env: гейт ✓19 · ⚠24 · ✗0"\necho "⚠ тест: увага"\necho "✗ тест: червоне"\necho "гейт: ✓ 5 · ✗ 3 — глянь"\necho "⚠ спільне: хмара"\n' > "$t/repos/a/tools/env_check.sh"; printf 'echo "усе гаразд"\necho "⚠ спільне: хмара"\n' > "$t/repos/b/tools/env_check.sh"
   go() { printf '{"session_id":"%s","source":"%s"}' "$1" "$2" | LENS_PROFILE=1 LENS_REPOS_ROOT="$t/repos" LENS_ENV_DIR="$t" LENS_MARK_DIR="$t" LENS_SKILLS_DIR="$t/skills" bash "${BASH_SOURCE[0]}" SessionStart; }
@@ -92,6 +92,7 @@ fi
 if [ "$ev" = SessionStart ] || [ "$ev" = profile-test ]; then
   ss_in=""; [ "$ev" = SessionStart ] && ss_in="$(cat 2>/dev/null)"   # JSON події — читаємо ПЕРШИМ: хук репо міг би з'їсти stdin
   [ "$ev" = SessionStart ] && repo_hooks
+  [ "$ev" = SessionStart ] && [ -z "${LENS_NO_SELFTEST:-}" ] && python3 "$h/selftest_all.py" bg 2>/dev/null   # AE S143: усі selftest у фоні (~60 с, старт не чекає); ✗ — у handoff_check і після першого коміту
   # профіль — двома частинами ≤ 10 000 знаків кожна (стеля additionalContext Claude Code; понад — лише прев'ю 2 000): 1 — тут, 2 — у перше повідомлення Konst (profile_parts.py)
   prof() { [ "${LENS_PROFILE:-}" = 1 ] && [ -f "$h/../PROFILE.md" ] || return 0
     python3 -c 'import json,sys,subprocess; t=subprocess.run([sys.executable,sys.argv[1],"1"],capture_output=True,text=True).stdout; print(json.dumps({"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":t}},ensure_ascii=False))' "$h/profile_parts.py"; }

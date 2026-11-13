@@ -244,7 +244,9 @@ def hooks_journal(repos):
     """HOOK-5: спрацювання гачків цієї сесії (/tmp/lens-hooks-<сесія>.tsv, пише диспетчер) мають вердикти в журналі ядра."""
     sid = re.sub(r'[^A-Za-z0-9_-]', '', os.environ.get('CLAUDE_CODE_SESSION_ID', ''))
     log = f'/tmp/lens-hooks-{sid}.tsv' if sid else ''
-    crash = hook_crashes(sid)   # AE S143: впалий гачок мовчить — без цього рядка падіння виглядає як «нема що сказати»
+    sta = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'hooks', 'selftest_all.py')   # AE S143: фоновий прогін усіх selftest зі старту
+    red = subprocess.run([sys.executable, sta, 'report'], capture_output=True, text=True).stdout.splitlines() if os.path.isfile(sta) else []
+    crash = [('✗', 'selftest: ' + l.lstrip('✗ ')) for l in red if l.startswith('✗')] + hook_crashes(sid)   # AE S143: впалий гачок мовчить — без цього рядка падіння виглядає як «нема що сказати»
     if not log or not os.path.isfile(log): return crash + [('ⓘ', 'журнал гачків: спрацювань цієї сесії не записано (лог диспетчера порожній)')]
     rows = [l.split('\t') for l in open(log, encoding='utf-8', errors='replace') if l.strip()]
     by = {}
@@ -325,7 +327,7 @@ def report(repos):
     for r in repos:
         if os.path.isfile(dh): out = subprocess.run([sys.executable, dh, r], capture_output=True, text=True).stdout.strip().splitlines(); out and print(f'  {os.path.basename(os.path.abspath(r))}: {out[-1]}')
     return 1 if bad else 0
-JPATH = 'tools/claude-code/hooks/HOOK_JOURNAL.md'
+JPATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'hooks', 'HOOK_JOURNAL.md')   # AE S143: відносний шлях падав поза коренем ядра
 
 # REV-1 (AE S143, В-361, Konst: «твоя ревізія повинна працювати так, як моя»): ОДНА точка ревізії для всіх тригерів —
 #   слово Konst (hooks/handoff-remind.sh) · поріг контексту (hooks/ctx_watch.py, і вночі — після коміту) · сам агент перед «можна /compact».
