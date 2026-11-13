@@ -57,11 +57,10 @@ def run(d, roots, mark_dir='/tmp'):
     h = heads(rs)
     if os.path.exists(mark) and open(mark).read() == h: return None
     open(mark, 'w').write(h)
+    if rev:   # REV-1 (AE S143): та сама точка ревізії, що й поріг ctx_watch і сам агент — handoff_check revision (вивід + чек-лист + мітка для precompact_guard)
+        r = subprocess.run([sys.executable, HC, 'revision', *roots[:1]], capture_output=True, text=True)
+        return "Гачок «ревізія пам'яті» (AE S109 · REV-1) — handoff_check revision:\n" + r.stdout.strip()[-8000:]
     r = subprocess.run([sys.executable, HC, *rs], capture_output=True, text=True)
-    if rev: return ("Гачок «ревізія пам'яті» (AE S109) — handoff_check:\n" + r.stdout.strip()[:6000] +
-            "\n\nРевізія — без переїзду: ✗ — виправ, закоміть і запуш; ⚠ — звір. Потім пройди сесію (git log з її початку) і для КОЖНОГО: рішення Konst чи агента → `DECISIONS` (В-N) або бриф; "
-            "новий прилад → карта репо (REPO_LAYOUT) + «Прилади продуктів» ядра; нове правило → CLAUDE.md / профіль / рецепт; зміна стану → брифи §0 і черга; урок → свій дім + рядок у самері. "
-            "Звіт Konst — таблиця «що · дім · коміт» і «чого ще нема».")
     return ("Гачок «перевірка пам'яті перед переїздом» (HOOK-3.2) — handoff_check:\n" + r.stdout.strip()[:6000] +
             "\n\nДо стартового повідомлення: ✗ — виправ, закоміть і запуш; ⚠ — звір. Потім прочитай §0 і стартове ОЧИМА НОВОГО АГЕНТА: "
             "(а) з першого екрана ясно, що робимо далі й у якому порядку? (б) нема історії замість «як є»? "
@@ -70,7 +69,8 @@ def run(d, roots, mark_dir='/tmp'):
             "Знахідки — виправ, закоміть і запуш, тоді стартове в чат. Якщо Konst не переїжджає (слово випадкове) — проігноруй цей контекст.")
 
 def selftest():
-    t = tempfile.mkdtemp(prefix='hr-'); r = os.path.join(t, 'Prod')
+    t = tempfile.mkdtemp(prefix='hr-'); os.environ['LENS_REV_MARK'] = os.path.join(t, 'revmark')   # REV-1: тест не ставить справжню мітку «ревізію зроблено»
+    r = os.path.join(t, 'Prod')
     os.makedirs(os.path.join(r, 'sessions'))
     sh = lambda *c: subprocess.run(c, cwd=r, check=True, capture_output=True)
     sh('git', 'init', '-q'); sh('git', 'config', 'user.email', 't@t'); sh('git', 'config', 'user.name', 't')

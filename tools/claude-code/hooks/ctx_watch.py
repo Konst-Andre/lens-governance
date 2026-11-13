@@ -82,6 +82,19 @@ def line(path):
     n = numbers(path); k = lambda x: f'{x // 1000} тис.'
     return f"контекст {k(n['ctx'])} · {n['ctx'] * 100 // n['w']}% вікна {k(n['w'])} · стиснення на {k(n['t'])} · ревізія на {k(n['r'])} (найбільший крок {k(n['step'])}) · стиснень у сесії {n['comp']}"
 
+def _hc():
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__)))); import handoff_check; return handoff_check
+
+def revise():
+    """REV-1 (AE S143, В-361): поріг ревізії сам запускає handoff_check revision (повний прохід + чек-лист + мітка для precompact_guard),
+    раз на стан HEAD усіх репо сесії (повтор без нових комітів — короткий рядок). Помилка — рядок, не падіння гачка."""
+    try:
+        hc = _hc(); once = f'/tmp/lens-ctxrev-{hc.sid()}'
+        t, _ = hc.revision(os.environ.get('LENS_ROOT') or '/home/user', once)
+        return ('\n\nРЕВІЗІЯ — сама, на порозі (REV-1; той самий прохід, що на слово Konst «ревізія»):\n' + t[:6000]) if t else \
+               ' · ревізію на цьому HEAD уже дано (ctx_watch) — після виправлень і коміту дасть знову'
+    except Exception as e: return f' · ревізія сама не запустилась ({type(e).__name__}) — python3 <ядро>/tools/claude-code/handoff_check.py revision'
+
 def hook(inp, now=None):
     ev = inp.get('hook_event_name') or 'UserPromptSubmit'
     if ev == 'PostToolUse' and 'git commit' not in str((inp.get('tool_input') or {}).get('command', '')): return ''
@@ -91,7 +104,11 @@ def hook(inp, now=None):
         b, k = getattr(read, 'boundary', {}), lambda x: f'{x // 1000} тис.'
         v = (f"Після стиснення № {n['comp']} ({b.get('trigger', '?')}): контекст {k(b.get('preTokens', 0))} → {k(b.get('postTokens', 0))} · " if b else 'Після стиснення: ') + \
             f"наступне стиснення на {k(n['t'])}, ревізія на {k(n['r'])} (ctx_watch). Перша відповідь — звір переказ із самері §0 і допиши в §1 рядок «стиснення N: переказ ✓ / що загубив»." + cap(n)
-    else: v = verdict(n, now or time.time(), ev)
+        try: os.remove(_hc().rev_mark())   # REV-1: мітка «ревізію зроблено» — до стиснення; після нього для ручного /compact потрібна нова
+        except (OSError, ImportError): pass
+    else:
+        v = verdict(n, now or time.time(), ev)
+        if v and v.startswith(('⚠ контекст', '⚠ кеш холодний')): v += revise()   # REV-1: на порозі — та сама ревізія, що й на слово Konst (і вночі: після коміту)
     return json.dumps({'hookSpecificOutput': {'hookEventName': ev, 'additionalContext': v}}, ensure_ascii=False) if v else ''
 
 def selftest():
@@ -109,7 +126,7 @@ def selftest():
         nonlocal bad; print(('✓ ' if ok else '✗ ') + name); bad += not ok
     case('поріг стиснення: W 450 тис. → 395 600, W 1 млн → 901 600 (обидва = autocompact_state.threshold, AE S141)',
          limits(E)[1] == 395_600 and limits({'CLAUDE_AUTOCOMPACT_PCT_OVERRIDE': '92'})[1] == 901_600)
-    os.environ.update(E)
+    os.environ.update(E, LENS_ROOT=f'{d}/empty', LENS_REV_MARK=f'{d}/revmark')   # REV-1: тест не ганяє ревізію справжніх репо й не ставить справжню мітку
     v = lambda p, ev='UserPromptSubmit', ago=0: verdict(numbers(p), T0 + ago, ev)
     case('120 тис., повідомлення Konst — інформаційний рядок (маркер без виклику інструмента)', (v(tr('a', [a(120_000)])) or '').startswith('контекст 120 тис. · 26% вікна'))
     case('120 тис. після коміту — тиша', v(tr('a2', [a(120_000)]), 'PostToolUse') is None)
@@ -138,7 +155,22 @@ def selftest():
     open(f'{h}/.claude/projects/p1/OWN.jsonl', 'w').write('x'); time.sleep(0.01); open(f'{h}/.claude/projects/p2/CHILD.jsonl', 'w').write('x')
     os.environ['CLAUDE_CODE_SESSION_ID'] = 'OWN'
     case('рядок руками: свій журнал за CLAUDE_CODE_SESSION_ID, не новіший чужий (аудит claude -p)', newest(h).endswith('OWN.jsonl'))
-    print(f'─── ctx_watch selftest: {20 - bad}/20 ───'); return 1 if bad else 0
+    # REV-1: поріг ревізії сам дає повний прохід (раз на HEAD); нижче порога — ні; після стиснення мітка ревізії знімається
+    import subprocess; rt = f'{d}/root'; rp = f'{rt}/Prod'; os.makedirs(f'{rp}/docs/summary')
+    open(f'{rp}/docs/summary/P_SUMMARY_X.md', 'w').write('## §0 ВІДКРИТЕ\n- x\n\n```text\nСТАРТ: x\n```\n')
+    for c in (['init', '-q'], ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 's', '--allow-empty'], ['add', '-A'], ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 's2']):
+        subprocess.run(['git', '-C', rp, *c], capture_output=True)
+    os.environ.update(LENS_ROOT=rt, CLAUDE_CODE_SESSION_ID='REVTEST', LENS_REV_MARK=f'{d}/revmark')
+    for f in ('/tmp/lens-ctxrev-REVTEST',):
+        if os.path.exists(f): os.remove(f)
+    o1 = hook({'hook_event_name': 'UserPromptSubmit', 'transcript_path': tr('r1', [a(330_000)])}, T0); o2 = hook({'hook_event_name': 'PostToolUse', 'tool_input': {'command': 'git commit -m z'}, 'transcript_path': tr('r2', [a(330_000)])}, T0)
+    case('330 тис. — ⚠ і сама ревізія: вивід handoff_check + чек-лист, мітка для сторожа стиснення', 'РЕВІЗІЯ — сама' in o1 and '— Prod' in o1 and 'Звіт Konst' in o1 and os.path.exists(f'{d}/revmark'))
+    case('той самий HEAD після коміту (і вночі) — без повтору проходу, короткий рядок', 'уже дано' in o2 and 'РЕВІЗІЯ — сама' not in o2)
+    case('260 тис. (ⓘ) — ревізію сама не запускає', 'РЕВІЗІЯ' not in (hook({'transcript_path': tr('r3', [a(260_000)])}, T0) or ''))
+    hook({'hook_event_name': 'SessionStart', 'source': 'compact', 'transcript_path': p})
+    case('після стиснення мітку ревізії знято (ручний /compact знову вимагатиме ревізію)', not os.path.exists(f'{d}/revmark'))
+    os.remove('/tmp/lens-ctxrev-REVTEST')
+    print(f'─── ctx_watch selftest: {24 - bad}/24 ───'); return 1 if bad else 0
 
 if __name__ == '__main__':
     cmd = sys.argv[1] if len(sys.argv) > 1 else 'hook'

@@ -315,6 +315,50 @@ def report(repos):
     return 1 if bad else 0
 JPATH = 'tools/claude-code/hooks/HOOK_JOURNAL.md'
 
+# REV-1 (AE S143, В-361, Konst: «твоя ревізія повинна працювати так, як моя»): ОДНА точка ревізії для всіх тригерів —
+#   слово Konst (hooks/handoff-remind.sh) · поріг контексту (hooks/ctx_watch.py, і вночі — після коміту) · сам агент перед «можна /compact».
+#   `revision` — репо сесії → повний прохід + чек-лист «що з сесії ще не має дому» + мітка REV_MARK (її вимагає hooks/precompact_guard.sh для ручного /compact;
+#   знімає ctx_watch після стиснення). `gate` — лише ✗ рядки, exit 1 на ✗ (для сторожа стиснення), мітки не пише.
+CHECKLIST = ("Ревізія — без переїзду: ✗ — виправ, закоміть і запуш; ⚠ — звір. Потім пройди сесію (git log з її початку) і для КОЖНОГО: рішення Konst чи агента → `DECISIONS` (В-N) або бриф; "
+             "новий прилад → карта репо (REPO_LAYOUT) + «Прилади продуктів» ядра; нове правило → CLAUDE.md / профіль / рецепт; зміна стану → брифи §0 і черга; урок → свій дім + рядок у самері; "
+             "💡 без відповіді → самері §0 «💡 чекає вироку Konst». Звіт Konst — таблиця «що · дім · коміт» і «чого ще нема». З пам'яті сесії ревізія не робиться — лише з цього виводу.")
+
+def sid():
+    return re.sub(r'\W', '', os.environ.get('CLAUDE_CODE_SESSION_ID') or os.environ.get('CLAUDE_CODE_REMOTE_SESSION_ID') or 'x')
+
+def rev_mark(): return os.environ.get('LENS_REV_MARK') or f'/tmp/lens-revision-{sid()}'
+
+def session_repos(root='/home/user'):
+    """Репо сесії — як hooks/handoff-remind.sh: є sessions/ чи docs/summary, без .git/lens-readonly."""
+    out = []
+    for d in sorted(glob.glob(os.path.join(root, '*', '.git'))):
+        r = os.path.dirname(d)
+        if os.path.exists(os.path.join(d, 'lens-readonly')): continue
+        if any(os.path.isdir(os.path.join(r, x)) for x in ('sessions', 'docs/summary')): out.append(r)
+    return out
+
+def heads(rs): return ' '.join(git(r, 'rev-parse', 'HEAD') for r in rs)
+
+def revision(root='/home/user', once=None):
+    """→ (текст, є ✗). once — файл-позначка: той самий HEAD усіх репо, що й минулого разу → ('', False) (повтор не шумить)."""
+    import contextlib, io
+    rs = session_repos(root)
+    if not rs: return '', False
+    h = heads(rs)
+    if once and os.path.exists(once) and open(once).read() == h: return '', False
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf): bad = report(rs)
+    open(rev_mark(), 'w').write(f'{int(time.time())} {h}')
+    if once: open(once, 'w').write(h)
+    return buf.getvalue().strip() + '\n\n' + CHECKLIST, bool(bad)
+
+def gate(root='/home/user'):
+    import contextlib, io
+    rs = session_repos(root); buf = io.StringIO()
+    with contextlib.redirect_stdout(buf): report(rs) if rs else 0
+    return [l.strip() for l in buf.getvalue().splitlines() if l.strip().startswith('✗')]
+
+
 
 # (9) «код» для свіжості брифу — усе, крім документів і даних (AE S120, кандидат журналу гачків S119: коміти даних Олі з редактора й робота АНЦ —
 #     .json · фото — робили брифи «відсталими» без жодної зміни коду). Перелік — що НЕ код: невідоме розширення лишається кодом (сліпої плями нема).
@@ -437,7 +481,18 @@ def selftest():
     tcases = [('лічильники журналу: «хибне 2», «×N», «еволюція 14» = 1, «виправлено» — ні, перевірка — перша в комірці, дата не число, «нема» = 0', all(dict(tg[k]) == v for k, v in want.items()))]
     for name, ok in tcases:
         print(('✓' if ok else '✗') + ' ' + name); bad += not ok
-    total = len(cases) + len(jcases) + len(hcases) + len(tcases)
+    # REV-1: одна точка ревізії — revision (вивід + чек-лист + мітка, повтор на тому самому HEAD — тиша) · gate (лише ✗) · клон лише для читання — не репо сесії
+    os.environ['LENS_REV_MARK'] = os.path.join(tf, 'rev'); rg = os.path.dirname(mk(good)); rd = os.path.dirname(mk(good, dirty=True)); once = os.path.join(tf, 'once')
+    t1, _ = revision(rg, once); t2, _ = revision(rg, once)
+    ro = os.path.dirname(mk(good, dirty=True)); open(os.path.join(ro, 'Prod', '.git', 'lens-readonly'), 'w').close()
+    rcases = [('revision: повний вивід + чек-лист «що без дому» + мітка для сторожа стиснення', 'Звіт Konst — таблиця' in t1 and '— Prod' in t1 and os.path.exists(os.environ['LENS_REV_MARK'])),
+              ('revision: той самий HEAD удруге (once) → тиша', t2 == ''),
+              ('gate: незакомічене → ✗; чисте → нічого', any('незакомічене' in x for x in gate(rd)) and not any('незакомічене' in x for x in gate(rg))),
+              ('gate: клон лише для читання (.git/lens-readonly) не судиться', gate(ro) == [])]
+    os.environ.pop('LENS_REV_MARK')
+    for name, ok in rcases:
+        print(('✓' if ok else '✗') + ' ' + name); bad += not ok
+    total = len(cases) + len(jcases) + len(hcases) + len(tcases) + len(rcases)
     print(f'selftest: {total - bad}/{total}')
     return 1 if bad else 0
 
@@ -453,4 +508,8 @@ if __name__ == '__main__':
         prec = lambda r: f"{100 * r['справжніх'] // (r['справжніх'] + r['хибних'])} %" if r['справжніх'] + r['хибних'] else '—'   # справжні / (справжні + хибні) — на правило
         for k in sorted(t, key=lambda k: (k == 'інше', k)): print(f'| `{k}` | ' + ' | '.join(str(t[k][c]) for c, _, _ in T_COLS) + f' | {prec(t[k])} |')
         sys.exit(0)
+    if a[0] == 'revision':   # REV-1: ревізія агента = ревізія Konst — той самий прохід, що й на слово «ревізія»
+        t, b = revision(a[1] if len(a) > 1 else '/home/user'); print(t or 'репо сесії не знайдено'); sys.exit(1 if b else 0)
+    if a[0] == 'gate':   # REV-1: для hooks/precompact_guard.sh — лише ✗
+        x = gate(a[1] if len(a) > 1 else '/home/user'); print('\n'.join(x)); sys.exit(1 if x else 0)
     sys.exit(selftest() if a[0] == 'selftest' else report(a))

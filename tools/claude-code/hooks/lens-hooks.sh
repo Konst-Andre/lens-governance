@@ -80,7 +80,7 @@ u=lambda c:{"input_tokens":2,"cache_read_input_tokens":c-1002,"cache_creation_in
 r=[{"type":"assistant","timestamp":"2099-01-01T00:00:00Z","message":{"id":"m1","content":[],"usage":u(330000)}},{"type":"system","subtype":"compact_boundary","compactMetadata":{"trigger":"auto","preTokens":371723,"postTokens":14494}}]
 open(sys.argv[1],"w").write(json.dumps(r[0])+"\n"); open(sys.argv[2],"w").write("\n".join(json.dumps(x) for x in r)+"\n")' "$t/big.jsonl" "$t/cmp.jsonl"
   ok() { printf '%s' "$1" | python3 -c 'import json,sys; d=json.loads(sys.stdin.read()); a=d["hookSpecificOutput"]["additionalContext"]; sys.exit(0 if all(x in a for x in sys.argv[1:]) else 1)' "${@:2}" 2>/dev/null; }
-  e="CLAUDE_CODE_AUTO_COMPACT_WINDOW=450000 CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=92"
+  e="CLAUDE_CODE_AUTO_COMPACT_WINDOW=450000 CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=92 LENS_ROOT=$t/none LENS_REV_MARK=$t/revmark"   # REV-1: тест не ганяє ревізію справжніх репо й не чіпає справжню мітку
   o="$(printf '{"session_id":"c1","hook_event_name":"PostToolUse","tool_name":"Bash","tool_input":{"command":"git commit -m x"},"transcript_path":"%s"}' "$t/big.jsonl" | env $e LENS_ROOT="$t/none" bash "${BASH_SOURCE[0]}" PostToolUse)"
   ok "$o" "⚠ контекст 330 тис." "ревізія на 325 тис." && echo "✓ ctx_watch після коміту: 330 тис. → ⚠ одним JSON" || { echo "✗ ctx_watch після коміту: «$(printf '%s' "$o" | cut -c1-120)»"; bad=1; }
   o="$(printf '{"session_id":"c2","hook_event_name":"UserPromptSubmit","prompt":"далі","transcript_path":"%s"}' "$t/big.jsonl" | env $e LENS_REPOS_ROOT="$t/repos" LENS_ENV_DIR="$t" LENS_MARK_DIR="$t" bash "${BASH_SOURCE[0]}" UserPromptSubmit)"
