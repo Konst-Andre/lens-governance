@@ -18,6 +18,8 @@ EOF" "тіло heredoc з текстом «git add -A && git commit» → не �
 повідомлення
 ядро: ні
 EOF" "коміт з повідомленням у heredoc → коміт"
+  t none "sed -i \"s/rm x; git commit -qam c5/rm x; echo 4; git commit -qam c5/\" f.sh && bash f.sh selftest" "«; git commit» у лапках sed → не коміт (хибне AE S147)"
+  t commit "git commit -qm \"a; b\" && git push" "коміт з «;» у повідомленні в лапках → коміт"
   echo "commit-gate selftest: $ok/$n"; [ "$ok" = "$n" ]; exit
 fi
 H="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" python3 -c '
@@ -34,7 +36,8 @@ while i < len(L):
         while i < len(L) and L[i].strip() != m.group(1): i += 1
 scan = "\n".join(keep)
 GITC = r"^\s*(?:\w+=\S*\s+)*git\b(?:\s+-[cC]\s+\S+)*\s+commit\b"   # git … commit на початку команди; у тексті рядка (Python, heredoc) — ні (хибне 08.10 QR CC-4 · 19.10 AE S94)
-found = any(re.match(GITC, s) for s in re.split(r"&&|\|\||;|\||\n", scan))
+unq = re.sub(r"\x27[^\x27]*\x27|\x22(?:[^\x22\\]|\\.)*\x22", "\x27\x27", scan)   # AE S147: «;» у лапках (sed -i "s/…; git commit …/") — текст, не межа команди (хибне)
+found = any(re.match(GITC, s) for s in re.split(r"&&|\|\||;|\||\n", unq))
 if os.environ.get("COMMIT_GATE_DETECT") == "1": print("commit" if found else "none"); sys.exit(0)   # selftest: лише пошук коміту
 if not found: sys.exit(0)
 cwd, dirs = d.get("cwd") or os.getcwd(), []
