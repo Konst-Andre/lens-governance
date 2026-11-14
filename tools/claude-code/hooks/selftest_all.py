@@ -11,7 +11,8 @@ martincapodici.com «Production tests», 13.05.2025; oneuptime.com «Independent
   python3 selftest_all.py files <шлях>…    — лише тести цих файлів (commit-gate: змінив гачок → його тест до коміту)
   python3 selftest_all.py report           — рядки для handoff_check: ✗ з журналу останнього прогону або нічого
   python3 selftest_all.py selftest         — зуби самого запускача (зелений · червоний · без тесту · падіння)
-Судить: вихід ≠ 0 · «N/M» з N ≠ M в останніх рядках · «є ✗» · тайм-аут. Рядки «✗ …» усередині виводу — НЕ збій
+Судить: вихід ≠ 0 · «N/M» з N ≠ M в останніх рядках · «є ✗» · тайм-аут · пунктів «✓» менше, ніж у selftest_counts.json (В-377 В: «коментар з'їв
+код» — `#` посеред рядка тесту прибирає пункт мовчки; більше — ⚠ «підніми число тим самим комітом», файл сам не пишеться). Рядки «✗ …» усередині виводу — НЕ збій
 (детектори друкують очікуваний ✗ своїх випадків: clip, live_refs).
 """
 import os, re, subprocess, sys, tempfile, time
@@ -22,6 +23,14 @@ SKIP = {'selftest_all.py', 'audit_prompts.sh'}          # себе не ганя
 NO_TEST_OK = {'profile_parts.py'}                        # бібліотека profile-test диспетчера — тестується там
 SPECIAL = {'lens-hooks.sh': ['start-test', 'profile-test']}   # диспетчер: свої режими замість selftest
 TIMEOUT = 150
+COUNTS = os.environ.get('LENS_SELFTEST_COUNTS') or os.path.join(HERE, 'selftest_counts.json')   # очікувані числа ✓ — у репо, правиться тим самим комітом, що й тест
+INFO = []
+
+
+def expected():
+    try:
+        import json; return json.load(open(COUNTS, encoding='utf-8'))
+    except (OSError, ValueError): return {}
 
 
 def sid():
@@ -65,6 +74,10 @@ def run_one(f, timeout=TIMEOUT):
         if bad:
             fx = [l.strip() for l in out if l.strip().startswith('✗')][:2]
             return False, f'{n} {m}: вихід {r.returncode} · ' + (' · '.join(fx) or (out[-1] if out else 'без виводу'))[:220]
+        got, want = sum(1 for l in out if l.strip().startswith('✓')), expected().get(f'{n} {m}')
+        if want is not None and got < want:
+            return False, f'{n} {m}: пунктів ✓ {got} < очікуваних {want} — пункт зник мовчки (коментар посеред рядка?); свідомо прибрав — зменш число в selftest_counts.json'
+        if want is None or got > want: INFO.append(f'{n} {m}: пунктів ✓ {got}, у selftest_counts.json {want if want is not None else "нема"} — підніми число тим самим комітом')
     return True, n
 
 
@@ -90,12 +103,20 @@ def main(a):
         files, missing = discover()
         fails, n, dt = run(files, missing)
         head = f'selftest усіх гачків і приладів ядра: {n - len([x for x in fails if "без selftest" not in x])}/{n} · {dt:.0f} с · {time.strftime("%H:%M")}'
-        txt = '\n'.join([head] + ['✗ ' + x for x in fails] + ['⚠ ' + x for x in FLAKY])
+        txt = '\n'.join([head] + ['✗ ' + x for x in fails] + ['⚠ ' + x for x in FLAKY + list(dict.fromkeys(INFO))])
         try:
             open(log_path(), 'w', encoding='utf-8').write(txt + '\n')
             os.utime(log_path(), (time.time() - dt, time.time() - dt))   # час журналу = ПОЧАТОК прогону: файл, виправлений під час прогону, перевіряється заново
         except OSError: pass
-        print(txt if fails or FLAKY else head); return 1 if fails else 0
+        print(txt if fails or FLAKY or INFO else head); return 1 if fails else 0
+    if a[0] == 'counts':   # друкує JSON поточних чисел ✓ — для першого заповнення й свідомого перегляду (файл не пише: людина / агент кладе його комітом)
+        import json; files, _ = discover(); c = {}
+        for f in files:
+            for m in SPECIAL.get(os.path.basename(f), ['selftest']):
+                r = subprocess.run((['python3', f, m] if f.endswith('.py') else ['bash', f, m]), capture_output=True, text=True, timeout=TIMEOUT,
+                                   cwd=os.path.dirname(f), stdin=subprocess.DEVNULL, env=dict(os.environ, LENS_NO_SELFTEST='1'))
+                c[f'{os.path.basename(f)} {m}'] = sum(1 for l in (r.stdout + r.stderr).splitlines() if l.strip().startswith('✓'))
+        print(json.dumps(dict(sorted(c.items())), ensure_ascii=False, indent=1)); return 0
     if a[0] == 'bg':
         if os.environ.get('LENS_NO_SELFTEST'): return 0   # запобіжник кола й на рівні самого запускача
         subprocess.Popen([sys.executable, os.path.abspath(__file__), 'all'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
@@ -106,6 +127,7 @@ def main(a):
         fs = [f for f in fs if os.path.basename(f) not in SKIP and (os.path.basename(f) in SPECIAL or has_test(f))]
         fails, n, dt = run(fs)
         for x in fails: print('✗ ' + x)
+        for x in dict.fromkeys(INFO): print('⚠ ' + x)
         return 1 if fails else 0
     if a[0] == 'report':
         try: t = open(log_path(), encoding='utf-8').read().splitlines()
@@ -158,6 +180,18 @@ def selftest():
         with contextlib.redirect_stdout(buf): main(['report'])
     finally: HERE, TOOLS = old, ot
     cases.append(('report: файл виправлено після прогону → перевірено заново, старий ✗ зник', buf.getvalue().strip() == ''))
+    # В-377 В: число ✓ проти очікуваного; зуб — `#` посеред рядка тесту з'їдає пункт, вихід 0 і без «N/M»
+    cnt = os.path.join(h, 'three.sh'); W(cnt, '[ "$1" = selftest ] || exit 0\necho "✓ один"\necho "✓ два"\ntrue && echo "✓ три"\n')
+    global COUNTS; oc = COUNTS; COUNTS = os.path.join(d, 'counts.json'); W(COUNTS, '{"three.sh selftest": 3}')
+    try:
+        ok3 = run_one(cnt, 20)[0]
+        W(cnt, open(cnt).read().replace('true && echo "✓ три"', 'true # && echo "✓ три"')); r2 = run_one(cnt, 20)
+        INFO.clear(); W(COUNTS, '{"three.sh selftest": 1}'); r3 = run_one(cnt, 20)
+    finally: COUNTS = oc
+    cases.append(('пунктів ✓ стільки, скільки очікувано → ✓', ok3))
+    cases.append(('зуб: `#` посеред рядка тесту з\'їв пункт (вихід 0, без N/M) → ✗ «пункт зник мовчки»', not r2[0] and 'зник мовчки' in r2[1]))
+    cases.append(('пунктів більше за очікувані → не ✗, а ⚠ «підніми число»', r3[0] and any('підніми число' in x for x in INFO)))
+    INFO.clear()
     bad = 0
     for name, ok in cases:
         print(('✓ ' if ok else '✗ ') + name); bad += not ok
