@@ -7,7 +7,12 @@
 # Диспетчер логує спрацювання → handoff_check на переїзді вимагає вердикт. Похвала й розмова — тиша; хибне спрацювання — теж у журнал.
 # Не вада (хибне ×4, журнал гачків 16–18.10.2026): слово всередині короткої НАЗВИ в «…» з великої літери («Увійти знову» — кнопка) і
 # «не зламал…» (заперечення: «щоб це не зламало якість»). Те саме слово поза назвою — будить, як раніше; перше повідомлення сесії не вимикається.
-# Зуби: bash konst-miss.sh selftest — 12 випадків.
+# Група «прийняття» (режим yes, ярлик konst-yes — В-372, AE S145; план — AE-Simulator:docs/summary/AE_SUMMARY_2026-11-13_s2.md §0.2 п. 7):
+#   Konst приймає 💡 («так», «приймаю», «беремо», «згоден», «з підсиленням») — і лише коли останній звіт агента мав «💡 Пропоную» →
+#   нагадування про чек-лист підсилення ①–⑦ (дім — tools/claude-code/CLAUDE_CODE.md «Практики» · «Прийнята 💡»). «як є» · «дослівно» ·
+#   «без підсилення» — тиша. «так» — найчастіше слово: рахується лише першим словом речення й не «так само» / «не так».
+#   Диспетчер кличе yes окремо й додає до будь-якого іншого гачка (прийняття і вказівка на ваду можуть бути в одному повідомленні).
+# Зуби: bash konst-miss.sh selftest — 12 випадків пропусків + 11 прийняття (один — на файлі розмови).
 mode="${1:-run}"
 [ "$mode" = selftest ] && HOOK_IN="{}" || HOOK_IN="$(cat)"
 export HOOK_IN
@@ -15,6 +20,41 @@ python3 - "$mode" <<'PY'
 import json, os, re, sys
 CUE = re.compile(r"(?<![\w'’])(не те|не так|чому (ти )?не|знову|ти пропустив\w*|пропустив|не помітив|не побачив|проігнорув\w*|перекіс\w*|перекошен\w*|прилип\w*|обріза\w*|обрізан\w*|погано видно|не видно|ледь (видно|помітн\w*)|губиться|з'їха\w*|з’їха\w*|стрибає|технічн\w+ текст|незрозуміл\w*|не працює|зламал\w*)(?![\w'’])", re.I)
 CALM = re.compile(r"(?<![\w'’])(працює кайф|все працює|подобається|супер|чудов\w*)(?![\w'’])", re.I)
+
+YES = re.compile(r"(?<![\w'’])(приймаю|прийнято|беремо|згоден|згодна|погоджую|з підсиленням)(?![\w'’])|(?:^|[.!?\n]\s*)так(?![\w'’])(?!\s+само)", re.I)
+ASIS = re.compile(r"(?<![\w'’])(як є|дослівно|без підсилення)(?![\w'’])", re.I)
+IDEA = '💡 Пропоную'
+SERVICE = re.compile(r"\s*(Stop hook feedback|<system-reminder>|<command-|<local-command)")
+
+def last_report(path, tail=4_000_000):
+    """Текст останньої відповіді агента (між двома повідомленнями людини) — з хвоста розмови: журнал може мати 10+ МБ."""
+    try:
+        with open(os.path.expanduser(path), 'rb') as f:
+            f.seek(0, 2); n = f.tell(); f.seek(max(0, n - tail)); raw = f.read().decode('utf-8', 'ignore')
+    except Exception: return ''
+    cur, last = [], ''
+    for ln in raw.splitlines():
+        try: e = json.loads(ln)
+        except Exception: continue
+        m = e.get('message') or {}; role = m.get('role') or e.get('type'); c = m.get('content')
+        txt = c if isinstance(c, str) else ' '.join(x.get('text', '') for x in c if isinstance(x, dict) and x.get('type') == 'text') if isinstance(c, list) else ''
+        if role == 'user' and txt and not e.get('isMeta') and not SERVICE.match(txt):   # відгук гачка Stop — не межа звіту (S145: різав звіт з 💡 навпіл)
+            if cur: last = '\n'.join(cur); cur = []
+        elif role == 'assistant' and isinstance(c, list):
+            cur += [x.get('text', '') for x in c if isinstance(x, dict) and x.get('type') == 'text']
+    return '\n'.join(cur) if cur else last
+
+def yes(d, rep=None):
+    p = d.get('prompt') or ''
+    if not YES.search(p) or ASIS.search(p): return None
+    r = last_report(d.get('transcript_path') or '') if rep is None else rep
+    if IDEA not in r: return None
+    return ("Konst приймає 💡 — спершу підсилення за чек-листом (tools/claude-code/CLAUDE_CODE.md «Практики» · «Прийнята 💡», ядро): "
+            "① суть — яку причину лікує, не симптом? ② сильніше в межах — структура (один дім, злити з наявним) · техніка (простіше · дешевше · надійніше) · "
+            "контекст (знадобиться іншим → ядро) ③ світ — коли вирішує форму, три рядки з джерелом і датою ④ премортем — «через місяць шкодуємо — чому?», "
+            "дірка → латка або прийнятий ризик ⑤ ціна — ліміти заміром, ручні дії Konst, зворотність ⑥ вирок — роблю / звужую / відкидаю з причиною "
+            "⑦ у звіті блок «Підсилення: було → стало» + дірки й латки (нічого — що перевірив). Другий погляд (профіль ЦИКЛ п. 3) — не дублювати. "
+            "Дрібний оборотний крок — одним рядком. Хибне (це не прийняття 💡) — рядком «konst-yes … хибне» в журналі гачків.")
 
 NAME = re.compile(r"«[A-ZА-ЯІЇЄҐ][^«»\n]{0,38}»")   # назва кнопки / екрана в лапках: «Увійти знову», «Оновити сайт»
 
@@ -45,10 +85,32 @@ def selftest():
     bad = 0
     for name, p, want in cases:
         ok = (run({'prompt': p}) is not None) == want; bad += not ok; print(('✓ ' if ok else '✗ ') + name)
+    yc = [('«пропозицію приймаю» після 💡 → нагадування', 'пропозицію приймаю за чек-листом', 'Звіт.\n\n💡 Пропоную: гачок, що нагадує чек-лист.', True),
+          ('«так, роби» після 💡 → нагадування', 'так, роби', 'Звіт.\n\n💡 Пропоную: гачок, що нагадує чек-лист.', True),
+          ('«беремо з підсиленням» → нагадування', 'Добре. Беремо з підсиленням.', 'Звіт.\n\n💡 Пропоную: гачок, що нагадує чек-лист.', True),
+          ('«так» без 💡 у звіті → тиша', 'так, роби', 'Звіт без пропозиції.', False),
+          ('«так як є» після 💡 → тиша', 'так як є', 'Звіт.\n\n💡 Пропоную: гачок, що нагадує чек-лист.', False),
+          ('«приймаю дослівно» → тиша', 'приймаю дослівно', 'Звіт.\n\n💡 Пропоную: гачок, що нагадує чек-лист.', False),
+          ('«так само» після 💡 → тиша', 'зроби так само, як у рейці', 'Звіт.\n\n💡 Пропоную: гачок, що нагадує чек-лист.', False),
+          ('«не так» після 💡 → тиша', 'це не так працює', 'Звіт.\n\n💡 Пропоную: гачок, що нагадує чек-лист.', False),
+          ('«так» посеред речення після 💡 → тиша', 'чому воно так рухається', 'Звіт.\n\n💡 Пропоную: гачок, що нагадує чек-лист.', False),
+          ('звичайне доручення після 💡 → тиша', 'роби П3', 'Звіт.\n\n💡 Пропоную: гачок, що нагадує чек-лист.', False)]
+    import tempfile
+    tp = tempfile.NamedTemporaryFile('w', suffix='.jsonl', delete=False, encoding='utf-8')
+    for e in [{'type': 'user', 'message': {'role': 'user', 'content': 'зроби план'}},
+              {'type': 'assistant', 'message': {'role': 'assistant', 'content': [{'type': 'text', 'text': 'Звіт.\\n\\n💡 Пропоную: гачок.'}]}},
+              {'type': 'user', 'message': {'role': 'user', 'content': [{'type': 'text', 'text': 'Stop hook feedback:\nворота'}]}},
+              {'type': 'assistant', 'message': {'role': 'assistant', 'content': [{'type': 'text', 'text': 'дописав рядок'}]}}]: tp.write(json.dumps(e, ensure_ascii=False) + '\n')
+    tp.close()
+    ok = yes({'prompt': 'приймаю', 'transcript_path': tp.name}) is not None; bad += not ok; os.unlink(tp.name)
+    print(('✓ ' if ok else '✗ ') + 'розмова: 💡 до відгуку гачка Stop — відгук не межа звіту → нагадування'); cases = cases + [0]
+    for name, p, r, want in yc:
+        ok = (yes({'prompt': p}, r) is not None) == want; bad += not ok; print(('✓ ' if ok else '✗ ') + name)
+    cases = cases + yc
     print(f'─── konst-miss selftest: {len(cases) - bad}/{len(cases)} ───'); return 1 if bad else 0
 
 if sys.argv[1] == 'selftest': sys.exit(selftest())
-try: out = run(json.loads(os.environ.get('HOOK_IN') or '{}'))
+try: out = (yes if sys.argv[1] == 'yes' else run)(json.loads(os.environ.get('HOOK_IN') or '{}'))
 except Exception: __import__('traceback').print_exc(); out = None
 if out: print(json.dumps({'hookSpecificOutput': {'hookEventName': 'UserPromptSubmit', 'additionalContext': out}}, ensure_ascii=False))
 PY

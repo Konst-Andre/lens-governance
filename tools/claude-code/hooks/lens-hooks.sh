@@ -173,6 +173,7 @@ case "$ev" in
     run memory-guard.sh stop || run handoff-remind.sh stop || run plan-web.sh stop ;;
   prompt)   # перевірка перед переїздом (HOOK-3.2), інакше — аркуш середовища на прохання (ENV-1), інакше — «пропуск, знайдений Konst» (HOOK-5)
     o="$(run handoff-remind.sh "" || run env-remind.sh "" || run konst-miss.sh "")"
+    y="$(printf '%s' "$in" | bash "$h/konst-miss.sh" yes 2>>"$E")"; [ -n "$y" ] && o="$(mrg "$o" "$(fire konst-yes "$y")")"   # В-372 (AE S145): Konst приймає 💡 → чек-лист підсилення; додається, не витісняє
     r="$(run route-remind.sh "")"   # AE S135 · маршрут для Konst — додається до будь-якого іншого гачка, не витісняє (route-remind.sh)
     [ -n "$r" ] && o="$(python3 -c 'import json,sys
 a,b=sys.argv[1],sys.argv[2]
