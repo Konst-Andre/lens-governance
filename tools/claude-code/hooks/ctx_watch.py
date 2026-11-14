@@ -8,7 +8,8 @@
 #   поріг стиснення T = PCT/100 × (W − 20 000): W — CLAUDE_CODE_AUTO_COMPACT_WINDOW (без неї — 1 000 000), PCT — CLAUDE_AUTOCOMPACT_PCT_OVERRIDE
 #     (у хмарі 92 ставить платформа, серед змінних середовища Konst його нема). Звірено з get_session → autocompact_state.threshold на двох точках
 #     (AE S141): W 1 млн → 901 600 · W 450 тис. → 395 600 (effective_window 430 000).
-#   поріг ревізії R = T − найбільший крок − 15 000 (ціна самої ревізії). Крок — приріст контексту між двома `git commit` після останнього стиснення,
+#   поріг ревізії R = T − найбільший крок − 25 000 (ціна самої ревізії; AE S145, В-373: було 15 000 — заміряно ≥ 24 тис.: ревізія з ✗ почалась ≈ 372 тис.
+#   і не закінчилась до автостиснення на 396 тис.). Крок — приріст контексту між двома `git commit` після останнього стиснення,
 #     не менше 55 000 (найбільший крок AE S141 — 55 400). Ⓘ «на межі предмета» — від min(250 000, R − 70 000).
 # Вироки: на повідомлення Konst — завжди рядок «контекст · % вікна · ревізія на · стиснень у сесії» (з нього маркер, В-353) або ⓘ межа предмета · ⚠ ревізія зараз ·
 #   ⚠ кеш холодний (пауза > TTL при ≥ 250 тис.); після коміту — лише ⚠; лік стиснень (compact_boundary) ≥ 2 / ≥ 3 → вимога переїзду (вдень · вночі).
@@ -20,7 +21,7 @@
 # Запуск: echo '<json гачка>' | python3 ctx_watch.py hook   ·   python3 ctx_watch.py line [журнал]   ·   python3 ctx_watch.py selftest
 import datetime, glob, json, os, sys, time, tempfile
 
-RESERVE_OUT, STEP_MIN, REV_COST, SOFT, TTL_S = 20_000, 55_000, 15_000, 250_000, 3600
+RESERVE_OUT, STEP_MIN, REV_COST, SOFT, TTL_S = 20_000, 55_000, 25_000, 250_000, 3600
 CAP_DAY, CAP_NIGHT = 2, 3
 STALE_S = 3600     # В-364 п. 2 (б): замір лімітів старший за годину — «зміряй»
 BASE = 80_000      # постійна база контексту (AE S144, застосунок «Використання» після стиснення № 2: 95,5 тис. = інструменти MCP 35,2 · системні 20,8 · CLAUDE.md двох репо 11,5 ·
@@ -186,9 +187,9 @@ def selftest():
     case('120 тис., повідомлення Konst — інформаційний рядок (маркер без виклику інструмента)', (v(tr('a', [a(120_000)])) or '').startswith('контекст 120 тис. · 26% вікна'))
     case('120 тис. після коміту — тиша', v(tr('a2', [a(120_000)]), 'PostToolUse') is None)
     case('260 тис. — ⓘ межа предмета', (v(tr('b', [a(260_000)])) or '').startswith('ⓘ'))
-    case('330 тис. (> 395,6 − 55 − 15 = 325,6) — ⚠ ревізія зараз', (v(tr('c', [a(330_000)])) or '').startswith('⚠ контекст'))
+    case('320 тис. (> 395,6 − 55 − 25 = 315,6) — ⚠ ревізія зараз', (v(tr('c', [a(320_000)])) or '').startswith('⚠ контекст'))
     p = tr('d', [a(100_000, commit=True), a(190_000, commit=True), a(300_000)])
-    case('крок 90 тис. між комітами → поріг ревізії 290,6 тис.; 300 тис. — ⚠', numbers(p)['r'] == 290_600 and (v(p) or '').startswith('⚠ контекст'))
+    case('крок 90 тис. між комітами → поріг ревізії 280,6 тис.; 300 тис. — ⚠', numbers(p)['r'] == 280_600 and (v(p) or '').startswith('⚠ контекст'))
     p = tr('e', [a(100_000, commit=True), a(300_000, commit=True), {'type': 'system', 'subtype': 'compact_boundary'}, a(110_000, commit=True), a(120_000)])
     case('після стиснення кроки рахуються наново; 120 тис. — без ⚠', numbers(p)['step'] == STEP_MIN and not (v(p) or '').startswith('⚠'))
     case('відповідь субагента (isSidechain) не рахується', (v(tr('f', [a(120_000), a(390_000, side=True)])) or '').startswith('контекст 120 тис.'))
@@ -204,7 +205,7 @@ def selftest():
     case('журналу нема — тиша', hook({'transcript_path': f'{d}/none.jsonl'}) == '')
     p = tr('m', [a(370_000), {'type': 'system', 'subtype': 'compact_boundary', 'compactMetadata': {'trigger': 'auto', 'preTokens': 371_723, 'postTokens': 14_494}}])
     o = hook({'hook_event_name': 'SessionStart', 'source': 'compact', 'transcript_path': p})
-    case('SessionStart compact: «№ 1», «371 тис. → 14 тис.», пороги, вимога рядка «стиснення N»', all(x in o for x in ('№ 1', '371 тис. → 14 тис.', 'ревізія на 325 тис.', 'стиснення N')))
+    case('SessionStart compact: «№ 1», «371 тис. → 14 тис.», пороги, вимога рядка «стиснення N»', all(x in o for x in ('№ 1', '371 тис. → 14 тис.', 'ревізія на 315 тис.', 'стиснення N')))
     case('SessionStart startup — тиша', hook({'hook_event_name': 'SessionStart', 'source': 'startup', 'transcript_path': p}) == '')
     h = f'{d}/home'; os.makedirs(f'{h}/.claude/projects/p1'); os.makedirs(f'{h}/.claude/projects/p2')
     open(f'{h}/.claude/projects/p1/OWN.jsonl', 'w').write('x'); time.sleep(0.01); open(f'{h}/.claude/projects/p2/CHILD.jsonl', 'w').write('x')
