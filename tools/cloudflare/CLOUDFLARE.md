@@ -2,7 +2,7 @@
 
 > живе доки: проєкти Konst живуть на Cloudflare. Дім — `lens-governance:tools/cloudflare/` (поруч із каркасом `tools/claude-code/`).
 > Народився: AE-Simulator S89, 03.10.2026. Блок `cf-limits` нижче — **єдине джерело** чисел і порогів для `cf_budget.sh`; правиш число — правиш блок.
-> **Перевірено: 2026-10-03** (рядок читає `cf_budget.sh`; старше 30 днів — нагадує актуалізувати, §5).
+> **Перевірено: 2026-11-14** (рядок читає `cf_budget.sh`; старше 30 днів — нагадує актуалізувати, §5).
 
 **Навіщо.** Усі проєкти Konst — **один безкоштовний акаунт**. Ліміти спільні: бот AirLens, сайт AE, QR-Lens і кожен новий проєкт
 їдять з тих самих 100 000 запитів на день і однієї черги Workers Builds (1 збірка водночас); 500 збірок Pages на місяць — поки живий Pages `qr-lens` (§3). Сесія одного репо не бачить, що робить інший — тому бюджет
@@ -23,12 +23,12 @@ fresh_days=30
 
 | ресурс | ліміт Free | на що скидається | хто їсть | що буде при переповненні | джерело (перевірено) |
 |---|---|---|---|---|---|
-| запити до воркерів + Pages Functions | 100 000 / добу на **акаунт** | опівночі UTC | бот (вебхук, крон), API сайтів, проксі моделі | помилка 1027 — воркер не відповідає до кінця доби | developers.cloudflare.com/workers/platform/limits (03.10.2026) |
-| CPU на запит | 10 мс | — | важкий розбір, рендер | обрив запиту: Error 1102, `exceededCpu` | developers.cloudflare.com/workers/platform/limits (29.10.2026) |
-| статика Pages / `[assets]` воркера | без ліміту, безкоштовно | — | сайти, Mini App | — | developers.cloudflare.com/pages/functions/pricing (03.10.2026) |
-| **збірки Pages** | **500 / місяць на акаунт**, 1 водночас | календарний місяць | **кожен push у будь-яку гілку будь-якого підключеного репо** (за замовчуванням) | нові деплої стоять: сайт живий, але зміни (і дані з редактора) не доїжджають | developers.cloudflare.com/pages/platform/limits (03.10.2026) |
-| збірки воркерів (Workers Builds) | 3 000 хв / місяць, 1 водночас, 20 хв на збірку | місяць | push у репо з підключеним Workers Builds | викладка стоїть | developers.cloudflare.com/workers/ci-cd/builds/limits-and-pricing (03.10.2026) |
-| крон-тригери | 5 на акаунт | — | боти | новий крон не створиться | workers/platform/limits (03.10.2026) |
+| запити до воркерів + Pages Functions | 100 000 / добу на **акаунт** | опівночі UTC | бот (вебхук, крон), API сайтів, проксі моделі | помилка 1027 — воркер не відповідає до кінця доби | developers.cloudflare.com/workers/platform/limits (14.11.2026) |
+| CPU на запит | 10 мс | — | важкий розбір, рендер | обрив запиту: Error 1102, `exceededCpu` | developers.cloudflare.com/workers/platform/limits (14.11.2026) |
+| статика Pages / `[assets]` воркера | без ліміту, безкоштовно | — | сайти, Mini App | — | developers.cloudflare.com/pages/functions/pricing (14.11.2026) |
+| **збірки Pages** | **500 / місяць на акаунт**, 1 водночас | календарний місяць | **кожен push у будь-яку гілку будь-якого підключеного репо** (за замовчуванням) | нові деплої стоять: сайт живий, але зміни (і дані з редактора) не доїжджають | developers.cloudflare.com/pages/platform/limits (14.11.2026) |
+| збірки воркерів (Workers Builds) | 3 000 хв / місяць, 1 водночас, 20 хв на збірку | місяць | push у репо з підключеним Workers Builds | викладка стоїть | developers.cloudflare.com/workers/ci-cd/builds/limits-and-pricing (14.11.2026) |
+| крон-тригери | 5 на акаунт | — | боти | новий крон не створиться | workers/platform/limits (14.11.2026) |
 | D1 | 5 млн прочитаних · 100 тис. записаних **рядків** / добу; **одна база ≤ 500 МБ** (5 ГБ — на весь акаунт, не на базу) | опівночі UTC (рядки) · розмір — ніколи | бот | — | developers.cloudflare.com/d1/platform/pricing (30.10.2026) · /d1/platform/limits (07.11.2026); рецепт — кукбук том 6, T4 |
 
 **CPU — як судити (AE S120, 01.11.2026):** окремі запити понад 10 мс проходять без помилок — рідкі перевищення Cloudflare допускає, постійні — зупиняє (developers.cloudflare.com/workers/platform/limits, оновлено 29.10.2026: «built-in flexibility … infrequently runs over», «hitting the limit consistently … terminated»; «перенесення» (rollover) як механізм — лише community.cloudflare.com «Far over CPU time limit for free plan», 01.11.2026). Тому `cf_budget` судить відмови (✗) і **p50** (⚠ від alarm_share), p99 — довідка. Замір 01.11: airlens p50 19,2 мс (постійно понад межу, відмов 0) · ae-edit 7,2 · qr-admin 7,0.
@@ -168,3 +168,4 @@ Workers, Account Analytics) і `CLOUDFLARE_ACCOUNT_ID`. Скрипт лише ч
 | 2026-10-03 | AirLens S11 | API акаунта: запити по днях 26.09–03.10 за скриптами; проєкт Pages airlens (домени, деплої); developers.cloudflare.com/workers/ci-cd/builds/api-reference (22.09.2026) · …/configuration (API token) | заміряно: ≤ 2 027 запитів/добу, бот 97 %; Pages airlens видалено (131 деплой + проєкт, `DELETE …?force=true` без збоїв); Builds API — лише токен користувача (права: Workers Builds Configuration Edit + Workers Scripts Read); build token Workers Builds — окремий, автостворений, не чіпати |
 | 2026-10-03 | AE-Simulator S89 | developers.cloudflare.com/pages/platform/known-issues (06.05.2026) | проєкт Pages із >100 деплоями дашборд не видаляє: спершу деплої (`wrangler pages deployment delete <id> --project-name <p> --force` у циклі, скрипт на тій сторінці; або API `DELETE …/pages/projects/<p>/deployments/<id>?force=true`), активний продакшн-деплой лишається — потім видалити проєкт |
 | 2026-10-03 | AE-Simulator S89 | усі джерела §1; API акаунта: проєкти, збірки за 30 днів, запити за 7 днів | файл створено; заміряно: запити ≤ 2 000/добу (~2 %), збірки Pages ~305 за 30 днів (AE ~173, AirLens-Pages 132) |
+| 14.11.2026 | AE S146 | §1 усі рядки за джерелами (WebFetch): workers/platform/limits (100 000 / добу · 10 мс CPU · 5 кронів · «infrequently runs over» — допуск рідких перевищень, постійні — обрив) · workers/ci-cd/builds/limits-and-pricing (3 000 хв · 1 водночас · 20 хв) · pages/platform/limits (500 збірок · 1 водночас · Functions у квоті Workers) · pages/functions/pricing (статика — free and unlimited) · d1/platform/limits + pricing (500 МБ на базу · 5 ГБ · 5 млн / 100 тис. рядків) | змін нема; дати джерел → 14.11.2026 |

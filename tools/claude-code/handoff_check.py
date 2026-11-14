@@ -127,7 +127,11 @@ def check_repo(repo, now=None):
     grep = f'session_{tail}' if tail else 'Claude-Session'
     after = git(repo, 'log', '--format=%h', f'--grep={grep}', f'{last}..HEAD') if last else ''
     if after:   # AE S145 (В-370): самері живе в main, код — на гілці; коміт гілки, названий у самері main (чи origin/main), — не відстає
-        ref = ''.join(git(repo, 'show', f'{r}:{sm}') for r in ('main', 'origin/main')) if git(repo, 'rev-parse', '--abbrev-ref', 'HEAD') != 'main' else ''
+        # AE S146: на гілці самері тієї ж назви — старе; у main нова сесія завела своє (`_s2`) → читати 3 найновіші самері теки з main, а не лише файл з назвою гілки
+        def _main_sm(r):
+            d = os.path.dirname(sm); fs = sorted(x for x in git(repo, 'ls-tree', '--name-only', r, '--', d + '/').split() if 'summary' in x.lower())
+            return ''.join(git(repo, 'show', f'{r}:{f}') for f in (fs[-3:] or [sm]))
+        ref = ''.join(_main_sm(r) for r in ('main', 'origin/main')) if git(repo, 'rev-parse', '--abbrev-ref', 'HEAD') != 'main' else ''
         cov = [h for h in after.split() if ref and h[:7] in ref]
         if cov: after = ' '.join(h for h in after.split() if h not in cov)
     n = len(after.split()) if after else 0
@@ -428,11 +432,12 @@ def selftest():
         open(os.path.join(r, 'docs/summary/P_SUMMARY_2026-10-18.md'), 'w').write(summary)
         sh(r, 'git', 'add', '-A'); sh(r, 'git', 'commit', '-qm', 'самері\n\nClaude-Session: https://claude.ai/code/session_T')
         return r
-    def mk_br(named):   # AE S145 (В-370): самері — у main, код — на гілці claude/x; коміт гілки названо (чи ні) у самері main
+    def mk_br(named, new=False):   # AE S145 (В-370): самері — у main, код — на гілці claude/x; коміт гілки названо (чи ні) у самері main; new — у новому самері main (`_s2`, AE S146)
         r = mk_nl(good_nl); sh(r, 'git', 'branch', '-M', 'main'); sh(r, 'git', 'checkout', '-qb', 'claude/x')
         open(os.path.join(r, 'code.txt'), 'w').write('1'); sh(r, 'git', 'add', '-A'); sh(r, 'git', 'commit', '-qm', 'код\n\nClaude-Session: https://claude.ai/code/session_T')
         h = subprocess.run(['git', '-C', r, 'rev-parse', '--short=7', 'HEAD'], capture_output=True, text=True).stdout.strip()
-        sh(r, 'git', 'checkout', '-q', 'main'); open(os.path.join(r, 'docs/summary/P_SUMMARY_2026-10-18.md'), 'a').write(f'\n- код гілки `{h if named else "0000000"}`\n')
+        sh(r, 'git', 'checkout', '-q', 'main'); open(os.path.join(r, 'docs/summary/P_SUMMARY_2026-10-18' + ('_s2' if new else '') + '.md'), 'a').write(f'\n- код гілки `{h if named else "0000000"}`\n')
+        if new: sh(r, 'git', 'add', '-A')
         sh(r, 'git', 'commit', '-qam', 'самері\n\nClaude-Session: https://claude.ai/code/session_T'); sh(r, 'git', 'checkout', '-q', 'claude/x')
         return r
     def mk_k():   # ядро: самері в sessions/Lens_gov/ від сесії ядра; сесія продукту комітить робочу теку sessions/FAB-1/ (AE S139)
@@ -478,6 +483,7 @@ def selftest():
         ('не-Lens: самері без стартового → ✗', mk_nl(good_nl.split('## §6')[0]), 'стартове повідомлення нема'),
         ('гілка: коміт коду названо в самері main → не відстає (AE S145, В-370)', mk_br(True), '!самері відстає'),
         ('гілка: коміт коду НЕ названо в самері main → ✗ відстає (зуб)', mk_br(False), 'самері відстає'),
+        ('гілка: коміт коду названо в НОВОМУ самері main (`_s2`), на гілці — старе → не відстає (AE S146, хибне ✗ блокувало /compact)', mk_br(True, True), '!самері відстає'),
         ('ядро: коміт сесії продукту в sessions/FAB-1/, самері — sessions/Lens_gov/ → ⓘ, не ✗ «відстає» (хибне AE S139)', mk_k(), '!самері відстає'),
     ]
     bad = 0
