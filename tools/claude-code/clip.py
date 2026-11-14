@@ -9,7 +9,7 @@
 # Запуск:  python3 clip.py <сценарій.json> <тека виходу>        (сценарій — нижче)
 #          python3 clip.py selftest                              (зуби: рух → кліп і ≥ 3 кадри; без руху → ✗ «руху не видно»; стрибок на кроці з "motion" → ✗ «стрибок, не рух»)
 # Сценарій JSON: {"url": "...", "name": "rail_C", "viewport": [1920, 1080] | "device": "iPhone 15",
-#   "init": ["<js до завантаження>"], "ready": "<js-умова готовності>", "crop": [x, y, w, h],
+#   "init": ["<js до завантаження>"], "ready": "<js-умова готовності>", "crop": [x, y, w, h] (менший за екран — лише з "crop_why": "<чому, ≥ 20 знаків>", AE S146),
 #   "steps": [{"click": "<css>"}, {"hover": "<css>"}, {"move": [x, y]}, {"fill": ["<css>", "текст"]}, {"press": "Tab"}, {"eval": "<js>"}, {"wait": 900}],
 #   "min_frames": 3}
 #   Крок з рухом — мітка "motion": true: {"click": "<css>", "wait": 900, "motion": true}. Такий крок мусить дати ≥ 3 кадри, що змінюються,
@@ -53,6 +53,8 @@ def record(sc, out):
             marks[-1][1] = time.monotonic() - t0
         pg.wait_for_timeout(sc.get("tail", 500)); ctx.close(); b.close()
     src = next(vid.glob("*.webm"))
+    cb = crop_bad(sc, vw["width"], vw["height"])
+    if cb: print(f"✗ {name}: {cb}"); return False
     vf = "fps=30"
     if sc.get("crop"):
         x, y, w, h = sc["crop"]; vf = f"crop={w}:{h}:{x}:{y},fps=30"
@@ -88,6 +90,14 @@ def record(sc, out):
     print((f"✓ {name}: {n} кадрів змінюються, {dur:.1f} с → {mp4}" if ok else f"✗ {name}: {why}"))
     return ok
 
+def crop_bad(sc, W, H):
+    """AE S146 (пропуск Konst «чи береш до уваги центральну й праву частину?»): кліп руху різав ліву половину — рух центру й правої частини
+    ніхто не бачив. Кроп, менший за екран, — лише з причиною "crop_why" (≥ 20 знаків): рух предмета зсуває решту екрана."""
+    c = sc.get("crop")
+    if not c or (c[2] >= W and c[3] >= H): return None
+    if len(str(sc.get("crop_why") or "").strip()) >= 20: return None
+    return f"кроп {c[2]}×{c[3]} з екрана {W}×{H} без \"crop_why\" — рух решти екрана (центр, права частина) не видно; кадр — увесь екран або причина ≥ 20 знаків"
+
 def selftest():
     need_ffmpeg(); bad = 0; tmp = pathlib.Path(tempfile.mkdtemp())
     (tmp / "move.html").write_text("<!doctype html><style>#b{width:80px;height:80px;background:#08c;transition:transform .8s ease}#b.on{transform:translateX(400px)}</style>"
@@ -104,9 +114,12 @@ def selftest():
     for ok, m in [(r1 and (tmp / "out/move.mp4").stat().st_size > 1000 and (tmp / "out/move_frames.webp").exists(), "сторінка з рухом → MP4 + смуга кадрів"),
                   (not r2, "зуби: сторінка без руху → ✗ «руху не видно»"),
                   (not r3, "зуби: 4 миттєві перемикання на кроках з «motion» → ✗ «стрибок, не рух» (без мітки було ✓)"),
-                  (r4, "ті самі 4 кроки з переходом 0,8 с → ✓")]:
+                  (r4, "ті самі 4 кроки з переходом 0,8 с → ✓"),
+                  (crop_bad({"crop": [0, 0, 320, 360]}, 640, 360) is not None, "зуби: кроп половини екрана без crop_why → ✗ (AE S146)"),
+                  (crop_bad({"crop": [0, 0, 320, 360], "crop_why": "рух лише в кнопці, решта екрана статична"}, 640, 360) is None, "кроп з причиною → дозволено"),
+                  (crop_bad({"crop": [0, 0, 640, 360]}, 640, 360) is None, "кроп = увесь екран → дозволено")]:
         print(("✓ " if ok else "✗ ") + m); bad += not ok
-    print(f"─── clip selftest: {4 - bad}/4 ───"); sys.exit(1 if bad else 0)
+    print(f"─── clip selftest: {7 - bad}/7 ───"); sys.exit(1 if bad else 0)
 
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "selftest": selftest()
