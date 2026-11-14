@@ -11,11 +11,16 @@
 #   stop_hook_active не пропускає (інакше друга спроба обходила б суд), але стеля — 3 зупинки поспіль, далі пропуск і рядок «⚠ обійдено» в журнал спрацювань.
 # Подія UserPromptSubmit (режим open): кожен рядок журналу з «НЕ ЗРОБЛЕНО» (будь-якої сесії) → нагадування агентові на початку ходу, доки не закрито.
 # Розмиті слова («записав») не судить — зупиняв би даремно. Помилка розбору → тиша (stderr — у журнал помилок диспетчера).
-# Зуби: bash promise-guard.sh selftest — 20 випадків на тимчасовому репо; PG_INJECT=1|2|3 bash promise-guard.sh selftest — кожен ✗ (зламаний суд червоніє).
+# Зуби: bash promise-guard.sh selftest — на тимчасових репо; PG_INJECT=1|2|3|4 bash promise-guard.sh selftest — кожен ✗ (зламаний суд червоніє; 4 — будь-який хеш «народився в ході»).
+# Подія Stop (режим shadow, В-377 «так» Konst 14.11.2026 — тінь 2 сесії, далі блок при ≤ 1 хибній на 10 ходів): «заява дії = доказ» — у звіті
+#   «записав · закомітив · запушив · виправив · додав · зробив · готово · зроблено · ✅» (не в лапках «…», не в коді, не «не …», не «у ході N» / «S1xx»)
+#   → хоч один хеш коміту, що є в git і народився після останнього справжнього повідомлення Konst (transcript_path); «запушив» → він уже в origin/*;
+#   кожен хеш звіту — є в git; кожне `файл:рядок` — рядок існує. + злитий сюди memory_line (FAB-1): рядок «пам'ять: …» проти стану git.
+#   Вирок — рядком у /tmp/lens-shadow-<сесія>.tsv, нічого не друкує; підсумок — bash promise-guard.sh tally <сесія> (рядком у журнал гачків щосамері).
 mode="${1:-stop}"
-[ "$mode" = selftest ] && HOOK_IN="{}" || HOOK_IN="$(cat)"
+case "$mode" in selftest|tally) HOOK_IN="{}" ;; *) HOOK_IN="$(cat)" ;; esac
 export HOOK_IN PG_SELF="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-python3 - "$mode" <<'PY'
+python3 - "$mode" "${@:2}" <<'PY'
 import json, os, re, subprocess, sys, tempfile
 HERE = os.environ['PG_SELF']
 CLAIM = re.compile(r"(?<![«\"„])(?<!не )(?<!не\s\s)можна\s+(?:робити\s+|запускати\s+)?/compact", re.I)   # у лапках — цитата правила, не заява (хибне S146, хід 11: стартове цитувало сторож)
@@ -32,9 +37,9 @@ def git(repo, *a):
 
 def repos():
     root = env('LENS_ROOT', '/home/user')
-    return [os.path.join(root, n) for n in sorted(os.listdir(root)) if os.path.isdir(os.path.join(root, n, '.git'))] if os.path.isdir(root) else []
+    return [os.path.join(root, n) for n in sorted(os.listdir(root)) if os.path.exists(os.path.join(root, n, '.git'))] if os.path.isdir(root) else []   # .git-файл — тека worktree (../AE-main)
 
-INJ = os.environ.get('PG_INJECT', '')   # зуби selftest: 1 — будь-який хеш «є в git»; 2 — заяву «можна /compact» не бачить; 3 — коміти сесії не рахуються
+INJ = os.environ.get('PG_INJECT', '')   # зуби selftest: 1 — будь-який хеш «є в git»; 2 — заяву «можна /compact» не бачить; 3 — коміти сесії не рахуються; 4 — будь-який хеш «народився в ході»
 def exists(h):
     if INJ == '1': return True
     return any(git(r, 'cat-file', '-e', h + '^{commit}') is not None for r in repos())
@@ -111,6 +116,169 @@ def open_ctx():
     return ("Відкриті обіцянки «НЕ ЗРОБЛЕНО» в журналі гачків (" + str(len(o)) + "): спершу їх — виправлення з хешем і зубом, тоді рядок закрити; "
             "не встигаєш — у звіті першими рядками «не зроблено: …».\n" + "\n".join("· " + l.strip()[:220] for l in o[:5]))
 
+# ── «заява дії = доказ» (В-377) і рядок «пам'ять: …» (злито з memory_line.py, FAB-1) — поки лише тінь ──
+VERB = re.compile(r"(?<![\w-])(?<!не )(?:записав|закомітив|запушив|виправив|додав|зробив|готово|зроблено)(?![\w-])|✅", re.I)
+PUSHED = re.compile(r"(?<![\w-])(?<!не )запушив", re.I)
+PAST = re.compile(r"у\s+ході\s+\d+|(?<![\w-])S\d{2,3}(?![\w-])", re.I)   # «у ході 4 записав», «S145: додав» — історія, не заява цього ходу
+ANYHASH = re.compile(r"(?<![\w/#.-])(?=[0-9a-f]*[a-f])(?=[0-9a-f]*\d)([0-9a-f]{7,12}|[0-9a-f]{40})(?![\w/.-])")   # і літера, і цифра: не число, не слово
+REF = re.compile(r"`(?:([A-Za-z][\w.-]*):)?((?:[\w.-]+/)*[\w.-]+\.[A-Za-z0-9]{1,8}):(\d+)(?:[-–]\d+)?`")
+MLINE = re.compile(r"(?mi)^[\s>*_`-]*пам['’ʼ]ять\s*[:—-]\s*(.+)$")
+MNONE = re.compile(r"(?i)нового\s+нема")
+
+def plain(msg):
+    """Текст без коду й цитат: ```…```, `…`, «…», "…" — там дієслово не заява."""
+    t = re.sub(r"```.*?```", " ", msg, flags=re.S)
+    t = re.sub(r"`[^`\n]*`", " ", t)
+    for _ in range(3): t = re.sub(r"«[^«»]*»", " ", t)
+    return re.sub(r'"[^"\n]*"|„[^“”\n]*[“”]', " ", t)
+
+def konst_ts(path):
+    """Час останнього справжнього повідомлення (рядок, не tool_result) основної гілки запису; нема — None."""
+    last = None
+    try:
+        for l in open(path, encoding='utf-8', errors='replace'):
+            if '"user"' not in l: continue
+            try: r = json.loads(l)
+            except ValueError: continue
+            if r.get('type') != 'user' or r.get('isSidechain') or r.get('isMeta'): continue
+            c = (r.get('message') or {}).get('content')
+            real = isinstance(c, str) or (isinstance(c, list) and any(isinstance(x, dict) and x.get('type') == 'text' for x in c)
+                                          and not any(isinstance(x, dict) and x.get('type') == 'tool_result' for x in c))
+            if real and r.get('timestamp'): last = r['timestamp']
+    except OSError: return None
+    if not last: return None
+    import datetime; return datetime.datetime.fromisoformat(last.replace('Z', '+00:00')).timestamp()
+
+def where(h):
+    for r in repos():
+        if git(r, 'cat-file', '-e', h + '^{commit}') is not None: return r
+    return None
+
+def claim_verdict(d):
+    """→ (вид, текст) або None. Вид: fake-hash · bad-ref · claim-no-hash · claim-old-hash · unpushed."""
+    msg = d.get('last_assistant_message') or ''
+    body = re.sub(r"```.*?```", " ", msg, flags=re.S)
+    hs = list(dict.fromkeys(ANYHASH.findall(body)))[:10]
+    found = {h: where(h) for h in hs}
+    fake = [h for h, r in found.items() if r is None and INJ != '1']
+    if fake: return ('fake-hash', f"коміту {fake[0]} зі звіту нема в жодному репо сесії — хеш з голови?")
+    for m in REF.finditer(body):
+        pre, path, n = m.group(1), m.group(2), int(m.group(3))
+        roots = [r for r in repos() if pre and os.path.basename(r).lower() == pre.lower()] if pre else repos()
+        if pre and not roots: roots = repos()   # префікс — не назва репо сесії: шукати в усіх
+        cands = [path] if os.path.isabs(path) else [os.path.join(r, path) for r in roots]
+        ok = any(os.path.isfile(c) and sum(1 for _ in open(c, encoding='utf-8', errors='replace')) >= n for c in cands)
+        if not ok: return ('bad-ref', f"посилання `{m.group(0).strip('`')}` — такого рядка нема в жодному репо сесії")
+    lines = [l for l in plain(msg).split('\n') if VERB.search(l) and not PAST.search(l)]
+    if not lines: return None
+    if not hs: return ('claim-no-hash', "заява «" + VERB.search(lines[0]).group(0) + "» без хешу коміту: «" + lines[0].strip()[:100] + "»")
+    t0 = konst_ts(d.get('transcript_path') or '')
+    new = [h for h, r in found.items() if INJ == '4' or t0 is None or int(git(r, 'log', '-1', '--format=%ct', h).strip() or 0) >= t0]
+    if not new: return ('claim-old-hash', "заява дії, а жоден хеш звіту (" + ', '.join(hs[:3]) + ") не народився в цьому ході — старий коміт за доказ")
+    if any(PUSHED.search(l) for l in lines):
+        un = [h for h in new if not (git(found[h], 'branch', '-r', '--contains', h) or '').strip()]
+        if un: return ('unpushed', f"«запушив», а коміту {un[0]} ще нема в origin — push і read-back")
+    return None
+
+def mem_verdict(d):
+    """Рядок «пам'ять: …» проти стану git (з memory_line.py, FAB-1). → (вид, текст) або None. Вид: no-line · none-dirty · no-sha · fake-sha · unpushed."""
+    m = MLINE.findall(d.get('last_assistant_message') or '')
+    if not m: return ('no-line', "у відповіді нема рядка «пам'ять: <коміт> (доми)» або «пам'ять: нового нема» (профіль, ЗВІТ)")
+    rs = [r for r in repos() if not os.path.exists(os.path.join(r, '.git', 'lens-readonly'))]
+    dirty = [os.path.basename(r) for r in rs if (git(r, 'status', '--porcelain') or '').strip()]
+    ahead = [os.path.basename(r) for r in rs if (git(r, 'rev-parse', '--abbrev-ref', '@{u}') or '').strip()
+             and (git(r, 'rev-list', '--count', '@{u}..HEAD') or '0').strip() not in ('', '0')]
+    claim = m[-1]
+    if MNONE.search(claim):
+        return ('none-dirty', "«нового нема», а незакомічене: " + (', '.join(dirty) or '—') + "; не на GitHub: " + (', '.join(ahead) or '—')) if dirty or ahead else None
+    shas = re.findall(r"\b[0-9a-f]{7,40}\b", claim)
+    if not shas: return ('no-sha', "у рядку «пам'ять: …» нема ні хешу коміту, ні «нового нема»")
+    for x in shas:
+        if where(x) is None: return ('fake-sha', f"коміту {x} з рядка «пам'ять: …» нема в жодному репо сесії")
+    if ahead: return ('unpushed', "коміт названо, але HEAD ще не на GitHub у: " + ', '.join(ahead))
+    return None
+
+def shadow_path(s): return os.path.join(env('LENS_SHADOW_DIR', '/tmp'), f'lens-shadow-{s}.tsv')
+
+def shadow(d, s):
+    if d.get('stop_hook_active'): return
+    import time; ts = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
+    with open(shadow_path(s), 'a', encoding='utf-8') as f:
+        for name, fn in (('memory-line', mem_verdict), ('claim', claim_verdict)):
+            v = fn(d); f.write('\t'.join([ts, name, v[0] if v else 'тиша', (v[1][:160].replace('\t', ' ').replace('\n', ' ') if v else '')]) + '\n')
+
+def tally(s):
+    rows = [l.rstrip('\n').split('\t') for l in open(shadow_path(s), encoding='utf-8')] if os.path.exists(shadow_path(s)) else []
+    out = []
+    for name in ('memory-line', 'claim'):
+        rr = [r for r in rows if len(r) > 2 and r[1] == name]; k = {}
+        for r in rr:
+            if r[2] != 'тиша': k[r[2]] = k.get(r[2], 0) + 1
+        out.append(f"{name}: ходів {len(rr)} · блокував би {sum(k.values())} (" + (' · '.join(f'{a} {b}' for a, b in sorted(k.items())) or '—') + ")")
+    log = os.path.join(env('LENS_SHADOW_DIR', '/tmp'), f'lens-hooks-{s}.tsv')
+    old = sum(1 for l in open(log, encoding='utf-8', errors='replace') if '\tmemory-guard\t' in l) if os.path.exists(log) else 0
+    return "тінь promise-guard — " + ' | '.join(out) + f" | старий memory-guard блокував {old}"
+
+def selftest_claim():
+    """Тінь на тимчасовому репо з віддаленим: старий коміт (до повідомлення Konst) · новий запушений · новий не запушений."""
+    import time
+    T = tempfile.mkdtemp(); root = os.path.join(T, 'w'); os.makedirs(root); o = os.path.join(T, 'o.git'); r = os.path.join(root, 'Repo')
+    sh = lambda c, **e: subprocess.run(c, shell=True, cwd=r, capture_output=True, text=True, env=dict(os.environ, **e)).stdout.strip()
+    subprocess.run(['git', 'init', '-q', '--bare', o]); subprocess.run(['git', 'clone', '-q', o, r], capture_output=True)
+    now = int(time.time()); old_d = f'@{now - 1000} +0000'
+    sh('git config user.email a@b; git config user.name t; printf "a\\nb\\nc\\n" > f.txt; git add f.txt; git commit -qm old', GIT_COMMITTER_DATE=old_d, GIT_AUTHOR_DATE=old_d)
+    old = sh('git rev-parse --short HEAD')
+    sh('echo 2 >> f.txt; git commit -qam new; git push -q -u origin HEAD'); new = sh('git rev-parse --short HEAD')
+    tp = os.path.join(T, 't.jsonl'); iso = lambda x: time.strftime('%Y-%m-%dT%H:%M:%S.000Z', time.gmtime(x))
+    with open(tp, 'w') as f:
+        f.write(json.dumps({'type': 'user', 'timestamp': iso(now - 100), 'message': {'content': 'Konst: роби'}}) + '\n')
+        f.write(json.dumps({'type': 'user', 'timestamp': iso(now - 10), 'message': {'content': [{'type': 'tool_result', 'content': 'x'}]}}) + '\n')
+    save = {k: os.environ.get(k) for k in ('LENS_ROOT', 'LENS_SHADOW_DIR')}; os.environ.update(LENS_ROOT=root, LENS_SHADOW_DIR=T)
+    D = lambda m, **k: dict({'last_assistant_message': m, 'transcript_path': tp}, **k)
+    cases = []
+    def c(name, fn, msg, want, **k):
+        v = fn(D(msg, **k)); got = v[0] if v else None
+        cases.append((name + ('' if got == want else f' (вийшло: {got})'), got == want))
+    C, M = claim_verdict, mem_verdict
+    c('claim: дії нема, хешу нема → тиша', C, 'План: зроблю наступним ходом.', None)
+    c('claim: «записав» без хешу → claim-no-hash', C, 'Записав у бриф.', 'claim-no-hash')
+    c('claim: «записав» + новий хеш → тиша', C, f'Записав у бриф, `{new}`.', None)
+    c('claim: «✅» + новий хеш голим словом → тиша', C, f'✅ П4 — ядро {new}', None)
+    c('claim: «готово» лише зі старим хешем → claim-old-hash', C, f'Готово: `{old}`.', 'claim-old-hash')
+    c('claim: старий + новий хеш → тиша (історія поруч з доказом)', C, f'✅ П3 `{old}` · виправив `{new}`', None)
+    c('claim: «записав» у лапках → тиша', C, 'Ти просив, щоб «записав» означало слід у git.', None)
+    c('claim: «не записав» → тиша', C, 'Ще не записав — наступний хід.', None)
+    c('claim: «у ході 4 записав» → тиша', C, 'У ході 4 записав правило.', None)
+    c('claim: «S145: додав» → тиша', C, 'S145: додав гачок.', None)
+    c('claim: дієслово в коді → тиша', C, 'Сторож шукає `записав`.', None)
+    c('claim: хеш з голови → fake-hash', C, 'Прилад `d00df00d1` дав ✓.', 'fake-hash')
+    c('claim: `файл:рядок` існує → тиша', C, 'Див. `f.txt:3`.', None)
+    c('claim: `Репо:файл:рядок` існує → тиша', C, 'Див. `Repo:f.txt:2`.', None)
+    c('claim: `файл:рядок` за кінцем файла → bad-ref', C, 'Див. `f.txt:99`.', 'bad-ref')
+    c('claim: `файл:рядок` файла нема → bad-ref', C, 'Див. `nope.md:1`.', 'bad-ref')
+    sh('echo 3 >> f.txt; git commit -qam local'); loc = sh('git rev-parse --short HEAD')
+    c('claim: «запушив» + новий, але не в origin → unpushed', C, f'Закомітив і запушив `{loc}`.', 'unpushed')
+    c('claim: «закомітив» + новий не в origin → тиша (push не заявлено)', C, f'Закомітив `{loc}`.', None)
+    c('memory: нема рядка → no-line', M, 'Готово.', 'no-line')
+    c('memory: «нового нема», а не запушено → none-dirty', M, "пам'ять: нового нема", 'none-dirty')
+    sh('git push -q')
+    c('memory: «нового нема», дерево чисте → тиша', M, "пам'ять: нового нема", None)
+    c('memory: хеш є і на GitHub, жирним і з ’ → тиша', M, f"**пам’ять:** `{loc}` (ядро)", None)
+    c('memory: рядок без хешу → no-sha', M, "пам'ять: записав у самері", 'no-sha')
+    c('memory: хеш з голови → fake-sha', M, "пам'ять: deadbee (самері)", 'fake-sha')
+    sh('echo n > new.md')
+    c('memory: «нового нема», новий файл → none-dirty', M, "пам'ять: нового нема", 'none-dirty')
+    sh('rm new.md; echo 4 >> f.txt; git commit -qam c5')
+    c('memory: коміт є, не запушено → unpushed', M, f"пам'ять: {loc}", 'unpushed')
+    shadow(D('Записав.'), 'st'); shadow(D(f"✅ `{new}`\nпам'ять: {new}"), 'st'); shadow(D('x', stop_hook_active=True), 'st')
+    open(os.path.join(T, 'lens-hooks-st.tsv'), 'w', encoding='utf-8').write("t\tstop\tmemory-guard\tx\n")
+    s = tally('st'); ok = 'memory-line: ходів 2' in s and 'claim: ходів 2 · блокував би 1 (claim-no-hash 1)' in s and 'блокував 1' in s
+    cases.append(('тінь: два ходи (третій — повтор гачка) → підсумок обох суддів і старого гачка' + ('' if ok else f' ({s})'), ok))
+    for k, v in save.items():
+        if v is None: os.environ.pop(k, None)
+        else: os.environ[k] = v
+    return cases
+
 def selftest():
     t = tempfile.mkdtemp(); root = os.path.join(t, 'w'); k = os.path.join(root, 'k'); os.makedirs(k)
     G = lambda *a: subprocess.run(['git', '-C', k, *a], capture_output=True, text=True, check=True).stdout.strip()
@@ -155,6 +323,7 @@ def selftest():
     row(''); cases.append(('open: відкритих нема → тиша', open_ctx() is None))
     row('| 14.11 | **пропуск Konst** — без хешу |\n'); n = [stop(D('ок')) is not None for _ in range(5)]
     cases.append(('стеля: 3 зупинки поспіль, 4-та пропускає, далі знову суд', n == [True, True, True, False, True]))
+    cases += selftest_claim()
     bad = 0
     for name, ok in cases:
         bad += not ok; print(('✓ ' if ok else '✗ ') + name)
@@ -162,9 +331,12 @@ def selftest():
 
 m = sys.argv[1]
 if m == 'selftest': sys.exit(selftest())
+if m == 'tally': print(tally(re.sub(r'[^A-Za-z0-9_-]', '', sys.argv[2] if len(sys.argv) > 2 else '') or 'nosession')); sys.exit(0)
 try:
     d = json.loads(os.environ.get('HOOK_IN') or '{}')
-    if m == 'open':
+    if m == 'shadow':
+        shadow(d, re.sub(r'[^A-Za-z0-9_-]', '', sys.argv[2] if len(sys.argv) > 2 else '') or 'nosession')
+    elif m == 'open':
         o = open_ctx()
         if o: print(json.dumps({'hookSpecificOutput': {'hookEventName': 'UserPromptSubmit', 'additionalContext': o}}, ensure_ascii=False))
     else:

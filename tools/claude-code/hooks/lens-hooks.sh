@@ -184,9 +184,9 @@ case "$ev" in
     c=""; [ "$tool" = Bash ] && c="$(printf '%s' "$in" | python3 "$h/ctx_watch.py" hook 2>>"$E")"; [ -n "$c" ] && po="$(mrg "$po" "$(fire ctx-watch "$c")")"
     po="$(mrg "$po" "$hm")"; [ -n "$po" ] && printf '%s\n' "$po" ;;   # + пам'ять після коміту (AE S109): нові ✗ / ⚠ handoff_check   # коміт змінив аркуш середовища → запропонувати оновити (ENV-1)
   stop)   # перший з відповіддю перемагає: гачок пам'яті, перевірка перед переїздом (HOOK-3.2), «план без світу» (HOOK-2.5)
-    # тінь (FAB-1, 10.11.2026): кандидат на заміну memory-guard — перевірка рядка «пам'ять: …» проти стану git. Лише пише вирок у
-    #   /tmp/lens-shadow-<сесія>.tsv, нічого не друкує й не блокує; підсумок сесії — python3 memory_line.py tally <сесія> (рядком у журнал гачків)
-    printf '%s' "$in" | python3 "$h/memory_line.py" shadow "${sid:-nosession}" > /dev/null 2>&1
+    # тінь (FAB-1 10.11 · В-377 14.11.2026): «заява дії = доказ» + рядок «пам'ять: …» (злито з memory_line.py) проти стану git. Лише пише вирок у
+    #   /tmp/lens-shadow-<сесія>.tsv, нічого не друкує й не блокує; підсумок сесії — bash promise-guard.sh tally <сесія> (рядком у журнал гачків щосамері)
+    printf '%s' "$in" | bash "$h/promise-guard.sh" shadow "${sid:-nosession}" > /dev/null 2>&1
     run memory-guard.sh stop || run handoff-remind.sh stop || run promise-guard.sh stop || run plan-web.sh stop ;;   # promise-guard (AE S146): «можна /compact» — сам проганяє сторож; «пропуск Konst» — лише з хешем і зубом
   prompt)   # перевірка перед переїздом (HOOK-3.2), інакше — аркуш середовища на прохання (ENV-1), інакше — «пропуск, знайдений Konst» (HOOK-5)
     o="$(run handoff-remind.sh "" || run env-remind.sh "" || run konst-miss.sh "")"
