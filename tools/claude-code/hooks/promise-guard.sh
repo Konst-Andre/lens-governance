@@ -121,6 +121,8 @@ VERB = re.compile(r"(?<![\w-])(?<!не )(?:записав|закомітив|з�
 PUSHED = re.compile(r"(?<![\w-])(?<!не )запушив", re.I)
 PAST = re.compile(r"у\s+ході\s+\d+|(?<![\w-])S\d{2,3}(?![\w-])", re.I)   # «у ході 4 записав», «S145: додав» — історія, не заява цього ходу
 ANYHASH = re.compile(r"(?<![\w/#.-])(?=[0-9a-f]*[a-f])(?=[0-9a-f]*\d)([0-9a-f]{7,12}|[0-9a-f]{40})(?![\w/.-])")   # і літера, і цифра: не число, не слово
+TICKHASH = re.compile(r"`([0-9a-f]{7,12}|[0-9a-f]{40})`")   # у бектиках — будь-який (S147: ≈ 4 % коротких хешів — самі цифри, голими їх не впізнати)
+def hashes(body): return list(dict.fromkeys(TICKHASH.findall(body) + ANYHASH.findall(body)))[:10]
 REF = re.compile(r"`(?:([A-Za-z][\w.-]*):)?((?:[\w.-]+/)*[\w.-]+\.[A-Za-z0-9]{1,8}):(\d+)(?:[-–]\d+)?`")
 MLINE = re.compile(r"(?mi)^[\s>*_`-]*пам['’ʼ]ять\s*[:—-]\s*(.+)$")
 MNONE = re.compile(r"(?i)нового\s+нема")
@@ -158,7 +160,7 @@ def claim_verdict(d):
     """→ (вид, текст) або None. Вид: fake-hash · bad-ref · claim-no-hash · claim-old-hash · unpushed."""
     msg = d.get('last_assistant_message') or ''
     body = re.sub(r"```.*?```", " ", msg, flags=re.S)
-    hs = list(dict.fromkeys(ANYHASH.findall(body)))[:10]
+    hs = hashes(body)
     found = {h: where(h) for h in hs}
     fake = [h for h, r in found.items() if r is None and INJ != '1']
     if fake: return ('fake-hash', f"коміту {fake[0]} зі звіту нема в жодному репо сесії — хеш з голови?")
@@ -241,6 +243,7 @@ def selftest_claim():
         cases.append((name + ('' if got == want else f' (вийшло: {got})'), got == want))
     C, M = claim_verdict, mem_verdict
     c('claim: дії нема, хешу нема → тиша', C, 'План: зроблю наступним ходом.', None)
+    cases.append(('claim: хеш із самих цифр у бектиках впізнано, голе число — ні (плаваючий selftest S147)', hashes('`1234567` · 7654321 · abc1234') == ['1234567', 'abc1234']))
     c('claim: «записав» без хешу → claim-no-hash', C, 'Записав у бриф.', 'claim-no-hash')
     c('claim: «записав» + новий хеш → тиша', C, f'Записав у бриф, `{new}`.', None)
     c('claim: «✅» + новий хеш голим словом → тиша', C, f'✅ П4 — ядро {new}', None)

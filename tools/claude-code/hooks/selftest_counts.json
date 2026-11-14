@@ -19,7 +19,7 @@
  "port_same.py selftest": 6,
  "precompact_guard.sh selftest": 20,
  "profile_check.sh selftest": 3,
- "promise-guard.sh selftest": 47,
+ "promise-guard.sh selftest": 48,
  "pw_quiet.py selftest": 8,
  "review-remind.sh selftest": 9,
  "route-remind.sh selftest": 9,
