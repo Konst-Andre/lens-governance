@@ -21,12 +21,12 @@
  "profile_check.sh selftest": 3,
  "promise-guard.sh selftest": 47,
  "pw_quiet.py selftest": 8,
- "review-remind.sh selftest": 0,
+ "review-remind.sh selftest": 9,
  "route-remind.sh selftest": 9,
  "rules-guard.py selftest": 15,
- "shots_check.py selftest": 0,
+ "shots_check.py selftest": 11,
  "shots_same.py selftest": 3,
- "ui-guard.sh selftest": 0,
+ "ui-guard.sh selftest": 32,
  "ui-review-gate.sh selftest": 34,
  "version_check.py selftest": 6
 }

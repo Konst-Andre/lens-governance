@@ -57,6 +57,13 @@ def discover(dirs=(HERE, TOOLS)):
     return out, missing
 
 
+def points(out, frac):
+    """Число пунктів тесту: рядки «✓» — є; нема (тест друкує лише «N/M») — M, якщо він лічиться (💡 S147 з підсиленням: одне правило тут,
+    а не правка виводу кожного тесту; зашите M з рядками «✓» лічиться за «✓», бо зашите не падає, коли пункт зник)."""
+    v = sum(1 for l in out if l.strip().startswith('✓'))
+    return v if v or not frac else frac[-1][1]
+
+
 def run_one(f, timeout=TIMEOUT):
     n = os.path.basename(f)
     modes = SPECIAL.get(n, ['selftest'])
@@ -74,7 +81,7 @@ def run_one(f, timeout=TIMEOUT):
         if bad:
             fx = [l.strip() for l in out if l.strip().startswith('✗')][:2]
             return False, f'{n} {m}: вихід {r.returncode} · ' + (' · '.join(fx) or (out[-1] if out else 'без виводу'))[:220]
-        got, want = sum(1 for l in out if l.strip().startswith('✓')), expected().get(f'{n} {m}')
+        got, want = points(out, frac), expected().get(f'{n} {m}')
         if want is not None and got < want:
             return False, f'{n} {m}: пунктів ✓ {got} < очікуваних {want} — пункт зник мовчки (коментар посеред рядка?); свідомо прибрав — зменш число в selftest_counts.json'
         if want is None or got > want: INFO.append(f'{n} {m}: пунктів ✓ {got}, у selftest_counts.json {want if want is not None else "нема"} — підніми число тим самим комітом')
@@ -115,7 +122,8 @@ def main(a):
             for m in SPECIAL.get(os.path.basename(f), ['selftest']):
                 r = subprocess.run((['python3', f, m] if f.endswith('.py') else ['bash', f, m]), capture_output=True, text=True, timeout=TIMEOUT,
                                    cwd=os.path.dirname(f), stdin=subprocess.DEVNULL, env=dict(os.environ, LENS_NO_SELFTEST='1'))
-                c[f'{os.path.basename(f)} {m}'] = sum(1 for l in (r.stdout + r.stderr).splitlines() if l.strip().startswith('✓'))
+                o = (r.stdout + r.stderr).strip().splitlines()
+                c[f'{os.path.basename(f)} {m}'] = points(o, [(int(x), int(y)) for x, y in re.findall(r'(\d+)\s*/\s*(\d+)', '\n'.join(o[-3:]))])
         print(json.dumps(dict(sorted(c.items())), ensure_ascii=False, indent=1)); return 0
     if a[0] == 'bg':
         if os.environ.get('LENS_NO_SELFTEST'): return 0   # запобіжник кола й на рівні самого запускача
@@ -191,6 +199,12 @@ def selftest():
     cases.append(('пунктів ✓ стільки, скільки очікувано → ✓', ok3))
     cases.append(('зуб: `#` посеред рядка тесту з\'їв пункт (вихід 0, без N/M) → ✗ «пункт зник мовчки»', not r2[0] and 'зник мовчки' in r2[1]))
     cases.append(('пунктів більше за очікувані → не ✗, а ⚠ «підніми число»', r3[0] and any('підніми число' in x for x in INFO)))
+    nm = os.path.join(h, 'nm.sh'); W(nm, '[ "$1" = selftest ] || exit 0\nn=0; for x in a b c; do n=$((n+1)); done\necho "nm selftest: $n/$n"\n')
+    COUNTS = os.path.join(d, 'counts.json'); W(COUNTS, '{"nm.sh selftest": 3}')
+    try:
+        okn = run_one(nm, 20)[0]; W(nm, open(nm).read().replace('a b c', 'a b')); rn = run_one(nm, 20)
+    finally: COUNTS = oc
+    cases.append(('тест без рядків «✓», лише «N/M» з лічбою: пунктів = M; M упало (пункт зник) → ✗', okn and not rn[0] and 'зник мовчки' in rn[1]))
     INFO.clear()
     bad = 0
     for name, ok in cases:
