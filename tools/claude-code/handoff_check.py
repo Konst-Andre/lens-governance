@@ -126,6 +126,10 @@ def check_repo(repo, now=None):
     tail = mine_tail()
     grep = f'session_{tail}' if tail else 'Claude-Session'
     after = git(repo, 'log', '--format=%h', f'--grep={grep}', f'{last}..HEAD') if last else ''
+    if after:   # AE S145 (В-370): самері живе в main, код — на гілці; коміт гілки, названий у самері main (чи origin/main), — не відстає
+        ref = ''.join(git(repo, 'show', f'{r}:{sm}') for r in ('main', 'origin/main')) if git(repo, 'rev-parse', '--abbrev-ref', 'HEAD') != 'main' else ''
+        cov = [h for h in after.split() if ref and h[:7] in ref]
+        if cov: after = ' '.join(h for h in after.split() if h not in cov)
     n = len(after.split()) if after else 0
     owns = (not tail) or bool(git(repo, 'log', '--format=%h', f'--grep=session_{tail}', '--', os.path.dirname(sm) + '/'))   # тека самого самері, не вся sessions/: AE S139 — тека sessions/FAB-1/ давала хибне ✗ «самері ядра відстає»
     if n and is_kernel and not owns:
@@ -424,6 +428,13 @@ def selftest():
         open(os.path.join(r, 'docs/summary/P_SUMMARY_2026-10-18.md'), 'w').write(summary)
         sh(r, 'git', 'add', '-A'); sh(r, 'git', 'commit', '-qm', 'самері\n\nClaude-Session: https://claude.ai/code/session_T')
         return r
+    def mk_br(named):   # AE S145 (В-370): самері — у main, код — на гілці claude/x; коміт гілки названо (чи ні) у самері main
+        r = mk_nl(good_nl); sh(r, 'git', 'branch', '-M', 'main'); sh(r, 'git', 'checkout', '-qb', 'claude/x')
+        open(os.path.join(r, 'code.txt'), 'w').write('1'); sh(r, 'git', 'add', '-A'); sh(r, 'git', 'commit', '-qm', 'код\n\nClaude-Session: https://claude.ai/code/session_T')
+        h = subprocess.run(['git', '-C', r, 'rev-parse', '--short=7', 'HEAD'], capture_output=True, text=True).stdout.strip()
+        sh(r, 'git', 'checkout', '-q', 'main'); open(os.path.join(r, 'docs/summary/P_SUMMARY_2026-10-18.md'), 'a').write(f'\n- код гілки `{h if named else "0000000"}`\n')
+        sh(r, 'git', 'commit', '-qam', 'самері\n\nClaude-Session: https://claude.ai/code/session_T'); sh(r, 'git', 'checkout', '-q', 'claude/x')
+        return r
     def mk_k():   # ядро: самері в sessions/Lens_gov/ від сесії ядра; сесія продукту комітить робочу теку sessions/FAB-1/ (AE S139)
         d = tempfile.mkdtemp(prefix='hc-'); r = os.path.join(d, 'lens-governance'); os.makedirs(os.path.join(r, 'sessions/Lens_gov')); os.makedirs(os.path.join(r, 'kernel'))
         sh(r, 'git', 'init', '-q'); sh(r, 'git', 'config', 'user.email', 't@t'); sh(r, 'git', 'config', 'user.name', 't')
@@ -465,6 +476,8 @@ def selftest():
         ('бриф за шаблоном, код після нього → ⚠ «відстає» (BRIEF-2)', mk(good, {'lens/X_brief.md': '# X\n## §0 Коротко\n- **Стан:** a\n- **Далі:** b\n- **Чекає Konst:** c\n'}, code_after=True), 'відстає'),
         ('бриф за шаблоном, після нього лише коміт даних (.json · фото) → без «відстає» (AE S120)', mk(good, {'lens/X_brief.md': '# X\n## §0 Коротко\n- **Стан:** a\n- **Далі:** b\n- **Чекає Konst:** c\n'}, data_after=True), '!відстає'),
         ('не-Lens: самері без стартового → ✗', mk_nl(good_nl.split('## §6')[0]), 'стартове повідомлення нема'),
+        ('гілка: коміт коду названо в самері main → не відстає (AE S145, В-370)', mk_br(True), '!самері відстає'),
+        ('гілка: коміт коду НЕ названо в самері main → ✗ відстає (зуб)', mk_br(False), 'самері відстає'),
         ('ядро: коміт сесії продукту в sessions/FAB-1/, самері — sessions/Lens_gov/ → ⓘ, не ✗ «відстає» (хибне AE S139)', mk_k(), '!самері відстає'),
     ]
     bad = 0
