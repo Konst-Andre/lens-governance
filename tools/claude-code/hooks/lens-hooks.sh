@@ -5,7 +5,7 @@
 # Аргумент — подія (setup script v2 і v3) або старе ім'я v1 (pre · post · stop — середовища з текстом 08.10 працюють і далі):
 #   pre  | PreToolUse          — лише Write|Edit|Bash: бриф лише з шаблону (brief-guard, BRIEF-2); далі гачки по черзі, перший з відповіддю (deny/ask) перемагає; огляд UI до коміту (ui-review-gate, HOOK-2 п.4); нагадування (review-remind stand) — останнім
 #   post | PostToolUse         — лише Read|Bash|Grep|WebSearch|WebFetch: позначки (ui-guard mark: кукбук і пошук ззовні) + нагадування після коміту з UI (review-remind post)
-#   stop | Stop                — гачок пам'яті (memory-guard, HOOK-3), далі перевірка перед переїздом, коли його оголошує агент (handoff-remind stop, HOOK-3.2), далі «план без світу» (plan-web, HOOK-2.5)
+#   stop | Stop                — гачок пам'яті (memory-guard, HOOK-3), далі перевірка перед переїздом, коли його оголошує агент (handoff-remind stop, HOOK-3.2), далі «сказав — перевір» (promise-guard, AE S146), далі «план без світу» (plan-web, HOOK-2.5)
 #   UserPromptSubmit           — + маршрут для Konst (route-remind, AE S135 — додається до будь-якого) · перевірка пам'яті перед переїздом (handoff-remind, HOOK-3.2), інакше «пропуск, знайдений Konst» (konst-miss, HOOK-5): лише на слово-тригер (перевіряє Python: grep -i на кирилиці залежить від локалі; ~50 мс раз на повідомлення)
 #   SessionStart               — профіль Konst з репо (tools/claude-code/PROFILE.md) як контекст сесії, ЛИШЕ коли в середовищі LENS_PROFILE=1: спільний акаунт, де поле
 #                                профілю в налаштуваннях бачили б і чужі чати (слово Konst 18.10.2026, QR CC-18; ACCOUNT_MOVE.md п.1-б). Старт і повтор після стиснення (без matcher —
@@ -72,7 +72,7 @@ if [ "$ev" = start-test ]; then export LENS_NO_SELFTEST=1   # AE S143: стар�
   rm -rf "$t/skills"; o="$(go s8 startup)"; case "$o" in *'"reloadSkills": true'*'Частина 1/2'*|*'Частина 1/2'*'"reloadSkills": true'*) [ -f "$t/skills/night/SKILL.md" ] && echo "✓ навички ядра: скопійовано в теку навичок, reloadSkills у тому ж JSON, що й профіль" || { echo "✗ навички: файла нема"; bad=1; };; *) echo "✗ навички: reloadSkills нема у виводі"; bad=1;; esac
   o="$(go s9 startup)"; case "$o" in *reloadSkills*) echo "✗ навички без змін → reloadSkills зайвий"; bad=1;; *'Частина 1/2'*) echo "✓ навички без змін → без reloadSkills, профіль на місці";; *) echo "✗ навички без змін: профілю нема"; bad=1;; esac
   c="$(printf '{}' | bash "${BASH_SOURCE[0]}" PreCompact)"; n=${#c}; [ "$n" -gt 200 ] && [ "$n" -le 10000 ] && echo "✓ PreCompact: інструкції для переказу ($n знаків ≤ 10 000)" || { echo "✗ PreCompact: $n знаків"; bad=1; }
-  s="$(printf '{"session_id":"s6","last_assistant_message":"Готово, без рядка."}' | LENS_SHADOW_DIR="$t" bash "${BASH_SOURCE[0]}" Stop)"
+  s="$(printf '{"session_id":"s6","last_assistant_message":"Готово, без рядка."}' | LENS_JOURNAL="$t/none.md" LENS_SHADOW_DIR="$t" bash "${BASH_SOURCE[0]}" Stop)"
   [ -z "$s" ] && grep -q 'memory-line	no-line' "$t/lens-shadow-s6.tsv" 2>/dev/null && echo "✓ Stop: тінь memory-line записала вирок і нічого не заблокувала" || { echo "✗ тінь: вивід «$s», файл: $(cat "$t/lens-shadow-s6.tsv" 2>/dev/null | cut -c1-120)"; bad=1; }
   # AE S141 (В-352): ctx_watch у трьох місцях — після коміту · повідомлення Konst · після стиснення; кожне — один чинний JSON
   python3 -c 'import json,sys
@@ -187,11 +187,12 @@ case "$ev" in
     # тінь (FAB-1, 10.11.2026): кандидат на заміну memory-guard — перевірка рядка «пам'ять: …» проти стану git. Лише пише вирок у
     #   /tmp/lens-shadow-<сесія>.tsv, нічого не друкує й не блокує; підсумок сесії — python3 memory_line.py tally <сесія> (рядком у журнал гачків)
     printf '%s' "$in" | python3 "$h/memory_line.py" shadow "${sid:-nosession}" > /dev/null 2>&1
-    run memory-guard.sh stop || run handoff-remind.sh stop || run plan-web.sh stop ;;
+    run memory-guard.sh stop || run handoff-remind.sh stop || run promise-guard.sh stop || run plan-web.sh stop ;;   # promise-guard (AE S146): «можна /compact» — сам проганяє сторож; «пропуск Konst» — лише з хешем і зубом
   prompt)   # перевірка перед переїздом (HOOK-3.2), інакше — аркуш середовища на прохання (ENV-1), інакше — «пропуск, знайдений Konst» (HOOK-5)
     o="$(run handoff-remind.sh "" || run env-remind.sh "" || run konst-miss.sh "")"
     y="$(printf '%s' "$in" | bash "$h/konst-miss.sh" yes 2>>"$E")"; [ -n "$y" ] && o="$(mrg "$o" "$(fire konst-yes "$y")")"   # В-372 (AE S145): Konst приймає 💡 → чек-лист підсилення; додається, не витісняє
     hm="$(held UserPromptSubmit)"; [ -n "$hm" ] && o="$(mrg "$o" "$(fire held "$hm")")"   # В-373: стиснення відкладено / зупинено
+    pg="$(run promise-guard.sh open)"; [ -n "$pg" ] && o="$(mrg "$o" "$pg")"   # AE S146: відкриті «НЕ ЗРОБЛЕНО» журналу — щоходу, доки не закрито
     r="$(run route-remind.sh "")"   # AE S135 · маршрут для Konst — додається до будь-якого іншого гачка, не витісняє (route-remind.sh)
     [ -n "$r" ] && o="$(python3 -c 'import json,sys
 a,b=sys.argv[1],sys.argv[2]

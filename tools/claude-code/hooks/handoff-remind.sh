@@ -293,7 +293,7 @@ def stop(d, roots, mark_dir='/tmp'):
 mode = sys.argv[1]
 if mode == 'selftest': sys.exit(selftest())
 if mode == 'post':
-    try: out = post(json.loads(os.environ.get('HOOK_IN') or '{}'), ['/home/user'])
+    try: out = post(json.loads(os.environ.get('HOOK_IN') or '{}'), [os.environ.get('LENS_ROOT') or '/home/user'])   # AE S146: LENS_ROOT — тест диспетчера не ганяє справжні репо (було коло: start-test → handoff_check → selftest start-test, 175 с)
     except Exception: __import__('traceback').print_exc(); out = None
     if out: print(json.dumps({'hookSpecificOutput': {'hookEventName': 'PostToolUse', 'additionalContext': out}}, ensure_ascii=False))
     sys.exit(0)
