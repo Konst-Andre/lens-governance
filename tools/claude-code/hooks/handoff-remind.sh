@@ -151,19 +151,30 @@ def selftest():
     mk = os.path.join(t, 'pf'); F = lambda ls: post_filter(ls, mk)[0]
     r1 = F(['⚠ бриф a.md відстає: 1 коміт(ів)', '✗ незакомічене: 2 (x)', '✗ самері відстає: після abc1234 комітів агента без самері — 1 (abc1234)', '⚠ описи, що згадують змінений у сесії код, але не мінялись: README.md (g.sh)'])
     r2 = F(['⚠ бриф a.md відстає: 2 коміт(ів)', '✗ самері відстає: після abc1234 комітів агента без самері — 3 (abc1234 def5678 0a1b2c3)', '⚠ описи, що згадують змінений у сесії код, але не мінялись: README.md (g.sh) · docs/B.md (h.py)'])
-    ok = (len(r1) == 2 and not any('незакомічене' in x or 'самері' in x for x in r1)
+    ok = (len(r1) == 3 and sum('лишились змінені файли поза ним: x' in x for x in r1) == 1 and not any('самері' in x for x in r1)
           and len(r2) == 2 and any('самері' in x for x in r2) and any('docs/B.md' in x and 'README' not in x for x in r2) and not any('бриф a.md' in x for x in r2))
-    print(('✓' if ok else '✗') + ' post: шум — те саме з іншим числом · незакомічене · самері < 3 → тиша; новий документ в «описах» і самері ≥ 3 → є'); bad += not ok
+    print(('✓' if ok else '✗') + ' post: шум — те саме з іншим числом · самері < 3 → тиша; новий документ в «описах» і самері ≥ 3 → є; незакомічене — раз на набір файлів (S145)'); bad += not ok
+    mk2 = os.path.join(t, 'pf2'); G = lambda ls: post_filter(ls, mk2)[0]
+    a1 = G(['AE ✗ незакомічене: 2 (site/index.html, tools/x.py)']); a2 = G(['AE ✗ незакомічене: 2 (site/index.html, tools/x.py)']); a3 = G(['AE ✗ незакомічене: 1 (docs/e2e/SPEED.tsv)'])
+    ok = len(a1) == 1 and a1[0].startswith('AE ✗ після коміту') and 'site/index.html' in a1[0] and not a2 and len(a3) == 1
+    print(('✓' if ok else '✗') + ' post: «незакомічене» — з назвою репо, той самий набір файлів удруге → тиша, новий набір → є (S145: коміт без коду)'); bad += not ok
     _p(f'selftest: {N[0] - bad}/{N[0]}'); return 1 if bad else 0
 
 POST_LAG = 3   # «самері відстає» після коміту — лише від стількох комітів (на кожен однорядковий коміт — шум; переїзд ловить усе)
 def post_filter(lines, mark):
-    """Шум гачка після коміту (досвід AE S109): новизна — за змістом без чисел і хешів; «описи…» — по документу; без «незакомічене»; самері — з порогом."""
+    """Шум гачка після коміту (досвід AE S109): новизна — за змістом без чисел і хешів; «описи…» — по документу; «незакомічене» — раз на набір файлів (S145); самері — з порогом."""
     norm = lambda l: re.sub(r'\b[0-9a-f]{7,40}\b', '@', re.sub(r'\d+([.,]\d+)?', '#', l))
     seen = set(open(mark, encoding='utf-8').read().splitlines()) if os.path.exists(mark) else set()
     new, keys = [], set()
     for l in lines:
-        if 'незакомічене' in l: continue   # посеред роботи це норма; перевіряє переїзд
+        if 'незакомічене' in l:   # AE S145 (×2 за день, 💡 «так з підсиленням» Konst): коміт без коду — `git add` стояв у команді, яку заблокував гачок,
+            # а гачок мовчав («посеред роботи це норма»). Тепер — раз на набір файлів (той самий набір → тиша), з назвою репо; не блок, лише рядок.
+            m = re.search(r'незакомічене:\s*\d+\s*\(([^)]*)\)', l); fl = m.group(1).strip() if m else l
+            k = 'нез:' + fl; keys.add(k)
+            if k not in seen: new.append(l.split(' ✗', 1)[0] + ' ✗ після коміту лишились змінені файли поза ним: ' + fl +
+                                         ' — свідомо (наступний коміт) чи загубився `git add`? Команда, яку зупинив гачок, не виконалась цілком — `git add` у ній теж'
+                                         ' (AE S145); після зупинки — додати файли заново, тоді коміт (inklings-codex.pages.dev «lint-staged failure drops staged files», 14.11.2026)')
+            continue
         m = re.search(r'самері відстає.*?—\s*(\d+)', l)
         if m and int(m.group(1)) < POST_LAG: continue
         docs = re.findall(r'([\w./-]+\.md) \(([^)]*)\)', l) if 'описи' in l else []
@@ -183,7 +194,12 @@ def post(d, roots, mark_dir='/tmp'):
     rs = repos(roots)
     if not rs: return None
     r = subprocess.run([sys.executable, HC, *rs], capture_output=True, text=True)
-    new, keys = post_filter([l.strip() for l in r.stdout.splitlines() if l.strip().startswith(('✗', '⚠'))],
+    out, rp = [], ''
+    for l in r.stdout.splitlines():   # рядок «— <репо>» — заголовок блоку handoff_check; «незакомічене» без назви репо в кількох репо сесії — не знати де
+        l = l.strip()
+        if l.startswith('— '): rp = l[2:].strip()
+        elif l.startswith(('✗', '⚠')): out.append((rp + ' ' + l) if 'незакомічене' in l and rp else l)
+    new, keys = post_filter(out,
                             os.path.join(mark_dir, 'lens-handoff-post-' + re.sub(r'\W', '', d.get('session_id') or 'x')))
     if not new: return None
     return ("Гачок «пам'ять після коміту» (AE S109) — handoff_check знайшов нове:\n" + '\n'.join(new)[:4000] +
