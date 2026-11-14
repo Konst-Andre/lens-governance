@@ -35,7 +35,7 @@ def ctx_of(u): return u.get('input_tokens', 0) + u.get('cache_creation_input_tok
 
 def read(path):
     """→ (останній запит (час, usage) | None, найбільший крок між комітами після останнього стиснення)."""
-    last, commits, seen = None, [], set(); read.boundary = {}; read.comp = 0
+    last, commits, seen = None, [], set(); read.boundary = {}; read.comp = 0; read.ttl = TTL_S
     for ln in open(path, encoding='utf-8', errors='replace'):
         try: r = json.loads(ln)
         except ValueError: continue
@@ -44,7 +44,10 @@ def read(path):
         m = r.get('message') if isinstance(r.get('message'), dict) else {}
         u = m.get('usage')
         if r.get('type') == 'assistant' and u:
-            last = (r.get('timestamp'), u)
+            last = (r.get('timestamp'), u); cc = u.get('cache_creation') or {}   # В-377 Б: тривалість кешу — з останньої відповіді, що його писала
+            if os.environ.get('CTX_INJECT') != '1':   # зуб selftest: тип кешу не читається → «5 хв» зникає
+                if cc.get('ephemeral_1h_input_tokens', 0) > 0: read.ttl = 3600
+                elif cc.get('ephemeral_5m_input_tokens', 0) > 0: read.ttl = 300
             for c in m.get('content') or []:
                 if isinstance(c, dict) and c.get('type') == 'tool_use' and c.get('id') not in seen and 'git commit' in str((c.get('input') or {}).get('command', '')):
                     seen.add(c.get('id')); commits.append(ctx_of(u))
@@ -96,7 +99,17 @@ def numbers(path, env=os.environ):
     last, step = read(path) if path and os.path.exists(path) else (None, 0)
     w, t = limits(env); step = max(step, STEP_MIN); r = t - step - REV_COST
     return dict(last=last, ctx=ctx_of(last[1]) if last else 0, w=w, t=t, r=r, soft=min(SOFT, r - 70_000), step=step, comp=getattr(read, 'comp', 0) if last or path else 0,
-                post=(getattr(read, 'boundary', {}) or {}).get('postTokens', 0) if path else 0)
+                post=(getattr(read, 'boundary', {}) or {}).get('postTokens', 0) if path else 0, ttl=getattr(read, 'ttl', TTL_S) if last else TTL_S)
+
+def cache(n, now):
+    """В-377 Б (Konst S146: «знати наперед, до котрої відповідь дешевша»): «кеш 1 год: теплий до ≈HH:MM (Київ)» = остання відповідь основної гілки
+    (будь-якого типу — і та, що на фонову задачу) + TTL її кешу. Рядок приходить на повідомлення Konst і після коміту, тож похибка — хвилини: «≈».
+    Кожне читання кешу продовжує йому життя (docs.claude.com «Prompt caching», 14.11.2026) — тому від останньої відповіді, не від першої."""
+    if not n['last']: return ''
+    until = ts_of(n['last'][0]) + n['ttl']; lab = '1 год' if n['ttl'] >= 3600 else f"{n['ttl'] // 60} хв"; t = kyiv(until)
+    z = '' if 'UTC' in t else ' (Київ)'
+    return f" · кеш {lab}: теплий до ≈{t}{z}" if now < until else f" · кеш {lab}: холодний з ≈{t}{z} — перший запит перепише контекст"
+
 
 def cap(n):
     c = n['comp']
@@ -112,7 +125,7 @@ def verdict(n, now, event):
         return None
     ctx, u = n['ctx'], n['last'][1]
     gap = now - datetime.datetime.fromisoformat(n['last'][0].replace('Z', '+00:00')).timestamp()
-    ttl = TTL_S if (u.get('cache_creation') or {}).get('ephemeral_1h_input_tokens', 0) or not u.get('cache_creation_input_tokens') else 300
+    ttl = n['ttl']
     k = lambda x: f'{x // 1000} тис.'
     tail = f"(стиснення на {k(n['t'])}, ревізія на {k(n['r'])}; найбільший крок {k(n['step'])} — ctx_watch)"
     if event == 'UserPromptSubmit' and gap > ttl and ctx >= SOFT:
@@ -122,7 +135,7 @@ def verdict(n, now, event):
     if event == 'UserPromptSubmit' and ctx >= n['soft']:
         return f"ⓘ контекст {k(ctx)} — на найближчій межі предмета: ревізія → /compact {tail}" + cap(n)
     if event == 'UserPromptSubmit':   # В-353: рядок щоповідомлення — маркер навантаження береться з нього, без окремого виклику інструмента
-        return f"контекст {k(ctx)} · {ctx * 100 // n['w']}% вікна {k(n['w'])} · ревізія на {k(n['r'])} · стиснень у сесії {n['comp']} (ctx_watch)" + cap(n)
+        return f"контекст {k(ctx)} · {ctx * 100 // n['w']}% вікна {k(n['w'])} · ревізія на {k(n['r'])} · стиснень у сесії {n['comp']} (ctx_watch)" + cache(n, now) + cap(n)
     return None
 
 def newest(home='~'):
@@ -135,7 +148,7 @@ def newest(home='~'):
 
 def line(path):
     n = numbers(path); k = lambda x: f'{x // 1000} тис.'
-    return f"контекст {k(n['ctx'])} · {n['ctx'] * 100 // n['w']}% вікна {k(n['w'])} · стиснення на {k(n['t'])} · ревізія на {k(n['r'])} (найбільший крок {k(n['step'])}) · стиснень у сесії {n['comp']}" + lim(path, time.time())
+    return f"контекст {k(n['ctx'])} · {n['ctx'] * 100 // n['w']}% вікна {k(n['w'])} · стиснення на {k(n['t'])} · ревізія на {k(n['r'])} (найбільший крок {k(n['step'])}) · стиснень у сесії {n['comp']}" + cache(n, time.time()) + lim(path, time.time())
 
 def _hc():
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__)))); import handoff_check; return handoff_check
@@ -168,7 +181,7 @@ def hook(inp, now=None):
     return json.dumps({'hookSpecificOutput': {'hookEventName': ev, 'additionalContext': v}}, ensure_ascii=False) if v else ''
 
 def selftest():
-    d = tempfile.mkdtemp(); bad = 0; T0 = 1_800_000_000
+    d = tempfile.mkdtemp(); bad = 0; total = 0; T0 = 1_800_000_000
     iso = lambda s: datetime.datetime.fromtimestamp(s, datetime.timezone.utc).isoformat().replace('+00:00', 'Z')
     def a(ctx, ago=60, commit=False, side=False, h1=True, tid='x'):
         c = [{'type': 'tool_use', 'id': f'{tid}{ctx}', 'input': {'command': 'git commit -m x'}}] if commit else []
@@ -179,7 +192,7 @@ def selftest():
         p = f'{d}/{name}.jsonl'; open(p, 'w').write('\n'.join(json.dumps(r) for r in rows) + '\n'); return p
     E = {'CLAUDE_CODE_AUTO_COMPACT_WINDOW': '450000', 'CLAUDE_AUTOCOMPACT_PCT_OVERRIDE': '92'}
     def case(name, ok):
-        nonlocal bad; print(('✓ ' if ok else '✗ ') + name); bad += not ok
+        nonlocal bad, total; print(('✓ ' if ok else '✗ ') + name); bad += not ok; total += 1
     case('поріг стиснення: W 450 тис. → 395 600, W 1 млн → 901 600 (обидва = autocompact_state.threshold, AE S141)',
          limits(E)[1] == 395_600 and limits({'CLAUDE_AUTOCOMPACT_PCT_OVERRIDE': '92'})[1] == 901_600)
     os.environ.update(E, LENS_ROOT=f'{d}/empty', LENS_REV_MARK=f'{d}/revmark')   # REV-1: тест не ганяє ревізію справжніх репо й не ставить справжню мітку
@@ -243,7 +256,15 @@ def selftest():
     case('після коміту ліміти не друкуються (шум уночі)', 'ліміти' not in (hook({'hook_event_name': 'PostToolUse', 'tool_input': {'command': 'git commit -m y'}, 'transcript_path': tr('lc', [a(330_000), le((60, 0.1, R5, 0.2))])}, T0) or ''))
     o = hook({'transcript_path': tr('pc', [a(300_000), {'type': 'system', 'subtype': 'compact_boundary', 'compactMetadata': {'trigger': 'manual', 'preTokens': 300_000, 'postTokens': 16_000}}])}, T0)
     case('перше повідомлення після стиснення (відповіді ще нема) — «≈ 96 тис.» замість тиші', 'контекст ≈ 96 тис.' in o and 'точне — після першої відповіді' in o)
-    print(f'─── ctx_watch selftest: {31 - bad}/31 ───'); return 1 if bad else 0
+    # В-377 Б: «кеш … теплий до ≈HH:MM» — від останньої відповіді + TTL її кешу
+    c1 = v(tr('k1', [a(120_000, ago=60)])) or ''
+    case('кеш 1 год: «теплий до» = остання відповідь + 60 хв, київський час', f'кеш 1 год: теплий до ≈{kyiv(T0 - 60 + 3600)}' in c1)
+    case('кеш 5 хв (кредити): «теплий до» = остання відповідь + 5 хв', f'кеш 5 хв: теплий до ≈{kyiv(T0 - 60 + 300)}' in (v(tr('k2', [a(120_000, ago=60, h1=False)])) or ''))
+    z = a(130_000, ago=30); z['message']['usage'].update(cache_creation_input_tokens=0, cache_creation={'ephemeral_1h_input_tokens': 0, 'ephemeral_5m_input_tokens': 0})
+    case('відповідь без запису кешу (лише читання) — тип від попередньої (5 хв), час — від неї', f'кеш 5 хв: теплий до ≈{kyiv(T0 - 30 + 300)}' in (v(tr('k3', [a(120_000, ago=90, h1=False), z])) or ''))
+    case('пауза > TTL при малому контексті — «холодний з», без ⚠', 'кеш 1 год: холодний з' in (o := v(tr('k4', [a(120_000, ago=4000)])) or '') and not o.startswith('⚠'))
+    case('рядок руками (line) теж має «кеш … теплий до / холодний з»', 'кеш 1 год:' in line(tr('k5', [a(120_000)])))
+    print(f'─── ctx_watch selftest: {total - bad}/{total} ───'); return 1 if bad else 0
 
 if __name__ == '__main__':
     cmd = sys.argv[1] if len(sys.argv) > 1 else 'hook'
