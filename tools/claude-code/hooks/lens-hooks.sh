@@ -10,7 +10,7 @@
 #   SessionStart               — профіль Konst з репо (tools/claude-code/PROFILE.md) як контекст сесії, ЛИШЕ коли в середовищі LENS_PROFILE=1: спільний акаунт, де поле
 #                                профілю в налаштуваннях бачили б і чужі чати (слово Konst 18.10.2026, QR CC-18; ACCOUNT_MOVE.md п.1-б). Старт і повтор після стиснення (без matcher —
 #                                на всі source). З 22.10.2026 (ACC-1) — на обох акаунтах; у полі акаунта тоді лише ядро (6 рядків), інакше профіль двічі. Зуби: bash lens-hooks.sh profile-test
-#   PostToolUseFailure · SubagentStop · PreCompact · SessionEnd — поки без гачків: вихід одразу
+#   PreCompact — сторож стиснення (precompact_guard.sh, нижче) · PostToolUseFailure · SubagentStop · SessionEnd — поки без гачків: вихід одразу
 # Ціна: подія без гачка й інструмент поза фільтром — лише bash, без Python (заміряно 09.10: подія без гачка ~6 мс, інструмент поза фільтром ~13 мс; повний ланцюг ~140 мс — як у CLAUDE_CODE.md).
 h="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ev="$1"
@@ -87,6 +87,13 @@ open(sys.argv[1],"w").write(json.dumps(r[0])+"\n"); open(sys.argv[2],"w").write(
   ok "$o" "⚠ контекст 330 тис." && echo "✓ ctx_watch на повідомлення Konst: ⚠ у контексті" || { echo "✗ ctx_watch на повідомлення: «$(printf '%s' "$o" | cut -c1-120)»"; bad=1; }
   o="$(printf '{"session_id":"c3","hook_event_name":"SessionStart","source":"compact","transcript_path":"%s"}' "$t/cmp.jsonl" | env $e LENS_PROFILE=1 LENS_REPOS_ROOT="$t/repos" LENS_ENV_DIR="$t" LENS_MARK_DIR="$t" LENS_SKILLS_DIR="$t/skills" bash "${BASH_SOURCE[0]}" SessionStart)"
   ok "$o" "Частина 1/2" "371 тис. → 14 тис." && echo "✓ ctx_watch після стиснення: «371 тис. → 14 тис.» і профіль в одному JSON" || { echo "✗ ctx_watch після стиснення: «$(printf '%s' "$o" | tail -c 160)»"; bad=1; }
+  # В-373 (AE S145): сторож відклав автостиснення → агент чує на наступному кроці (будь-який інструмент) і лише раз на спробу
+  printf 'tries=1\nctx=400000\ncap=430000\ndirty= ревізії-після-стиснення-не-було\n' > "$t/held"
+  o="$(printf '{"session_id":"c4","hook_event_name":"PostToolUse","tool_name":"Edit","tool_input":{}}' | env $e LENS_HELD="$t/held" LENS_FLAG="$t/nf" LENS_MARK_DIR="$t" bash "${BASH_SOURCE[0]}" PostToolUse)"
+  o2="$(printf '{"session_id":"c4","hook_event_name":"PostToolUse","tool_name":"Edit","tool_input":{}}' | env $e LENS_HELD="$t/held" LENS_FLAG="$t/nf" LENS_MARK_DIR="$t" bash "${BASH_SOURCE[0]}" PostToolUse)"
+  ok "$o" "АВТОСТИСНЕННЯ ВІДКЛАДЕНО" "400 тис." "430 тис." && [ -z "$o2" ] && echo "✓ відкладене автостиснення: агент чує на Edit, повтор без нової спроби — тиша" || { echo "✗ відкладене автостиснення: «$(printf '%s' "$o" | cut -c1-120)» · повтор «$(printf '%s' "$o2" | cut -c1-60)»"; bad=1; }
+  sleep 1; touch "$t/nf"; o="$(printf '{"session_id":"c5","hook_event_name":"UserPromptSubmit","prompt":"далі"}' | env $e LENS_HELD="$t/none-held" LENS_FLAG="$t/nf" LENS_MARK_DIR="$t" LENS_REPOS_ROOT="$t/repos" LENS_ENV_DIR="$t" bash "${BASH_SOURCE[0]}" UserPromptSubmit)"
+  ok "$o" "Konst пробував /compact" && [ ! -e "$t/nf" ] && echo "✓ зупинений /compact: агент чує на наступне повідомлення, позначку знято" || { echo "✗ зупинений /compact: «$(printf '%s' "$o" | cut -c1-120)»"; bad=1; }
   rm -rf "$t"; exit $bad
 fi
 if [ "$ev" = SessionStart ] || [ "$ev" = profile-test ]; then
@@ -123,7 +130,7 @@ if [ "$ev" = SessionStart ] || [ "$ev" = profile-test ]; then
 fi
 # PreCompact (CTX-1, FAB-1 10.11.2026): stdout гачка Claude Code бере як інструкції для переказу при стисненні (code.claude.com/docs/en/hooks «PreCompact output»,
 #   10.11.2026; ≤ 10 000 знаків) — один файл ядра на всі репо замість розділу «Compact instructions» у кожному CLAUDE.md
-[ "$ev" = PreCompact ] && { LENS_HOOKS="$h" bash "$h/precompact_guard.sh"; exit $?; }   # AE S140 (FAB-2, «так» Konst): сторож «ревізія → /compact» — ручне стиснення з незакоміченим / незапушеним → вихід 2 (зупинено), авто — ніколи; інструкції переказу + факти git — його stdout
+[ "$ev" = PreCompact ] && { LENS_HOOKS="$h" bash "$h/precompact_guard.sh"; exit $?; }   # AE S140 (FAB-2, «так» Konst): сторож «ревізія → /compact» — ручне стиснення з незакоміченим / незапушеним → вихід 2 (зупинено), авто — відкладає до ревізії, нижче стелі (AE S145, В-373); інструкції переказу + факти git — його stdout
 case "$ev" in pre|PreToolUse) ev=pre;; post|PostToolUse) ev=post;; stop|Stop) ev=stop;; UserPromptSubmit) ev=prompt;; *) exit 0;; esac
 in="$(cat)"
 tool="$(printf '%s' "$in" | grep -o '"tool_name" *: *"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/')"
@@ -142,6 +149,15 @@ except Exception: print(0)' 2>/dev/null)"
   printf '%s\t%s\t%s\t%s\n' "$(date -u +%FT%TZ)" "$ev" "$1" "$(printf '%s' "$2" | tr '\n\t' '  ' | sed 's/"permissionDecisionReason": *"//;s/"reason": *"//;s/"additionalContext": *"//' | cut -c1-200)" >> "/tmp/lens-hooks-${sid:-nosession}.tsv" 2>/dev/null
   printf '%s\n' "$2"
 }
+held() {   # AE S145 (В-373): сторож стиснення відклав автостиснення / зупинив /compact → агент чує одразу, на кожній новій спробі (не раз на сесію)
+  local f="${LENS_HELD:-/tmp/lens-autocompact-held}" b="${LENS_FLAG:-/tmp/lens-compact-blocked}" seen="${LENS_MARK_DIR:-/tmp}/lens-held-seen" t=""
+  if [ -s "$f" ] && [ "$f" -nt "$seen" ]; then
+    t="АВТОСТИСНЕННЯ ВІДКЛАДЕНО сторожем (спроба $(sed -n 's/^tries=//p' "$f"); контекст $(( $(sed -n 's/^ctx=//p' "$f") / 1000 )) тис., стеля $(( $(sed -n 's/^cap=//p' "$f") / 1000 )) тис. — там пропущу саме): не все збережено —$(sed -n 's/^dirty=//p' "$f"). Зараз, до нової роботи: python3 <ядро>/tools/claude-code/handoff_check.py revision → виправ ✗ → коміт → push. Після ревізії ✓ стиснення пройде на наступній спробі. Konst — одним рядком у звіті."
+  elif [ -e "$b" ] && [ "$b" -nt "$seen" ]; then
+    t="Konst пробував /compact — сторож зупинив: не все збережено. Ревізія (handoff_check revision) → виправ ✗ → коміт → push, тоді скажи Konst «можна /compact»."; rm -f "$b"
+  fi
+  [ -n "$t" ] && { touch "$seen"; python3 -c 'import json,sys; print(json.dumps({"hookSpecificOutput":{"hookEventName":sys.argv[1],"additionalContext":sys.argv[2]}},ensure_ascii=False))' "$1" "$t"; }
+}
 run() { out="$(printf '%s' "$in" | bash "$h/$1" $2 2>>"$E")"; [ -n "$out" ] && { fire "${1%.sh}" "$out"; return 0; }; return 1; }
 case "$ev" in
   pre)
@@ -154,7 +170,8 @@ case "$ev" in
     done
     o="$(printf '%s' "$in" | python3 "$h/rules-guard.py" pre 2>>"$E")"; [ -n "$o" ] && fire rules-guard "$o"; exit 0 ;;
   post)
-    case "$tool" in Read|Bash|Grep|WebSearch|WebFetch) ;; *) exit 0;; esac
+    hm="$(held PostToolUse)"; [ -n "$hm" ] && hm="$(fire held "$hm")"
+    case "$tool" in Read|Bash|Grep|WebSearch|WebFetch) ;; *) [ -n "$hm" ] && printf '%s\n' "$hm"; exit 0;; esac
     printf '%s' "$in" | bash "$h/ui-guard.sh" mark 2>>"$E"
     # після коміту — два нагадування можуть збігтись (огляд UI · бриф, BRIEF-2 19.10.2026): одне повідомлення, обидва тексти
     o1="$(printf '%s' "$in" | bash "$h/review-remind.sh" post 2>>"$E")"; o2="$(printf '%s' "$in" | bash "$h/brief-guard.sh" post 2>>"$E")"
@@ -165,7 +182,7 @@ case "$ev" in
     [ -z "$o1" ] && [ -z "$o2" ] && [ "$tool" = Bash ] && po="$(run handoff-remind.sh post || run env-remind.sh post)"
     # AE S141 (В-352): після кожного `git commit` — ctx_watch: ⚠, коли контекст ≥ порога ревізії (крок нічної зміни закінчується комітом, а повідомлень Konst уночі нема)
     c=""; [ "$tool" = Bash ] && c="$(printf '%s' "$in" | python3 "$h/ctx_watch.py" hook 2>>"$E")"; [ -n "$c" ] && po="$(mrg "$po" "$(fire ctx-watch "$c")")"
-    [ -n "$po" ] && printf '%s\n' "$po" ;;   # + пам'ять після коміту (AE S109): нові ✗ / ⚠ handoff_check   # коміт змінив аркуш середовища → запропонувати оновити (ENV-1)
+    po="$(mrg "$po" "$hm")"; [ -n "$po" ] && printf '%s\n' "$po" ;;   # + пам'ять після коміту (AE S109): нові ✗ / ⚠ handoff_check   # коміт змінив аркуш середовища → запропонувати оновити (ENV-1)
   stop)   # перший з відповіддю перемагає: гачок пам'яті, перевірка перед переїздом (HOOK-3.2), «план без світу» (HOOK-2.5)
     # тінь (FAB-1, 10.11.2026): кандидат на заміну memory-guard — перевірка рядка «пам'ять: …» проти стану git. Лише пише вирок у
     #   /tmp/lens-shadow-<сесія>.tsv, нічого не друкує й не блокує; підсумок сесії — python3 memory_line.py tally <сесія> (рядком у журнал гачків)
@@ -174,6 +191,7 @@ case "$ev" in
   prompt)   # перевірка перед переїздом (HOOK-3.2), інакше — аркуш середовища на прохання (ENV-1), інакше — «пропуск, знайдений Konst» (HOOK-5)
     o="$(run handoff-remind.sh "" || run env-remind.sh "" || run konst-miss.sh "")"
     y="$(printf '%s' "$in" | bash "$h/konst-miss.sh" yes 2>>"$E")"; [ -n "$y" ] && o="$(mrg "$o" "$(fire konst-yes "$y")")"   # В-372 (AE S145): Konst приймає 💡 → чек-лист підсилення; додається, не витісняє
+    hm="$(held UserPromptSubmit)"; [ -n "$hm" ] && o="$(mrg "$o" "$(fire held "$hm")")"   # В-373: стиснення відкладено / зупинено
     r="$(run route-remind.sh "")"   # AE S135 · маршрут для Konst — додається до будь-якого іншого гачка, не витісняє (route-remind.sh)
     [ -n "$r" ] && o="$(python3 -c 'import json,sys
 a,b=sys.argv[1],sys.argv[2]

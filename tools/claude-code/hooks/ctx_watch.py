@@ -247,6 +247,8 @@ def selftest():
 if __name__ == '__main__':
     cmd = sys.argv[1] if len(sys.argv) > 1 else 'hook'
     if cmd == 'selftest': sys.exit(selftest())
+    if cmd == 'hold':   # AE S145 (В-373): для precompact_guard — «контекст · стеля відкладення автостиснення» (стеля = W − 20 000, вікно Claude Code)
+        n = numbers(sys.argv[2] if len(sys.argv) > 2 else ''); print(n['ctx'], n['w'] - RESERVE_OUT); sys.exit(0)
     if cmd == 'line': print(line(sys.argv[2] if len(sys.argv) > 2 else newest())); sys.exit(0)
     try: inp = json.load(sys.stdin)
     except ValueError: inp = {}

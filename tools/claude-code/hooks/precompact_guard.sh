@@ -3,13 +3,15 @@
 # живе доки: діє правило «ревізія → /compact» (lens-governance:tools/claude-code/CLAUDE_CODE.md «Практики»); виклик — диспетчер hooks/lens-hooks.sh, подія PreCompact.
 # Що робить: (1) ручне /compact, а в репо сесії є незакомічене або HEAD не на GitHub → вихід 2, стиснення не відбувається, рядок бачить Konst;
 #            (2) слово Konst у самій команді — «/compact без ревізії …» — пропускає (обхід з причиною, слід у журналі диспетчера);
-#            (3) автоматичне стиснення НЕ блокує ніколи (hooks «PreCompact»: блок під час рятування від ліміту контексту валить запит),
-#                але пише незбережене в інструкції переказу — щоб після стиснення агент першим ділом зберіг;
+#            (3) автоматичне (AE S145, В-373 — було «НЕ блокує ніколи»): не все збережено і контекст < стелі (W − 20 000; ctx_watch hold) →
+#                вихід 2 = відкласти: «проактивне автостиснення пропускається, розмова йде нестиснутою» (code.claude.com/docs/en/hooks
+#                «PreCompact», 14.11.2026); позначка LENS_HELD → диспетчер щокроку каже агентові «ревізія зараз». Стеля досягнута чи
+#                > 40 спроб — пропускає (стиснення-рятунок після помилки ліміту блокувати не можна: запит упаде) і пише незбережене в переказ;
 #            (4) у вивід (= інструкції переказу, ≤ 10 000 знаків) — факти git від програми: репо · гілка · HEAD · коміти цієї сесії;
 #            (5) при блоці лишає позначку — наступний UserPromptSubmit каже агентові «Konst пробував стиснути: зроби ревізію».
 # Помилка самого гачка (вихід не 0 і не 2) стиснення не зупиняє — так влаштовано Claude Code (hooks «Exit code output»): сторож відмовляє «у відкрите».
 # Запуск: echo '{"trigger":"manual","custom_instructions":null}' | LENS_ROOT=/home/user LENS_HOOKS=<тека гачків> bash precompact_guard.sh
-#         bash precompact_guard.sh selftest     → 11 випадків на тимчасовому репо + обгортка PreCompact (шаблон ENVIRONMENT.md і живий ~/.claude/settings.json)
+#         bash precompact_guard.sh selftest     → 16 випадків на тимчасовому репо + обгортка PreCompact (шаблон ENVIRONMENT.md і живий ~/.claude/settings.json)
 set -u
 guard() {
   local root="${LENS_ROOT:-/home/user}" hooks="${LENS_HOOKS:-.}" sid="${CLAUDE_CODE_REMOTE_SESSION_ID:-}" in trig ci facts="" dirty="" r n hd b cm
@@ -32,6 +34,16 @@ $cm}"
   [ -z "$dirty" ] && [ -f "$hc" ] && x="$(python3 "$hc" gate "$root" 2>/dev/null | head -8 | cut -c1-300)"
   [ -n "$x" ] && dirty="$dirty handoff_check:✗($(printf '%s\n' "$x" | wc -l))"
   [ -f "$hc" ] && [ ! -f "$mark" ] && dirty="$dirty ревізії-після-стиснення-не-було"
+  local held="${LENS_HELD:-/tmp/lens-autocompact-held}" hc_ctx hc_cap tries
+  if [ "$trig" = auto ] && [ -n "$dirty" ] && [ "${LENS_AUTO_HOLD:-1}" = 1 ]; then
+    read -r hc_ctx hc_cap <<<"$(printf '%s' "$in" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("transcript_path",""))' 2>/dev/null | xargs -r -I{} python3 "$hooks/ctx_watch.py" hold {} 2>/dev/null)"
+    tries="$(sed -n 's/^tries=//p' "$held" 2>/dev/null)"; tries=$(( ${tries:-0} + 1 ))
+    if [ -n "${hc_ctx:-}" ] && [ "${hc_ctx:-0}" -gt 0 ] && [ "$hc_ctx" -lt "$hc_cap" ] && [ "$tries" -le 40 ]; then
+      printf 'tries=%s\nctx=%s\ncap=%s\ndirty=%s\n' "$tries" "$hc_ctx" "$hc_cap" "$dirty" > "$held"
+      echo "Автостиснення відкладено ($tries): не все збережено —$dirty. Пропущу саме на $((hc_cap/1000)) тис." >&2; return 2
+    fi
+  fi
+  rm -f "$held"
   if [ "$trig" = manual ] && [ -n "$dirty" ]; then
     case "$ci" in *"без ревізії"*|*"без ревизии"*) echo "$(date -u +%FT%TZ) precompact обхід: $dirty · «$ci»" >> "${LENS_LOG:-/tmp/lens-precompact.log}" ;;
       *) : > "${LENS_FLAG:-/tmp/lens-compact-blocked}"
@@ -52,18 +64,25 @@ selftest() {
   ( cd "$t/w/repoA" && git config user.email a@b && git config user.name t && echo 1 > f && git add -A && git commit -qm "c1
 
 Claude-Session: https://claude.ai/code/session_TESTSID" && git push -q origin HEAD 2>/dev/null )
-  run() { printf '{"hook_event_name":"PreCompact","trigger":"%s","custom_instructions":%s}' "$1" "${2:-null}" | CLAUDE_CODE_REMOTE_SESSION_ID=cse_TESTSID CLAUDE_CODE_SESSION_ID=TESTSID LENS_REV_MARK="$t/rev" LENS_ROOT="$t/w" LENS_HOOKS="$t/hooks" LENS_FLAG="$t/flag" LENS_LOG="$t/log" bash "$me" 2>"$t/err" >"$t/out"; echo $?; }
+  u() { printf '{"type":"assistant","timestamp":"2026-11-14T10:00:00Z","message":{"role":"assistant","usage":{"input_tokens":%s},"content":[]}}\n' "$1"; }
+  u 300000 > "$t/small.jsonl"; u 431000 > "$t/big.jsonl"
+  run() { printf '{"hook_event_name":"PreCompact","trigger":"%s","custom_instructions":%s,"transcript_path":"%s"}' "$1" "${2:-null}" "${TR:-$t/small.jsonl}" | CLAUDE_CODE_AUTO_COMPACT_WINDOW=450000 CLAUDE_CODE_REMOTE_SESSION_ID=cse_TESTSID CLAUDE_CODE_SESSION_ID=TESTSID LENS_REV_MARK="$t/rev" LENS_ROOT="$t/w" LENS_HOOKS="$t/hooks" LENS_FLAG="$t/flag" LENS_HELD="$t/held" LENS_LOG="$t/log" bash "$me" 2>"$t/err" >"$t/out"; echo $?; }
   say() { [ "$1" = 1 ] && echo "✓ $2" || { echo "✗ $2"; bad=1; }; }
-  mkdir -p "$t/hooks"; cp "$(dirname "$me")/../handoff_check.py" "$t/"; cp "$(dirname "$me")/../doc_health.py" "$t/" 2>/dev/null
+  mkdir -p "$t/hooks"; cp "$(dirname "$me")/../handoff_check.py" "$t/"; cp "$(dirname "$me")/../doc_health.py" "$t/" 2>/dev/null; cp "$(dirname "$me")/ctx_watch.py" "$t/hooks/"
   e=$(run manual); say $([ "$e" = 2 ] && grep -q "ревізії-після-стиснення-не-було" "$t/err" && echo 1) "REV-1: чисте, але ревізії після стиснення не було + manual → 2"
-  e=$(run auto); say $([ "$e" = 0 ] && grep -q "НЕ ЗБЕРЕЖЕНО.*ревізії" "$t/out" && echo 1) "REV-1: без ревізії + auto → 0, у переказі «спершу: ревізія»"
+  e=$(run auto); say $([ "$e" = 2 ] && grep -q "tries=1" "$t/held" && grep -q "ревізії" "$t/held" && echo 1) "В-373: без ревізії + auto, контекст 300 тис. < стелі 430 → 2 (відкладено), позначка для агента"
+  e=$(run auto); say $([ "$e" = 2 ] && grep -q "tries=2" "$t/held" && echo 1) "В-373: друга спроба — лік спроб 2"
+  e=$(TR="$t/big.jsonl" run auto); say $([ "$e" = 0 ] && [ ! -e "$t/held" ] && grep -q "НЕ ЗБЕРЕЖЕНО.*ревізії" "$t/out" && echo 1) "В-373: контекст 431 тис. ≥ стелі → 0 (рятунок не блокуємо), позначку знято, у переказі «спершу: ревізія»"
+  printf 'tries=40\n' > "$t/held"; e=$(run auto); say $([ "$e" = 0 ] && echo 1) "В-373: 41-ша спроба → 0 (стеля спроб)"
+  e=$(LENS_AUTO_HOLD=0 run auto); say $([ "$e" = 0 ] && echo 1) "LENS_AUTO_HOLD=0 → auto не відкладається"
   touch "$t/rev"
   e=$(run manual); say $([ "$e" = 0 ] && grep -q "HEAD" "$t/out" && grep -q "c1" "$t/out" && echo 1) "чисте + ревізія є + manual → 0; у фактах HEAD і коміт цієї сесії"
   sed -i 's/```text/```txt/' "$t/w/repoA/docs/summary/A_SUMMARY_X.md"; ( cd "$t/w/repoA" && git commit -qam c1b && git push -q origin HEAD 2>/dev/null )
   e=$(run manual); say $([ "$e" = 2 ] && grep -q "handoff_check:✗" "$t/err" && grep -q "стартове повідомлення нема" "$t/err" && echo 1) "REV-1: ✗ handoff_check (самері без стартового) + manual → 2, рядок ✗ бачить Konst"
   sed -i 's/```txt/```text/' "$t/w/repoA/docs/summary/A_SUMMARY_X.md"; ( cd "$t/w/repoA" && git commit -qam c1c && git push -q origin HEAD 2>/dev/null )
   echo x > "$t/w/repoA/new"; e=$(run manual); say $([ "$e" = 2 ] && grep -q "незакомічене" "$t/err" && [ -e "$t/flag" ] && echo 1) "незакомічене + manual → 2, рядок Konst, позначка для агента"
-  e=$(run auto); say $([ "$e" = 0 ] && grep -q "НЕ ЗБЕРЕЖЕНО" "$t/out" && echo 1) "незакомічене + auto → 0 (не блокуємо), «НЕ ЗБЕРЕЖЕНО» в інструкціях"
+  e=$(run auto); say $([ "$e" = 2 ] && grep -q "незакомічене" "$t/held" && echo 1) "незакомічене + auto під стелею → 2 (відкладено)"
+  e=$(TR="$t/big.jsonl" run auto); say $([ "$e" = 0 ] && grep -q "НЕ ЗБЕРЕЖЕНО" "$t/out" && echo 1) "незакомічене + auto на стелі → 0, «НЕ ЗБЕРЕЖЕНО» в інструкціях"
   e=$(run manual '"без ревізії: чернетка, не шкода"'); say $([ "$e" = 0 ] && grep -q "обхід" "$t/log" && echo 1) "«/compact без ревізії …» → 0, слід у журналі"
   e=$(run manual '"збережи рішення про рейку"'); say $([ "$e" = 2 ] && echo 1) "інші слова в /compact обходу не дають → 2"
   ( cd "$t/w/repoA" && git add new && git commit -qm c2 ); e=$(run manual); say $([ "$e" = 2 ] && grep -q "не-на-GitHub" "$t/err" && echo 1) "закомічено, не запушено + manual → 2"
@@ -78,6 +97,6 @@ Claude-Session: https://claude.ai/code/session_TESTSID" && git push -q origin HE
       e=$(LENS_HOOKS_SH="$t/fake.sh" bash -c "${c//\~\/.claude\/lens-hooks.sh/$w}" </dev/null >/dev/null 2>&1; echo $?)
       want=0; [ $ev = PreCompact ] && want=2
       say "$([ -n "$c" ] && [ "$e" = $want ] && echo 1)" "обгортка $ev ($(basename "$s")): вихід диспетчера 2 → $want ($([ $want = 2 ] && echo '«/compact» справді зупиняється' || echo 'збій гачка Konst не блокує'))"; done; done
-  echo "─── precompact_guard selftest: $([ $bad = 0 ] && echo 11+обгортки || echo є ✗) ───"; return $bad
+  echo "─── precompact_guard selftest: $([ $bad = 0 ] && echo 16+обгортки || echo є ✗) ───"; return $bad
 }
 if [ "${1:-}" = selftest ]; then selftest; else guard; fi
