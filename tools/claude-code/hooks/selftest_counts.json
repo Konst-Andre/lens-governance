@@ -4,7 +4,7 @@
  "commit-gate.sh selftest": 5,
  "commit_files.py selftest": 33,
  "ctx_watch.py selftest": 39,
- "doc_health.py selftest": 49,
+ "doc_health.py selftest": 50,
  "env-remind.sh selftest": 10,
  "env_drift.py selftest": 7,
  "frame_init.sh selftest": 5,

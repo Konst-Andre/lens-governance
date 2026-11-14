@@ -271,7 +271,7 @@ def orphan_tools(root):
     if not tl: return []
     text = '\n'.join(open(os.path.join(root, f), encoding='utf-8', errors='replace').read() for f in files(root) if os.path.isfile(os.path.join(root, f)))
     return [('M9', f, 'про прилад не каже жоден живий документ — рядок у карту репо (REPO_LAYOUT / CLAUDE_CODE.md), або в archive/')
-            for f in tl if os.path.splitext(os.path.basename(f))[0] not in text]
+            for f in tl if os.path.splitext(os.path.basename(f))[0] not in text and not (os.path.dirname(f) + '/') in text]   # AE S147: тека зразків названа повним шляхом — її файли згадані (15 сторінок АНЦ — не прилади)
 
 
 def queue_behind(root):
@@ -413,6 +413,7 @@ def selftest():
     cases += [('M7: «§13-д» без заголовка §13 → ⚠', {'lens/S.md': '## §1 А\nx\n## §2 Б\nx\n## §3 В\nдив. §13-д\n'}, '⚠', 'мертвих адрес § 1'),
               ('M7: «§3-п.2» є заголовок · «gov §12.4» · «Бібліотека §7.1» → ✓', {'lens/S.md': '## §1 А\nx\n## §2 Б\nx\n## §3 В\nдив. §3-п.2 · gov §12.4 · Бібліотека §7.1\n'}, '✓', '')]
     cases += [('M9: прилад, про який не каже жоден .md → ⚠', {'tools/gone_v1.py': 'x', 'README.md': 'нічого\n'}, '⚠', 'приладів без згадки 1'),
+              ('M9: файли теки, яку .md називає повним шляхом зі слешем → згадані', {'tools/cases/pg/1.page.txt': 'x', 'README.md': 'зразки — `tools/cases/pg/`\n'}, '✓', ''),
               ('M9: прилад згаданий іменем без розширення → ✓', {'tools/stand/walk_v2.py': 'x', 'docs/REPO_LAYOUT.md': 'прохід walk_v2 — чинний\n'}, '✓', '')]
     F = 'Кожне правило — **Правило** · **Чому** · **Як перевірити**.\n'
     cases += [('M8: форма оголошена, розділ з правилом без перевірки → ⚠', {'lens/F.md': F + '### 1 А\n**Правило.** x\n**Як перевірити.** y\n### 2 Б\n**Правило.** z\n'}, '⚠', 'правил без «Як перевірити» 1'),
