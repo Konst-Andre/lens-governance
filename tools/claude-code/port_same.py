@@ -22,7 +22,7 @@
 #   ще ні — рух як функція ключа (ширина рейки при різних кроках рушіїв: режим "key" — порівнювати значення при однаковому ключі),
 #   фокус клавіатурою (додати "focus": селектор у стан), дотик і WebKit (лише Chromium). Нове вміння — тут, з рядком selftest і зубом;
 #   новий вид предмета — roots/pick, властивість — props, стан — states (сценарій продукту, прилад не чіпати).
-import json, os, sys, tempfile, shutil, threading, functools, http.server, socketserver, pathlib, io, contextlib
+import json, os, sys, subprocess, tempfile, shutil, threading, functools, http.server, socketserver, pathlib, io, contextlib
 
 KEY = "const key = e => { const p = []; for (let n = e; n && n !== r; n = n.parentElement) { const i = [...n.parentElement.children].indexOf(n) + 1; p.unshift(n.tagName.toLowerCase() + ':' + i); } return p.join('>'); };"
 MEAS_JS = "([root, pick, props]) => { const r = document.querySelector(root); if (!r) return null; const out = {}; " + KEY + r"""
@@ -172,6 +172,13 @@ def run(scn_path, inject=False, shots=None):
     for st, n, x in V: print(f'{st} {n}' + (f' — {x}' if x else ''))
     bad = sum(s == '✗' for s, _, _ in V)
     print(f"─── port_same «{C.get('name', P.stem)}»: ✓ {len(V) - bad} · ✗ {bad}" + (' (--inject)' if inject else '') + (f' · борг {len(debt)}' if debt else '') + ' ───')
+    if not bad and not inject:   # позначка для воріт огляду (ui-review-gate ⑦, AE S145): той самий хеш диффу UI, що рахує ворота
+        try:
+            top = subprocess.run(['git', '-C', str(P.resolve().parent), 'rev-parse', '--show-toplevel'], capture_output=True, text=True).stdout.strip()
+            hx = subprocess.run(['bash', str(pathlib.Path(__file__).resolve().parent / 'hooks/ui-review-gate.sh'), 'hash', top], capture_output=True, text=True).stdout.strip() if top else ''
+            if hx in ('', 'None'): print('ⓘ змін UI в робочій теці нема — позначку не записано (ворота судять дифф до коміту: port_same — до git commit)')
+            elif hx: open(f'/tmp/lens-portsame-{hx}', 'w').write(f"{C.get('name', P.stem)} ✓ {len(V)}\n"); print(f'✓ позначка port_same для диффу {hx[:8]} — ворота огляду приймуть done')
+        except Exception as e: print(f'ⓘ позначку port_same не записано ({type(e).__name__})')
     return bad
 
 

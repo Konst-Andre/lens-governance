@@ -24,7 +24,7 @@ CHECK = ("чек-лист огляду (як користувач, а не ли�
          "(на зменшених знімках губляться капсула, «приклеєна» до краю, і розтягнуті іконки); "
          "паритет тем: покращив місце в одній темі — те саме місце в іншій, щоб жодна не відставала (обʼєм тим інструментом, що живе в темі: A66); "
          "матеріал карток (поле = well, кнопка = lift); переноси й обрізання; консоль; скрол убік; відступи — зі шкали (4 · 8 · 12 · 16 · 24), не випадкові; "
-         "є примірка цього екрана (shots/README.md, «обрано» / «у роботі») — знімок «після» тим самим кадром поруч з обраним — кроп 1:1 того самого стану, обидві теми, `python3 tools/claude-code/shots_same.py <примірка.png> <код.png>` ✓ (очі на дрібних кадрах пропустили сірий значок замість бірюзового), показати Konst (tools/claude-code/SHOTS.md §5). "
+         "є примірка цього екрана (shots/README.md, «обрано» / «у роботі») — знімок «після» тим самим кадром поруч з обраним — кроп 1:1 того самого стану, обидві теми, `python3 tools/claude-code/shots_same.py <примірка.png> <код.png>` ✓ (очі на дрібних кадрах пропустили сірий значок замість бірюзового), показати Konst (tools/claude-code/SHOTS.md §5); переносиш обрану примірку в продукт — `python3 tools/claude-code/port_same.py <port_*.json>` ✓ (порт ≡ примірка за предметами, станами, темами й рухом; done без нього — ✗, SHOTS.md §1 п. 4). "
          "② дія → результат: після тапу людина бачить, що сталося, що змінилось і де перевірити самій; довга дія — хід до кінця по всіх реальних кінцях джерела "
          "(успіх · помилка · «не буде» · немає прав); кожна кнопка — шлях до кінця, приймач розуміє, є зворотна дія (wsd 3.9); "
          "мок зовнішнього джерела — лише з тих самих реальних кінців (коди відповідей, права токена, пропущені кроки), не з очікуваних. "
@@ -72,6 +72,12 @@ def ui_state(top):   # (файли UI, хеш диффу) — дифф прот�
     return files, h.hexdigest()
 
 MOTION = re.compile(r"\btransition\s*:|@keyframes|\banimation(-name)?\s*:|requestAnimationFrame|\.animate\(|--spring|\bspring\b|will-change\s*:\s*transform", re.I)
+def live_fits(top, files):   # ⑦ порт ≡ примірка (AE S145, В-373 · В-371): дифф міняє продукт (не shots/), а примірку-накладку shots/**/fit_* міняли ≤ 14 днів тому
+    # світ: design QA (код ≡ задуманому дизайну) ≠ регресія (код ≡ своєму минулому) — перед злиттям, свідома різниця — окремим кошиком (hypermatic.com «visual regression testing vs design QA», 14.11.2026)
+    if not [f for f in files if '/shots/' not in '/' + f]: return []
+    out = git(top, "log", "--since=14.days", "--name-only", "--format=", "--", ":(glob)**/shots/**/fit_*", ":(glob)shots/**/fit_*")
+    return sorted({os.path.dirname(f) for f in out.split() if f})
+
 def motion_in(top, files):   # рух у ДОДАНИХ рядках диффу (і в нових файлах) — Konst AE S140: рух показується кліпом, не знімком
     add = [l[1:] for l in git(top, "diff", "HEAD", "--unified=0", "--", *files).splitlines() if l.startswith("+") and not l.startswith("+++")]
     for f in git(top, "ls-files", "--others", "--exclude-standard", "--", *files).splitlines():
@@ -133,7 +139,8 @@ def lint_mark(hx): return f"/tmp/lens-uilint-{hx}"
 if mode == "done":
     opt = lambda k: args[args.index(k) + 1] if k in args and args.index(k) + 1 < len(args) else None
     nolint, clip, noclip = opt("--no-lint"), opt("--clip"), opt("--no-clip")
-    rest = [a for i, a in enumerate(args) if a not in ("--no-lint", "--clip", "--no-clip") and not (i > 0 and args[i - 1] in ("--no-lint", "--clip", "--no-clip"))]
+    KO = ("--no-lint", "--clip", "--no-clip", "--no-port")
+    rest = [a for i, a in enumerate(args) if a not in KO and not (i > 0 and args[i - 1] in KO)]
     note = rest[0] if rest else ""
     top = git(rest[1] if len(rest) > 1 else os.getcwd(), "rev-parse", "--show-toplevel")
     if len(note) < 40: print("✗ рядок огляду < 40 знаків — назви стани, теми й що бачить людина після дії"); sys.exit(1)
@@ -155,7 +162,17 @@ if mode == "done":
         else:
             print(f"✗ у диффі є рух (transition · animation · пружина), кліпу нема: python3 tools/claude-code/clip.py <сценарій.json> <тека> → MP4 у чат (SendUserFile), "
                   f"тоді done \"<огляд>\" {top} --clip <файл.mp4>; кліп не має сенсу — --no-clip \"<чому, ≥ 30 знаків>\""); sys.exit(1)
-    open(mark(hx), "w").write(note + ("" if lint else f"\n[без ui_lint: {nolint}]") + cliprec + "\n" + "\n".join(files) + "\n")
+    # ⑦ порт ≡ примірка (AE S145, Konst: «щоб наступний агент знайшов port_same сам»): жива примірка + дифф продукту → позначка port_same ✓ цього диффу або причина
+    portrec, nop = "", opt("--no-port")
+    fits = live_fits(top, files)
+    if fits:
+        pm = f"/tmp/lens-portsame-{hx}"
+        if os.path.exists(pm): portrec = "\n[port_same ✓: " + open(pm).read().strip()[:160] + "]"
+        elif nop and len(nop) >= 30: portrec = f"\n[без port_same: {nop}]"
+        else:
+            print(f"✗ жива примірка ({', '.join(fits[:3])}) і дифф продукту: порт ≡ примірка — машиною: python3 tools/claude-code/port_same.py <сценарій port_*.json біля примірки> (ядро; SHOTS.md §1 п. 4) → ✓ 0 ✗ лишає позначку цього диффу; "
+                  f"дифф не переносить примірку — done \"<огляд>\" {top} --no-port \"<чому, ≥ 30 знаків>\""); sys.exit(1)
+    open(mark(hx), "w").write(note + ("" if lint else f"\n[без ui_lint: {nolint}]") + cliprec + portrec + "\n" + "\n".join(files) + "\n")
     print(f"✓ позначка огляду {hx[:8]} · {os.path.basename(top)}: {', '.join(files)}" + ("" if lint else " · ⚠ без ui_lint — причина записана")); sys.exit(0)
 
 if mode == "selftest":
@@ -210,6 +227,18 @@ if mode == "selftest":
         r = dn(note, tmp, "--clip", f"{tmp}/c.mp4"); say(r.returncode == 0 and "[кліп:" in open(mark(hx)).read(), "дифф з рухом + --clip <mp4> → ✓, кліп у позначці")
         os.remove(mark(hx)); r = dn(note, tmp, "--no-clip", "рух лише ховер кольору — кліп нічого не покаже"); say(r.returncode == 0, "--no-clip з причиною → ✓"); os.remove(mark(hx)); os.remove(lint_mark(hx))
         os.remove(f"{tmp}/m.css"); os.remove(f"{tmp}/c.mp4")
+        # ⑦ порт ≡ примірка (AE S145): жива примірка (fit_* у коміті ≤ 14 днів) + дифф продукту → потрібна позначка port_same або --no-port
+        os.makedirs(f"{tmp}/docs/shots/P8", exist_ok=True); open(f"{tmp}/docs/shots/P8/fit_y_v1.js", "w").write("1")
+        subprocess.run(["git", "-C", tmp, "add", "docs/shots/P8"], check=True); subprocess.run(["git", "-C", tmp, "commit", "-qm", "примірка"], check=True)
+        files, hx = ui_state(tmp); open(lint_mark(hx), "w").write("✗0")
+        for f in (mark(hx), f"/tmp/lens-portsame-{hx}"):
+            if os.path.exists(f): os.remove(f)
+        r = dn(note, tmp); say(r.returncode == 1 and "port_same" in r.stdout and not os.path.exists(mark(hx)), "зуби: жива примірка + дифф продукту без port_same → ✗")
+        r = dn(note, tmp, "--no-port", "коротко"); say(r.returncode == 1, "зуби: --no-port без причини (< 30 знаків) → ✗")
+        r = dn(note, tmp, "--no-port", "правка тексту кнопки — примірку рейки не переносить"); say(r.returncode == 0 and "без port_same" in open(mark(hx)).read(), "--no-port з причиною → ✓, причина в позначці")
+        os.remove(mark(hx)); open(f"/tmp/lens-portsame-{hx}", "w").write("port_p2 ✓ 59")
+        r = dn(note, tmp); say(r.returncode == 0 and "port_same ✓" in open(mark(hx)).read(), "позначка port_same цього диффу → ✓, у позначці огляду")
+        os.remove(mark(hx)); os.remove(f"/tmp/lens-portsame-{hx}"); os.remove(lint_mark(hx))
         # сітка review-remind post: UI-коміт без позначки → озивається; з позначкою на ці файли → тиша (без дубля)
         rr = os.path.join(os.path.dirname(os.environ["UI_GATE_SELF"]), "review-remind.sh")
         post = lambda sid: subprocess.run(["bash", rr, "post"], input=json.dumps({"tool_name": "Bash", "session_id": sid, "cwd": tmp, "tool_input": {"command": "git commit -am x"}}), capture_output=True, text=True).stdout
