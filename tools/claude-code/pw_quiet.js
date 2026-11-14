@@ -1,5 +1,5 @@
 // pw_quiet.js · у сторінці: window.__aeQuiet(ms) — «усе, що мало статись за ms, сталось» (таймери з терміном у вікні · скінченні анімації ·
-// запити в дорозі · два кадри); інакше — до межі. Вантажать обгортки pw_quiet.py (Python) і pw_quiet.mjs (Node) як init script (path — абсолютний).
+// запити в дорозі · рух рушія сторінки — html[data-moving] · два кадри); інакше — до межі. Вантажать обгортки pw_quiet.py (Python) і pw_quiet.mjs (Node) як init script (path — абсолютний).
 // живе доки: прилади Playwright чекають через wait_for_timeout / waitForTimeout. Народився в AE S103 (замір і зуби — AE-Simulator:docs/DECISIONS.md В-216), wsd 1.21.
 (() => { if (window.__aeQ) return; const Q = window.__aeQ = { t: new Map(), net: 0 };
   const st = window.setTimeout.bind(window), ct = window.clearTimeout.bind(window);
@@ -11,6 +11,7 @@
   const busy = end => { const now = performance.now();
     for (const d of Q.t.values()) if (d <= end) return true;
     if (Q.net > 0) return true;
+    if (document.documentElement && document.documentElement.hasAttribute('data-moving')) return true;   // рушій руху сторінки (свій цикл кадрів — getAnimations його не бачить): рух іде, доки html[data-moving] (AE S145, В-370)
     for (const an of (document.getAnimations ? document.getAnimations() : [])) { if (an.playState !== 'running') continue;
       const c = an.effect && an.effect.getComputedTiming(); if (!c || !isFinite(c.endTime)) continue;
       if (now + (c.endTime - (+an.currentTime || 0)) / (an.playbackRate || 1) <= end) return true; }

@@ -3,7 +3,8 @@
 
 Пауза N мс гарантувала: що мало статись за N мс — сталось. quiet гарантує те саме і повертається, щойно це правда:
 таймери сторінки (setTimeout) з терміном у вікні · скінченні анімації й переходи (document.getAnimations(): лишилось = endTime − currentTime,
-MDN 24.10.2026) · запити в дорозі (fetch · XHR) · і так два кадри поспіль. Інакше — чекає до межі N, як раніше. setInterval не тримає.
+MDN 24.10.2026) · запити в дорозі (fetch · XHR) · рух власного рушія сторінки — поки стоїть html[data-moving] (цикл requestAnimationFrame
+getAnimations не бачить; сигнал стану застосунку, не час — Chromatic «Animations», 14.11.2026; контракт рушія — лоток кукбука A121 (cand.), розділ S145; AE S145) · і так два кадри поспіль. Інакше — чекає до межі N, як раніше. setInterval не тримає.
 Не беремо Playwright Clock (playwright.dev/python/docs/clock): підробляє й requestAnimationFrame — для приладів з мережею ризик.
 Замір AE S103: проходи 46 → 21 с і 90 → 46 с; знахідки пункт у пункт ті самі; на старому білді — ті самі ✗.
 
@@ -79,6 +80,10 @@ def selftest():
         t(d < 200, f'таймер поза вікном (900 > 300) → не тримає ({d:.0f} мс)')
         pg.evaluate("document.getElementById('a').style.opacity='0'"); s = time.monotonic(); pg.wait_for_timeout(600); d = (time.monotonic() - s) * 1000
         t(220 <= d < 500 and pg.evaluate("getComputedStyle(document.getElementById('a')).opacity") == '0', f'перехід 250 мс → дочекано кінця ({d:.0f} мс)')
+        pg.goto('data:text/html,x')   # чиста сторінка: таймер 900 мс попереднього пункту інакше тримає вікно сам (хибний ✗, S145)
+        pg.evaluate("(() => { const h = document.documentElement; h.setAttribute('data-moving', ''); const t0 = performance.now(); const f = () => { if (performance.now() - t0 < 300) requestAnimationFrame(f); else { h.removeAttribute('data-moving'); document.body.dataset.mv = 1; } }; requestAnimationFrame(f); })()")
+        s = time.monotonic(); pg.wait_for_timeout(700); d = (time.monotonic() - s) * 1000
+        t(pg.evaluate('document.body.dataset.mv') == '1' and 280 <= d < 600, f'рушій сторінки: html[data-moving] 300 мс (цикл кадрів, не анімація браузера) → дочекано кінця ({d:.0f} мс)')
         pg.evaluate("setInterval(()=>{},50)"); s = time.monotonic(); pg.wait_for_timeout(300); d = (time.monotonic() - s) * 1000
         t(d < 200, f'setInterval не тримає ({d:.0f} мс)')
         s = time.monotonic(); pg.wait_real(300); d = (time.monotonic() - s) * 1000
