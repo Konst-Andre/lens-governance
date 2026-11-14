@@ -13,13 +13,13 @@
 #   --inject — до порту додається "inject_css" сценарію (підкинута вада) → мусить бути ✗ (зуби).
 # Сценарій (JSON біля примірки продукту; шляхи — від теки сценарію):
 #   ref {site | git+path, overlay: [js…], hide: [селектор…], query} — білд-еталон (тека або коміт: git archive) + файли накладки; hide — кнопки й панель примірки (вставляються перед </body>) · port {site, query}
-#   viewport [w, h] · headers {ім'я: значення} (CSP продукту) · stubs [{url, status, body}] · ready — JS-умова «застосунок готовий» · settle (мс)
+#   viewport [w, h] · headers {ім'я: значення} (CSP продукту) · stubs [{url, status, body}] · init — JS до завантаження (обидва боки) · ready — JS-умова «застосунок готовий» · settle (мс)
 #   themes [{name, js}] · states [{name, js, hover?, wait?}] · roots [{name, sel, pick, tol_px?, pix_tol?}] · props — обчислені стилі
 #   tol_px (0,5) · pix_tol (середня різниця каналу 0–255, 2) · motion [{name, setup?, trigger, sample, frames, mode?: time | shape, tol: {ім'я | *: допуск}}]
 #     time — кожен кадр за часом (рівні кадри); shape — пік · западина · кінець (коли перший кадр — важкий render() застосунку)
 #     key (AE S146, П4 порту v7) — значення як функція ключа: "key": <ім'я поля семплера> (напр. ширина рейки); кожен кадр еталону ⟂ значення порту
-#       при тій самій величині ключа (лінійно між кадрами порту) — не залежить від частоти кадрів і швидкості рушія; межі ключа (старт · кінець) ≡ еталону;
-#       ключ має бути монотонним за рух (одне згортання; подвійний клік — режим shape); допуск ключа — tol[<ключ>] (типово 1)
+#       при тій самій величині ключа (лінійно між кадрами порту) — не залежить від частоти кадрів і швидкості рушія; кінець ключа ≡ еталону (старт — ні, як у shape);
+#       значення — функція ключа (хід ключа може бути немонотонним — криві сортуються за ключем); поле, якого в кадрі нема, не судиться; допуск ключа — tol[<ключ>] (типово 1)
 #   inject_css — вада для --inject · debt [...]
 # Межі еволюції (Konst В-371: «щоб адаптувався й покращувався»): вміє — статичні стани, наведення, рух за часом, шрифти;
 #   вміє ще — рух як функція ключа (режим key, AE S146); ще ні — немонотонний ключ (подвійний клік — поки shape),
@@ -101,6 +101,7 @@ def run(scn_path, inject=False, shots=None):
         b = pw.chromium.launch(); pg = {}; E = {'ref': [], 'port': []}; F = {}
         for side in ('ref', 'port'):
             ctx = b.new_context(viewport={'width': vw, 'height': vh}); p = ctx.new_page()
+            if C.get('init'): p.add_init_script(C['init'])   # AE S146: стан до завантаження (квиток, тема) — однаковий обом бокам
             for s in C.get('stubs', []):
                 p.route(s['url'], lambda r, *_, s=s: r.fulfill(status=s.get('status', 200), headers={'access-control-allow-origin': '*'}, content_type='application/json', body=s.get('body', '{}')))
             p.on('pageerror', lambda e, side=side: E[side].append(str(e)[:160])); p.goto(U[side])
@@ -166,7 +167,7 @@ def run(scn_path, inject=False, shots=None):
                 ca, cz = curve(a), curve(z)
                 if not ca or not cz: worst[kk] = (1e9, 'ключа нема')
                 else:
-                    for nm, i in (('старт', 0), ('кінець', -1)):
+                    for nm, i in (('кінець', -1),):   # старт не судимо — перший кадр уже після кроку, залежить від того, коли прийшов клік (як у shape)
                         e = abs([fr[kk] for fr in a if kk in fr][i] - [fr[kk] for fr in z if kk in fr][i])
                         if e >= worst.get(kk, (0, 0))[0]: worst[kk] = (e, nm)
                     lo, hi = cz[0][0], cz[-1][0]
