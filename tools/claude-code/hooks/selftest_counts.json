@@ -3,7 +3,7 @@
  "clip.py selftest": 9,
  "commit-gate.sh selftest": 5,
  "commit_files.py selftest": 33,
- "ctx_watch.py selftest": 36,
+ "ctx_watch.py selftest": 39,
  "doc_health.py selftest": 49,
  "env-remind.sh selftest": 10,
  "env_drift.py selftest": 7,

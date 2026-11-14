@@ -95,6 +95,24 @@ def lim(path, now):
     w5 = [x for x in rs if x[2] == fr][0][1]; w7 = [x for x in rs if x[4] == sr][0][3]
     return f' · ліміти {kyiv(t)}: 5 год {d(f)} · тиждень {d(s)} (сесія: тиждень +{d(s - w7)}; це вікно 5 год +{d(f - w5)}; скид 5 год {kyiv(fr)})'
 
+def marker(path, now, why='<причина>'):
+    """Маркер — останній рядок звіту, зібраний машиною (Konst S147: «щоб я не шукав його в тексті відповіді»): смуга контексту · 5 год · тиждень
+    (останній замір list_events, відсотки — як у контексту) · кеш. Замір старий (> 60 хв) або вікно 5 год скинулось — «ліміти — зміряй», старих цифр нема."""
+    n = numbers(path); pct = n['ctx'] * 100 // n['w'] if n['w'] else 0; c = pct * 12 / 100; f = int(c)
+    bar = '█' * f + ('▓' if c - f >= 0.25 and f < 12 else '') ; bar += '░' * (12 - len(bar))
+    out = f"{bar} {pct}%"
+    rs = rates(path) if path and os.path.exists(path) else []
+    if rs and now - rs[-1][0] <= STALE_S and not (now >= rs[-1][2] > 0):
+        t, f5, r5, w7, r7 = rs[-1]; w = lambda x: ('⚠ ' if x >= 0.8 else '') + f'{round(x * 100)}%'
+        try:
+            from zoneinfo import ZoneInfo; day = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'нд'][datetime.datetime.fromtimestamp(r7, ZoneInfo('Europe/Kyiv')).weekday()] + ' '
+        except Exception: day = ''
+        out += f" · 5 год {w(f5)} (скид {kyiv(r5)}) · тиждень {w(w7)} (скид {day}{kyiv(r7)})"
+    else: out += ' · ліміти — зміряй (list_events)'
+    cc = cache(n, now)
+    if cc: out += ' · ' + cc.split(': ', 1)[1].replace('теплий до', 'кеш до').replace(' (Київ)', '').split(' — ')[0].replace('холодний з', 'кеш холодний з')
+    return out + ' · ' + why
+
 def numbers(path, env=os.environ):
     last, step = read(path) if path and os.path.exists(path) else (None, 0)
     w, t = limits(env); step = max(step, STEP_MIN); r = t - step - REV_COST
@@ -177,7 +195,9 @@ def hook(inp, now=None):
     else:
         v = verdict(n, now or time.time(), ev)
         if v and v.startswith(('⚠ контекст', '⚠ кеш холодний')): v += revise()   # REV-1: на порозі — та сама ревізія, що й на слово Konst (і вночі: після коміту)
-        if ev == 'UserPromptSubmit' and os.path.exists(inp.get('transcript_path') or ''): v = (v or 'ctx_watch') + lim(inp.get('transcript_path', ''), now or time.time())   # В-364 п. 2: ліміти — лише на повідомлення Konst, не після коміту
+        if ev == 'UserPromptSubmit' and os.path.exists(inp.get('transcript_path') or ''):   # В-364 п. 2: ліміти — лише на повідомлення Konst, не після коміту
+            v = (v or 'ctx_watch') + lim(inp.get('transcript_path', ''), now or time.time()) + \
+                '\nмаркер (S147) — наприкінці відповіді: list_events kinds ["rate_limit_event"] → python3 <ядро>/tools/claude-code/hooks/ctx_watch.py marker "<причина>" → останній рядок звіту як є'
     return json.dumps({'hookSpecificOutput': {'hookEventName': ev, 'additionalContext': v}}, ensure_ascii=False) if v else ''
 
 def selftest():
@@ -264,6 +284,12 @@ def selftest():
     case('відповідь без запису кешу (лише читання) — тип від попередньої (5 хв), час — від неї', f'кеш 5 хв: теплий до ≈{kyiv(T0 - 30 + 300)}' in (v(tr('k3', [a(120_000, ago=90, h1=False), z])) or ''))
     case('пауза > TTL при малому контексті — «холодний з», без ⚠', 'кеш 1 год: холодний з' in (o := v(tr('k4', [a(120_000, ago=4000)])) or '') and not o.startswith('⚠'))
     case('рядок руками (line) теж має «кеш … теплий до / холодний з»', 'кеш 1 год:' in line(tr('k5', [a(120_000)])))
+    # S147: маркер — смуга контексту · 5 год · тиждень · кеш одним рядком
+    mk = marker(tr('mk', [a(207_000, ago=60), le((300, 0.44, R5, 0.52))]), T0, 'три коміти')
+    case('маркер: смуга 12 клітинок і % контексту, 5 год і тиждень у %, кеш до ≈, причина', mk.startswith('█████▓░░░░░░ 46%') and '5 год 44% (скид ' in mk
+         and 'тиждень 52% (скид ' in mk and f'кеш до ≈{kyiv(T0 - 60 + 3600)}' in mk and mk.endswith(' · три коміти'))
+    case('маркер: замір лімітів старший за 60 хв → «ліміти — зміряй», старих цифр нема', 'ліміти — зміряй' in (o := marker(tr('mk2', [a(207_000), le((4000, 0.44, R5, 0.52))]), T0)) and '44%' not in o)
+    case('маркер: ліміт ≥ 80 % → ⚠ перед числом', '5 год ⚠ 85%' in marker(tr('mk3', [a(207_000), le((60, 0.85, R5, 0.52))]), T0))
     print(f'─── ctx_watch selftest: {total - bad}/{total} ───'); return 1 if bad else 0
 
 if __name__ == '__main__':
@@ -272,6 +298,7 @@ if __name__ == '__main__':
     if cmd == 'hold':   # AE S145 (В-373): для precompact_guard — «контекст · стеля відкладення автостиснення» (стеля = W − 20 000, вікно Claude Code)
         n = numbers(sys.argv[2] if len(sys.argv) > 2 else ''); print(n['ctx'], n['w'] - RESERVE_OUT); sys.exit(0)
     if cmd == 'line': print(line(sys.argv[2] if len(sys.argv) > 2 else newest())); sys.exit(0)
+    if cmd == 'marker': print(marker(newest(), time.time(), sys.argv[2] if len(sys.argv) > 2 else '<причина>')); sys.exit(0)
     try: inp = json.load(sys.stdin)
     except ValueError: inp = {}
     out = hook(inp)
