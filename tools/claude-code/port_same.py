@@ -17,9 +17,12 @@
 #   themes [{name, js}] · states [{name, js, hover?, wait?}] · roots [{name, sel, pick, tol_px?, pix_tol?}] · props — обчислені стилі
 #   tol_px (0,5) · pix_tol (середня різниця каналу 0–255, 2) · motion [{name, setup?, trigger, sample, frames, mode?: time | shape, tol: {ім'я | *: допуск}}]
 #     time — кожен кадр за часом (рівні кадри); shape — пік · западина · кінець (коли перший кадр — важкий render() застосунку)
+#     key (AE S146, П4 порту v7) — значення як функція ключа: "key": <ім'я поля семплера> (напр. ширина рейки); кожен кадр еталону ⟂ значення порту
+#       при тій самій величині ключа (лінійно між кадрами порту) — не залежить від частоти кадрів і швидкості рушія; межі ключа (старт · кінець) ≡ еталону;
+#       ключ має бути монотонним за рух (одне згортання; подвійний клік — режим shape); допуск ключа — tol[<ключ>] (типово 1)
 #   inject_css — вада для --inject · debt [...]
 # Межі еволюції (Konst В-371: «щоб адаптувався й покращувався»): вміє — статичні стани, наведення, рух за часом, шрифти;
-#   ще ні — рух як функція ключа (ширина рейки при різних кроках рушіїв: режим "key" — порівнювати значення при однаковому ключі),
+#   вміє ще — рух як функція ключа (режим key, AE S146); ще ні — немонотонний ключ (подвійний клік — поки shape),
 #   фокус клавіатурою (додати "focus": селектор у стан), дотик і WebKit (лише Chromium). Нове вміння — тут, з рядком selftest і зубом;
 #   новий вид предмета — roots/pick, властивість — props, стан — states (сценарій продукту, прилад не чіпати).
 import json, os, sys, subprocess, tempfile, shutil, threading, functools, http.server, socketserver, pathlib, io, contextlib
@@ -156,6 +159,29 @@ def run(scn_path, inject=False, shots=None):
                         e = abs(sa[nm] - sz.get(nm, 1e9))
                         if e >= worst.get(k, (0, 0))[0]: worst[k] = (e, nm)
                 ks = []
+            if mo.get('mode') == 'key':   # AE S146: значення ≡ при тій самій величині ключа — частота кадрів і швидкість рушія не важать
+                kk = mo.get('key'); tk = mo.get('tol', {}).get(kk, 1)
+                def curve(S):
+                    c = sorted(((fr[kk], fr) for fr in S if kk in fr), key=lambda p: p[0]); return c
+                ca, cz = curve(a), curve(z)
+                if not ca or not cz: worst[kk] = (1e9, 'ключа нема')
+                else:
+                    for nm, i in (('старт', 0), ('кінець', -1)):
+                        e = abs([fr[kk] for fr in a if kk in fr][i] - [fr[kk] for fr in z if kk in fr][i])
+                        if e >= worst.get(kk, (0, 0))[0]: worst[kk] = (e, nm)
+                    lo, hi = cz[0][0], cz[-1][0]
+                    for k in [x for x in ks if x != kk]:
+                        for kv, fr in ca:
+                            if not (lo <= kv <= hi) or k not in fr: continue
+                            vz = None
+                            for (k1, f1), (k2, f2) in zip(cz, cz[1:]):
+                                if k1 <= kv <= k2 and k in f1 and k in f2:
+                                    q = (kv - k1) / ((k2 - k1) or 1); vz = f1[k] + (f2[k] - f1[k]) * q; break
+                            if vz is None: continue
+                            e = abs(fr[k] - vz)
+                            if e >= worst.get(k, (0, 0))[0]: worst[k] = (e, f'{kk} {kv:.1f}')
+                    if tk != mo.get('tol', {}).get('*', .5): mo.setdefault('tol', {})[kk] = tk
+                ks = []
             for k in ks:
                 for fr in a:
                     vz = interp(z, fr['t'], k) if k in fr else None
@@ -166,7 +192,7 @@ def run(scn_path, inject=False, shots=None):
             badm = [f'{k}: {e:.3f} на {t if isinstance(t, str) else f"{t:.0f} мс"}' for k, (e, t) in worst.items() if e > tl.get(k, tl.get('*', .5)) and not is_debt(mo['name'], k)]
             moved = any(len({round(fr.get(k, 0), 3) for fr in a}) > 1 for k in keys)
             ok(f"рух «{mo['name']}»: еталон рухається (кадрів {len(a)})", moved, '' if moved else 'значення стоять — семплер не бачить руху')
-            ok(f"рух «{mo['name']}»: " + ("форма ≡ еталону (пік · западина · кінець)" if mo.get('mode') == 'shape' else "кожен кадр ≡ еталону за часом"), moved and not badm, ' · '.join(badm[:3]) or ' · '.join(f'{k} ≤ {e:.3f}' for k, (e, _) in worst.items()))
+            ok(f"рух «{mo['name']}»: " + ("форма ≡ еталону (пік · западина · кінець)" if mo.get('mode') == 'shape' else f"кожне значення ≡ еталону при тому самому ключі «{mo.get('key')}»" if mo.get('mode') == 'key' else "кожен кадр ≡ еталону за часом"), moved and not badm, ' · '.join(badm[:3]) or ' · '.join(f'{k} ≤ {e:.3f}' for k, (e, _) in worst.items()))
         for side in ('ref', 'port'): ok(f'помилок сторінки 0 ({"еталон" if side == "ref" else "порт"})', not E[side], '; '.join(E[side][:2]))
         b.close()
     for st, n, x in V: print(f'{st} {n}' + (f' — {x}' if x else ''))
@@ -204,13 +230,22 @@ def selftest():
     (t / 'short').mkdir(); (t / 'short' / 'index.html').write_text(page('#r .x{color:rgb(200,0,0);margin-left:6px}', (mv % 200).replace('p*50', 'p*40')), encoding='utf-8')   # рух коротший: кінець 40 ⟂ 50
     shb = scn('short'); shb['motion'][0]['mode'] = 'shape'; shb['motion'][0]['tol'] = {'x': 1}
     (t / 'shapeb.json').write_text(json.dumps(shb), encoding='utf-8')
+    # режим «ключ»: значення — функція зсуву (прозорість = x/50); порт з іншою швидкістю й тією самою функцією → ✓, з іншою функцією → ✗
+    mk = "window.go=()=>{const e=document.querySelector('#r .x');let t0=null;const f=n=>{if(t0===null)t0=n;const p=Math.min(1,(n-t0)/%d),x=p*50;e.style.transform='translateX('+x+'px)';e.style.opacity=String(%s);if(p<1)requestAnimationFrame(f)};requestAnimationFrame(f)}"
+    (t / 'kfit.js').write_text("document.head.insertAdjacentHTML('beforeend','<style>#r .x{color:rgb(200,0,0);margin-left:6px}</style>');" + mk % (200, 'x/50'), encoding='utf-8')
+    for nm, d, fx in (('kgood', 90, 'x/50'), ('kbad', 200, '(x/50)*(x/50)')):
+        (t / nm).mkdir(); (t / nm / 'index.html').write_text(page('#r .x{color:rgb(200,0,0);margin-left:6px}', mk % (d, fx)), encoding='utf-8')
+        kc = scn(nm); kc['ref']['overlay'] = ['kfit.js']; kc['motion'][0].update(mode='key', key='x', frames=30, tol={'x': 1, 'o': .03})
+        kc['motion'][0]['sample'] = "{x: new DOMMatrix(getComputedStyle(document.querySelector('#r .x')).transform).m41, o: +getComputedStyle(document.querySelector('#r .x')).opacity}"
+        (t / f'{nm}.json').write_text(json.dumps(kc), encoding='utf-8')
     g, go = q('good.json'); bd, bo = q('bad.json'); gi, gio = q('good.json', inject=True)
     xs = lambda o: [l for l in o.splitlines() if l.startswith('✗')]
     T = [('порт ≡ примірці (стилі, місце, пікселі, рух) → ✗ 0', g == 0, go),
          ('порт без зсуву → ✗ «margin-left»', any('margin-left' in l for l in xs(bo)), bo),
          ('порт з іншою швидкістю руху → ✗ «рух … кожен кадр»', any('кожен кадр' in l for l in xs(bo)), bo),
          ('--inject (вада кольору) → ✗ «color»', any('color' in l for l in xs(gio)), gio),
-         ('режим «форма»: той самий рух → ✓; коротший рух (кінець 40 ⟂ 50) → ✗', not any('форма' in l for l in xs(q('shape.json')[1])) and any('форма' in l for l in xs(q('shapeb.json')[1])), '')]
+         ('режим «форма»: той самий рух → ✓; коротший рух (кінець 40 ⟂ 50) → ✗', not any('форма' in l for l in xs(q('shape.json')[1])) and any('форма' in l for l in xs(q('shapeb.json')[1])), ''),
+         ('режим «ключ»: інша швидкість, та сама функція → ✓; інша функція прозорості → ✗', not any('ключі' in l for l in xs(q('kgood.json')[1])) and any('ключі' in l for l in xs(q('kbad.json')[1])), q('kgood.json')[1][-500:] + q('kbad.json')[1][-500:])]
     n = 0
     for name, c, out in T:
         n += c; print(('✓' if c else '✗') + ' ' + name + ('' if c else '\n' + out[-700:]))
