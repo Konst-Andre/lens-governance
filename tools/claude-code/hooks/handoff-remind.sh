@@ -132,6 +132,7 @@ def selftest():
     for name, d, want in [('Stop HOOK-3.3: переїзд + 💡, у стартовому «нема» → block', S(IDEA, s='i1'), True),
                           ('Stop HOOK-3.3: 💡 записана в стартовому → тиша', S(IDEA.replace('нема', 'сторінку-мапу продукту простими словами'), s='i2'), False),
                           ('Stop HOOK-3.3: «💡 Пропоную: ідей нема» → тиша', S('Переїжджаємо. ```text\nx\n```\n💡 Пропоную: ідей нема.', s='i3'), False),
+                          ('Stop HOOK-3.3: «💡 Пропоную: нового поза твоїм питанням нема» → тиша (хибне AE S146)', S('Переїжджаємо. ```text\nx\n```\n💡 **Пропоную:** нового поза твоїм питанням нема. Обидві ідеї — першими.', s='i6'), False),
                           ('Stop HOOK-3.3: 💡 + блок text з промптом (не стартове) → тиша (хибне AE S139)', S('Промпт:\n```text\nYou are an auditor.\n```\n💡 **Пропоную:** зробити одну сторінку-мапу продукту простими словами.', s='i5'), False),
                           ('Stop HOOK-3.3: 💡 без переїзду → тиша', S('Готово. 💡 Пропоную: зробити одну сторінку-мапу продукту простими словами.', s='i4'), False)]:
         out = stop(d, [t], t); ok = (out is not None and 'HOOK-3.3' in out) == want
@@ -217,7 +218,7 @@ def idea_missing(msg, rs):
     m = PROP.search(msg)
     if not m: return None
     idea = m.group(1).strip()
-    if re.match(r'(ідей|нових)\s+нема', idea, re.I): return None   # чесне «ідей нема» — не 💡
+    if re.match(r'(ідей|нових|нового|нічого)\b[^.!?\n]{0,50}?\bнема', idea, re.I): return None   # чесне «ідей нема» — не 💡; «нового поза твоїм питанням нема» теж (хибне AE S146)
     first = re.split(r'(?<=[.!?])\s', idea, 1)[0][:400]
     words = {w.lower() for w in WORD.findall(first)}
     if len(words) < 2: return None
