@@ -11,14 +11,14 @@
 #   stop_hook_active не пропускає (інакше друга спроба обходила б суд), але стеля — 3 зупинки поспіль, далі пропуск і рядок «⚠ обійдено» в журнал спрацювань.
 # Подія UserPromptSubmit (режим open): кожен рядок журналу з «НЕ ЗРОБЛЕНО» (будь-якої сесії) → нагадування агентові на початку ходу, доки не закрито.
 # Розмиті слова («записав») не судить — зупиняв би даремно. Помилка розбору → тиша (stderr — у журнал помилок диспетчера).
-# Зуби: bash promise-guard.sh selftest — 18 випадків на тимчасовому репо; PG_INJECT=1|2|3 bash promise-guard.sh selftest — кожен ✗ (зламаний суд червоніє).
+# Зуби: bash promise-guard.sh selftest — 20 випадків на тимчасовому репо; PG_INJECT=1|2|3 bash promise-guard.sh selftest — кожен ✗ (зламаний суд червоніє).
 mode="${1:-stop}"
 [ "$mode" = selftest ] && HOOK_IN="{}" || HOOK_IN="$(cat)"
 export HOOK_IN PG_SELF="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 python3 - "$mode" <<'PY'
 import json, os, re, subprocess, sys, tempfile
 HERE = os.environ['PG_SELF']
-CLAIM = re.compile(r"(?<!не )(?<!не\s\s)можна\s+(?:робити\s+|запускати\s+)?/compact", re.I)
+CLAIM = re.compile(r"(?<![«\"„])(?<!не )(?<!не\s\s)можна\s+(?:робити\s+|запускати\s+)?/compact", re.I)   # у лапках — цитата правила, не заява (хибне S146, хід 11: стартове цитувало сторож)
 MISS = re.compile(r"пропуск Konst", re.I)
 OPEN = re.compile(r"(?<!«)НЕ ЗРОБЛЕНО:")   # мітка — з двокрапкою; згадка правила «НЕ ЗРОБЛЕНО» в лапках — не обіцянка (хибне S146, хід 9)
 HASH = re.compile(r"`([0-9a-f]{7,40})`")
@@ -65,7 +65,7 @@ def guard_says():
     e = dict(os.environ, LENS_FLAG=os.path.join(t, 'flag'), LENS_LOG=os.path.join(t, 'log'), LENS_HELD=os.path.join(t, 'held'), LENS_HOOKS=HERE)
     try:
         r = subprocess.run(['bash', env('LENS_PC_GUARD', os.path.join(HERE, 'precompact_guard.sh'))], input='{"trigger":"manual","custom_instructions":null}',
-                           capture_output=True, text=True, env=e, timeout=float(env('PG_TIMEOUT', '45')))
+                           capture_output=True, text=True, errors='replace', env=e, timeout=float(env('PG_TIMEOUT', '45')))   # сторож ріже вивід head -c посеред літери — падіння S146
     except subprocess.TimeoutExpired:   # не встиг — не «пропустив»: заява лишається неперевіреною
         return ("сторож не відповів за " + env('PG_TIMEOUT', '45') + " с — прожени сам: echo '{\"trigger\":\"manual\"}' | LENS_HOOKS=<ядро>/tools/claude-code/hooks "
                 "bash <ядро>/tools/claude-code/hooks/precompact_guard.sh; echo $? — «можна /compact» лише після виходу 0 у цьому ході")
@@ -134,6 +134,9 @@ def selftest():
     case('«можна /compact», сторож зупинив би → block', lambda: row(''), 'Від тебе: можна /compact', True, no_g)
     sl = os.path.join(t, 'gs.sh'); open(sl, 'w').write('sleep 5; exit 0\n'); os.environ['PG_TIMEOUT'] = '1'
     case('«можна /compact», сторож не встиг → block (не перевірено ≠ можна)', lambda: row(''), 'можна /compact', True, sl); os.environ.pop('PG_TIMEOUT')
+    cut = os.path.join(t, 'gu.sh'); open(cut, 'w').write("printf 'ab\\342\\200' ; printf 'Стиснення зупинено' >&2; exit 2\n")
+    case('сторож дав обрізану літеру UTF-8 → не падає, block', lambda: row(''), 'можна /compact', True, cut)
+    case('цитата «можна /compact» у лапках → тиша', lambda: row(''), 'Сторож не дасть закінчити відповідь із «можна /compact» без прогону', False, no_g)
     case('«не можна /compact», сторож зупинив би → тиша', lambda: row(''), 'Поки не можна /compact: ревізія.', False, no_g)
     case('старий рядок без хешу (до сесії) → тиша', lambda: row(''), 'ок', False)
     case('новий «пропуск Konst» без хешу → block', lambda: row('| 14.11 | **пропуск Konst** — рішення: зроблю потім |\n'), 'ок', True)
