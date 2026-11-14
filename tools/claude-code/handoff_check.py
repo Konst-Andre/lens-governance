@@ -282,7 +282,8 @@ def journal_health(k, today=None):
     for l in rows:
         d, m = map(int, re.match(r'^\| (\d\d)\.(\d\d)', l).groups())
         x = dt.date(today.year, m, d)
-        if x > today: x = dt.date(today.year - 1, m, d)
+        if (x - today).days > 2: x = dt.date(today.year - 1, m, d)   # AE S145: рядок за київською датою на день попереду контейнера UTC — не «минулий рік» (було 364 дн.)
+        elif x > today: x = today
         ages.append((today - x).days)
     kb = len(txt.encode()) / 1024; old = max(ages, default=0); long = sum(len(l) > J_ROW for l in rows)
     s = f'журнал гачків: §1 {len(rows)} рядків · {kb:.0f} КБ · найстаріший {old} дн.'
@@ -494,7 +495,8 @@ def selftest():
     hcases = [('журнал: свіжі короткі рядки → ✓', '## §1\n| 10.10 | s | x | y | z |\n## §2\n', '✓', ''),
               ('журнал: рядок старший за 30 дн. → ⚠ ротація', '## §1\n| 31.08 | s | x | y | z |\n## §2\n', '⚠', 'ротація'),
               ('журнал: рядок довший за 700 знаків → ⚠ «деталь у коміт»', '## §1\n| 10.10 | s | ' + 'x' * 800 + ' |\n## §2\n', '⚠', 'деталь у коміт'),
-              ('журнал: 20.12 при 10.10 — минулий рік (294 дн.) → ⚠', '## §1\n| 20.12 | s | x |\n## §2\n', '⚠', '294 дн.')]
+              ('журнал: 20.12 при 10.10 — минулий рік (294 дн.) → ⚠', '## §1\n| 20.12 | s | x |\n## §2\n', '⚠', '294 дн.'),
+              ('журнал: 11.10 при 10.10 (Київ попереду UTC) — сьогодні, не минулий рік → ✓', '## §1\n| 11.10.2026 | s | x | y | z |\n## §2\n', '✓', '0 дн.')]
     for name, body, want, part in hcases:
         open(jf, 'w').write(body); g, t = journal_health(jf, T0); ok = g == want and part in t
         print(('✓' if ok else '✗') + ' ' + name); bad += not ok
