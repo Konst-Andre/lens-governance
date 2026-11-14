@@ -11,7 +11,7 @@
 #   stop_hook_active не пропускає (інакше друга спроба обходила б суд), але стеля — 3 зупинки поспіль, далі пропуск і рядок «⚠ обійдено» в журнал спрацювань.
 # Подія UserPromptSubmit (режим open): кожен рядок журналу з «НЕ ЗРОБЛЕНО» (будь-якої сесії) → нагадування агентові на початку ходу, доки не закрито.
 # Розмиті слова («записав») не судить — зупиняв би даремно. Помилка розбору → тиша (stderr — у журнал помилок диспетчера).
-# Зуби: bash promise-guard.sh selftest — 17 випадків на тимчасовому репо; PG_INJECT=1|2|3 bash promise-guard.sh selftest — кожен ✗ (зламаний суд червоніє).
+# Зуби: bash promise-guard.sh selftest — 18 випадків на тимчасовому репо; PG_INJECT=1|2|3 bash promise-guard.sh selftest — кожен ✗ (зламаний суд червоніє).
 mode="${1:-stop}"
 [ "$mode" = selftest ] && HOOK_IN="{}" || HOOK_IN="$(cat)"
 export HOOK_IN PG_SELF="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -20,7 +20,7 @@ import json, os, re, subprocess, sys, tempfile
 HERE = os.environ['PG_SELF']
 CLAIM = re.compile(r"(?<!не )(?<!не\s\s)можна\s+(?:робити\s+|запускати\s+)?/compact", re.I)
 MISS = re.compile(r"пропуск Konst", re.I)
-OPEN = re.compile(r"НЕ ЗРОБЛЕНО")
+OPEN = re.compile(r"(?<!«)НЕ ЗРОБЛЕНО:")   # мітка — з двокрапкою; згадка правила «НЕ ЗРОБЛЕНО» в лапках — не обіцянка (хибне S146, хід 9)
 HASH = re.compile(r"`([0-9a-f]{7,40})`")
 TEETH = re.compile(r"зуб|selftest|--inject|INJECT|чек-лист", re.I)
 SAID = re.compile(r"не зроблено", re.I)
@@ -148,6 +148,7 @@ def selftest():
     G('reset', '-q', '--hard', 'HEAD~1')
     row('| 14.11 | **пропуск Konst** — НЕ ЗРОБЛЕНО: x |\n')
     oc = open_ctx(); cases.append(('open: відкритий рядок → нагадування', bool(oc) and 'НЕ ЗРОБЛЕНО' in oc))
+    row(f'| 14.11 | **пропуск Konst** — правило: або «НЕ ЗРОБЛЕНО» + звіт; виправлено `{fix}`, selftest |\n'); cases.append(('open: згадка «НЕ ЗРОБЛЕНО» в лапках — не обіцянка → тиша', open_ctx() is None and verdict(D('ок')) is None))
     row(''); cases.append(('open: відкритих нема → тиша', open_ctx() is None))
     row('| 14.11 | **пропуск Konst** — без хешу |\n'); n = [stop(D('ок')) is not None for _ in range(5)]
     cases.append(('стеля: 3 зупинки поспіль, 4-та пропускає, далі знову суд', n == [True, True, True, False, True]))
