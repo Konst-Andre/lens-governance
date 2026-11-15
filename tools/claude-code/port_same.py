@@ -14,7 +14,7 @@
 # Сценарій (JSON біля примірки продукту; шляхи — від теки сценарію):
 #   ref {site | git+path, overlay: [js…], hide: [селектор…], query} — білд-еталон (тека або коміт: git archive) + файли накладки; hide — кнопки й панель примірки (вставляються перед </body>) · port {site, query}
 #   viewport [w, h] · headers {ім'я: значення} (CSP продукту) · stubs [{url, status, body}] · init — JS до завантаження (обидва боки) · ready — JS-умова «застосунок готовий» · settle (мс)
-#   themes [{name, js}] · states [{name, js, hover?, hover_wait? (мс після наведення, типово 250), wait?}] · roots [{name, sel, pick, tol_px?, pix_tol?, optional?}] · props — обчислені стилі
+#   themes [{name, js}] · states [{name, js, hover?, hover_wait? (мс після наведення, типово 250), wait?}] · roots [{name, sel, pick, tol_px?, pix_tol?, optional?}] · props — обчислені стилі (і самого кореня — ключ @root)
 #     optional (AE S147) — корінь, що є лише в деяких станах (підказка в body): нема в обох — не судиться; є в одному — ✗
 #   tol_px (0,5) · pix_tol (середня різниця каналу 0–255, 2) · motion [{name, setup?, trigger, sample, frames, mode?: time | shape, tol: {ім'я | *: допуск}}]
 #     time — кожен кадр за часом (рівні кадри); shape — пік · западина · кінець (коли перший кадр — важкий render() застосунку)
@@ -32,7 +32,7 @@ KEY = "const key = e => { const p = []; for (let n = e; n && n !== r; n = n.pare
 MEAS_JS = "([root, pick, props]) => { const r = document.querySelector(root); if (!r) return null; const out = {}; " + KEY + r"""
   for (const e of r.querySelectorAll(pick)) { if (!e.getClientRects().length) continue; const b = e.getBoundingClientRect(), c = getComputedStyle(e);
     const o = { x: b.x, y: b.y, w: b.width, h: b.height }; for (const p of props) o[p] = c.getPropertyValue(p); out[key(e)] = o; }
-  const rb = r.getBoundingClientRect(); out['@root'] = { x: rb.x, y: rb.y, w: rb.width, h: rb.height }; return out; }"""
+  const rb = r.getBoundingClientRect(); out['@root'] = { x: rb.x, y: rb.y, w: rb.width, h: rb.height }; const rc = getComputedStyle(r); for (const p of props) out['@root'][p] = rc.getPropertyValue(p); return out; }   /* AE S147: стилі самого кореня теж — матеріал рейки (тло, тінь за краєм) живе на .sidebar; знімок кореня тінь за краєм обрізає (playwright.dev toHaveCSS, 15.11.2026) */"""
 SAMPLER_JS = r"""([sample, frames]) => new Promise(res => { const S = []; let n = 0, t0 = null; const f = new Function('return (' + sample + ')');
   const tick = now => { if (t0 === null) t0 = now; let v = {}; try { v = f() || {}; } catch (_) {} S.push({ t: now - t0, ...v }); if (++n < frames) requestAnimationFrame(tick); else res(S); };
   requestAnimationFrame(tick); })"""
@@ -249,6 +249,10 @@ def selftest():
         hc = scn(nm); hc['ref']['overlay'] = ['hfit.js']; hc['motion'] = []; hc['roots'].append({'name': 'tp', 'sel': '#tp', 'pick': '*', 'optional': True})
         hc['states'] = [{'name': 'спокій', 'js': '', 'wait': 50}, {'name': 'наведення', 'js': '', 'wait': 50, 'hover': '#r b', 'hover_wait': 700}]
         (t / f'{nm}.json').write_text(json.dumps(hc), encoding='utf-8')
+    # AE S147: стиль самого кореня (матеріал рейки — на .sidebar): примірка фарбує #r, порт — ні → ✗ «@root background-color»
+    (t / 'rfit.js').write_text("document.head.insertAdjacentHTML('beforeend','<style>#r .x{color:rgb(200,0,0);margin-left:6px}#r{background-color:rgb(0,90,0)}</style>');" + mv % 200, encoding='utf-8')
+    rc = scn('good'); rc['ref']['overlay'] = ['rfit.js']; rc['props'] = ['color', 'margin-left', 'background-color']; rc['motion'] = []; (t / 'rbad.json').write_text(json.dumps(rc), encoding='utf-8')
+    rb_, rbo = q('rbad.json')
     hg, hgo = q('hgood.json'); hb, hbo = q('hbad.json')
     g, go = q('good.json'); bd, bo = q('bad.json'); gi, gio = q('good.json', inject=True)
     xs = lambda o: [l for l in o.splitlines() if l.startswith('✗')]
@@ -258,6 +262,7 @@ def selftest():
          ('--inject (вада кольору) → ✗ «color»', any('color' in l for l in xs(gio)), gio),
          ('режим «форма»: той самий рух → ✓; коротший рух (кінець 40 ⟂ 50) → ✗', not any('форма' in l for l in xs(q('shape.json')[1])) and any('форма' in l for l in xs(q('shapeb.json')[1])), ''),
          ('підказка після наведення (0,4 с, hover_wait 700, корінь optional): та сама → ✗ 0 (і в спокої, де її нема в обох); інший колір → ✗ «tp»', hg == 0 and any('tp' in l for l in xs(hbo)), hgo[-400:] + hbo[-400:]),
+         ('стиль самого кореня (тло на #r лише в примірці) → ✗ «@root background-color»', any('@root background-color' in l for l in xs(rbo)), rbo[-500:]),
          ('режим «ключ»: інша швидкість, та сама функція → ✓; інша функція прозорості → ✗', not any('ключі' in l for l in xs(q('kgood.json')[1])) and any('ключі' in l for l in xs(q('kbad.json')[1])), q('kgood.json')[1][-500:] + q('kbad.json')[1][-500:])]
     n = 0
     for name, c, out in T:
