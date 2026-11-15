@@ -8,10 +8,12 @@
 #   ② рядок «пропуск Konst», доданий у HOOK_JOURNAL.md цією сесією (комітами з міткою сесії + незакомічене), без хешу коміту, що є в git, і без зуба
 #      (selftest · --inject · INJECT · чек-лист) → block; виняток — «НЕ ЗРОБЛЕНО: чому · коли» в рядку;
 #   ③ є такий відкритий рядок цієї сесії, а у відповіді нема слів «не зроблено» в перших 1500 знаках → block (Konst бачить невиконане першим, не «записано»).
+#   ④ (REV-4, AE S148) «ревізія ✓ / пройдена / зроблена / чиста» поза лапками й кодом → у відповіді печатка handoff_check.py revision
+#      «ревізія ✓ · HEAD <репо>@<h7> … · ✗ 0» саме на поточному HEAD, і та сама — у мітці ревізії (пише лише revision) → інакше block.
 #   stop_hook_active не пропускає (інакше друга спроба обходила б суд), але стеля — 3 зупинки поспіль, далі пропуск і рядок «⚠ обійдено» в журнал спрацювань.
 # Подія UserPromptSubmit (режим open): кожен рядок журналу з «НЕ ЗРОБЛЕНО» (будь-якої сесії) → нагадування агентові на початку ходу, доки не закрито.
 # Розмиті слова («записав») не судить — зупиняв би даремно. Помилка розбору → тиша (stderr — у журнал помилок диспетчера).
-# Зуби: bash promise-guard.sh selftest — на тимчасових репо; PG_INJECT=1|2|3|4 bash promise-guard.sh selftest — кожен ✗ (зламаний суд червоніє; 4 — будь-який хеш «народився в ході»).
+# Зуби: bash promise-guard.sh selftest — на тимчасових репо; PG_INJECT=1|2|3|4|5 bash promise-guard.sh selftest — кожен ✗ (зламаний суд червоніє; 4 — будь-який хеш «народився в ході»; 5 — заяву ревізії не бачить).
 # Подія Stop (режим shadow, В-377 «так» Konst 14.11.2026 — тінь 2 сесії, далі блок при ≤ 1 хибній на 10 ходів): «заява дії = доказ» — у звіті
 #   «записав · закомітив · запушив · виправив · додав · зробив · готово · зроблено · ✅» (не в лапках «…», не в коді, не «не …», не «у ході N» / «S1xx»)
 #   → хоч один хеш коміту, що є в git і народився після останнього справжнього повідомлення Konst (transcript_path); «запушив» → він уже в origin/*;
@@ -39,7 +41,7 @@ def repos():
     root = env('LENS_ROOT', '/home/user')
     return [os.path.join(root, n) for n in sorted(os.listdir(root)) if os.path.exists(os.path.join(root, n, '.git'))] if os.path.isdir(root) else []   # .git-файл — тека worktree (../AE-main)
 
-INJ = os.environ.get('PG_INJECT', '')   # зуби selftest: 1 — будь-який хеш «є в git»; 2 — заяву «можна /compact» не бачить; 3 — коміти сесії не рахуються; 4 — будь-який хеш «народився в ході»
+INJ = os.environ.get('PG_INJECT', '')   # зуби selftest: 1 — будь-який хеш «є в git»; 2 — заяву «можна /compact» не бачить; 3 — коміти сесії не рахуються; 4 — будь-який хеш «народився в ході»; 5 — заяву ревізії не бачить
 def exists(h):
     if INJ == '1': return True
     return any(git(r, 'cat-file', '-e', h + '^{commit}') is not None for r in repos())
@@ -82,6 +84,8 @@ def verdict(d):
         g = guard_says()
         if g: return ("Ворота «сказав — перевір» (Konst S146): у відповіді «можна /compact», а сторож стиснення на цьому стані зупинить. Його слова:\n" + g +
                       "\nВиправ ✗ (ревізія → коміт → push), тоді пиши «можна /compact». ✗ не пояснювати — виправляти.")
+    sg = seal_gap(msg)   # ④ REV-4: «ревізія ✓» лише з печаткою revision на поточному HEAD
+    if sg: return sg
     rows = added_rows(d); bad = []; opened = []
     for r in rows:
         if OPEN.search(r): opened.append(r); continue
@@ -95,6 +99,22 @@ def verdict(d):
         return ("Ворота «записав ≠ зробив» (Konst S146): у журналі є відкритий рядок цієї сесії «НЕ ЗРОБЛЕНО» (" + opened[0].strip()[:120] +
                 "…), а у звіті нема «не зроблено: …» на початку. Konst має бачити невиконане першим — допиши блок «не зроблено: що · чому · коли».")
     return None
+
+REVCLAIM = re.compile(r"ревізі[яюї]\s*(?:[:—–-]\s*)?(?:✓|пройден|зроблен|чист)", re.I)   # заява «ревізія ✓ / пройдена / зроблена / чиста»; «ревізія ✗» і «не зроблено» — ні
+def hck():
+    sys.path.insert(0, os.path.dirname(HERE)); import handoff_check; return handoff_check
+def seal_gap(msg):
+    """④ REV-4 (Konst AE S148): заява ревізії поза лапками й кодом → у відповіді має бути печатка handoff_check revision на поточному HEAD
+    усіх репо сесії, і та сама печатка — у мітці ревізії (її пише лише revision: печатку не надрукуєш руками)."""
+    if INJ == '5' or not REVCLAIM.search(plain(msg)): return None
+    h = hck(); rs = h.session_repos(env('LENS_ROOT', '/home/user'))
+    if not rs: return None
+    want = h.seal(rs, 0)
+    if want in msg and h.seal_ok(rs): return None
+    return ("Ворота «ревізія ✓ = печатка» (REV-4, Konst AE S148): у відповіді заява ревізії, а печатки на поточному HEAD нема"
+            + (" (у тексті є, але revision її не ставив — прогін на цьому HEAD дав ✗ або його не було)" if want in msg else "") +
+            ".\nПрожени python3 <ядро>/tools/claude-code/handoff_check.py revision на фінальному стані (після останньої правки самері й стартового), "
+            "виправ ✗, закоміть, запуш, ще раз revision — і встав його останній рядок як є. Очікую: " + want)
 
 def counter(d, blocked):
     f = os.path.join(env('LENS_MARK_DIR', '/tmp'), f"lens-promise-{sid(d) or 'x'}.n")
@@ -282,6 +302,28 @@ def selftest_claim():
         else: os.environ[k] = v
     return cases
 
+def selftest_seal():
+    """④ REV-4: заява ревізії без печатки · печатка без прогону · стара печатка → block; свіжа печатка revision → тиша; «ревізія ✗» і цитата — тиша."""
+    t = tempfile.mkdtemp(); root = os.path.join(t, 'w'); r = os.path.join(root, 'P'); os.makedirs(os.path.join(r, 'docs', 'summary'))
+    G = lambda *a: subprocess.run(['git', '-C', r, *a], capture_output=True, text=True, check=True).stdout.strip()
+    G('init', '-q'); G('config', 'user.email', 't@t'); G('config', 'user.name', 't')
+    open(os.path.join(r, 'docs', 'summary', 'P_SUMMARY_X.md'), 'w').write('# s\n## §0 ВІДКРИТЕ\n- далі x\n## Стартове\n```text\nСтарт: x\n```\n'); G('add', '.'); G('commit', '-qm', 'base')
+    old = {k: os.environ.get(k) for k in ('LENS_ROOT', 'LENS_REV_MARK')}
+    os.environ.update(LENS_ROOT=root, LENS_REV_MARK=os.path.join(t, 'mark'))
+    h = hck(); want = h.seal([r], 0); v = lambda m: seal_gap(m) is not None
+    out = []
+    out.append(('④ «ревізія ✓» без печатки → block', v('Що ти побачиш: ревізія ✓, усе в домах.')))
+    out.append(('④ печатка в тексті, але revision її не ставив → block', v('ревізія ✓\n' + want)))
+    h.revision(root)   # прогін ставить печатку в мітку (чисте репо → ✓)
+    out.append(('④ печатка revision на поточному HEAD → тиша', not v('Ревізія пройдена:\n' + want)))
+    out.append(('④ «ревізія ✗», цитата «ревізія ✓» і печатка в коді не є заявою → тиша', not v('ревізія ✗ — виправляю; правило: «ревізія ✓» лише з печаткою; `ревізія ✓`')))
+    open(os.path.join(r, 'x.md'), 'w').write('x'); G('add', '.'); G('commit', '-qm', 'x')
+    out.append(('④ новий коміт після ревізії → печатка стара → block', v('ревізія ✓\n' + want)))
+    for k, x in old.items():
+        if x is None: os.environ.pop(k, None)
+        else: os.environ[k] = x
+    return out
+
 def selftest():
     t = tempfile.mkdtemp(); root = os.path.join(t, 'w'); k = os.path.join(root, 'k'); os.makedirs(k)
     G = lambda *a: subprocess.run(['git', '-C', k, *a], capture_output=True, text=True, check=True).stdout.strip()
@@ -327,6 +369,7 @@ def selftest():
     row('| 14.11 | **пропуск Konst** — без хешу |\n'); n = [stop(D('ок')) is not None for _ in range(5)]
     cases.append(('стеля: 3 зупинки поспіль, 4-та пропускає, далі знову суд', n == [True, True, True, False, True]))
     cases += selftest_claim()
+    cases += selftest_seal()
     bad = 0
     for name, ok in cases:
         bad += not ok; print(('✓ ' if ok else '✗ ') + name)

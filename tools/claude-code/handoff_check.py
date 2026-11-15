@@ -7,6 +7,8 @@
 #
 # Запуск:  python3 tools/claude-code/handoff_check.py <тека репо> [<тека репо> …]    → рядки ✓ / ⚠ / ✗ / ⓘ; exit 1 на ✗
 #          python3 tools/claude-code/handoff_check.py selftest                         → зуби: тимчасові репо, усі випадки брифу
+#          python3 tools/claude-code/handoff_check.py revision [<корінь>] [--table]    → ревізія + печатка «ревізія ✓ · HEAD … · ✗ 0» (REV-1 · REV-4); --table — заготовка таблиці з git log
+#          HC_INJECT=rev4 … selftest → ✗ (зуб REV-4: коміти без запису не бачить, печатку не звіряє)
 # «Свої» коміти — за трейлером Claude-Session ≡ CLAUDE_CODE_REMOTE_SESSION_ID (cse_X ↔ session_X); нема змінної — усі коміти агента.
 import glob, os, re, subprocess, sys, tempfile, time
 
@@ -351,7 +353,9 @@ JPATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'hooks', 'HOOK_
 #   знімає ctx_watch після стиснення). `gate` — лише ✗ рядки, exit 1 на ✗ (для сторожа стиснення), мітки не пише.
 CHECKLIST = ("Ревізія — без переїзду: ✗ — виправ, закоміть і запуш; ⚠ — звір. Потім пройди сесію (git log з її початку) і для КОЖНОГО: рішення Konst чи агента → `DECISIONS` (В-N) або бриф; "
              "новий прилад → карта репо (REPO_LAYOUT) + «Прилади продуктів» ядра; нове правило → CLAUDE.md / профіль / рецепт; зміна стану → брифи §0 і черга; урок → свій дім + рядок у самері; "
-             "💡 без відповіді → самері §0 «💡 чекає вироку Konst». Звіт Konst — таблиця «що · дім · коміт» і «чого ще нема». З пам'яті сесії ревізія не робиться — лише з цього виводу.")
+             "💡 без відповіді → самері §0 «💡 чекає вироку Konst». Звіт Konst — таблиця «що · дім · коміт» (заготовка — handoff_check.py revision --table, з git log) і «чого ще нема». "
+             "З пам'яті сесії ревізія не робиться — лише з цього виводу. Правив самері чи стартове після цього прогону — revision ще раз: печатка нижче старіє з HEAD; "
+             "у звіті — її рядок як є, не «ревізія ✓» своїми словами (гачок promise-guard зупинить).")
 
 def sid():
     return re.sub(r'\W', '', os.environ.get('CLAUDE_CODE_SESSION_ID') or os.environ.get('CLAUDE_CODE_REMOTE_SESSION_ID') or 'x')
@@ -369,6 +373,50 @@ def session_repos(root='/home/user'):
 
 def heads(rs): return ' '.join(git(r, 'rev-parse', 'HEAD') for r in rs)
 
+# REV-4 (AE S148, Konst: «чому ревізія наче зроблена, а потім знайшлись мертві шляхи й помилки?»): одна перевірка для revision і гачка Stop REV-2
+#   (hooks/handoff-remind.sh імпортує ці функції — копії нема) · печатка на HEAD замість слова агента · таблиця з git log, не з пам'яті.
+#   Практика: Stop-гачок звіряє заяву з файлом стану, який пише сама перевірка (codingwithroby «The Stop Hook That Won't Let Claude Lie to You»;
+#   ctxgrd «Verifying agent work», 15.11.2026); суд моделлю — не беремо (дорого, не вимірне).
+SUMF = re.compile(r'(^docs/summary/|^sessions/.*summary)', re.I)
+
+def latest_summary(r):
+    """Найновіше самері репо за часом зміни: не-Lens — docs/summary/*SUMMARY*.md, Lens — sessions/**/*summary*.md."""
+    xs = glob.glob(os.path.join(r, 'docs', 'summary', '*SUMMARY*.md')) + glob.glob(os.path.join(r, 'sessions', '**', '*summary*.md'), recursive=True)
+    return max(xs, key=os.path.getmtime) if xs else None
+
+def session_log(r):
+    """Коміти цієї сесії (трейлер Claude-Session ≡ CLAUDE_CODE_REMOTE_SESSION_ID), новіші першими: [(h7, тема, правив самері)]."""
+    s = os.environ.get('CLAUDE_CODE_REMOTE_SESSION_ID', ''); tail = s.split('_', 1)[1] if '_' in s else ''
+    if not tail: return []
+    out = []
+    for ln in git(r, 'log', '--format=%h\x1f%s', '--abbrev=7', f'--grep=session_{tail}').splitlines():
+        h, subj = ln.split('\x1f', 1)
+        out.append((h, subj, any(SUMF.search(f) for f in git(r, 'show', '--name-only', '--format=', h).split())))
+    return out
+
+def uncovered_commits(rs, text=''):
+    """Коміти сесії, яких нема ні в text (відповідь агента), ні в найновішому самері жодного репо сесії. Коміт, що правив самері, — записаний
+    ним самим (свій хеш у самері вписати не може). → ['репо h7', …]"""
+    if os.environ.get('HC_INJECT') == 'rev4': return []
+    mem = text + ''.join(open(f, encoding='utf-8').read() for f in filter(None, (latest_summary(r) for r in rs)))
+    return [f'{os.path.basename(r)} {h}' for r in rs for h, _, s in session_log(r) if not s and h not in mem]
+
+def seal(rs, n_bad):
+    """Печатка ревізії: агент цитує її, а не пише «ревізія ✓» сам; стара з першим новим комітом будь-якого репо сесії."""
+    return f"ревізія {'✓' if not n_bad else '✗'} · HEAD " + ' '.join(f'{os.path.basename(r)}@{git(r, "rev-parse", "--short=7", "HEAD")}' for r in rs) + f' · ✗ {n_bad}'
+
+def seal_ok(rs):
+    """Мітка ревізії несе печатку ✓ саме на поточному HEAD усіх репо сесії (її пише лише revision)."""
+    try: ls = open(rev_mark(), encoding='utf-8').read().splitlines()
+    except OSError: return False
+    if os.environ.get('HC_INJECT') == 'rev4': return True
+    return len(ls) > 1 and ls[1] == seal(rs, 0)
+
+def rev_table(rs):
+    """`revision --table`: таблиця ревізії з git log сесії (що · коміт); «дім» дописує агент."""
+    rows = [f"| {subj[:90].replace('|', '/')} | ? | {os.path.basename(r)} `{h}` |" for r in rs for h, subj, _ in reversed(session_log(r))]
+    return '| що | дім | коміт |\n|---|---|---|\n' + ('\n'.join(rows) if rows else '| (комітів сесії нема) | — | — |')
+
 def revision(root='/home/user', once=None):
     """→ (текст, є ✗). once — файл-позначка: той самий HEAD усіх репо, що й минулого разу → ('', False) (повтор не шумить)."""
     import contextlib, io
@@ -378,9 +426,14 @@ def revision(root='/home/user', once=None):
     if once and os.path.exists(once) and open(once).read() == h: return '', False
     buf = io.StringIO()
     with contextlib.redirect_stdout(buf): bad = report(rs)
-    open(rev_mark(), 'w').write(f'{int(time.time())} {h}')
+    txt = buf.getvalue().strip()
+    miss = uncovered_commits(rs)   # REV-4 (а): те саме, що судить гачок Stop REV-2 на переїзді
+    if miss: txt += (f'\n  ✗ коміти сесії без запису в самері — {len(miss)}: ' + ' · '.join(miss[:10]) + (' …' if len(miss) > 10 else '')
+                     + ' → рядком §1 самері (що · дім · коміт)')
+    s = seal(rs, sum(1 for l in txt.splitlines() if l.strip().startswith('✗')))
+    open(rev_mark(), 'w').write(f'{int(time.time())} {h}\n{s}')   # precompact_guard дивиться лише, чи мітка є; другий рядок — для promise-guard ④
     if once: open(once, 'w').write(h)
-    return buf.getvalue().strip() + '\n\n' + CHECKLIST, bool(bad)
+    return txt + '\n\n' + CHECKLIST + '\n\n' + s, bool(bad or miss)
 
 def gate(root='/home/user'):
     import contextlib, io
@@ -538,6 +591,17 @@ def selftest():
     ef = os.path.join(rg, 'err.log'); open(ef, 'w').write('DeprecationWarning: x\n')
     c0 = hook_crashes('x', ef); open(ef, 'a').write('Traceback (most recent call last):\n  File "h"\nKeyError: \'tool_input\'\n'); c1 = hook_crashes('x', ef)
     rcases.append(('гачок впав (Traceback у журналі помилок) → ✗ з KeyError; лише попередження → тиша (AE S143)', c0 == [] and c1 and c1[0][0] == '✗' and 'KeyError' in c1[0][1]))
+    # REV-4: коміт сесії без запису в самері → ✗ і печатка ✗ · записав → печатка ✓ у мітці · новий коміт → печатка стара · таблиця з git log
+    os.environ['LENS_REV_MARK'] = os.path.join(tf, 'rev4'); r4 = mk(good, commit_after=True); g4 = os.path.dirname(r4)
+    h4 = git(r4, 'rev-parse', '--short=7', 'HEAD'); ta, ba = revision(g4)
+    open(os.path.join(r4, 'sessions/P_session_summary_X.md'), 'a').write(f'\n- код `{h4}`\n'); sh(r4, 'git', 'commit', '-qam', 'самері\n\nClaude-Session: https://claude.ai/code/session_T')
+    tb, bb = revision(g4); okb = seal_ok([r4])
+    open(os.path.join(r4, 'lens/A.md'), 'a').write('w'); sh(r4, 'git', 'commit', '-qam', 'ще прилад\n\nClaude-Session: https://claude.ai/code/session_T')
+    stale = seal_ok([r4]); tab = rev_table([r4])
+    rcases += [('REV-4 (а): коміт сесії без запису в самері → ✗ з хешем, печатка «ревізія ✗»', ba and 'коміти сесії без запису' in ta and h4 in ta and ta.splitlines()[-1].startswith('ревізія ✗')),
+               ('REV-4 (б): записав коміт у самері → печатка «ревізія ✓ · HEAD … · ✗ 0» і в мітці', not bb and tb.splitlines()[-1].startswith('ревізія ✓') and tb.splitlines()[-1].endswith('✗ 0') and okb),
+               ('REV-4 (г): новий коміт після ревізії → печатка стара', not stale),
+               ('REV-4 (в): --table — заголовок «що · дім · коміт» і кожен коміт сесії', '| що | дім | коміт |' in tab and h4 in tab and 'ще прилад' in tab)]
     os.environ.pop('LENS_REV_MARK')
     for name, ok in rcases:
         print(('✓' if ok else '✗') + ' ' + name); bad += not ok
@@ -558,6 +622,8 @@ if __name__ == '__main__':
         for k in sorted(t, key=lambda k: (k == 'інше', k)): print(f'| `{k}` | ' + ' | '.join(str(t[k][c]) for c, _, _ in T_COLS) + f' | {prec(t[k])} |')
         sys.exit(0)
     if a[0] == 'revision':   # REV-1: ревізія агента = ревізія Konst — той самий прохід, що й на слово «ревізія»
+        if '--table' in a:   # REV-4 (в): заготовка таблиці ревізії з git log сесії
+            print(rev_table(session_repos(next((x for x in a[1:] if x != '--table'), '/home/user')))); sys.exit(0)
         t, b = revision(a[1] if len(a) > 1 else '/home/user'); print(t or 'репо сесії не знайдено'); sys.exit(1 if b else 0)
     if a[0] == 'gate':   # REV-1: для hooks/precompact_guard.sh — лише ✗
         x = gate(a[1] if len(a) > 1 else '/home/user'); print('\n'.join(x)); sys.exit(1 if x else 0)

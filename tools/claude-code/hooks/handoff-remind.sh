@@ -26,6 +26,7 @@ REV = re.compile(r"\bревізі[яюї]\b|\bзвір\w*\s+пам.?ят\w*|\bз
 TRIG = re.compile(r"переїжджаємо|переїжджай\w*|переїхати|переїдемо|стартов\w+\s+повідомлен\w*|\bнов[ау]\s+сесі[яю]\b", re.I)   # лише команди: «переїжджаємо / переїхати / стартове / нову сесію»; іменник «переїзд» — розповідь (тричі хибне 10.10), «переїжджає» — опис (G6 «переїжджає в скрипт», хибне 10.10 QR CC-7) — журнал гачків §1
 STARTER = re.compile(r'(?im)^\s*старт\w*\s*:')   # ознака стартового в блоці text — рядок «СТАРТ:» / «Старт:» (є в стартових AE і ядра). AE S139: промпт моделі давав хибний переїзд; AE S140: текст завдання для Fable («гачок старту», «самері … §0») — теж (хибне), тому вже не «старт|самері» будь-де
 HC = os.environ['HC']
+sys.path.insert(0, os.path.dirname(HC)); import handoff_check as HCK   # REV-4: спільні функції ревізії (latest_summary · uncovered_commits · rev_mark)
 NARR = re.compile(r'(?:\bдо|\bпісля|\bбез|\bперед|\bвід|\bщодо|\bпро)\s+$', re.I)   # «стиснення до ревізії» — розповідь, не команда (хибне AE S143: повний прохід на слово в розповіді)
 def is_rev(pr):
     return any(not NARR.search(pr[max(0, m.start() - 12):m.start()]) for m in REV.finditer(pr))
@@ -149,6 +150,13 @@ def selftest():
     o1 = post(P('cd x && git commit -qm x'), [t], t); o2 = post(P('git commit -qm y'), [t], t); o3 = post(P('git status'), [t], t); o4 = post(P("echo '{\"command\":\"git commit -m x\"}' | bash h.sh", 'q2'), [t], t)
     ok = o1 is not None and '✗' in o1 and o2 is None and o3 is None and o4 is None
     print(('✓' if ok else '✗') + ' post: коміт → нові ✗; повтор того самого → тиша; не коміт і «git commit» у тексті echo → тиша'); bad += not ok
+    to = tempfile.mkdtemp(); ro = os.path.join(to, 'Old'); os.makedirs(os.path.join(ro, 'docs', 'summary'))
+    for c in (['init', '-q'], ['config', 'user.email', 't@t'], ['config', 'user.name', 't']): subprocess.run(['git', '-C', ro, *c], check=True, capture_output=True)
+    open(os.path.join(ro, 'docs', 'summary', 'X_SUMMARY_1.md'), 'w').write('x'); subprocess.run(['git', '-C', ro, 'add', '-A'], check=True)
+    subprocess.run(['git', '-C', ro, 'commit', '-qm', 'old'], check=True, capture_output=True, env=dict(os.environ, GIT_COMMITTER_DATE='2020-01-01T00:00:00', GIT_AUTHOR_DATE='2020-01-01T00:00:00'))
+    open(os.path.join(ro, 'dirty.py'), 'w').write('x')
+    ok = post(P('cd /tmp/hc && git commit -qm x', 'q3'), [to], t) is None
+    print(('✓' if ok else '✗') + ' post: коміт не в репо сесії (HEAD жодного не свіжий) → тиша (хибне AE S149: фікстура в /tmp)'); bad += not ok
     mk = os.path.join(t, 'pf'); F = lambda ls: post_filter(ls, mk)[0]
     r1 = F(['⚠ бриф a.md відстає: 1 коміт(ів)', '✗ незакомічене: 2 (x)', '✗ самері відстає: після abc1234 комітів агента без самері — 1 (abc1234)', '⚠ описи, що згадують змінений у сесії код, але не мінялись: README.md (g.sh)'])
     r2 = F(['⚠ бриф a.md відстає: 2 коміт(ів)', '✗ самері відстає: після abc1234 комітів агента без самері — 3 (abc1234 def5678 0a1b2c3)', '⚠ описи, що згадують змінений у сесії код, але не мінялись: README.md (g.sh) · docs/B.md (h.py)'])
@@ -161,6 +169,7 @@ def selftest():
     print(('✓' if ok else '✗') + ' post: «незакомічене» — з назвою репо, той самий набір файлів удруге → тиша, новий набір → є (S145: коміт без коду)'); bad += not ok
     _p(f'selftest: {N[0] - bad}/{N[0]}'); return 1 if bad else 0
 
+POST_FRESH = 300   # с: коміт «щойно» в репо сесії (post); amend і rebase теж міняють час коміту
 POST_LAG = 3   # «самері відстає» після коміту — лише від стількох комітів (на кожен однорядковий коміт — шум; переїзд ловить усе)
 def post_filter(lines, mark):
     """Шум гачка після коміту (досвід AE S109): новизна — за змістом без чисел і хешів; «описи…» — по документу; «незакомічене» — раз на набір файлів (S145); самері — з порогом."""
@@ -194,6 +203,10 @@ def post(d, roots, mark_dir='/tmp'):
     if not re.search(r'(?:^|[;&|(]\s*)git(?:\s+-C\s+\S+)?\s+commit\b', cmd) or '--dry-run' in cmd: return None   # git commit на місці команди (echo «…git commit…» — не коміт, хибне S109)
     rs = repos(roots)
     if not rs: return None
+    # AE S149 (хибне): коміт у тимчасовій теці (`cd /tmp/… && git commit`, фікстура тесту) давав «лишились змінені файли поза ним» на репо сесії.
+    #   Коміт був у репо сесії ⇔ HEAD хоч одного з них щойно народився (вікно POST_FRESH с); інакше — тиша.
+    now = time.time()
+    if not any(now - int(subprocess.run(['git', '-C', x, 'log', '-1', '--format=%ct'], capture_output=True, text=True).stdout.strip() or 0) <= POST_FRESH for x in rs): return None
     r = subprocess.run([sys.executable, HC, *rs], capture_output=True, text=True)
     out, rp = [], ''
     for l in r.stdout.splitlines():   # рядок «— <репо>» — заголовок блоку handoff_check; «незакомічене» без назви репо в кількох репо сесії — не знати де
@@ -208,10 +221,7 @@ def post(d, roots, mark_dir='/tmp'):
 
 PROP = re.compile(r'💡\s*\**\s*Пропоную\s*\**\s*:?\s*\**\s*(.+)', re.S)
 WORD = re.compile(r'[А-Яа-яЇїІіЄєҐґA-Za-z]{6,}')
-def latest_summary(r):
-    """Найновіше живе самері репо: не-Lens — docs/summary/*SUMMARY*.md, Lens — sessions/**/*summary*.md (за часом зміни)."""
-    xs = glob.glob(os.path.join(r, 'docs', 'summary', '*SUMMARY*.md')) + glob.glob(os.path.join(r, 'sessions', '**', '*summary*.md'), recursive=True)
-    return max(xs, key=os.path.getmtime) if xs else None
+latest_summary = HCK.latest_summary   # REV-4: одна функція з handoff_check.py (і revision, і цей гачок)
 def idea_missing(msg, rs):
     """HOOK-3.3 (пропуск Konst AE S136): відповідь-переїзд із «💡 Пропоную», а ні стартове в ній, ні §0 найновішого самері не мають рядка «💡 …» з її суттю
     (≥ 2 спільних слів від 6 літер з першого речення 💡) → суть 💡, інакше None. Правило — AE CLAUDE.md «Самері», «💡 на переїзді» (Konst S135)."""
@@ -234,20 +244,7 @@ def idea_missing(msg, rs):
     return first[:200]
 
 TABLE = re.compile(r'\|\s*що\s*\|\s*дім\s*\|\s*коміт\s*\|', re.I)   # заголовок таблиці ревізії «що · дім · коміт»
-def rev_mark():
-    sid = re.sub(r'\W', '', os.environ.get('CLAUDE_CODE_SESSION_ID') or os.environ.get('CLAUDE_CODE_REMOTE_SESSION_ID') or 'x')
-    return os.environ.get('LENS_REV_MARK') or f'/tmp/lens-revision-{sid}'   # та сама мітка, що handoff_check.py rev_mark()
-def session_commits(r):
-    """Коміти цієї сесії (трейлер Claude-Session ≡ CLAUDE_CODE_REMOTE_SESSION_ID), крім тих, що правили самері: вони записані самим комітом."""
-    sid = os.environ.get('CLAUDE_CODE_REMOTE_SESSION_ID', ''); tail = sid.split('_', 1)[1] if '_' in sid else ''
-    if not tail: return []
-    out = subprocess.run(['git', '-C', r, 'log', '--format=%h', '--abbrev=7', f'--grep=session_{tail}'], capture_output=True, text=True).stdout.split()
-    keep = []
-    for h in out:
-        fs = subprocess.run(['git', '-C', r, 'show', '--name-only', '--format=', h], capture_output=True, text=True).stdout.split()
-        if any(re.search(r'(^docs/summary/|^sessions/.*summary)', f, re.I) for f in fs): continue   # коміт правив самері — записаний ним самим (свій хеш у самері вписати не може)
-        keep.append(h)
-    return keep
+rev_mark = HCK.rev_mark   # та сама мітка, що handoff_check.py revision
 def rev_gap(msg, rs):
     """REV-2 (Konst AE S143: «ревізія при переїзді — машиною, щоб моя ревізія = твоя»): відповідь-переїзд пропускається, лише коли
     (а) мітка ревізії (handoff_check.py revision) свіжіша за останній коміт репо сесії; (б) у відповіді є таблиця «що · дім · коміт»;
@@ -259,8 +256,7 @@ def rev_gap(msg, rs):
         gaps.append('ревізії після останнього коміту не було → python3 lens-governance/tools/claude-code/handoff_check.py revision (✗ — виправ, коміт, push, ще раз)')
     if not TABLE.search(msg):
         gaps.append('у відповіді нема таблиці ревізії «| що | дім | коміт |» — кожне рішення · прилад · правило сесії з домом і комітом')
-    mem = msg + ''.join(open(f, encoding='utf-8').read() for f in filter(None, (latest_summary(r) for r in rs)))
-    miss = [f'{os.path.basename(r)} {h}' for r in rs for h in session_commits(r) if h not in mem]
+    miss = HCK.uncovered_commits(rs, msg)   # REV-4 (а): той самий код, що в handoff_check.py revision
     if miss:
         gaps.append(f'коміти сесії без запису ні в таблиці, ні в самері — {len(miss)}: ' + ' · '.join(miss[:10]) + (' …' if len(miss) > 10 else '')
                     + ' → кожен у таблицю (що · дім) або рядком §1 самері')
