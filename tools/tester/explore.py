@@ -30,14 +30,14 @@ DEVICES = {'pc': dict(viewport={'width': 1920, 'height': 1080}, device_scale_fac
                           user_agent='Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1')}
 
 # у сторінці: керуючі елементи станом зараз (видимі, досяжні, не вимкнені) — підпис, локатор для повтору, «група» для вибірки однакових
-CONTROLS_JS = r"""() => {
+CONTROLS_JS = r"""(extra) => {
   const vis = e => { const r = e.getBoundingClientRect(), s = getComputedStyle(e); return r.width > 2 && r.height > 2 && s.visibility !== 'hidden' && s.display !== 'none' && +s.opacity > 0.05; };
   const path = e => { const p = []; for (let n = e; n && n.nodeType === 1 && n !== document.body; n = n.parentElement) {
       if (n.id && document.querySelectorAll('#' + CSS.escape(n.id)).length === 1) { p.unshift('#' + CSS.escape(n.id)); break; }
       let i = 1, s = n; while ((s = s.previousElementSibling)) if (s.tagName === n.tagName) i++;
       p.unshift(n.tagName.toLowerCase() + ':nth-of-type(' + i + ')'); } return (p[0] && p[0][0] === '#' ? '' : 'body > ') + p.join(' > '); };
   const out = [];
-  for (const e of document.querySelectorAll('a[href],button,[role=button],[role=tab],[role=menuitem],summary,select,input[type=checkbox],input[type=radio],[onclick]')) {
+  for (const e of document.querySelectorAll('a[href],button,[role=button],[role=tab],[role=menuitem],summary,select,input[type=checkbox],input[type=radio],[onclick]' + (extra ? ',' + extra : ''))) {   // extra — cfg «extra_controls» (В-389: рядки таблиці з делегованим кліком)
     if (!vis(e) || e.closest('[inert]')) continue;
     const r = e.getBoundingClientRect(), c = document.elementFromPoint(Math.min(innerWidth - 1, Math.max(0, r.left + r.width / 2)), Math.min(innerHeight - 1, Math.max(0, r.top + r.height / 2)));
     const name = (e.getAttribute('aria-label') || e.textContent || e.getAttribute('title') || e.value || '').replace(/\s+/g, ' ').trim().slice(0, 60);
@@ -141,7 +141,7 @@ def run(cfg, out_dir, baseline=None, max_clicks=None, quiet=False, shard=None, c
       judge(pg, ev, start['name'], 'старт'); unseen(pg, start['name'], 'старт')
       for c in ev['con'][:5]: add('⚠', 'консоль', start['name'], c, 'старт')
       for r in ev['req'][:5]: add('✗', 'запит', start['name'], r, 'старт')
-      ctrls = pg.evaluate(CONTROLS_JS); ctx.close()
+      ctrls = pg.evaluate(CONTROLS_JS, cfg.get('extra_controls', '')); ctx.close()
       groups = {}
       for c in ctrls: groups.setdefault(c['group'], []).append(c)
       todo = []
