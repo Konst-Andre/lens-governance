@@ -14,7 +14,8 @@
 # Сценарій (JSON біля примірки продукту; шляхи — від теки сценарію):
 #   ref {site | git+path, overlay: [js…], hide: [селектор…], query} — білд-еталон (тека або коміт: git archive) + файли накладки; hide — кнопки й панель примірки (вставляються перед </body>) · port {site, query}
 #   viewport [w, h] · headers {ім'я: значення} (CSP продукту) · stubs [{url, status, body}] · init — JS до завантаження (обидва боки) · ready — JS-умова «застосунок готовий» · settle (мс)
-#   themes [{name, js}] · states [{name, js, hover?, wait?}] · roots [{name, sel, pick, tol_px?, pix_tol?}] · props — обчислені стилі
+#   themes [{name, js}] · states [{name, js, hover?, hover_wait? (мс після наведення, типово 250), wait?}] · roots [{name, sel, pick, tol_px?, pix_tol?, optional?}] · props — обчислені стилі
+#     optional (AE S147) — корінь, що є лише в деяких станах (підказка в body): нема в обох — не судиться; є в одному — ✗
 #   tol_px (0,5) · pix_tol (середня різниця каналу 0–255, 2) · motion [{name, setup?, trigger, sample, frames, mode?: time | shape, tol: {ім'я | *: допуск}}]
 #     time — кожен кадр за часом (рівні кадри); shape — пік · западина · кінець (коли перший кадр — важкий render() застосунку)
 #     key (AE S146, П4 порту v7) — значення як функція ключа: "key": <ім'я поля семплера> (напр. ширина рейки); кожен кадр еталону ⟂ значення порту
@@ -118,12 +119,13 @@ def run(scn_path, inject=False, shots=None):
                     p.wait_for_timeout(st.get('wait', 400))
                     if st.get('hover'):
                         h = p.locator(st['hover']).first
-                        if h.count(): h.hover(); p.wait_for_timeout(250)
+                        if h.count(): h.hover(); p.wait_for_timeout(st.get('hover_wait', 250))   # AE S147: підказка з затримкою 0,5 с — 250 мс міряли невидиму
                     M[side] = {rt['name']: p.evaluate(MEAS_JS, [rt['sel'], rt['pick'], props]) for rt in C['roots']}
                     shot[side] = {rt['name']: (p.locator(rt['sel']).first.screenshot() if p.locator(rt['sel']).count() else None) for rt in C['roots']}
                 for rt in C['roots']:
                     tol = rt.get('tol_px', C.get('tol_px', .5)); ptol = rt.get('pix_tol', C.get('pix_tol', 2.0))
                     a, z = M['ref'][rt['name']], M['port'][rt['name']]
+                    if a is None and z is None and rt.get('optional'): continue   # AE S147: корінь, що живе лише в деяких станах (підказка), — нема в обох ≡
                     if a is None or z is None: ok(f'{tag} · {rt["name"]}: корінь є в обох', False, f'еталон {a is not None} · порт {z is not None}'); continue
                     miss = [m for m in sorted(set(a) ^ set(z)) if not is_debt(m, '@set')]; bad = []
                     for k in sorted(set(a) & set(z)):
@@ -239,6 +241,15 @@ def selftest():
         kc = scn(nm); kc['ref']['overlay'] = ['kfit.js']; kc['motion'][0].update(mode='key', key='x', frames=30, tol={'x': 1, 'o': .03})
         kc['motion'][0]['sample'] = "{x: new DOMMatrix(getComputedStyle(document.querySelector('#r .x')).transform).m41, o: +getComputedStyle(document.querySelector('#r .x')).opacity}"
         (t / f'{nm}.json').write_text(json.dumps(kc), encoding='utf-8')
+    # AE S147: підказка з'являється через 0,4 с після наведення (у body, не в корені) — hover_wait і корінь optional
+    hp = lambda c: "document.querySelector('#r b').addEventListener('mouseenter',()=>setTimeout(()=>{const d=document.createElement('i');d.id='tp';d.textContent='t';d.style.cssText='position:absolute;left:250px;top:10px;color:rgb(%s)';document.body.append(d)},400))" % c
+    (t / 'hfit.js').write_text(hp('200,0,0'), encoding='utf-8')
+    for nm, c in (('hgood', '200,0,0'), ('hbad', '0,0,200')):
+        (t / nm).mkdir(); (t / nm / 'index.html').write_text(page('', hp(c)), encoding='utf-8')
+        hc = scn(nm); hc['ref']['overlay'] = ['hfit.js']; hc['motion'] = []; hc['roots'].append({'name': 'tp', 'sel': '#tp', 'pick': '*', 'optional': True})
+        hc['states'] = [{'name': 'спокій', 'js': '', 'wait': 50}, {'name': 'наведення', 'js': '', 'wait': 50, 'hover': '#r b', 'hover_wait': 700}]
+        (t / f'{nm}.json').write_text(json.dumps(hc), encoding='utf-8')
+    hg, hgo = q('hgood.json'); hb, hbo = q('hbad.json')
     g, go = q('good.json'); bd, bo = q('bad.json'); gi, gio = q('good.json', inject=True)
     xs = lambda o: [l for l in o.splitlines() if l.startswith('✗')]
     T = [('порт ≡ примірці (стилі, місце, пікселі, рух) → ✗ 0', g == 0, go),
@@ -246,6 +257,7 @@ def selftest():
          ('порт з іншою швидкістю руху → ✗ «рух … кожен кадр»', any('кожен кадр' in l for l in xs(bo)), bo),
          ('--inject (вада кольору) → ✗ «color»', any('color' in l for l in xs(gio)), gio),
          ('режим «форма»: той самий рух → ✓; коротший рух (кінець 40 ⟂ 50) → ✗', not any('форма' in l for l in xs(q('shape.json')[1])) and any('форма' in l for l in xs(q('shapeb.json')[1])), ''),
+         ('підказка після наведення (0,4 с, hover_wait 700, корінь optional): та сама → ✗ 0 (і в спокої, де її нема в обох); інший колір → ✗ «tp»', hg == 0 and any('tp' in l for l in xs(hbo)), hgo[-400:] + hbo[-400:]),
          ('режим «ключ»: інша швидкість, та сама функція → ✓; інша функція прозорості → ✗', not any('ключі' in l for l in xs(q('kgood.json')[1])) and any('ключі' in l for l in xs(q('kbad.json')[1])), q('kgood.json')[1][-500:] + q('kbad.json')[1][-500:])]
     n = 0
     for name, c, out in T:

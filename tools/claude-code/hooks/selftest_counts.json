@@ -16,7 +16,7 @@
  "live_refs.py selftest": 5,
  "memory-guard.sh selftest": 21,
  "plan-web.sh selftest": 14,
- "port_same.py selftest": 6,
+ "port_same.py selftest": 7,
  "precompact_guard.sh selftest": 20,
  "profile_check.sh selftest": 3,
  "promise-guard.sh selftest": 48,
