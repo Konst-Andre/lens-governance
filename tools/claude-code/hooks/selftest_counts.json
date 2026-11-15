@@ -1,6 +1,6 @@
 {
  "brief-guard.sh selftest": 12,
- "clip.py selftest": 9,
+ "clip.py selftest": 11,
  "commit-gate.sh selftest": 5,
  "commit_files.py selftest": 33,
  "ctx_watch.py selftest": 39,

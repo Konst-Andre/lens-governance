@@ -7,7 +7,7 @@
 #   flaviocopes «Record a product demo with Playwright», addpipe «inline recorder on iOS»; смуга — фільтри mpdecimate + кадри → плитка
 #   (FFmpeg wiki «multiple screenshots to an image (tile)», 12.11.2026).
 # Запуск:  python3 clip.py <сценарій.json> <тека виходу>        (сценарій — нижче)
-#          python3 clip.py selftest                              (зуби: рух → кліп і ≥ 3 кадри; без руху → ✗ «руху не видно»; стрибок на кроці з "motion" → ✗ «стрибок, не рух»)
+#          python3 clip.py selftest                              (зуби: рух → кліп і ≥ 3 кадри; голодний запис → повтор → ✓; без руху → ✗ «руху не видно»; стрибок на кроці з "motion" → ✗ «стрибок, не рух»)
 # Сценарій JSON: {"url": "...", "name": "rail_C", "viewport": [1920, 1080] | "device": "iPhone 15",
 #   "init": ["<js до завантаження>"], "ready": "<js-умова готовності>", "crop": [x, y, w, h] (менший за екран — лише з "crop_why": "<чому, ≥ 20 знаків>", AE S146),
 #   "steps": [{"click": "<css>"}, {"hover": "<css>"}, {"move": [x, y]}, {"fill": ["<css>", "текст"]}, {"press": "Tab"}, {"eval": "<js>"}, {"wait": 900}],
@@ -24,6 +24,17 @@ def need_ffmpeg():
     if not shutil.which("ffmpeg"): print("✗ ffmpeg нема — кліп не зібрати (apt-get install -y ffmpeg)"); sys.exit(2)
 
 def record(sc, out):
+    """AE S148 (AE-GFLK, борг 2-в): під навантаженням браузер пропускає кадри — крок з "motion" давав 1–2 кадри й ✗ «стрибок», з повтору ✓.
+    Світ: Chromium губить кадри запису, коли скрипт випереджає малювання (groups.google.com chromium-discuss «Screencast frame doesn't trigger
+    every frame», 15.11.2026). Тому «стрибок» — повторний запис до 2 разів, рядок ⚠ з числом; справжній стрибок повторюється → ✗ і після."""
+    name = sc.get("name", "clip"); k = 0
+    ok, line, jump = record_once(sc, out, k)
+    while jump and k < 2:
+        k += 1; print(f"⚠ {name}: замало кадрів на кроці з motion — повтор запису {k}"); ok, line, jump = record_once(sc, out, k)
+    LAST_K[0] = k; print(line + (" (і після 2 повторів запису)" if jump and k else "")); return ok
+LAST_K = [0]
+
+def record_once(sc, out, attempt=0):
     from playwright.sync_api import sync_playwright
     out = pathlib.Path(out); out.mkdir(parents=True, exist_ok=True)
     name = sc.get("name", "clip"); vid = pathlib.Path(tempfile.mkdtemp())
@@ -54,7 +65,7 @@ def record(sc, out):
         pg.wait_for_timeout(sc.get("tail", 500)); ctx.close(); b.close()
     src = next(vid.glob("*.webm"))
     cb = crop_bad(sc, vw["width"], vw["height"])
-    if cb: print(f"✗ {name}: {cb}"); return False
+    if cb: return False, f"✗ {name}: {cb}", False
     vf = "fps=30"
     if sc.get("crop"):
         x, y, w, h = sc["crop"]; vf = f"crop={w}:{h}:{x}:{y},fps=30"
@@ -66,6 +77,7 @@ def record(sc, out):
                     "-fps_mode", "vfr", str(fr / "%04d.png")], check=True, capture_output=True, text=True)
     frames = sorted(glob.glob(str(fr / "*.png")))
     pts = [float(x) for x in re.findall(r"pts_time:([0-9.]+)", pr.stderr)][:len(frames)]
+    if attempt < sc.get("_starve", 0): pts = pts[::40]   # лише selftest: «голодний» запис — кожен 40-й кадр (≈ 0–1 на крок)
     dur = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(mp4)], capture_output=True, text=True).stdout.strip() or 0)
     if frames:
         from PIL import Image
@@ -87,8 +99,8 @@ def record(sc, out):
     print("   кроки (кадрів, що змінюються):", [sum(1 for t in pts if a - 0.05 <= t <= (b or a) + 0.15) for a, b, s in marks])
     ok = n >= mn and not errs and not jumps
     why = (f"руху не видно (кадрів, що змінюються, {n} < {mn})" if n < mn else "") + ("; ".join(jumps)) + (f"; помилки сторінки: {'; '.join(errs)}" if errs else "")
-    print((f"✓ {name}: {n} кадрів змінюються, {dur:.1f} с → {mp4}" if ok else f"✗ {name}: {why}"))
-    return ok
+    line = f"✓ {name}: {n} кадрів змінюються, {dur:.1f} с → {mp4}" if ok else f"✗ {name}: {why}"
+    return ok, line, bool(jumps) and n >= mn and not errs
 
 def crop_bad(sc, W, H):
     """AE S146 (пропуск Konst «чи береш до уваги центральну й праву частину?»): кліп руху різав ліву половину — рух центру й правої частини
@@ -111,15 +123,17 @@ def selftest():
     four = [{"click": "#t", "wait": 600, "motion": True}] * 4
     r3 = record({"viewport": [640, 360], "steps": four, "url": (tmp / "jump.html").as_uri(), "name": "jump"}, tmp / "out")
     r4 = record({"viewport": [640, 360], "steps": four, "url": (tmp / "move.html").as_uri(), "name": "move4"}, tmp / "out")
+    r5 = record({"viewport": [640, 360], "steps": four, "url": (tmp / "move.html").as_uri(), "name": "move4s", "_starve": 1}, tmp / "out") and LAST_K[0] == 1
     for ok, m in [(r1 and (tmp / "out/move.mp4").stat().st_size > 1000 and (tmp / "out/move_frames.webp").exists(), "сторінка з рухом → MP4 + смуга кадрів"),
                   (not r2, "зуби: сторінка без руху → ✗ «руху не видно»"),
                   (not r3, "зуби: 4 миттєві перемикання на кроках з «motion» → ✗ «стрибок, не рух» (без мітки було ✓)"),
                   (r4, "ті самі 4 кроки з переходом 0,8 с → ✓"),
+                  (r5, "голодний перший запис (кожен 40-й кадр) → ⚠ «замало кадрів» і повтор → ✓ (AE S148)"),
                   (crop_bad({"crop": [0, 0, 320, 360]}, 640, 360) is not None, "зуби: кроп половини екрана без crop_why → ✗ (AE S146)"),
                   (crop_bad({"crop": [0, 0, 320, 360], "crop_why": "рух лише в кнопці, решта екрана статична"}, 640, 360) is None, "кроп з причиною → дозволено"),
                   (crop_bad({"crop": [0, 0, 640, 360]}, 640, 360) is None, "кроп = увесь екран → дозволено")]:
         print(("✓ " if ok else "✗ ") + m); bad += not ok
-    print(f"─── clip selftest: {7 - bad}/7 ───"); sys.exit(1 if bad else 0)
+    print(f"─── clip selftest: {8 - bad}/8 ───"); sys.exit(1 if bad else 0)
 
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "selftest": selftest()
