@@ -38,6 +38,7 @@
 | Cloudflare · каркас репо під Claude Code | `tools/cloudflare/CLOUDFLARE.md` · `tools/claude-code/CLAUDE_CODE.md` |
 | версія застосунку (B · rev): коли піднімати, хто вирішує, перевірка | `tools/claude-code/VERSIONS.md` — рядок «версія: …» у плані кроку; `version_check.py` у `env_check` продукту |
 | теки, імена, адресація `Репо:шлях` у ядрі | `kernel/Lens_REPO_LAYOUT.md` — формула ядра, **не** `<Репо>:docs/REPO_LAYOUT.md` продукту |
+| Konst каже **«паралельна сесія»** (ще одна сесія Claude на окреме поле роботи) — коли так і ні, завдання дитині, зведення, ціна в лімітах | `tools/claude-code/CLAUDE_CODE.md` «Паралельні сесії» |
 | Konst сказав **«нічна зміна»** (іде спати, делегує роботу без нагляду) — що можна, чого ніколи, пороги лімітів, ранковий звіт | `tools/claude-code/NIGHT_SHIFT.md` |
 | переїзд на інший акаунт Claude («новий / інший / резервний акаунт») — сам продиктуй Konst список | `tools/claude-code/ACCOUNT_MOVE.md` |
 | архівне джерело · рішення переїзду продуктів (`Р-N`) | греп по `archive/` (перейменування — `kernel/Lens_ARCHIVE_INDEX.md` §3-б) · `kernel/Lens_REPO_LAYOUT.md` §4-б |
