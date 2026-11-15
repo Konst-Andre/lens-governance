@@ -156,8 +156,11 @@ def run(cfg, out_dir, baseline=None, max_clicks=None, quiet=False, shard=None, c
         if c['href'] and re.match(r'^(https?:)?//', c['href']) and not c['href'].startswith(cfg['url'][:30]): continue   # зовнішні посилання — не наш сайт
         ctx, pg, ev = page(); path = f"{start['name']} → {label}"
         try:
-          ready(pg, start); e0 = len(ev['err']); m0 = pg.evaluate('window.__tester.muts'); u0 = pg.url; l0 = pg.evaluate('window.__testerLook()'); n0 = ev['n']; s0 = pg.evaluate('window.__testerScroll()')
-          loc = pg.locator(c['sel']).first
+          ready(pg, start)
+          try: pg.locator(c['sel']).first.scroll_into_view_if_needed(timeout=2000); pg.wait_for_timeout(150)   # В-389: Playwright докручує елемент перед кліком сам — міряти після цього, інакше «стрибок» хибний (пошук 15.11.2026: замір — прямокутник і прокрутка до / після)
+          except Exception: pass
+          e0 = len(ev['err']); m0 = pg.evaluate('window.__tester.muts'); u0 = pg.url; l0 = pg.evaluate('window.__testerLook()'); n0 = ev['n']; s0 = pg.evaluate('window.__testerScroll()')
+          loc = pg.locator(c['sel']).first; p0 = loc.evaluate(POS_JS)
           if c['tag'] == 'select':
             opts = loc.evaluate("e => [...e.options].filter(o => !o.disabled && o.value !== e.value).map(o => o.value)")
             if opts: loc.select_option(opts[0])
@@ -172,6 +175,11 @@ def run(cfg, out_dir, baseline=None, max_clicks=None, quiet=False, shard=None, c
             dd = [abs(a - b) for a, b in zip(s0, s1) if a != b]
             if dd and max(dd) <= 48 and not (calm_ok and calm_ok.search(c['name'] or '')):
               add('⚠', 'зсув після кліку', start['name'], f'прокрутка зрушила на {max(dd)} px без переходу — вміст «повзе» з кожним кліком', path)
+            # В-389 (AE S149, Konst «з підсиленням»): великий стрибок клікнутого — сайт сам прокрутив колонку (каталог: клік по клітинці → рядок поїхав на 886 px).
+            #   Поріг — ½ висоти колонки (слово Konst); у звіті — на скільки й як (прокрутка колонки було → стало). Виняток — calm_ok.
+            p1 = pg.locator(c['sel']).first.evaluate(POS_JS)
+            if p0 and p1 and abs(p1[0] - p0[0]) > p0[1] / 2 and not (calm_ok and calm_ok.search(c['name'] or '')):
+              add('⚠', 'стрибок клікнутого', start['name'], f'натиснутий елемент зрушив на {abs(p1[0] - p0[0]):.0f} px (більше ½ висоти колонки {p0[1]:.0f} px) без переходу; прокрутка колонки {p0[2]} → {p1[2]} — сторінка сама прокрутила список', path)
           mq = pg.evaluate('window.__tester.muts'); pg.wait_real(700); storm = pg.evaluate('window.__tester.muts') - mq   # вікно ЛІЧБИ — справжній час, не тиша
           if storm > cfg.get('calm_max', 20) and not (calm_ok and calm_ok.search(c['name'] or '')):
             add('⚠', 'сторінка не затихає', start['name'], f'після кліку DOM міняється далі: {storm} змін за 0,7 с (цикл перемальовувань?)', path)
@@ -279,6 +287,7 @@ def run_jobs(cfg, out_dir, baseline, max_clicks, jobs):
   q = f"паралельно {n} · " + ' | '.join(r['quiet'] for r in parts)
   return finish(cfg, out_dir, baseline, F, COV, WR, max(r['cache'] for r in parts), CST, q, parts[0]['use_cache'])
 
+POS_JS = "e => { const r = e.getBoundingClientRect(); let p = e.parentElement; while (p && !(p.scrollHeight > p.clientHeight + 4 && /auto|scroll/.test(getComputedStyle(p).overflowY))) p = p.parentElement; return r.width || r.height ? [r.top, p ? p.clientHeight : innerHeight, p ? Math.round(p.scrollTop) : Math.round(scrollY)] : null }"   # В-389 AE: де натиснутий елемент · висота його колонки · її прокрутка
 SELF_PAGE = """<!doctype html><html lang=uk><head><meta charset=utf-8><meta name=viewport content="width=device-width"><title>selftest</title></head><body>
 <h1>Тест</h1><p id=o>старт</p>
 <button id=ok onclick="o.textContent='гаразд'">Добре</button>
@@ -291,6 +300,7 @@ DEFECTS = {
   'прокрутка вбік': "<div style='width:3000px;height:10px'></div>",
   'кнопка без назви': "<button onclick=\"o.textContent='x'\"></button>",
   'зсув після кліку': "<div id=sc style='height:120px;overflow:auto'><div style='height:900px'>довгий список</div></div><button onclick=\"sc.scrollTop+=20;o.textContent='вибрано'\">Вибрати</button>",
+  'стрибок клікнутого': "<div style='height:300px;overflow:auto' id=jb><div style='height:40px'></div><button onclick=\"jb.scrollTop+=250;o.textContent='так'\">Обрати рядок</button><div style='height:1200px'></div></div>",
   'сторінка не затихає': "<button onclick=\"setInterval(()=>{o.textContent=String(Math.random())},25)\">Перейменувати</button>",
   'запис заблоковано': "<button onclick=\"fetch('/api/save',{method:'POST',body:'{}'}).catch(()=>{});o.textContent='шлю'\">Зберегти чернетку</button>",
   # S111 (тиша): дія, відкладена на 200 мс (у вікні after_click_ms), — тиша її дочікується, тож кнопка не «мертва»
