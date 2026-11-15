@@ -119,6 +119,10 @@ def selftest():
     print(('✓' if ok else '✗') + ' Stop REV-2: свіжа мітка, без таблиці й без коміту сесії → block з обома'); bad += not ok
     o = stop(S(MV + TB, s='v4'), [t], t); ok = o is None or 'REV-2' not in o
     print(('✓' if ok else '✗') + ' Stop REV-2: свіжа мітка + таблиця + кожен коміт сесії → пропускає'); bad += not ok
+    if os.path.exists(rm): os.remove(rm)   # без мітки REV-2 блокував би будь-яке «переїзд»-повідомлення — тиша доводить, що тригер не спрацював
+    ok = stop(S('💡 Переїзд коштує одного «переїжджаємо» від тебе; `переїжджаємо` у коді.', s='p7'), [t], t) is None and stop(S('Переїжджаємо.', s='p8'), [t], t) is not None
+    print(('✓' if ok else '✗') + ' Stop: «переїжджаємо» в лапках чи коді — не оголошення → тиша; без лапок → суд (хибне AE S149)'); bad += not ok
+    open(rm, 'w').close()
     for name, d, want in [('Stop: агент дає стартове, є ✗ → block', S(MV + TB), True),
                           ('Stop: звичайна відповідь → тиша', S('Готово, коміт abc.', s='p2'), False),
                           ('Stop: «переїжджає» в описі (межа G6 переїжджає в скрипт) → тиша', S('Стара межа G6 переїжджає в новий скрипт.', s='p4'), False),
@@ -262,11 +266,17 @@ def rev_gap(msg, rs):
                     + ' → кожен у таблицю (що · дім) або рядком §1 самері')
     return gaps
 
+def unquoted(t):
+    """Текст без коду й цитат (```…```, `…`, «…», "…") — там «переїжджаємо» не оголошення (хибне AE S149: 💡 «коштує одного «переїжджаємо» від тебе»)."""
+    t = re.sub(r"```.*?```", " ", t, flags=re.S); t = re.sub(r"`[^`\n]*`", " ", t)
+    for _ in range(3): t = re.sub(r"«[^«»]*»", " ", t)
+    return re.sub(r'"[^"\n]*"', " ", t)
+
 def stop(d, roots, mark_dir='/tmp'):
     """Stop: переїзд оголошує агент (стартове чи «переїжджаємо» у відповіді) — є ✗ → block, щоб виправив до кінця ходу."""
     if d.get('stop_hook_active'): return None
     msg = d.get('last_assistant_message') or ''
-    if not (STOP_TRIG.search(msg) or any(STARTER.search(b) for b in re.findall(r'```text(.*?)```', msg, re.S))): return None   # AE S139: блок text — стартове, лише коли в ньому «старт» / «самері» (промпт моделі в блоці text — не переїзд)   # AE S93 → S129: «стартове повідомлення» в реченні агента — не переїзд (хибне); переїзд — блок стартового чи «переїжджаємо»
+    if not (STOP_TRIG.search(unquoted(msg)) or any(STARTER.search(b) for b in re.findall(r'```text(.*?)```', msg, re.S))): return None   # AE S139: блок text — стартове, лише коли в ньому «старт» / «самері» (промпт моделі в блоці text — не переїзд)   # AE S93 → S129: «стартове повідомлення» в реченні агента — не переїзд (хибне); переїзд — блок стартового чи «переїжджаємо»
     rs = repos(roots)
     if not rs: return None
     gap = idea_missing(msg, rs)   # HOOK-3.3: 💡 з відповіді-переїзду не записана — блок щоразу (stop_hook_active рятує від кола)
