@@ -234,7 +234,7 @@ def check_repo(repo, now=None):
         hold = re.search(r'стоїть до:\s*(\d{2})\.(\d{2})\.(\d{4})', head)
         if hold and time.strftime('%Y%m%d') <= hold.group(3) + hold.group(2) + hold.group(1): continue
         wl = re.search(r'(?m)стежить за:\s*(.+)$', head)
-        subj = re.findall(r'`([^`:]+)`', wl.group(1)) if wl else [x for x in re.findall(r'`([^`\s:]+/[^`\s:]*|[^`\s:/]+\.[a-z]{1,5})`', k) if os.path.exists(os.path.join(repo, x.rstrip('*')))]
+        subj = re.findall(r'`([^`:]+)`', wl.group(1).split(' — ')[0]) if wl else [x for x in re.findall(r'`([^`\s:]+/[^`\s:]*|[^`\s:/]+\.[a-z]{1,5})`', k) if os.path.exists(os.path.join(repo, x.rstrip('*')))]
         hit = lambda f: not subj or any(f == x or (x.endswith('/') and f.startswith(x)) or __import__('fnmatch').fnmatch(f, x) for x in subj)
         if last:
             n = sum(1 for c in git(repo, 'log', '--format=%H', f'{last}..HEAD').split() if any(f and not f.lower().endswith(NOT_CODE) and hit(f) for f in git(repo, 'show', '--name-only', '--format=', c).split('\n'))
@@ -545,7 +545,7 @@ def selftest():
         ('бриф ядра без «§0 Коротко» → ✗, винятку kernel/ нема (BRIEF-2 крок 4)', mk(good, {'kernel/Lens_X_brief.md': '# X\n## §1 Навіщо\n'}), '✗:не за шаблоном'),
         ('бриф за шаблоном, код після нього з «бриф: без змін — …» → без «відстає»', mk(good, {'lens/X_brief.md': '# X\n## §0 Коротко\n- **Стан:** a\n- **Далі:** b\n- **Чекає Konst:** c\n'}, code_after='бриф: без змін — інший пункт'), '!відстає'),
         ('бриф за шаблоном, код після нього → ⚠ «відстає» (BRIEF-2)', mk(good, {'lens/X_brief.md': '# X\n## §0 Коротко\n- **Стан:** a\n- **Далі:** b\n- **Чекає Konst:** c\n'}, code_after=True), 'відстає'),
-        ('REV-3: «стежить за: `site/`», код лише в tools/ → без «відстає»', mk(good, {'lens/X_brief.md': '# X\n> стежить за: `site/` · `worker/*.js`\n' + '# X\n## §0 Коротко\n- **Стан:** a\n- **Далі:** b\n- **Чекає Konst:** c\n'[4:]}, code_after=True), '!відстає'),
+        ('REV-3: «стежить за: `site/` — пояснення `tools/`», код лише в tools/ → без «відстає» (шлях після « — » — не предмет)', mk(good, {'lens/X_brief.md': '# X\n> стежить за: `site/` · `worker/*.js` — пояснення, а не предмет: `tools/`\n' + '# X\n## §0 Коротко\n- **Стан:** a\n- **Далі:** b\n- **Чекає Konst:** c\n'[4:]}, code_after=True), '!відстає'),
         ('REV-3: «стежить за: `tools/`», код у tools/ → ⚠ «відстає» «його предмета» (зуб)', mk(good, {'lens/X_brief.md': '# X\n> стежить за: `tools/`\n' + '# X\n## §0 Коротко\n- **Стан:** a\n- **Далі:** b\n- **Чекає Konst:** c\n'[4:]}, code_after=True), 'відстає: 1 коміт(ів) його предмета'),
         ('REV-3: без рядка — шлях з §0 `lens/A.md`, код у tools/ → без «відстає»', mk(good, {'lens/X_brief.md': '# X\n## §0 Коротко\n- **Стан:** a · `lens/A.md`\n- **Далі:** b\n- **Чекає Konst:** c\n'}, code_after=True), '!відстає'),
         ('REV-3: «стоїть до: 31.12.2099» → тиша до дати', mk(good, {'lens/X_brief.md': '# X\n> стоїть до: 31.12.2099\n' + '# X\n## §0 Коротко\n- **Стан:** a\n- **Далі:** b\n- **Чекає Konst:** c\n'[4:]}, code_after=True), '!відстає'),
