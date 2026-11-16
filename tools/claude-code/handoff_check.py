@@ -225,10 +225,21 @@ def check_repo(repo, now=None):
         if k is None or not all(re.search(w, k) for w in ('Стан', 'Далі', 'Чекає')):
             L.append(('✗', f'бриф {rel} не за шаблоном: нема §0 «Коротко» зі Стан · Далі · Чекає → tools/claude-code/templates/BRIEF_template.md')); continue
         last = git(repo, 'log', '-1', '--format=%H', '--', rel)
+        # REV-3 (AE S151, 16.11.2026; 💡 S147 «так, з підсиленням» Konst): «відстає» — лише коміти, що зачепили ПРЕДМЕТ брифу, не будь-який код репо
+        #   (до того — 11 хибних ⚠ на кожній ревізії AE). Предмет: рядок шапки «стежить за: `шлях` · `тека/` · `ґлоб*`» → інакше шляхи в бектиках
+        #   з §0 «Коротко», що існують у репо → інакше стара логіка з підказкою «додай «стежить за»». «стоїть до: дд.мм.рррр» у шапці — бриф свідомо
+        #   стоїть: до дати мовчимо. Світ: `stale` (socket.dev/npm/package/@whenlabs/stale, 16.11.2026) — документ «відстає», коли файли, на які він
+        #   посилається, мали коміти після нього; беремо мапу «документ → свої шляхи»; поріг віку (30 дн.) не беремо — у нас свіжість комітами.
+        head = open(p, encoding='utf-8', errors='replace').read().split('\n## ', 1)[0]
+        hold = re.search(r'стоїть до:\s*(\d{2})\.(\d{2})\.(\d{4})', head)
+        if hold and time.strftime('%Y%m%d') <= hold.group(3) + hold.group(2) + hold.group(1): continue
+        wl = re.search(r'(?m)стежить за:\s*(.+)$', head)
+        subj = re.findall(r'`([^`:]+)`', wl.group(1)) if wl else [x for x in re.findall(r'`([^`\s:]+/[^`\s:]*|[^`\s:/]+\.[a-z]{1,5})`', k) if os.path.exists(os.path.join(repo, x.rstrip('*')))]
+        hit = lambda f: not subj or any(f == x or (x.endswith('/') and f.startswith(x)) or __import__('fnmatch').fnmatch(f, x) for x in subj)
         if last:
-            n = sum(1 for c in git(repo, 'log', '--format=%H', f'{last}..HEAD').split() if any(f and not f.lower().endswith(NOT_CODE) for f in git(repo, 'show', '--name-only', '--format=', c).split('\n'))
+            n = sum(1 for c in git(repo, 'log', '--format=%H', f'{last}..HEAD').split() if any(f and not f.lower().endswith(NOT_CODE) and hit(f) for f in git(repo, 'show', '--name-only', '--format=', c).split('\n'))
                     and not re.search(r'бриф\s*:', git(repo, 'log', '-1', '--format=%B', c), re.I))   # «бриф: …» у коміті — брифи розглянуто свідомо (як brief-guard); AE S94: код BRIEF-2 робив «відсталим» бриф ARCH-1
-            if n: L.append(('⚠', f'бриф {rel} відстає: {n} коміт(ів) коду після його останньої правки — §0 «Коротко» і «Кроки» ще «як є»?'))
+            if n: L.append(('⚠', f'бриф {rel} відстає: {n} коміт(ів) ' + ('його предмета' if subj else 'коду (предмет не названо — додай у шапку «стежить за: `шлях`»)') + ' після його останньої правки — §0 «Коротко» і «Кроки» ще «як є»?'))
     # (7) незбережене: контейнер скинеться — пропаде
     dirty = [x for x in subprocess.run(['git', '-C', repo, 'status', '--porcelain'], capture_output=True, text=True).stdout.split('\n') if x.strip()]
     if dirty: L.append(('✗', f'незакомічене: {len(dirty)} ({", ".join(x[3:] for x in dirty[:4])}) — коміт і push до переїзду'))
@@ -534,6 +545,11 @@ def selftest():
         ('бриф ядра без «§0 Коротко» → ✗, винятку kernel/ нема (BRIEF-2 крок 4)', mk(good, {'kernel/Lens_X_brief.md': '# X\n## §1 Навіщо\n'}), '✗:не за шаблоном'),
         ('бриф за шаблоном, код після нього з «бриф: без змін — …» → без «відстає»', mk(good, {'lens/X_brief.md': '# X\n## §0 Коротко\n- **Стан:** a\n- **Далі:** b\n- **Чекає Konst:** c\n'}, code_after='бриф: без змін — інший пункт'), '!відстає'),
         ('бриф за шаблоном, код після нього → ⚠ «відстає» (BRIEF-2)', mk(good, {'lens/X_brief.md': '# X\n## §0 Коротко\n- **Стан:** a\n- **Далі:** b\n- **Чекає Konst:** c\n'}, code_after=True), 'відстає'),
+        ('REV-3: «стежить за: `site/`», код лише в tools/ → без «відстає»', mk(good, {'lens/X_brief.md': '# X\n> стежить за: `site/` · `worker/*.js`\n' + '# X\n## §0 Коротко\n- **Стан:** a\n- **Далі:** b\n- **Чекає Konst:** c\n'[4:]}, code_after=True), '!відстає'),
+        ('REV-3: «стежить за: `tools/`», код у tools/ → ⚠ «відстає» «його предмета» (зуб)', mk(good, {'lens/X_brief.md': '# X\n> стежить за: `tools/`\n' + '# X\n## §0 Коротко\n- **Стан:** a\n- **Далі:** b\n- **Чекає Konst:** c\n'[4:]}, code_after=True), 'відстає: 1 коміт(ів) його предмета'),
+        ('REV-3: без рядка — шлях з §0 `lens/A.md`, код у tools/ → без «відстає»', mk(good, {'lens/X_brief.md': '# X\n## §0 Коротко\n- **Стан:** a · `lens/A.md`\n- **Далі:** b\n- **Чекає Konst:** c\n'}, code_after=True), '!відстає'),
+        ('REV-3: «стоїть до: 31.12.2099» → тиша до дати', mk(good, {'lens/X_brief.md': '# X\n> стоїть до: 31.12.2099\n' + '# X\n## §0 Коротко\n- **Стан:** a\n- **Далі:** b\n- **Чекає Konst:** c\n'[4:]}, code_after=True), '!відстає'),
+        ('REV-3: «стоїть до: 01.01.2020» (минуло) → ⚠ «відстає» (зуб)', mk(good, {'lens/X_brief.md': '# X\n> стоїть до: 01.01.2020\n' + '# X\n## §0 Коротко\n- **Стан:** a\n- **Далі:** b\n- **Чекає Konst:** c\n'[4:]}, code_after=True), 'відстає'),
         ('бриф за шаблоном, після нього лише коміт даних (.json · фото) → без «відстає» (AE S120)', mk(good, {'lens/X_brief.md': '# X\n## §0 Коротко\n- **Стан:** a\n- **Далі:** b\n- **Чекає Konst:** c\n'}, data_after=True), '!відстає'),
         ('не-Lens: самері без стартового → ✗', mk_nl(good_nl.split('## §6')[0]), 'стартове повідомлення нема'),
         ('гілка: коміт коду названо в самері main → не відстає (AE S145, В-370)', mk_br(True), '!самері відстає'),
