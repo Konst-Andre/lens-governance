@@ -5,7 +5,7 @@
 # (git commit / gh_commit / push_files / create_or_update_file) → {"decision":"block"} з причиною: агент продовжує й записує або пояснює, чому нічого.
 # Один раз на хід: stop_hook_active = true (агент уже продовжує через гачок) → тиша. Помилка розбору → тиша (гачок не ламає роботу).
 # Формат — code.claude.com/docs/en/hooks «Stop» (stop_hook_active, transcript_path; decision/reason), 08.10.2026.
-# Зуби: bash memory-guard.sh selftest — 21 випадок (S106: + стартове з «СТАРТ:» першим → тиша · рішення другим повідомленням → block; S105: + переказ «Konst: поки ні» у стартовому → тиша · «Ні, …» поруч → block) (рішення без коміту → block; з комітом · без рішень · повтор · «так» усередині слова · сповіщення системи → тиша;
+# Зуби: bash memory-guard.sh selftest — 22 випадки (S151: + коміт з нового рядка після heredoc → тиша; S106: + стартове з «СТАРТ:» першим → тиша · рішення другим повідомленням → block; S105: + переказ «Konst: поки ні» у стартовому → тиша · «Ні, …» поруч → block) (рішення без коміту → block; з комітом · без рішень · повтор · «так» усередині слова · сповіщення системи → тиша;
 # примірка: варіант названо, рядок «примірка» → block · рядок уже «обрано» · «беру в роботу» · «варіант А …» описом → тиша · «Варіант Б» коротко → block).
 mode="${1:-stop}"
 [ "$mode" = selftest ] && HOOK_IN="{}" || HOOK_IN="$(cat)"
@@ -86,10 +86,12 @@ def verdict(d):
     u = re.sub(r"(?<![\w'’])Konst(\s+S\d+)?\s*:\s*[^.;\n)]{0,60}", " ", u)
     cues = sorted({m.group(1).lower() for m in CUE.finditer(re.sub(r"«[^»\n]{0,40}»", " ", u))})
     if not cues: return None
+    # AE S151 (16.11.2026, хибне): у JSON перенос — два знаки «\\n», і «EOF\\ngit commit» після heredoc не давав межі слова перед git → коміт не видно;
+    #   перенос повертаємо справжнім до пошуку (зуб — «коміт з нового рядка після heredoc → тиша»)
     for x in L[idx[-1] + 1:]:
         if x.get('type') != 'assistant': continue
         for i in (x.get('message') or {}).get('content') or []:
-            if isinstance(i, dict) and i.get('type') == 'tool_use' and COMMIT.search(json.dumps(i.get('input') or {}, ensure_ascii=False) + ' ' + str(i.get('name'))):
+            if isinstance(i, dict) and i.get('type') == 'tool_use' and COMMIT.search(json.dumps(i.get('input') or {}, ensure_ascii=False).replace('\\n', '\n') + ' ' + str(i.get('name'))):
                 return None
     return ("Гачок пам'яті (HOOK-3): в останньому повідомленні Konst є слова-рішення (" + ', '.join(cues[:6]) + "), а в цьому ході не було коміту. "
             "Профіль Konst: факт, рішення чи домовленість із чату — у репо в тому ж ході (самері §0/§1, черга, дім знання) → коміт → рядок «пам'ять: <коміт>». "
@@ -105,6 +107,7 @@ def selftest():
     R = {'type': 'user', 'message': {'content': [{'type': 'tool_result', 'content': 'ok'}]}}
     cases = [('рішення без коміту → block', [U('Так, згоден, прод не захищаємо'), A('ls'), R], False, True),
              ('рішення з комітом → тиша', [U('Дозволяю, поїхали'), A('cd x && git add -A && git commit -qm t'), R], False, False),
+             ('коміт з нового рядка після heredoc → тиша (хибне AE S151)', [U('Пропозицію приймаю'), A("python3 - <<'EOF'\nprint(1)\nEOF\ngit commit -qam t"), R], False, False),
              ('без слів-рішень → тиша', [U('Що там зі збіркою?'), A('ls'), R], False, False),
              ('повтор (stop_hook_active) → тиша', [U('Так, згоден'), A('ls'), R], True, False),
              ('«так» усередині слова не рахується → тиша', [U('Таким чином дивлюсь'), A('ls')], False, False),
