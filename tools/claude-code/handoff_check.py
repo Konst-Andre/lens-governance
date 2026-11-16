@@ -70,7 +70,8 @@ def repo_dir(repo, name):
     if os.path.basename(os.path.abspath(repo)).lower() == name.lower(): return repo
     for c in os.listdir(base):
         if c.lower() == name.lower() and os.path.isdir(os.path.join(base, c)): return os.path.join(base, c)
-    if name.lower() in KERNEL_NAMES and os.path.isdir('/tmp/lens-governance'): return '/tmp/lens-governance'
+    t = os.environ.get('LENS_KERNEL_TMP', '/tmp/lens-governance')   # AE S150: selftest вимикає — інакше фікстура продукту брала справжній клон env_check і ганяла Lens_validate (✗ Р-9 «усе гаразд»)
+    if name.lower() in KERNEL_NAMES and os.path.isdir(t): return t
     return None
 
 
@@ -449,6 +450,7 @@ NOT_CODE = ('.md', '.json', '.webp', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.
 
 
 def selftest():
+    os.environ['LENS_KERNEL_TMP'] = os.path.join(tempfile.gettempdir(), 'hc-no-kernel-clone')   # фікстури не бачать /tmp/lens-governance контейнера
     def sh(d, *c): subprocess.run(c, cwd=d, check=True, capture_output=True)
     def mk(summary, extra=None, commit_after=False, new_after=False, both=False, dirty=False, code_after=False, data_after=False):
         d = tempfile.mkdtemp(prefix='hc-'); r = os.path.join(d, 'Prod'); os.makedirs(os.path.join(r, 'sessions')); os.makedirs(os.path.join(r, 'lens'))

@@ -77,6 +77,7 @@ def record_once(sc, out, attempt=0):
                     "-fps_mode", "vfr", str(fr / "%04d.png")], check=True, capture_output=True, text=True)
     frames = sorted(glob.glob(str(fr / "*.png")))
     pts = [float(x) for x in re.findall(r"pts_time:([0-9.]+)", pr.stderr)][:len(frames)]
+    pts_all = pts   # лік кадрів (n) — за всіма кадрами; «голодний» selftest проріджує лише кроки
     if attempt < sc.get("_starve", 0): pts = pts[::40]   # лише selftest: «голодний» запис — кожен 40-й кадр (≈ 0–1 на крок)
     dur = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(mp4)], capture_output=True, text=True).stdout.strip() or 0)
     if frames:
@@ -92,7 +93,10 @@ def record_once(sc, out, attempt=0):
             sheet.paste(im.resize((tw, th)), (x0, y0)); d = ImageDraw.Draw(sheet)
             d.rectangle([x0, y0 + th, x0 + tw - 1, y0 + th + BAND - 1], fill="#222"); d.text((x0 + 6, y0 + th + 3), f"{k + 1}/{len(ims)} · {lab}", fill="white")
         sheet.save(out / f"{name}_frames.webp", "WEBP", quality=80)
-    n = len(frames); mn = sc.get("min_frames", 3); jumps = []
+    # AE S150 (FAB-2 Ж7): кадри ДО першого кроку — завантаження й перше малювання сторінки, не рух від дії; під навантаженням їх 2–5 →
+    # статична сторінка давала хибний ✓ (2 з 20 прогонів selftest). Є кроки — лічимо від першого (смуга кадрів показує все, як і раніше).
+    t_from = marks[0][0] - 0.05 if marks else -1
+    n = sum(1 for t in pts_all if t >= t_from) if marks else len(frames); mn = sc.get("min_frames", 3); jumps = []
     for k, (a, b, s) in enumerate(marks):
         c = sum(1 for t in pts if a - 0.05 <= t <= (b or a) + 0.15)
         if s.get("motion") and c < 3: jumps.append(f"крок {k + 1}: {c} кадр(ів) — стрибок, не рух")

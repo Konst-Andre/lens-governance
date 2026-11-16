@@ -64,6 +64,15 @@ def points(out, frac):
     return v if v or not frac else frac[-1][1]
 
 
+def tenv():
+    """Середовище тесту: без кола bg (LENS_NO_SELFTEST) і без підпису комітів у фікстурах (AE S150: глобальний commit.gpgsign=true
+    контейнера + недоступний сервер підпису → git commit у тимчасовому репо — вихід 128, selftest-и handoff_check і promise-guard ✗
+    не з власної вини). GIT_CONFIG_COUNT — git-scm.com/docs/git-config «ENVIRONMENT», додаємо пару, а не перетираємо наявні."""
+    e = dict(os.environ, LENS_NO_SELFTEST='1'); n = int(e.get('GIT_CONFIG_COUNT') or 0)
+    e.update({'GIT_CONFIG_COUNT': str(n + 1), f'GIT_CONFIG_KEY_{n}': 'commit.gpgsign', f'GIT_CONFIG_VALUE_{n}': 'false'})
+    return e
+
+
 def run_one(f, timeout=TIMEOUT):
     n = os.path.basename(f)
     modes = SPECIAL.get(n, ['selftest'])
@@ -71,7 +80,7 @@ def run_one(f, timeout=TIMEOUT):
         cmd = (['python3', f, m] if f.endswith('.py') else ['bash', f, m])
         try:
             r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, cwd=os.path.dirname(f), stdin=subprocess.DEVNULL,
-                               env=dict(os.environ, LENS_NO_SELFTEST='1'))   # start-test кличе SessionStart → без цього bg ганяв би сам себе по колу
+                               env=tenv())   # start-test кличе SessionStart → без цього bg ганяв би сам себе по колу
         except subprocess.TimeoutExpired:
             return False, f'{n} {m}: не встиг за {timeout} с'
         out = (r.stdout + r.stderr).strip().splitlines()
@@ -121,7 +130,7 @@ def main(a):
         for f in files:
             for m in SPECIAL.get(os.path.basename(f), ['selftest']):
                 r = subprocess.run((['python3', f, m] if f.endswith('.py') else ['bash', f, m]), capture_output=True, text=True, timeout=TIMEOUT,
-                                   cwd=os.path.dirname(f), stdin=subprocess.DEVNULL, env=dict(os.environ, LENS_NO_SELFTEST='1'))
+                                   cwd=os.path.dirname(f), stdin=subprocess.DEVNULL, env=tenv())
                 o = (r.stdout + r.stderr).strip().splitlines()
                 c[f'{os.path.basename(f)} {m}'] = points(o, [(int(x), int(y)) for x, y in re.findall(r'(\d+)\s*/\s*(\d+)', '\n'.join(o[-3:]))])
         print(json.dumps(dict(sorted(c.items())), ensure_ascii=False, indent=1)); return 0
