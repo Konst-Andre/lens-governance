@@ -50,7 +50,11 @@ def record_once(sc, out, attempt=0):
         pg = ctx.new_page(); errs = []; pg.on("pageerror", lambda e: errs.append(str(e)[:160]))
         for js in sc.get("init", []): pg.add_init_script(js)
         pg.goto(sc["url"])
-        if sc.get("ready"): pg.wait_for_function(sc["ready"], timeout=30000)
+        if sc.get("ready"):   # опитування evaluate, не wait_for_function: та виконує умову через eval, а CSP проду (без 'unsafe-eval') його ріже (AE S152, прев'ю воркера)
+            end = time.monotonic() + 30
+            while not pg.evaluate(f"() => {{ try {{ return !!({sc['ready']}); }} catch (_) {{ return false; }} }}"):
+                if time.monotonic() > end: raise TimeoutError(f"ready за 30 с не настав: {sc['ready'][:80]}")
+                pg.wait_for_timeout(100)
         pg.wait_for_timeout(sc.get("settle", 600))
         for s in sc.get("steps", []):
             marks.append([time.monotonic() - t0, None, s])
@@ -128,16 +132,21 @@ def selftest():
     r3 = record({"viewport": [640, 360], "steps": four, "url": (tmp / "jump.html").as_uri(), "name": "jump"}, tmp / "out")
     r4 = record({"viewport": [640, 360], "steps": four, "url": (tmp / "move.html").as_uri(), "name": "move4"}, tmp / "out")
     r5 = record({"viewport": [640, 360], "steps": four, "url": (tmp / "move.html").as_uri(), "name": "move4s", "_starve": 1}, tmp / "out") and LAST_K[0] == 1
+    (tmp / "csp.html").write_text("<!doctype html><meta http-equiv=\"Content-Security-Policy\" content=\"script-src 'self' 'unsafe-inline'\">"
+                                  + (tmp / "move.html").read_text(encoding="utf-8") + "<script>setTimeout(() => { window.__ok = true; }, 300)</script>", encoding="utf-8")
+    try: r6 = record({**base, "url": (tmp / "csp.html").as_uri(), "name": "csp", "ready": "window.__ok === true"}, tmp / "out")
+    except Exception as e: r6 = False; print("  csp:", str(e)[:120])
     for ok, m in [(r1 and (tmp / "out/move.mp4").stat().st_size > 1000 and (tmp / "out/move_frames.webp").exists(), "сторінка з рухом → MP4 + смуга кадрів"),
                   (not r2, "зуби: сторінка без руху → ✗ «руху не видно»"),
                   (not r3, "зуби: 4 миттєві перемикання на кроках з «motion» → ✗ «стрибок, не рух» (без мітки було ✓)"),
                   (r4, "ті самі 4 кроки з переходом 0,8 с → ✓"),
+                  (r6, "сторінка з CSP без 'unsafe-eval' (як прод воркера) + ready → кліп пишеться (AE S152)"),
                   (r5, "голодний перший запис (кожен 40-й кадр) → ⚠ «замало кадрів» і повтор → ✓ (AE S148)"),
                   (crop_bad({"crop": [0, 0, 320, 360]}, 640, 360) is not None, "зуби: кроп половини екрана без crop_why → ✗ (AE S146)"),
                   (crop_bad({"crop": [0, 0, 320, 360], "crop_why": "рух лише в кнопці, решта екрана статична"}, 640, 360) is None, "кроп з причиною → дозволено"),
                   (crop_bad({"crop": [0, 0, 640, 360]}, 640, 360) is None, "кроп = увесь екран → дозволено")]:
         print(("✓ " if ok else "✗ ") + m); bad += not ok
-    print(f"─── clip selftest: {8 - bad}/8 ───"); sys.exit(1 if bad else 0)
+    print(f"─── clip selftest: {9 - bad}/9 ───"); sys.exit(1 if bad else 0)
 
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "selftest": selftest()
