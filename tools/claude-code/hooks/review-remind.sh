@@ -11,7 +11,10 @@
 # Формат — hookSpecificOutput.additionalContext (code.claude.com/docs/en/hooks, 08.10.2026): текст — фактами, не наказами.
 mode="$1"
 if [ "$mode" = selftest ]; then   # stand: адреса з «stand» усередині слова — тиша; .html стенда чи компера — нагадування (хибне QR CC-8)
-  ok=0; n=0
+  # AE S151 (плаваючий 1 з ~10): позначки тесту жили в /tmp з pid у імені й не прибирались; pid повторюється (pid_max 32768, фоновий прогін стартує біля тих самих
+  # номерів — 2804 шість разів) → стара позначка «маніфест читано» глушила випадок 2. Тепер позначки тесту — у своїй теці, а «сміття» в /tmp підкладено навмисно (зуб).
+  td="$(mktemp -d)"; export RR_TMP="$td"; [ "${RR_INJECT:-}" = 1 ] && RR_TMP=/tmp   # зуб: позначки знову в /tmp → випадок 2 ✗
+  ok=0; n=0; junk="/tmp/lens-stand-selftest2$$"; touch "$junk"
   for c in "0|curl -s https://qr-lens.konstandre.workers.dev/ | grep -o 'x[^>]*'; grep a tools/QR_Lens_zvit_template.html" \
            "1|cat a > kernel/stage/AE_stand_v3.html" "1|cp x tools/compare_v2.htm" "0|echo hi > notes.md" \
            "0|cat > docs/CHERGA.md <<X
@@ -31,7 +34,7 @@ X"; do
     got=$(python3 -c 'import json,sys; print(json.dumps({"session_id":"selftest%s" % sys.argv[2],"tool_name":"Bash","tool_input":{"command":sys.argv[1]}}))' "$cmd" "$n$$" | bash "$0" stand | grep -c 'Пункти: 1)')
     [ "$got" = "$want" ] && ok=$((ok+1)) || echo "✗ видача: «$cmd» → $got, очікував $want"
   done
-  rm -rf "$sb" "$ot"
+  rm -rf "$sb" "$ot" "$td"; rm -f "$junk"
   echo "review-remind selftest: $ok/$n"; [ "$ok" = "$n" ]; exit
 fi
 export RR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -42,7 +45,8 @@ d = json.load(sys.stdin)
 sid = re.sub(r"[^A-Za-z0-9_-]", "", str(d.get("session_id") or "nosession"))
 ti = d.get("tool_input") or {}
 raw = json.dumps(ti, ensure_ascii=False)
-seen = f"/tmp/lens-stand-{sid}"
+TMP = os.environ.get("RR_TMP") or "/tmp"   # позначки гачка; selftest — своя тека (AE S151)
+seen = f"{TMP}/lens-stand-{sid}"
 def say(event, text):
     print(json.dumps({"hookSpecificOutput": {"hookEventName": event, "additionalContext": text}}, ensure_ascii=False))
 if mode == "post":
@@ -58,7 +62,7 @@ if mode == "post":
         g = lambda *a: subprocess.run(["git", "-C", repo, *a], capture_output=True, text=True).stdout.strip()
         sha, when = g("log", "-1", "--format=%h"), g("log", "-1", "--format=%ct")
         if not sha or not when or time.time() - int(when) > 120: continue          # коміту не було («nothing to commit») — HEAD старий
-        mark = f"/tmp/lens-review-{sid}-{sha}"
+        mark = f"{TMP}/lens-review-{sid}-{sha}"
         if os.path.exists(mark): continue
         # видалення в shots/ (прийнята примірка прибирається, SHOTS.md) — не UI-правка, як і у воротах ui-review-gate (хибне AE S95: 12 файлів fit_*.css);
         # статус розбирається в коді з --name-status (практика libcamera checkstyle), не --diff-filter
@@ -90,7 +94,7 @@ elif mode == "stand":
         url = subprocess.run(["git", "-C", repo, "remote", "get-url", "origin"], capture_output=True, text=True).stdout.strip()
         if not re.search(r"/sandbox(\.git)?$", url): continue
         sha = subprocess.run(["git", "-C", repo, "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
-        mark = f"/tmp/lens-issue-{sid}-{sha}"
+        mark = f"{TMP}/lens-issue-{sid}-{sha}"
         if os.path.exists(mark): sys.exit(0)
         open(mark, "w").close()
         man = os.path.join(os.environ.get("RR_DIR", "."), "..", "..", "..", "kernel", "Lens_stagebench_manifest.md")

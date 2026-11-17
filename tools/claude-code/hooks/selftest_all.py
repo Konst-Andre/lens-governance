@@ -149,16 +149,19 @@ def main(a):
     if a[0] == 'report':
         try: t = open(log_path(), encoding='utf-8').read().splitlines()
         except OSError: return 0
-        when = os.path.getmtime(log_path())
+        when = os.path.getmtime(log_path()); new, changed = [t[0]], False
         for l in t[1:]:
-            if l.startswith('⚠'): print(l); continue
-            if not l.startswith('✗'): continue
+            if not l.startswith('✗'): new.append(l); l.startswith('⚠') and print(l); continue
             n = l[2:].split(' ', 1)[0].rstrip(':'); f = next((os.path.join(d, n) for d in (HERE, TOOLS) if os.path.isfile(os.path.join(d, n))), None)
-            if f and os.path.getmtime(f) > when and has_test(f):   # файл змінено після прогону — старий ✗ не вірити, перевірити заново (AE S143: ✗ від навмисно зламаного plan-web)
-                ok, msg = run_one(f)
-                if ok: continue
+            if f and has_test(f):   # старий ✗ не вірити — перепрогнати раз (AE S143: файл змінено після прогону; AE S151: held зупинив /compact ✗ зі старого логу плаваючого тесту)
+                ok, msg = run_one(f); changed = True
+                if ok and os.path.getmtime(f) > when: continue   # виправлено після прогону — тиша
+                if ok: l = f'⚠ {n}: плаваючий — у журналі прогону ✗, перепрогін ✓; знайти причину ({l[2:][:120]})'; new.append(l); print(l); continue
                 l = '✗ ' + msg
-            print(l)
+            new.append(l); print(l)
+        if changed:   # журнал — уже з вердиктом перепрогону: наступний report (кожен handoff_check, сторож /compact) не ганяє тест знову
+            try: open(log_path(), 'w', encoding='utf-8').write('\n'.join(new) + '\n'); os.utime(log_path(), (when, when))
+            except OSError: pass
         return 0
     if a[0] == 'selftest':
         return selftest()
@@ -197,6 +200,18 @@ def selftest():
         with contextlib.redirect_stdout(buf): main(['report'])
     finally: HERE, TOOLS = old, ot
     cases.append(('report: файл виправлено після прогону → перевірено заново, старий ✗ зник', buf.getvalue().strip() == ''))
+    # AE S151: held зупинив /compact ✗ зі старого журналу, а тест плаваючий — тепер report перепроганяє ✗ раз і незмінений файл → ⚠, не ✗; журнал переписано
+    W(os.environ['LENS_SELFTEST_LOG'], 'selftest …\n✗ green.sh selftest: вихід 1 · старий збій\n'); os.utime(os.environ['LENS_SELFTEST_LOG'], (time.time() + 60,) * 2)
+    HERE, TOOLS = h, h
+    try:
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf): main(['report'])
+        buf2 = io.StringIO()
+        with contextlib.redirect_stdout(buf2): main(['report'])
+    finally: HERE, TOOLS = old, ot
+    lg = open(os.environ['LENS_SELFTEST_LOG'], encoding='utf-8').read()
+    cases.append(('report: ✗ зі старого журналу, перепрогін ✓ → ⚠ «плаваючий», не ✗; журнал переписано — вдруге не ганяє',
+                  buf.getvalue().startswith('⚠ green.sh: плаваючий') and not any(x.startswith('✗') for x in buf.getvalue().splitlines() + lg.splitlines()) and buf2.getvalue() == buf.getvalue()))
     # В-377 В: число ✓ проти очікуваного; зуб — `#` посеред рядка тесту з'їдає пункт, вихід 0 і без «N/M»
     cnt = os.path.join(h, 'three.sh'); W(cnt, '[ "$1" = selftest ] || exit 0\necho "✓ один"\necho "✓ два"\ntrue && echo "✓ три"\n')
     global COUNTS; oc = COUNTS; COUNTS = os.path.join(d, 'counts.json'); W(COUNTS, '{"three.sh selftest": 3}')

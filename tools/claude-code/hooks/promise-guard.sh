@@ -250,7 +250,10 @@ def selftest_claim():
     now = int(time.time()); old_d = f'@{now - 1000} +0000'
     sh('git config user.email a@b; git config user.name t; printf "a\\nb\\nc\\n" > f.txt; git add f.txt; git commit -qm old', GIT_COMMITTER_DATE=old_d, GIT_AUTHOR_DATE=old_d)
     old = sh('git rev-parse --short HEAD')
-    sh('echo 2 >> f.txt; git commit -qam new; git push -q -u origin HEAD'); new = sh('git rev-parse --short HEAD')
+    for _ in range(40):   # AE S151 (плаваючий ≈ 4 %): голий хеш впізнається лише з літерою й цифрою (ANYHASH) — хеш із самих цифр валив випадок «✅ … голим словом»
+        sh('echo 2 >> f.txt; git commit -qam new'); new = sh('git rev-parse --short HEAD')
+        if ANYHASH.fullmatch(new): break
+    sh('git push -q -u origin HEAD')
     tp = os.path.join(T, 't.jsonl'); iso = lambda x: time.strftime('%Y-%m-%dT%H:%M:%S.000Z', time.gmtime(x))
     with open(tp, 'w') as f:
         f.write(json.dumps({'type': 'user', 'timestamp': iso(now - 100), 'message': {'content': 'Konst: роби'}}) + '\n')
@@ -262,6 +265,7 @@ def selftest_claim():
         v = fn(D(msg, **k)); got = v[0] if v else None
         cases.append((name + ('' if got == want else f' (вийшло: {got})'), got == want))
     C, M = claim_verdict, mem_verdict
+    cases.append(('фікстура: новий хеш — з літерою й цифрою (хеш із самих цифр голим не впізнати — плаваючий AE S151)', bool(ANYHASH.fullmatch(new))))
     c('claim: дії нема, хешу нема → тиша', C, 'План: зроблю наступним ходом.', None)
     cases.append(('claim: хеш із самих цифр у бектиках впізнано, голе число — ні (плаваючий selftest S147)', hashes('`1234567` · 7654321 · abc1234') == ['1234567', 'abc1234']))
     c('claim: «записав» без хешу → claim-no-hash', C, 'Записав у бриф.', 'claim-no-hash')
