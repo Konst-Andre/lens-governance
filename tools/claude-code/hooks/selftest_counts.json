@@ -1,6 +1,6 @@
 {
  "brief-guard.sh selftest": 12,
- "clip.py selftest": 11,
+ "clip.py selftest": 13,
  "commit-gate.sh selftest": 5,
  "commit_files.py selftest": 33,
  "ctx_watch.py selftest": 39,
@@ -24,7 +24,7 @@
  "review-remind.sh selftest": 9,
  "route-remind.sh selftest": 9,
  "rules-guard.py selftest": 15,
- "shots_check.py selftest": 11,
+ "shots_check.py selftest": 16,
  "shots_same.py selftest": 3,
  "ui-guard.sh selftest": 32,
  "ui-review-gate.sh selftest": 34,
