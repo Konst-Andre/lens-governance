@@ -240,6 +240,32 @@ def check_repo(repo, now=None):
             n = sum(1 for c in git(repo, 'log', '--format=%H', f'{last}..HEAD').split() if any(f and not f.lower().endswith(NOT_CODE) and hit(f) for f in git(repo, 'show', '--name-only', '--format=', c).split('\n'))
                     and not re.search(r'бриф\s*:', git(repo, 'log', '-1', '--format=%B', c), re.I))   # «бриф: …» у коміті — брифи розглянуто свідомо (як brief-guard); AE S94: код BRIEF-2 робив «відсталим» бриф ARCH-1
             if n: L.append(('⚠', f'бриф {rel} відстає: {n} коміт(ів) ' + ('його предмета' if subj else 'коду (предмет не названо — додай у шапку «стежить за: `шлях`»)') + ' після його останньої правки — §0 «Коротко» і «Кроки» ще «як є»?'))
+    # (10) черга ≡ брифи (Konst AE S151, 17.11.2026: «для кожного пункту черги вкажемо посилання на бриф… щоб такого більше не траплялося»).
+    #      Урок: бриф AE-AI жив без свого пункту — шлях до нього стояв лише в чужих рядках (AE-SCN, «Відкладено»), і маршрут його не побачив.
+    #      (а) бриф-сирота: id живого брифу (`<id>_brief.md`, у ядрі `Lens_<id>_brief.md`) не стоїть у першій клітинці рядка «Відкрите»
+    #          і не є пунктом «Відкладено» (пункт починається з `id` або несе «бриф `шлях`») → ⚠; згадка шляху в чужому рядку — не власник;
+    #      (б) рядок «Відкрите» без шляху до брифу (`…_brief.md`) → ⚠; «бриф не треба» — вже не відповідь (те саме слово Konst).
+    if qf:
+        qfull = open(qf[0], encoding='utf-8').read()
+        def part(head):
+            i = qfull.find(head)
+            if i < 0: return ''
+            j = qfull.find('\n## ', i + 1); return qfull[i:j if j > 0 else len(qfull)]
+        op, dfr = part('## Відкрите'), part('## Відкладено')
+        first = [m.group(1) for m in re.finditer(r'(?m)^\|([^|]*)\|', op)]
+        own_open = set(re.findall(r'`([^`]+)`', ' '.join(first)))
+        items = [l for l in dfr.splitlines() if l.startswith('- ')]
+        orphan = []
+        for b in sorted(glob.glob(os.path.join(repo, '**', '*_brief.md'), recursive=True)):
+            rel = os.path.relpath(b, repo).replace(os.sep, '/')
+            if rel.startswith('archive/') or '/archive/' in rel or 'templates/' in rel: continue
+            bid = re.sub(r'^Lens_', '', os.path.basename(b)[:-len('_brief.md')])
+            if bid in own_open: continue
+            if any(re.match(r'^- \*{0,2}`' + re.escape(bid) + '`', l) or re.search(r'бриф\s+`[^`]*' + re.escape(os.path.basename(b)) + '`', l) for l in items): continue
+            orphan.append(rel)
+        if orphan: L.append(('⚠', 'бриф-сирота — живий бриф без свого пункту черги (рядок «Відкрите» з його id у першій клітинці або пункт «Відкладено»): ' + ' · '.join(orphan[:6]) + ' → рядок черги, або бриф закрито → archive/'))
+        nob = [m.group(1) for l in op.splitlines() for m in [re.match(r'^\|\s*\*{0,2}`([^`]+)`', l)] if m and not re.search(r'_brief\.md', l)]
+        if nob: L.append(('⚠', 'рядок черги без брифу — шлях `…_brief.md` у рядку (Konst S151: бриф на кожен пункт): ' + ' · '.join(nob[:6]) + ' → tools/claude-code/templates/BRIEF_template.md'))
     # (7) незбережене: контейнер скинеться — пропаде
     dirty = [x for x in subprocess.run(['git', '-C', repo, 'status', '--porcelain'], capture_output=True, text=True).stdout.split('\n') if x.strip()]
     if dirty: L.append(('✗', f'незакомічене: {len(dirty)} ({", ".join(x[3:] for x in dirty[:4])}) — коміт і push до переїзду'))
@@ -491,13 +517,18 @@ def selftest():
         if commit_after:
             open(os.path.join(r, 'lens/A.md'), 'a').write('y'); sh(r, 'git', 'commit', '-qam', 'код\n\nClaude-Session: https://claude.ai/code/session_T')
         return r
-    def mk_nl(summary, q='## Відкрите\n| `AE-W` | x | 18.10.2026 | y |\n'):   # не-Lens каркас (AE): самері docs/summary/<P>_SUMMARY_<дата>.md, черга docs/CHERGA.md
+    def mk_nl(summary, q='## Відкрите\n| `AE-W` | x — бриф `docs/briefs/AE-W_brief.md` | 18.10.2026 | y |\n'):   # не-Lens каркас (AE): самері docs/summary/<P>_SUMMARY_<дата>.md, черга docs/CHERGA.md
         d = tempfile.mkdtemp(prefix='hc-'); r = os.path.join(d, 'Prod'); os.makedirs(os.path.join(r, 'docs/summary'))
         sh(r, 'git', 'init', '-q'); sh(r, 'git', 'config', 'user.email', 't@t'); sh(r, 'git', 'config', 'user.name', 't')
         open(os.path.join(r, 'docs/CHERGA.md'), 'w').write(q); open(os.path.join(r, 'CLAUDE.md'), 'w').write('x')
         open(os.path.join(r, 'docs/summary/P_SUMMARY_2026-10-18.md'), 'w').write(summary)
         sh(r, 'git', 'add', '-A'); sh(r, 'git', 'commit', '-qm', 'самері\n\nClaude-Session: https://claude.ai/code/session_T')
         return r
+    Q10 = '## Відкрите\n| `AE-W` | x — бриф `docs/briefs/AE-W_brief.md` | 18.10.2026 | y |\n'
+    def mk_q(q):   # (10): не-Lens каркас + бриф AE-X за шаблоном
+        r = mk_nl(good_nl, q); os.makedirs(os.path.join(r, 'docs/briefs'))
+        open(os.path.join(r, 'docs/briefs/AE-X_brief.md'), 'w').write('# X\n## §0 Коротко\n- **Стан:** a\n- **Далі:** b\n- **Чекає Konst:** c\n')
+        sh(r, 'git', 'add', '-A'); sh(r, 'git', 'commit', '-qm', 'бриф\n\nClaude-Session: https://claude.ai/code/session_T'); return r
     def mk_br(named, new=False):   # AE S145 (В-370): самері — у main, код — на гілці claude/x; коміт гілки названо (чи ні) у самері main; new — у новому самері main (`_s2`, AE S146)
         r = mk_nl(good_nl); sh(r, 'git', 'branch', '-M', 'main'); sh(r, 'git', 'checkout', '-qb', 'claude/x')
         open(os.path.join(r, 'code.txt'), 'w').write('1'); sh(r, 'git', 'add', '-A'); sh(r, 'git', 'commit', '-qm', 'код\n\nClaude-Session: https://claude.ai/code/session_T')
@@ -556,6 +587,13 @@ def selftest():
         ('гілка: коміт коду НЕ названо в самері main → ✗ відстає (зуб)', mk_br(False), 'самері відстає'),
         ('гілка: коміт коду названо в НОВОМУ самері main (`_s2`), на гілці — старе → не відстає (AE S146, хибне ✗ блокувало /compact)', mk_br(True, True), '!самері відстає'),
         ('ядро: коміт сесії продукту в sessions/FAB-1/, самері — sessions/Lens_gov/ → ⓘ, не ✗ «відстає» (хибне AE S139)', mk_k(), '!самері відстає'),
+        # (10) черга ≡ брифи (AE S151): фікстура — черга + бриф docs/briefs/AE-X_brief.md за шаблоном
+        ('(10) бриф без свого рядка, шлях лише в чужому рядку → ⚠ бриф-сирота (зуб, урок AE-AI)', mk_q(Q10 + '| `AE-W` | x, див. `docs/briefs/AE-X_brief.md` | 18.10.2026 | y |\n'), 'бриф-сирота'),
+        ('(10) id брифу в першій клітинці рядка «Відкрите» → без «сирота»', mk_q(Q10 + '| `AE-W` · `AE-X` | x | 18.10.2026 | y |\n'), '!бриф-сирота'),
+        ('(10) пункт «Відкладено» з «бриф `шлях`» → без «сирота»', mk_q(Q10 + '\n## Відкладено свідомо\n- **довідник** — бриф `docs/briefs/AE-X_brief.md`\n'), '!бриф-сирота'),
+        ('(10) «Відкладено» лише згадує шлях (без «бриф») → ⚠ бриф-сирота (зуб)', mk_q(Q10 + '\n## Відкладено свідомо\n- **щось** (крок 1, `docs/briefs/AE-X_brief.md`)\n'), 'бриф-сирота'),
+        ('(10) рядок «Відкрите» без шляху брифу, навіть з «бриф не треба» → ⚠ без брифу (зуб)', mk_nl(good_nl, '## Відкрите\n| `AE-W` | *(бриф не треба)* x | 18.10.2026 | y |\n'), 'рядок черги без брифу'),
+        ('(10) рядок «Відкрите» зі шляхом брифу → без «без брифу»', mk_nl(good_nl), '!рядок черги без брифу'),
     ]
     bad = 0
     for name, r, want in cases:
