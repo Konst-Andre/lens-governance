@@ -4,7 +4,8 @@
 #   python3 shots_check.py <тека репо>            — рядок «примірка: …» (теки нема — тиша, exit 0)
 #   python3 shots_check.py <тека репо> --inject   — підкидає знімок без рядка → мусить дати ✗ (зуби)
 #   python3 shots_check.py selftest               — випадки в тимчасових теках
-# ✗ знімок без рядка README · жива примірка без знімків · файли після «прийнято / відкинуто» · тека shots/ у ядрі (публічне репо)
+# ✗ знімок без рядка README (зведено по теці) · рядок таблиці не з 7 клітинок (AE S152: рядок з 3 клітинками мовчки випадав → 23 знімки «без рядка»;
+#   `|` у коді без `\|` давав 8–9 клітинок → дата з чужої колонки, вік не судився, а GitHub зайві клітинки відкидає — GFM «Tables», github.github.com/gfm, 17.11.2026) · жива примірка без знімків · файли після «прийнято / відкинуто» · тека shots/ у ядрі (публічне репо)
 # ⚠ жива старша за 14 дн. · тека > 3 МБ · живих > 5 · жива без накладки (fit_*) — не перезняти · PNG/JPG замість WebP
 import os, re, sys, datetime, tempfile, shutil
 
@@ -21,11 +22,30 @@ def find(repo):
     return None
 
 
-def rows(readme):
-    out = []
+COLS = 7   # id · стан · що · варіанти · вибір · куди · дата (SHOTS.md §4)
+
+
+def cells(line):
+    # клітинки рядка таблиці; `\|` (у тексті й у коді) — символ, не межа (GFM «Tables»)
+    return [x.strip().replace('\\|', '|') for x in re.split(r'(?<!\\)\|', line.strip().strip('|'))]
+
+
+def rows(readme, broken=None):
+    # рядки таблиці примірок (від заголовка «| id |» до першого рядка не таблиці); неповний чи зайвий — у broken, не мовчки геть
+    out, inside = [], False
     for line in open(readme, encoding='utf-8'):
-        c = [x.strip() for x in line.strip().strip('|').split('|')]
-        if len(c) < 7 or not line.startswith('|') or set(c[0]) <= set('-: ') or c[0] == 'id':
+        if not line.startswith('|'):
+            inside = False
+            continue
+        c = cells(line)
+        if c[0] == 'id':
+            inside = True
+            continue
+        if not inside or set(c[0]) <= set('-: '):
+            continue
+        if len(c) != COLS:
+            if broken is not None:
+                broken.append((c[0].strip('`'), len(c)))
             continue
         out.append({'id': c[0].strip('`'), 'state': c[1].strip('*').strip().lower(), 'date': c[6]})
     return out
@@ -41,7 +61,10 @@ def check(repo, today=None, inject=False):
     if os.path.exists(os.path.join(repo, 'kernel', 'Lens_INDEX.md')):
         bad.append(f'{d}/ у ядрі — репо публічне, знімки з реальними даними лише в приватному репо продукту')
     readme = os.path.join(base, 'README.md')
-    rs = rows(readme) if os.path.exists(readme) else []
+    broken = []
+    rs = rows(readme, broken) if os.path.exists(readme) else []
+    for i, n in broken:
+        bad.append(f'рядок README «{i}»: клітинок {n} з {COLS}' + (' — дописати порожні' if n < COLS else ' — `|` у тексті чи коді писати `\\|`'))
     if not os.path.exists(readme):
         bad.append(f'{d}/README.md нема — стан примірок ніде не записано')
     files = {}
@@ -52,16 +75,19 @@ def check(repo, today=None, inject=False):
     if inject:
         files['zz_inject/x.webp'] = 1
     owner = lambda rel: next((r for r in rs if rel.split('/')[0] == r['id'] or rel.split('/')[0].startswith(r['id'] + '_')), None)
+    orphan = {}
     for rel in sorted(files):
         if rel == 'README.md':
             continue
         r = owner(rel)
         if IMG.search(rel) and not r:
-            bad.append(f'знімок без рядка README: {rel}')
+            orphan.setdefault(rel.split('/')[0] if '/' in rel else '.', []).append(rel)
         elif r and r['state'] in DONE:
             bad.append(f'{r["id"]} «{r["state"]}», а файл лишився: {rel} — видалити (історія — git)')
         if IMG.search(rel) and not rel.lower().endswith('.webp'):
             warn.append(f'не WebP: {rel}')
+    for d, fs in orphan.items():   # зведено по теці: 23 однакові пункти ховали причину за обрізаним рядком env_check
+        bad.append(f'знімок без рядка README: {fs[0]}' if len(fs) == 1 else f'знімків без рядка README: {d}/ — {len(fs)} (напр. {os.path.basename(fs[0])})')
     live = [r for r in rs if r['state'] in LIVE]
     for r in live:
         mine = [f for f in files if owner(f) is r]
@@ -98,7 +124,7 @@ def line(repo, inject=False):
 def selftest():
     ok = n = 0
     T = tempfile.mkdtemp()
-    def case(name, readme, files, want, today=datetime.date(2026, 10, 11)):
+    def case(name, readme, files, want, today=datetime.date(2026, 10, 11), want_txt=''):
         nonlocal ok, n
         n += 1
         r = os.path.join(T, str(n)); s = os.path.join(r, 'lens', 'shots'); os.makedirs(s)
@@ -108,7 +134,7 @@ def selftest():
             p = os.path.join(s, f); os.makedirs(os.path.dirname(p), exist_ok=True); open(p, 'wb').write(b'x')
         bad, warn, _ = check(r, today)
         got = '✗' if bad else ('⚠' if warn else '✓')
-        if got == want:
+        if got == want and want_txt in ' · '.join(bad + warn):
             ok += 1
         else:
             print(f'✗ {name} → {got}, очікував {want}: {bad + warn}')
@@ -123,6 +149,11 @@ def selftest():
     case('PNG', row('QRL-1', 'обрано'), ['QRL-1_t/light.png', 'QRL-1_t/fit_b.css'], '⚠')
     case('README нема', None, ['QRL-1_t/light.webp'], '✗')
     case('невідомий стан', row('QRL-1', 'думаю'), [], '✗')
+    case('рядок з 3 клітинками — ✗ з причиною', '| QRL-1 | обрано | x |\n', ['QRL-1_t/light.webp', 'QRL-1_t/fit_b.css'], '✗', want_txt='клітинок 3 з 7')
+    case('`|` у коді без `\\|` — ✗ з причиною', '| QRL-1 | обрано | `?v=a|b` | x | x | x | 10.10.2026 |\n', ['QRL-1_t/light.webp', 'QRL-1_t/fit_b.css'], '✗', want_txt='клітинок 8 з 7')
+    case('`\\|` у коді — одна клітинка, дата читається', '| QRL-1 | обрано | `?v=a\\|b` | x | x | x | 20.09.2026 |\n', ['QRL-1_t/light.webp', 'QRL-1_t/fit_b.css'], '⚠', want_txt='21 дн.')
+    case('знімки без рядка — зведено по теці', row('QRL-1', 'обрано'), ['QRL-1_t/light.webp', 'QRL-1_t/fit_b.css'] + [f'QRL-2_x/{i}.webp' for i in range(5)], '✗', want_txt='QRL-2_x/ — 5')
+    case('інша таблиця нижче не судиться', row('QRL-1', 'обрано') + '\nтекст\n\n| a | b |\n|---|---|\n| 1 | 2 |\n', ['QRL-1_t/light.webp', 'QRL-1_t/fit_b.css'], '✓')
     case('id-префікс не плутає QRL-1 і QRL-10', row('QRL-1', 'обрано'), ['QRL-1_t/light.webp', 'QRL-1_t/fit_b.css', 'QRL-10_y/a.webp'], '✗')
     shutil.rmtree(T)
     print(f'shots_check selftest: {ok}/{n}')
