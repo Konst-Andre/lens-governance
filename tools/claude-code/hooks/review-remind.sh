@@ -5,7 +5,7 @@
 #           за останні 2 год нема → «коміт UI обійшов огляд» (раз на SHA). Є позначка — тиша: огляд до коміту вже вимагає ui-review-gate
 #           (HOOK-2 п.4, 09.10.2026); тут лишилась страхувальна сітка — гачок-ворота впав, вимкнений чи коміт пройшов повз нього
 #           + позначка «маніфест стендів прочитано», якщо виклик згадав Lens_stagebench_manifest
-#   stand — PreToolUse (Write|Edit|Bash): запис .html зі «стенд / bench / harness / компер» у шляху, а маніфест у цій сесії не читано → нагадування
+#   stand — PreToolUse (Write|Edit|Bash): [знято 18.11.2026, FAB-1 F1 — запис .html стенда більше не нагадує] запис .html зі «стенд / bench / harness / компер» у шляху, а маніфест у цій сесії не читано → нагадування
 #           + ВИДАЧА: `git push` у репо з origin `…/sandbox` (прев'ю для Konst) → пункти чек-листа «Перед видачею» маніфесту, прочитані з самого маніфесту
 #           (не копія: копія тухне), раз на коміт. Тригер — подія видачі, не ім'я файла (бриф SB-1 «Х7»: «stand» у konstandre/standalone — 2 хибних)
 # Формат — hookSpecificOutput.additionalContext (code.claude.com/docs/en/hooks, 08.10.2026): текст — фактами, не наказами.
@@ -13,10 +13,10 @@ mode="$1"
 if [ "$mode" = selftest ]; then   # stand: адреса з «stand» усередині слова — тиша; .html стенда чи компера — нагадування (хибне QR CC-8)
   # AE S151 (плаваючий 1 з ~10): позначки тесту жили в /tmp з pid у імені й не прибирались; pid повторюється (pid_max 32768, фоновий прогін стартує біля тих самих
   # номерів — 2804 шість разів) → стара позначка «маніфест читано» глушила випадок 2. Тепер позначки тесту — у своїй теці, а «сміття» в /tmp підкладено навмисно (зуб).
-  td="$(mktemp -d)"; export RR_TMP="$td"; [ "${RR_INJECT:-}" = 1 ] && RR_TMP=/tmp   # зуб: позначки знову в /tmp → випадок 2 ✗
+  td="$(mktemp -d)"; export RR_TMP="$td"; [ "${RR_INJECT:-}" = 1 ] && RR_TMP=/tmp   # зуб був на нагадуванні .html (випадок 2) — знято з ним 18.11.2026 (F1); лишився для сумісності, не кусає
   ok=0; n=0; junk="/tmp/lens-stand-selftest2$$"; touch "$junk"
   for c in "0|curl -s https://qr-lens.konstandre.workers.dev/ | grep -o 'x[^>]*'; grep a tools/QR_Lens_zvit_template.html" \
-           "1|cat a > kernel/stage/AE_stand_v3.html" "1|cp x tools/compare_v2.htm" "0|echo hi > notes.md" \
+           "0|cat a > kernel/stage/AE_stand_v3.html" "0|cp x tools/compare_v2.htm" "0|echo hi > notes.md" \
            "0|cat > docs/CHERGA.md <<X
 джерело — ANC_island_animations_standalone_v1.html
 X"; do
@@ -107,17 +107,8 @@ elif mode == "stand":
             "доказ кожного пункту одним блоком у повідомленні Konst (рядок паспорта · вивід смоуку · число · знімок) або «н/з, бо …». "
             + ("Пункти: " + " · ".join(items) + "." if items else "Розділ «Перед видачею» в маніфесті не знайдено — гачок відстав від маніфесту, скажи Konst."))
         sys.exit(0)
-    if os.path.exists(seen): sys.exit(0)
-    path = str(ti.get("file_path", "")) if tool in ("Write", "Edit") else str(ti.get("command", ""))
-    if tool == "Bash" and not re.search(r"(>|\btee\b|\bcp\b|\bmv\b)", path): sys.exit(0)
-    # лише в імені .html-файлу, не в усій команді: «konstandre» в адресі давало хибне (QR CC-8, 10.10)
-    # і лише ЦІЛЬ запису (> · tee · аргументи cp/mv), не згадка в тексті: «…standalone_v1.html» у heredoc для .md давало хибне (S90 AE, 18.10)
-    names = ([f for f in re.findall(r"(?:>\s*|\btee\s+(?:-a\s+)?)([^\s\x27\x22|;&<>]+)", path) + [w for s in re.findall(r"\b(?:cp|mv)\b[^|;&\n]*", path) for w in s.split()]]
-             if tool == "Bash" else [path])
-    if any(re.search(r"(stand|stend|bench|harness|compar|стенд|компер)", f, re.I) for f in names if re.search(r"\.html?$", f, re.I)):
-        open(seen, "w").close()
-        say("PreToolUse", "Стенди, харнеси й компери Lens описує маніфест ядра lens-governance:kernel/Lens_stagebench_manifest.md (буфер — lens-governance:kernel/Lens_stagebench_delta_running.md); "
-            "у цій сесії його ще не відкривали (lens-governance:CLAUDE.md «Звідки брати»: «будую чи правлю стенд, харнес, компер, важелі»). "
-            "Перед посиланням Konst (push у sandbox) стенд звіряють з розділом маніфесту «Перед видачею» — з доказом кожного пункту.")
+    # нагадування «прочитай маніфест» на запис .html стенда знято 18.11.2026 (FAB-1 F1 · Б11): handoff_check tally — справжніх 0, хибних 3;
+    # лишилась лише видача (push у sandbox → чек-лист «Перед видачею»): там подія справжня.
+    sys.exit(0)
 ' "$mode"
 exit 0
