@@ -12,6 +12,7 @@
 mode="${1:-run}"
 [ "$mode" = selftest ] && HOOK_IN="{}" || HOOK_IN="$(cat)"
 export HOOK_IN
+export LENS_HOOK_DIR="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"   # REV-5 Л2-б: питання іспиту — ../handoff_exam_questions.md
 python3 - "$mode" <<'PY'
 import json, os, re, sys, glob, pathlib
 EVERY = int(os.environ.get('ROUTE_EVERY') or 3)
@@ -63,7 +64,19 @@ def run(d, rep=None, src=None):
             "Бери з самері §0 і черги репо, не з пам'яті чату; змінилось — спершу онови самері §0, тоді показуй.")
     if f: body += f" Самері: {f}."
     if rt: body += "\nЗ самері зараз:\n" + rt[:1200]
+    if not rep: body = readback() + '\n' + body
     return body
+
+def readback():
+    """REV-5 Л2-б (💡 AE S155, оцінена агентом за словом Konst «оціни сам… підсиль»): переказ прийому — I-PASS «synthesis by receiver»: новий агент
+    у ПЕРШІЙ відповіді сесії сам переказує прийняте, коротко й з `файл:рядок`; розбіжність, яку бачить Konst, — дешевше за діру через три ходи.
+    Ціна — ≤ 6 рядків, без іншої моделі (іспит-прилад — на ревізії). Питання — той самий файл, що в іспиті (одна правда)."""
+    qf = pathlib.Path(os.environ.get('LENS_HOOK_DIR') or '.') / '..' / 'handoff_exam_questions.md'
+    try: qs = [ln.strip() for ln in re.findall(r'(?ms)^## \d+\n(.*?)(?=^## \d+\n|\Z)', qf.read_text(encoding='utf-8'))]
+    except OSError: qs = []
+    qs = ' · '.join(f'{i}) ' + q.split('?')[0].split('.')[0][:70] for i, q in enumerate(qs, 1)) or 'що першим · рішення попередньої сесії й де · що чекає Konst · чого не робити · де код і гілка · що незрозуміло чи суперечить'
+    return ("Переказ прийому (REV-5 Л2-б, перша відповідь сесії): одразу після «що ти побачиш» — блок «**Прийняв:**» ≤ 6 рядків, своїми словами, з `файл:рядок`, "
+            f"лише з репо (не з пам'яті й не дослівно зі стартового): {qs}. Суперечність чи застаріле — назви й виправ у репо першим ходом.")
 
 def selftest():
     R = 'x' * 450
@@ -84,7 +97,10 @@ def selftest():
     (tmp / 'docs/summary/X_SUMMARY_2026-11-07.md').write_text('## §0\n\n**0.1 · ДЕ МИ:** тут\n\n**0.2 · МАРШРУТ (S2 →):**\n  1. Крок один.\n  2. Крок два.\n\n**0.3 · ВІД KONST:** ...\n', encoding='utf-8')
     f, rt = route_text(str(tmp)); ok = bool(rt) and 'Крок два' in rt and 'ВІД KONST' not in rt; bad += not ok
     print(('✓ ' if ok else '✗ ') + 'маршрут береться з самері §0.2 (до наступного пункту §0)')
-    print(f'─── route-remind selftest: {len(cases) + 1 - bad}/{len(cases) + 1} ───'); return 1 if bad else 0
+    b1 = run({'prompt': 'роби далі'}, [], (None, None)) or ''; b2 = run({'prompt': 'нагадай, куди рухаємось?'}, [R], (None, None)) or ''
+    ok2 = 'Прийняв' in b1 and 'суперечить' in b1 and 'Прийняв' not in b2; bad += not ok2
+    print(('✓ ' if ok2 else '✗ ') + 'REV-5 Л2-б: перша відповідь сесії → «Прийняв:» з питаннями іспиту (6-те — суперечності); далі — без нього')
+    print(f'─── route-remind selftest: {len(cases) + 2 - bad}/{len(cases) + 2} ───'); return 1 if bad else 0
 
 if sys.argv[1] == 'selftest': sys.exit(selftest())
 try: out = run(json.loads(os.environ.get('HOOK_IN') or '{}'))

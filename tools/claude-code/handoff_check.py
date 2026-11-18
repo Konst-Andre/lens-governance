@@ -487,6 +487,7 @@ JPATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'hooks', 'HOOK_
 CHECKLIST = ("Ревізія — без переїзду: ✗ — виправ, закоміть і запуш; ⚠ — звір. Потім пройди сесію (git log з її початку) і для КОЖНОГО: рішення Konst чи агента → `DECISIONS` (В-N) або бриф; "
              "новий прилад → карта репо (REPO_LAYOUT) + «Прилади продуктів» ядра; нове правило → CLAUDE.md / профіль / рецепт; зміна стану → брифи §0 і черга; урок → свій дім + рядок у самері; "
              "💡 без відповіді → самері §0 «💡 чекає вироку Konst». Звіт Konst — таблиця «що · дім · коміт» (заготовка — handoff_check.py revision --table, з git log) і «чого ще нема». "
+             "Іспит нового агента (REV-5 Л2) — `python3 <ядро>/tools/claude-code/handoff_exam.py run` на фінальному HEAD (модель · effort · навіщо — у чат до запуску): звір кожну відповідь таблицею «питання · відповідь · правда з репо · ✓/✗», виправ, закоміть, повтори; печатка «ревізія ✓» — лише з іспитом на HEAD і «незрозуміло 0». "
              "З пам'яті сесії ревізія не робиться — лише з цього виводу. Правив самері чи стартове після цього прогону — revision ще раз: печатка нижче старіє з HEAD; "
              "у звіті — її рядок як є, не «ревізія ✓» своїми словами (гачок promise-guard зупинить).")
 
@@ -534,16 +535,36 @@ def uncovered_commits(rs, text=''):
     mem = text + ''.join(open(f, encoding='utf-8').read() for f in filter(None, (latest_summary(r) for r in rs)))
     return [f'{os.path.basename(r)} {h}' for r in rs for h, _, s in session_log(r) if not s and h not in mem]
 
-def seal(rs, n_bad):
-    """Печатка ревізії: агент цитує її, а не пише «ревізія ✓» сам; стара з першим новим комітом будь-якого репо сесії."""
-    return f"ревізія {'✓' if not n_bad else '✗'} · HEAD " + ' '.join(f'{os.path.basename(r)}@{git(r, "rev-parse", "--short=7", "HEAD")}' for r in rs) + f' · ✗ {n_bad}'
+def exam_state(rs):
+    """REV-5 Л2 → Л3: стан іспиту нового агента (handoff_exam.py) на поточному HEAD: (на_HEAD, K, рядок)."""
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import handoff_exam
+        return handoff_exam.state(rs)
+    except Exception as e: return False, None, f'іспит: стан не прочитано ({type(e).__name__})'
+
+def seal(rs, n_bad, n_checks=None, n_unver=0):
+    """Печатка ревізії: агент цитує її, а не пише «ревізія ✓» сам; стара з першим новим комітом будь-якого репо сесії.
+    REV-5 Л3 (Konst AE S155: «був 100 % впевнений… а тут купа дірок»): печатка каже, ЩО перевірено, — «ревізія ✓» лише коли машина ✗ 0
+    І іспит нового агента на цьому HEAD без незрозумілого; інакше «ревізія ⚠ · … · іспит не робився / незрозуміло K» — звучить як є, не як «повно».
+    «не перевірено M» — окрема категорія, не «пройдено» (практика Linaro LAVA: пропущене — свій статус, бракує очікуваного — провал; 18.11.2026)."""
+    on, k, ex = exam_state(rs)
+    word = '✗' if n_bad else ('✓' if on and k == 0 else '⚠')
+    return (f"ревізія {word} · HEAD " + ' '.join(f'{os.path.basename(r)}@{git(r, "rev-parse", "--short=7", "HEAD")}' for r in rs) + f' · ✗ {n_bad}'
+            + (f' · машина: {n_checks} перевірок' if n_checks is not None else '') + (f' · не перевірено {n_unver}' if n_unver else '') + f' · {ex}')
+
+def stored_seal(rs):
+    """Печатка з мітки ревізії, якщо мітка — на поточному HEAD усіх репо сесії; інакше None."""
+    try: ls = open(rev_mark(), encoding='utf-8').read().splitlines()
+    except OSError: return None
+    return ls[1] if len(ls) > 1 and ls[0].split(' ', 1)[-1] == heads(rs) else None
 
 def seal_ok(rs):
-    """Мітка ревізії несе печатку ✓ саме на поточному HEAD усіх репо сесії (її пише лише revision)."""
-    try: ls = open(rev_mark(), encoding='utf-8').read().splitlines()
-    except OSError: return False
+    """Мітка ревізії несе «ревізія ✓» саме на поточному HEAD усіх репо сесії (її пише лише revision), і іспит досі на цьому HEAD без незрозумілого."""
     if os.environ.get('HC_INJECT') == 'rev4': return True
-    return len(ls) > 1 and ls[1] == seal(rs, 0)
+    s = stored_seal(rs)
+    if not s or not s.startswith('ревізія ✓'): return False
+    on, k, _ = exam_state(rs)
+    return bool(on and k == 0)
 
 def rev_table(rs):
     """`revision --table`: таблиця ревізії з git log сесії (що · коміт); «дім» дописує агент."""
@@ -563,7 +584,8 @@ def revision(root='/home/user', once=None):
     miss = uncovered_commits(rs)   # REV-4 (а): те саме, що судить гачок Stop REV-2 на переїзді
     if miss: txt += (f'\n  ✗ коміти сесії без запису в самері — {len(miss)}: ' + ' · '.join(miss[:10]) + (' …' if len(miss) > 10 else '')
                      + ' → рядком §1 самері (що · дім · коміт)')
-    s = seal(rs, sum(1 for l in txt.splitlines() if l.strip().startswith('✗')))
+    ls_ = [l.strip() for l in txt.splitlines()]
+    s = seal(rs, sum(1 for l in ls_ if l.startswith('✗')), sum(1 for l in ls_ if l[:1] in '✓⚠✗ⓘ'), sum(1 for l in ls_ if l.startswith('ⓘ') and 'не перевірено' in l))
     open(rev_mark(), 'w').write(f'{int(time.time())} {h}\n{s}')   # precompact_guard дивиться лише, чи мітка є; другий рядок — для promise-guard ④
     if once: open(once, 'w').write(h)
     return txt + '\n\n' + CHECKLIST + '\n\n' + s, bool(bad or miss)
@@ -775,12 +797,18 @@ def selftest():
     os.environ['LENS_REV_MARK'] = os.path.join(tf, 'rev4'); r4 = mk(good, commit_after=True); g4 = os.path.dirname(r4)
     h4 = git(r4, 'rev-parse', '--short=7', 'HEAD'); ta, ba = revision(g4)
     open(os.path.join(r4, 'sessions/P_session_summary_X.md'), 'a').write(f'\n- код `{h4}`\n'); sh(r4, 'git', 'commit', '-qam', 'самері\n\nClaude-Session: https://claude.ai/code/session_T')
+    os.environ['LENS_EXAM_MARK'] = os.path.join(tf, 'exam4')
+    tn, _ = revision(g4); okn = seal_ok([r4])   # REV-5 Л3: машина ✗ 0, іспиту нема → «ревізія ⚠ · … · іспит не робився», не «✓»
+    open(os.environ['LENS_EXAM_MARK'], 'w').write(heads([r4]) + '\nіспит · незрозуміло 2\n{}\n'); tk, _ = revision(g4); okk = seal_ok([r4])
+    open(os.environ['LENS_EXAM_MARK'], 'w').write(heads([r4]) + '\nіспит · незрозуміло 0\n{}\n')
     tb, bb = revision(g4); okb = seal_ok([r4])
     open(os.path.join(r4, 'lens/A.md'), 'a').write('w'); sh(r4, 'git', 'commit', '-qam', 'ще прилад\n\nClaude-Session: https://claude.ai/code/session_T')
     stale = seal_ok([r4]); tab = rev_table([r4])
     rcases += [('REV-4 (а): коміт сесії без запису в самері → ✗ з хешем, печатка «ревізія ✗»', ba and 'коміти сесії без запису' in ta and h4 in ta and ta.splitlines()[-1].startswith('ревізія ✗')),
-               ('REV-4 (б): записав коміт у самері → печатка «ревізія ✓ · HEAD … · ✗ 0» і в мітці', not bb and tb.splitlines()[-1].startswith('ревізія ✓') and tb.splitlines()[-1].endswith('✗ 0') and okb),
-               ('REV-4 (г): новий коміт після ревізії → печатка стара', not stale),
+               ('REV-5 Л3: машина ✗ 0, іспиту нема → «ревізія ⚠ … іспит не робився», мітка не дає ✓ (S155: «✗ 0» звучало як «повно»)', tn.splitlines()[-1].startswith('ревізія ⚠') and 'іспит не робився' in tn.splitlines()[-1] and 'машина: ' in tn.splitlines()[-1] and not okn),
+               ('REV-5 Л3: іспит на HEAD «незрозуміло 2» → «ревізія ⚠ · … незрозуміло 2»', tk.splitlines()[-1].startswith('ревізія ⚠') and 'незрозуміло 2' in tk.splitlines()[-1] and not okk),
+               ('REV-4 (б) + REV-5: записав коміт у самері, іспит на HEAD «незрозуміло 0» → печатка «ревізія ✓ · HEAD … · ✗ 0 · машина … · іспит ✓» і в мітці', not bb and tb.splitlines()[-1].startswith('ревізія ✓') and '· ✗ 0 ·' in tb.splitlines()[-1] and 'іспит ✓' in tb.splitlines()[-1] and okb),
+               ('REV-4 (г): новий коміт після ревізії → печатка стара (і іспит — теж)', not stale),
                ('REV-4 (в): --table — заголовок «що · дім · коміт» і кожен коміт сесії', '| що | дім | коміт |' in tab and h4 in tab and 'ще прилад' in tab)]
     # REV-5 Л1 (12): вкладення Konst — журнал сесії з 2 зображеннями user (і 1 зображенням у tool_result — не рахується)
     trp = os.path.join(tf, 'tr.jsonl'); img = {'type': 'image', 'source': {'type': 'base64', 'data': 'x'}}
@@ -796,7 +824,7 @@ def selftest():
                ('(12) «не зберігаємо» в самері → ✓', a2 and a2[0] == '✓'),
                ('(12) зображень нема → тиша', attachments([ra], os.path.join(tf, 'tr0.jsonl')) is None),
                ('(12) журналу нема → ⓘ «не перевірено», не ✓', (attachments([ra], os.path.join(tf, 'none.jsonl')) or ('',))[0] == 'ⓘ')]
-    os.environ.pop('LENS_REV_MARK')
+    os.environ.pop('LENS_REV_MARK'); os.environ.pop('LENS_EXAM_MARK', None)
     for name, ok in rcases:
         print(('✓' if ok else '✗') + ' ' + name); bad += not ok
     total = len(cases) + len(jcases) + len(hcases) + len(tcases) + len(rcases)

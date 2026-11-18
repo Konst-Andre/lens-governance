@@ -100,7 +100,7 @@ def verdict(d):
                 "…), а у звіті нема «не зроблено: …» на початку. Konst має бачити невиконане першим — допиши блок «не зроблено: що · чому · коли».")
     return None
 
-REVCLAIM = re.compile(r"ревізі[яюї]\s*(?:[:—–-]\s*)?(?:✓|пройден|зроблен|чист)", re.I)   # заява «ревізія ✓ / пройдена / зроблена / чиста»; «ревізія ✗» і «не зроблено» — ні
+REVCLAIM = re.compile(r"ревізі[яюї]\s*(?:[:—–-]\s*)?(?:✓|пройден|зроблен|чист)|(?:все|усе|всё)\s+записан|пам'ять\s+(?:повн|ціл)|нічого\s+не\s+загубил", re.I)   # заява «ревізія ✓ / пройдена / зроблена / чиста»; REV-5 Л3 (AE S155): і «все записано», «пам'ять повна / ціла», «нічого не загубили» — та сама заява повноти; «ревізія ✗» і «не зроблено» — ні
 def hck():
     sys.path.insert(0, os.path.dirname(HERE)); import handoff_check; return handoff_check
 def seal_gap(msg):
@@ -109,12 +109,13 @@ def seal_gap(msg):
     if INJ == '5' or not REVCLAIM.search(plain(msg)): return None
     h = hck(); rs = h.session_repos(env('LENS_ROOT', '/home/user'))
     if not rs: return None
-    want = h.seal(rs, 0)
+    want = h.stored_seal(rs) or h.seal(rs, 0)   # REV-5 Л3: печатка з мітки revision (у ній «машина: N» і стан іспиту), інакше — очікувана форма
     if want in msg and h.seal_ok(rs): return None
     return ("Ворота «ревізія ✓ = печатка» (REV-4, Konst AE S148): у відповіді заява ревізії, а печатки на поточному HEAD нема"
             + (" (у тексті є, але revision її не ставив — прогін на цьому HEAD дав ✗ або його не було)" if want in msg else "") +
             ".\nПрожени python3 <ядро>/tools/claude-code/handoff_check.py revision на фінальному стані (після останньої правки самері й стартового), "
-            "виправ ✗, закоміть, запуш, ще раз revision — і встав його останній рядок як є. Очікую: " + want)
+            "виправ ✗, закоміть, запуш; іспит нового агента — handoff_exam.py run на цьому HEAD (REV-5 Л2: «ревізія ✓» лише з іспитом «незрозуміло 0»); "
+            "ще раз revision — і встав його останній рядок як є. Без іспиту чи з «незрозуміло K» заява «✓ / все записано» — неправда: пиши печатку «ревізія ⚠ …» як є. Очікую: " + want)
 
 def counter(d, blocked):
     f = os.path.join(env('LENS_MARK_DIR', '/tmp'), f"lens-promise-{sid(d) or 'x'}.n")
@@ -318,11 +319,17 @@ def selftest_seal():
     out = []
     out.append(('④ «ревізія ✓» без печатки → block', v('Що ти побачиш: ревізія ✓, усе в домах.')))
     out.append(('④ печатка в тексті, але revision її не ставив → block', v('ревізія ✓\n' + want)))
-    h.revision(root)   # прогін ставить печатку в мітку (чисте репо → ✓)
-    out.append(('④ печатка revision на поточному HEAD → тиша', not v('Ревізія пройдена:\n' + want)))
+    os.environ['LENS_EXAM_MARK'] = os.path.join(t, 'exam')
+    h.revision(root); w0 = h.stored_seal([r]) or ''   # REV-5 Л3: машина ✓, іспиту нема → печатка «ревізія ⚠ … іспит не робився»
+    out.append(('④ REV-5: машина ✓, іспиту нема → «ревізія пройдена» навіть з печаткою → block', v('Ревізія пройдена:\n' + w0) and w0.startswith('ревізія ⚠')))
+    out.append(('④ REV-5: «все записано» без печатки ✓ → block', v('Що ти побачиш: все записано як слід, переїжджаємо.')))
+    open(os.environ['LENS_EXAM_MARK'], 'w').write(h.heads([r]) + '\nіспит · незрозуміло 0\n{}\n')
+    h.revision(root); want = h.stored_seal([r]) or want   # прогін ставить печатку в мітку (чисте репо + іспит на HEAD → ✓)
+    out.append(('④ печатка revision на поточному HEAD (машина + іспит) → тиша', not v('Ревізія пройдена:\n' + want) and want.startswith('ревізія ✓')))
     out.append(('④ «ревізія ✗», цитата «ревізія ✓» і печатка в коді не є заявою → тиша', not v('ревізія ✗ — виправляю; правило: «ревізія ✓» лише з печаткою; `ревізія ✓`')))
     open(os.path.join(r, 'x.md'), 'w').write('x'); G('add', '.'); G('commit', '-qm', 'x')
     out.append(('④ новий коміт після ревізії → печатка стара → block', v('ревізія ✓\n' + want)))
+    os.environ.pop('LENS_EXAM_MARK', None)
     for k, x in old.items():
         if x is None: os.environ.pop(k, None)
         else: os.environ[k] = x
