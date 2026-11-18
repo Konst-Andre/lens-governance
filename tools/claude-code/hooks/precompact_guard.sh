@@ -66,8 +66,8 @@ selftest() {
 Claude-Session: https://claude.ai/code/session_TESTSID" && git push -q origin HEAD 2>/dev/null )
   u() { printf '{"type":"assistant","timestamp":"2026-11-14T10:00:00Z","message":{"role":"assistant","usage":{"input_tokens":%s},"content":[]}}\n' "$1"; }
   u 300000 > "$t/small.jsonl"; u 431000 > "$t/big.jsonl"
-  run() { printf '{"hook_event_name":"PreCompact","trigger":"%s","custom_instructions":%s,"transcript_path":"%s"}' "$1" "${2:-null}" "${TR:-$t/small.jsonl}" | CLAUDE_CODE_AUTO_COMPACT_WINDOW=450000 CLAUDE_CODE_REMOTE_SESSION_ID=cse_TESTSID CLAUDE_CODE_SESSION_ID=TESTSID LENS_REV_MARK="$t/rev" LENS_ROOT="$t/w" LENS_HOOKS="$t/hooks" LENS_FLAG="$t/flag" LENS_HELD="$t/held" LENS_LOG="$t/log" bash "$me" 2>"$t/err" >"$t/out"; echo $?; }
-  say() { [ "$1" = 1 ] && echo "✓ $2" || { echo "✗ $2"; bad=1; }; }
+  run() { printf '{"hook_event_name":"PreCompact","trigger":"%s","custom_instructions":%s,"transcript_path":"%s"}' "$1" "${2:-null}" "${TR:-$t/small.jsonl}" | CLAUDE_CODE_AUTO_COMPACT_WINDOW=450000 CLAUDE_CODE_REMOTE_SESSION_ID=cse_TESTSID CLAUDE_CODE_SESSION_ID=TESTSID LENS_REV_MARK="$t/rev" LENS_ROOT="$t/w" LENS_HOOKS="$t/hooks" LENS_FLAG="$t/flag" LENS_HELD="$t/held" LENS_LOG="$t/log" LENS_TRANSCRIPT="$t/none.jsonl" bash "$me" 2>"$t/err" >"$t/out"; echo $?; }
+  say() { [ $# = 1 ] && set -- "" "$1"; [ "$1" = 1 ] && echo "✓ $2" || { echo "✗ $2"; bad=1; }; }   # $# = 1: порожній $(…) без лапок — провал тесту, не «unbound variable» (AE S155)
   mkdir -p "$t/hooks"; cp "$(dirname "$me")/../handoff_check.py" "$t/"; cp "$(dirname "$me")/../doc_health.py" "$t/" 2>/dev/null; cp "$(dirname "$me")/ctx_watch.py" "$t/hooks/"
   e=$(run manual); say $([ "$e" = 2 ] && grep -q "ревізії-після-стиснення-не-було" "$t/err" && echo 1) "REV-1: чисте, але ревізії після стиснення не було + manual → 2"
   e=$(run auto); say $([ "$e" = 2 ] && grep -q "tries=1" "$t/held" && grep -q "ревізії" "$t/held" && echo 1) "В-373: без ревізії + auto, контекст 300 тис. < стелі 430 → 2 (відкладено), позначка для агента"
