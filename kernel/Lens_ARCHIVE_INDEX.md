@@ -254,11 +254,12 @@ archive/
 
 Теки `archive/stands/` у ядрі більше нема (05–06.10.2026, журнал GW кроки 3–4): стенди StockCheck і Фармастора — `stock-check:archive/stands/`, QR Lens — `QR-Lens:archive/stands/`. Перелік до виїзду — історія git цього файла.
 
-### `archive/superseded/` — 5 файлів *(звірено `git ls-files` 06.10.2026; + лоток wsd 18.11.2026)*
+### `archive/superseded/` — 6 файлів *(звірено `git ls-files` 06.10.2026; + лоток wsd і розділ «Гачки» 18.11.2026)*
 
 Продуктове витіснене виїхало з продуктами: Drive Lens концепти → `Drive-Lens:archive/superseded/`, KPI → `KPI-Lens:archive/superseded/`
 (05.10.2026), `farmastor_v2_data.js` · `StockCheck_B32_STAGEBENCH_HANDOFF.md` · `StockCheck_collapse_C_CANON_delta.md` — зі StockCheck у `stock-check` (06.10.2026).
 
+- `CLAUDE_CODE_hooks_2026-11-18.md` — 🗄 18.11.2026 (FAB-1 F3). Розділ «Гачки» `tools/claude-code/CLAUDE_CODE.md` до стиснення, байт у байт: історія кожного рядка реєстру, заміри, калібровки, слова Konst. Живий реєстр — там само «Гачки», механіка — шапки `tools/claude-code/hooks/`. Йти сюди — по «чому гачок такий» і по даті рішення.
 - `wsd_delta_running.md` — 🗄 18.11.2026 (FAB-1 W7 · З3). Лоток wsd: порожній з 17.09.2026, правила йдуть одразу в дім (INTAKE). Таблиці «✅ спорожнено» — історія злиттів v2.27–G-C.
 - `canon_delta_A45_material_lever_manifest.md` — 🗄 01.08.2026. Буфер **пережив ціль**: A45 канонізовано в `Lens_iOS_cookbook_3_material.md`. Йти сюди тільки за **сирими важелями компера** матеріальності, яких канон не зберіг
 
