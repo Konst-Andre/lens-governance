@@ -177,8 +177,18 @@ def revise():
     try:
         hc = _hc(); once = f'/tmp/lens-ctxrev-{hc.sid()}'
         t, _ = hc.revision(os.environ.get('LENS_ROOT') or '/home/user', once)
-        return ('\n\nРЕВІЗІЯ — сама, на порозі (REV-1; той самий прохід, що на слово Konst «ревізія»):\n' + t[:6000]) if t else \
-               ' · ревізію на цьому HEAD уже дано (ctx_watch) — після виправлень і коміту дасть знову'
+        if not t: return ' · ревізію на цьому HEAD уже дано (ctx_watch) — після виправлень і коміту дасть знову'
+        # AE S154 (💡 ретро нічної зміни, «так» Konst): за порогом кожен коміт давав повний звіт ≈ 3 тис. токенів (3 рази поспіль,
+        # незмінний, крім одного ✗). Повний — перший раз; далі — лише ✗ і рядки, яких не було в попередньому прогоні, + печатка.
+        prev_p = once + '.txt'; prev = open(prev_p, encoding='utf-8').read() if os.path.exists(prev_p) else None
+        open(prev_p, 'w', encoding='utf-8').write(t)
+        if prev is None:
+            return '\n\nРЕВІЗІЯ — сама, на порозі (REV-1; той самий прохід, що на слово Konst «ревізія»):\n' + t[:6000]
+        body, seal = t.split('\n\n' + hc.CHECKLIST)[0], t.rstrip().splitlines()[-1]
+        old = set(prev.splitlines())
+        new = [l for l in body.splitlines() if l.strip() and (l not in old or l.strip().startswith('✗')) and l != seal]
+        return ('\n\nРЕВІЗІЯ на порозі — лише ✗ і нове проти попереднього прогону (повний звіт і чек-лист — '
+                'python3 <ядро>/tools/claude-code/handoff_check.py revision):\n' + '\n'.join(new[:60]) + ('\n' if new else '') + seal)
     except Exception as e: return f' · ревізія сама не запустилась ({type(e).__name__}) — python3 <ядро>/tools/claude-code/handoff_check.py revision'
 
 def hook(inp, now=None):
@@ -250,7 +260,7 @@ def selftest():
     for c in (['init', '-q'], ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 's', '--allow-empty'], ['add', '-A'], ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 's2']):
         subprocess.run(['git', '-C', rp, *c], capture_output=True)
     os.environ.update(LENS_ROOT=rt, CLAUDE_CODE_SESSION_ID='REVTEST', LENS_REV_MARK=f'{d}/revmark')
-    for f in ('/tmp/lens-ctxrev-REVTEST',):
+    for f in ('/tmp/lens-ctxrev-REVTEST', '/tmp/lens-ctxrev-REVTEST.txt'):
         if os.path.exists(f): os.remove(f)
     o1 = hook({'hook_event_name': 'UserPromptSubmit', 'transcript_path': tr('r1', [a(330_000)])}, T0); o2 = hook({'hook_event_name': 'PostToolUse', 'tool_input': {'command': 'git commit -m z'}, 'transcript_path': tr('r2', [a(330_000)])}, T0)
     case('330 тис. — ⚠ і сама ревізія: вивід handoff_check + чек-лист, мітка для сторожа стиснення', 'РЕВІЗІЯ — сама' in o1 and '— Prod' in o1 and 'Звіт Konst' in o1 and os.path.exists(f'{d}/revmark'))
@@ -258,7 +268,7 @@ def selftest():
     case('260 тис. (ⓘ) — ревізію сама не запускає', 'РЕВІЗІЯ' not in (hook({'transcript_path': tr('r3', [a(260_000)])}, T0) or ''))
     hook({'hook_event_name': 'SessionStart', 'source': 'compact', 'transcript_path': p})
     case('після стиснення мітку ревізії знято (ручний /compact знову вимагатиме ревізію)', not os.path.exists(f'{d}/revmark'))
-    os.remove('/tmp/lens-ctxrev-REVTEST')
+    [os.remove(x) for x in ('/tmp/lens-ctxrev-REVTEST', '/tmp/lens-ctxrev-REVTEST.txt') if os.path.exists(x)]
     # В-364 п. 2 (AE S144): ліміти з результатів list_events у журналі
     def le(*evs, sid=False):   # evs: (секунд до T0, 5 год, скид 5 год, тиждень)
         data = [{'created_at': iso(T0 - ago), 'rate_limit_event': {'internal_anthropic_catchall': {'rate_limit_info': {'unifiedWindows': {
@@ -290,6 +300,23 @@ def selftest():
          and 'тиждень 52% (скид ' in mk and f'кеш до ≈{kyiv(T0 - 60 + 3600)}' in mk and mk.endswith(' · три коміти'))
     case('маркер: замір лімітів старший за 60 хв → «ліміти — зміряй», старих цифр нема', 'ліміти — зміряй' in (o := marker(tr('mk2', [a(207_000), le((4000, 0.44, R5, 0.52))]), T0)) and '44%' not in o)
     case('маркер: ліміт ≥ 80 % → ⚠ перед числом', '5 год ⚠ 85%' in marker(tr('mk3', [a(207_000), le((60, 0.85, R5, 0.52))]), T0))
+    # S154: повторна ревізія на порозі — лише ✗ і нове + печатка; перша — повна
+    class _F:
+        CHECKLIST = 'ЧЕК'; n = 0
+        def sid(self): return 'st-' + str(os.getpid())
+        def revision(self, root, once):
+            _F.n += 1; return (f'  ✓ старе\n  ✗ біда\n  ⚠ нове{_F.n}\n\nЧЕК\n\nревізія ✗ · HEAD x@{_F.n}', True)
+    global _hc; keep = _hc; _hc = lambda: _F()
+    try:
+        r1, r2 = revise(), revise()
+    finally:
+        _hc = keep
+        for x in ('', '.txt'):
+            try: os.remove(f'/tmp/lens-ctxrev-st-{os.getpid()}' + x)
+            except OSError: pass
+    case('ревізія на порозі: перша — повна з чек-листом', 'ЧЕК' in r1 and '✓ старе' in r1)
+    case('ревізія на порозі: друга — лише ✗ і нове + печатка, без старого ✓ і чек-листа',
+         '✗ біда' in r2 and '⚠ нове2' in r2 and '✓ старе' not in r2 and 'ЧЕК' not in r2 and r2.rstrip().endswith('HEAD x@2'))
     print(f'─── ctx_watch selftest: {total - bad}/{total} ───'); return 1 if bad else 0
 
 if __name__ == '__main__':
