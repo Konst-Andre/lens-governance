@@ -28,6 +28,6 @@
  "shots_check.py selftest": 16,
  "shots_same.py selftest": 3,
  "ui-guard.sh selftest": 32,
- "ui-review-gate.sh selftest": 34,
+ "ui-review-gate.sh selftest": 35,
  "version_check.py selftest": 6
 }

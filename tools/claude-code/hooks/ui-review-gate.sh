@@ -157,6 +157,11 @@ if mode == "done":
     cliprec = ""
     if motion_in(top, files):
         cp = clip and (clip if os.path.isabs(clip) else os.path.join(top, clip))
+        # Ж2 FAB-2 (AE S153): кліп — свіжий, тобто знятий ПІСЛЯ останньої правки файлів диффу; інакше старий MP4 проходить на новий код
+        fresh = [(os.path.getmtime(os.path.join(top, f)), f) for f in files if os.path.isfile(os.path.join(top, f))]
+        newest = max(fresh) if fresh else (0, "")
+        if cp and os.path.isfile(cp) and cp.endswith(".mp4") and os.path.getsize(cp) > 10000 and os.path.getmtime(cp) + 1 < newest[0]:
+            print(f"✗ кліп {clip} старший за код диффу: {newest[1]} правлено після запису кліпу — зніми кліп заново (python3 tools/claude-code/clip.py <сценарій.json> <тека>), тоді done --clip"); sys.exit(1)
         if cp and os.path.isfile(cp) and cp.endswith(".mp4") and os.path.getsize(cp) > 10000: cliprec = f"\n[кліп: {clip}]"
         elif noclip and len(noclip) >= 30: cliprec = f"\n[без кліпу: {noclip}]"
         else:
@@ -224,6 +229,9 @@ if mode == "selftest":
         if os.path.exists(mark(hx)): os.remove(mark(hx))   # позначка минулого прогону з тим самим хешем
         r = dn(note, tmp); say(r.returncode == 1 and "кліп" in r.stdout and not os.path.exists(mark(hx)), "зуби: дифф з рухом без кліпу → ✗")
         open(f"{tmp}/c.mp4", "wb").write(b"0" * 20000)
+        t_old = os.path.getmtime(f"{tmp}/m.css") - 60; os.utime(f"{tmp}/c.mp4", (t_old, t_old))
+        r = dn(note, tmp, "--clip", f"{tmp}/c.mp4"); say(r.returncode == 1 and "старший за код" in r.stdout and not os.path.exists(mark(hx)), "зуби (Ж2): кліп, знятий ДО правки диффу → ✗ «старший за код»")
+        os.utime(f"{tmp}/c.mp4", None)
         r = dn(note, tmp, "--clip", f"{tmp}/c.mp4"); say(r.returncode == 0 and "[кліп:" in open(mark(hx)).read(), "дифф з рухом + --clip <mp4> → ✓, кліп у позначці")
         os.remove(mark(hx)); r = dn(note, tmp, "--no-clip", "рух лише ховер кольору — кліп нічого не покаже"); say(r.returncode == 0, "--no-clip з причиною → ✓"); os.remove(mark(hx)); os.remove(lint_mark(hx))
         os.remove(f"{tmp}/m.css"); os.remove(f"{tmp}/c.mp4")
