@@ -61,6 +61,7 @@ PY
 # свіжість рецептів (doc_health M10–M11) міряє git blame — на обрізаному клоні хмарної сесії (AE S129: 52 коміти) вона мовчить → добрати історію (≈ 800 комітів, секунди)
 [ "$(git rev-parse --is-shallow-repository 2>/dev/null)" = true ] && timeout 60 git fetch -q --unshallow origin 2>/dev/null
 python3 tools/claude-code/doc_health.py .
+python3 tools/claude-code/cookbook_check.py --quiet . | grep -E '^(⚠|✗)' | sed 's/^/кукбук: /'   # мапа §3 ≡ томи, номери wsd (FAB-1 K6); ✓ мовчить
 python3 tools/claude-code/shots_check.py .   # примірка: ядро публічне — тека shots/ тут ✗ (знімки з реальними даними лише в приватному репо продукту)
 
 # журнал гачків і перевірок — ріст (≤ 30 дн. у §1, ≤ 24 КБ, рядок ≤ 700 знаків; ротація — шапка журналу)
