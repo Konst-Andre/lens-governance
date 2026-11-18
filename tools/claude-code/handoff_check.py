@@ -514,9 +514,14 @@ def heads(rs): return ' '.join(git(r, 'rev-parse', 'HEAD') for r in rs)
 SUMF = re.compile(r'(^docs/summary/|^sessions/.*summary)', re.I)
 
 def latest_summary(r):
-    """Найновіше самері репо за часом зміни: не-Lens — docs/summary/*SUMMARY*.md, Lens — sessions/**/*summary*.md."""
-    xs = glob.glob(os.path.join(r, 'docs', 'summary', '*SUMMARY*.md')) + glob.glob(os.path.join(r, 'sessions', '**', '*summary*.md'), recursive=True)
-    return max(xs, key=os.path.getmtime) if xs else None
+    """Живе самері репо (абсолютний шлях) — за КОМІТОМ, як live_summary, не за часом зміни файла: у свіжому клоні й worktree час зміни
+    однаковий у всіх файлів → вибір навмання (REV-5, AE S155: іспит на worktree отримав стартове S150 від 15.11 замість 18.11_s2;
+    той самий вибір живив «коміти сесії без запису в самері»). Урок уже був у postcompact_check (AE S153) — тут лишився старий шлях."""
+    if os.environ.get('HC_INJECT') == 'mtime':   # зуб: стара поведінка
+        xs = glob.glob(os.path.join(r, 'docs', 'summary', '*SUMMARY*.md')) + glob.glob(os.path.join(r, 'sessions', '**', '*summary*.md'), recursive=True)
+        return max(xs, key=os.path.getmtime) if xs else None
+    rel = live_summary(r)
+    return os.path.join(r, rel) if rel else None
 
 def session_log(r):
     """Коміти цієї сесії (трейлер Claude-Session ≡ CLAUDE_CODE_REMOTE_SESSION_ID), новіші першими: [(h7, тема, правив самері)]."""
@@ -810,6 +815,11 @@ def selftest():
                ('REV-4 (б) + REV-5: записав коміт у самері, іспит на HEAD «незрозуміло 0» → печатка «ревізія ✓ · HEAD … · ✗ 0 · машина … · іспит ✓» і в мітці', not bb and tb.splitlines()[-1].startswith('ревізія ✓') and '· ✗ 0 ·' in tb.splitlines()[-1] and 'іспит ✓' in tb.splitlines()[-1] and okb),
                ('REV-4 (г): новий коміт після ревізії → печатка стара (і іспит — теж)', not stale),
                ('REV-4 (в): --table — заголовок «що · дім · коміт» і кожен коміт сесії', '| що | дім | коміт |' in tab and h4 in tab and 'ще прилад' in tab)]
+    # REV-5: живе самері — за комітом, не за часом зміни (свіжий клон / worktree)
+    rl = mk_nl(good_nl); time.sleep(1.1); open(os.path.join(rl, 'docs/summary/P_SUMMARY_2026-10-19.md'), 'w').write(good_nl)   # live_summary розрізняє коміти за секундою
+    sh(rl, 'git', 'add', '-A'); sh(rl, 'git', 'commit', '-qm', 'нове самері\n\nClaude-Session: https://claude.ai/code/session_T')
+    os.utime(os.path.join(rl, 'docs/summary/P_SUMMARY_2026-10-18.md'), (4e9, 4e9))   # старше за комітом, але «новіше» за часом зміни
+    rcases.append(('REV-5: latest_summary — за комітом, не за часом зміни (AE S155: worktree дав іспиту стартове S150)', (latest_summary(rl) or '').endswith('P_SUMMARY_2026-10-19.md')))
     # REV-5 Л1 (12): вкладення Konst — журнал сесії з 2 зображеннями user (і 1 зображенням у tool_result — не рахується)
     trp = os.path.join(tf, 'tr.jsonl'); img = {'type': 'image', 'source': {'type': 'base64', 'data': 'x'}}
     open(trp, 'w').write(json.dumps({'type': 'user', 'message': {'content': [{'type': 'text', 'text': 'концепти'}, img, img]}}) + '\n'
