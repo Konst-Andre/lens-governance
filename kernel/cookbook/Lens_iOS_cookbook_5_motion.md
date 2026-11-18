@@ -136,7 +136,7 @@ function placeAllThumbs(snap){document.querySelectorAll('.seg,.type-seg').forEac
 - **живий пульс** → `livePulse 1.4s ease-in-out infinite` (sync/live dot, A30).
 - **«характер»-жест (expressive)** → WAAPI overshoot-pop **поза драбиною**: функц-фідбек тримається в драбині (стеля .26s), а expressive «характер» (велика картка card-select, **950ms** `cubic-bezier(.34,1.56,.64,1)`) — окремий **НЕ-блокуючий** шар ПОВЕРХ, її стелю не порушує (A67.1). easing працює ЛИШЕ в парі з тривалістю — та сама крива на 140ms і на 950ms = різний характер.
 - **layout-driven reveal (банер / акордеон-розкриття)** → **candidate-A hybrid** (device✓ B46): банер лишає in-flow `height` 0→H на **main-thread** (unfold-характер збережено) + список (`.screen`) їде **composite** `translateY` синхронно (`.bnr-pin`: `position:absolute` @ `header_h`, `will-change` ЛИШЕ на видимому екрані) + **снап@onfinish** (1 repaint). **decel** `cubic-bezier(.4,0,.2,1)`, **~600ms, overshoot-FREE.** Пружина/овершут ЗАБОРОНЕНІ (layout-shift розміру → овершут = «гумовий» лейаут; пружина лише на selection-thumb/капсулі). Token-guard проти flush при швидкому open→close; reduced-motion = снап. **Чому hybrid, а не pure in-flow `height` (B36):** in-flow height = layout-prop → 14 карток repaint щокадру = 30–40ms спайки на XS (frame-gap довів, wsd 2.4); hybrid відчіпляє пейнт списку → dropped=0 / max-gap 17–27ms. **Чому НЕ composite-only (FLIP-overlay, candidate C):** C гладший, але дає «descend» (банер сповзає з-під хедера) — Konst device-відхилив характер; «unfold на місці» (низ банера зчеплений з верхом 1-ї картки) ФІЗИЧНО вимагає cross-thread sync = A (свідома «поступка»: ледь помітний мікродрейф на стику, device-прийнятний). *(QR Lens — `#ph-banner` reveal Tab-2; bannerJank RESOLVED, wsd 14.20.)*
-- **mode-switch close на context-switch табі → VT-crossfade** (device✓ B47): коли × / close міняє НЕ лише позицію, а **весь вид** (текстура fused→норм + поява filter-row + content swap) — обгортка `render()` у `document.startViewTransition` кросфейдить увесь diff як ОДНУ зміну. Семантика: **VT-crossfade = context switch** (Tab-1/3/4) ПРОТИ **slide = same-context reclaim** (Tab-2 candidate-A банер). per-context motion ≠ непослідовність. per-tab `--vt-cross` device-pick (overview500/qr400/equip500). Гард-набір — wsd 2.4 (feature-detect+фолбек · reduced-motion вручну · швидкий синхр. колбек · `[data-vt]`-scope проти колізії з тема-VT B28). *(QR Lens 14.20.)*
+- **mode-switch close на context-switch табі → VT-crossfade** (device✓ B47): коли × / close міняє НЕ лише позицію, а **весь вид** (текстура fused→норм + поява filter-row + content swap) — обгортка `render()` у `document.startViewTransition` кросфейдить увесь diff як ОДНУ зміну. Семантика: **VT-crossfade = context switch** (Tab-1/3/4) ПРОТИ **slide = same-context reclaim** (Tab-2 candidate-A банер). per-context motion ≠ непослідовність. per-tab `--vt-cross` device-pick (overview500/qr400/equip500). Гард-набір — A83 (feature-detect+фолбек · reduced-motion вручну · швидкий синхр. колбек · `[data-vt]`-scope проти колізії з тема-VT B28). *(QR Lens 14.20.)*
 - **VT володіє морфом** (device✓ B47.1): під VT-перехід **гасити власну entry-анімацію** елемента — кросфейд САМ морфить значення. Прецедент: gauge переграв 2200ms width-fill ВСЕРЕДИНІ 500ms VT → (а) fps-просадка (width=layout-prop thrash A70 під VT-композитом на XS) + (б) «порожній бар→refill» (rAF-reset 0% ПІСЛЯ синхр. VT-колбека → пустий new-snapshot). Фікс: ранній вихід entry-аніми під VT-прапор → `.sg-seg` лишаються на фінальній inline-ширині → VT морфить 67%→80% сам. Особливо критично для **layout-prop** анімацій (width/height) — вони і так thrash-небезпечні (A70), а під VT-композитом ще й конфліктують зі знімком.
 - **асиметрія open/close — ОКРЕМІ криві, не дзеркало** (A18.1): open = decel `(.32,.72,0,1)` «рішуче прибуття»; close = accel-in `(.4,0,1,1)` + micro-`scale(.98)` «рішучий відхід». Симетрична крива на close відчувається мляво. *(QR Lens Phase 3 — sheet-close B39.)*
 
@@ -473,7 +473,7 @@ keyframes 0% op0 · 12% op1 · 88% op1 · 100% op0
    кодує «об'єкт активний», а не «вміст пішов»;
 2. **вартість кадру** — смуга composite-only; периметральна петля = per-frame repaint по рамці (A70/A72);
 3. **трендовий маркер** — border beam у 2025–26 читається як підпис «AI-інтерфейс»,
-   той самий клас ризику, що й лівий accent-rail (wsd 2.4).
+   той самий клас ризику, що й лівий accent-rail (A84).
 
 **Три гарди — кожен закриває свій відмовний режим:**
 
@@ -497,7 +497,7 @@ keyframes 0% op0 · 12% op1 · 88% op1 · 100% op0
 **Код:** `fireSweep()` у `StockCheck_port_b28.html`; матриця `StockCheck_b27_jsdom_matrix.js`
 (34 твердження, сторожі S/T/Q/R).
 
-**Пов'язане:** A70 (композит під рухом) · A67 (press) · wsd 2.4 (анти-патерн декоративного акценту).
+**Пов'язане:** A70 (композит під рухом) · A67 (press) · A84 (анти-патерн декоративного акценту).
 
 ---
 
