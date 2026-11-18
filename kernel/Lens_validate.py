@@ -719,8 +719,9 @@ def gov(root):
         naked, na = [], 0
         for r_ in rules:
             num = re.match(r'#{2}\s*(\S+)', r_).group(1)
-            # маршрутна заглушка — тіло в іншому файлі
-            if is_route(r_) or len(r_.encode('utf-8')) < 400:
+            # маршрутна заглушка — тіло в іншому файлі; лише за структурою (FAB-1 М1, 18.11.2026):
+            # поріг «< 400 байт» ховав правила-рядки без тригера й детектора (3.1 · 3.2 · 3.8)
+            if is_route(r_):
                 continue
             if re.search(r'K2:n/a\s*—\s*\S', r_):
                 na += 1
@@ -730,7 +731,7 @@ def gov(root):
             naked.append(num)
         with_det = sum(
             1 for r_ in rules
-            if not (is_route(r_) or len(r_.encode('utf-8')) < 400)
+            if not is_route(r_)
             and not re.search(r'K2:n/a\s*—\s*\S', r_)
             and (DET_LABEL.search(r_)))
         total = len(naked) + na + with_det
@@ -738,7 +739,7 @@ def gov(root):
         # його ніхто не викличе, бо не сказано, КОЛИ. Ознака — мітка `**Тригер…**` на початку рядка
         # (як DET_LABEL); виняток — `T:n/a — причина` у тілі (правило-процедура, що діє завжди).
         no_trig = [re.match(r'#{2}\s*(\S+)', r_).group(1) for r_ in rules
-                   if not (is_route(r_) or len(r_.encode('utf-8')) < 400)
+                   if not is_route(r_)
                    and not re.search(r'T:n/a\s*—\s*\S', r_) and not TRIG_LABEL.search(r_)]
         if no_trig:
             warn(f'{f} — {len(no_trig)} правил без тригера (К1-1: «**Тригер.** коли …» або `T:n/a — причина`): '
@@ -762,6 +763,7 @@ def gov(root):
     g17(root, R(root, 'Lens_governance_CHERGA.md'))
     g20(root)
     g26(root)
+    g27(root)
 
 # ─────────────────────────── G21 · ОДИН ДІМ НОМЕРА ──────────────────────────
 WSD_VER = re.compile(r'^2\.(?:1[6-9]|[2-9]\d)$')   # «wsd 2.42» — версія файла (правила кластера 2 — до 2.15), не адреса
@@ -795,6 +797,62 @@ def g26(root):
     else:
         ok('зовнішні джерела в живому каноні мають дату або позначку «не перевірено»')
 
+
+
+def g27(root):
+    """G27 — таблиця «Маршрут розпилу» wsd ↔ доми (FAB-1 М3, 18.11.2026). Номер у рядку таблиці → у названому
+    домі є заголовок `## N` / `### N` з тілом (не заглушка) — інакше ✗ «маршрут веде в нікуди». Навпаки: правило
+    з тілом у домі з таблиці, якого нема в таблиці, → ✗ «адреса «wsd N» не знаходить дому». Діапазон
+    `12.15`–`12.19` розгортається. Практика — перевірка якорів docs-CI (GitLab internal_anchors, markdownlint
+    MD051: ціль посилання — наявний заголовок; 18.11.2026). Без цього таблицю не звіряв ніхто."""
+    print('\n[G27] таблиця маршруту wsd ↔ доми (FAB-1 М3)')
+    try:
+        wtxt = open(R(root, 'Work_Standard.md'), encoding='utf-8').read()
+    except OSError:
+        warn('Work_Standard.md не знайдено — G27 не виконався, це НЕ зелений результат')
+        return
+    sec = re.search(r'## Маршрут розпилу.*?\n(.*?)\n-{3,}', wtxt, re.S)
+    if not sec:
+        fail('у Work_Standard.md нема розділу «## Маршрут розпилу» з таблицею — G27 не має що звіряти')
+        return
+    nid = r'\d{1,2}\.\d{1,2}(?:-[а-яґ])?'
+    routed = {}
+    for row in [l for l in sec.group(1).split('\n') if l.startswith('| `')]:
+        cells = row.split('|')
+        home = re.search(r'`kernel/(?:wsd/)?([^`/]+\.md)`', cells[2])
+        ids = re.findall(r'`(' + nid + r')`', cells[1])
+        for a, lo, hi in re.findall(r'`(\d+)\.(\d+)`–`\d+\.(\d+)`', cells[1]):
+            ids += [f'{a}.{x}' for x in range(int(lo), int(hi) + 1)]
+        for n in ids:
+            routed[n] = home.group(1) if home else '?'
+    homes = sorted({h for h in routed.values() if h != '?'})
+    have = {}
+    for h in homes:
+        try:
+            txt = open(R(root, h), encoding='utf-8').read()
+        except OSError:
+            fail(f'маршрут веде в {h}, а файла нема')
+            continue
+        merged = {}
+        for part in re.split(r'\n(?=#{2,3}\s*' + nid + r'[\s·])', txt):
+            m = re.match(r'#{2,3}\s*(' + nid + r')[\s·]', part)
+            if m and not is_route(part):
+                have.setdefault(h, set()).add(m.group(1))
+            elif m:   # заглушка «злито в `N`» у тому ж домі — дійсна, якщо N має тіло тут
+                to = re.search(r'ROUTING →\*\*\s*злито в `(' + nid + r')`', part)
+                if to:
+                    merged[m.group(1)] = to.group(1)
+        for n, to in merged.items():
+            if to in have.get(h, set()):
+                have[h].add(n)
+    bad = [f'{n} → {h}' for n, h in sorted(routed.items()) if h == '?' or n not in have.get(h, set())]
+    lost = [f'{n} ({h})' for h in homes for n in sorted(have.get(h, set())) if n not in routed]
+    for b in bad:
+        fail(f'маршрут веде {b}, заголовка з тілом там нема')
+    for l in lost:
+        fail(f'{l} — правило з тілом у домі маршруту, у таблиці маршруту його нема (адреса «wsd N» не знайде дому)')
+    if not bad and not lost:
+        ok(f'таблиця маршруту ≡ доми: {len(routed)} номерів у {len(homes)} файлах')
 
 def g20(root):
     """G20 — досяжність правила (К3-1, GATE 06.10.2026).
