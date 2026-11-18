@@ -8,10 +8,11 @@
 # Підсилення проти чернетки (AE S153): (1) живе самері — за останнім комітом у docs/summary/, не за mtime (після свіжого клону mtime усіх файлів однаковий —
 #   вибір був би навмання); (2) незакомічене після автостиснення — факт і перевірка «чи переказ про нього знає» (сторож PreCompact автостиснення не зупиняє);
 #   (3) HEAD не на GitHub — факт; (4) без репо — один рядок «ⓘ», не мовчазне «✓»; (5) вихід — JSON SessionStart, ≤ 10 000 знаків (стеля additionalContext).
-# Звідки переказ: журнал сесії, рядок isCompactSummary — пишеться ДО SessionStart(compact): AE S153 18.11.2026, рядки 1019 → 1034 журналу, 2,4 с.
+# Звідки переказ: журнал сесії, рядок isCompactSummary — зазвичай ДО SessionStart(compact) (AE S153 18.11.2026, рядки 1019 → 1034, 2,4 с), але НЕ завжди:
+#   AE S155 стиснення 3 гачок прочитав переказ попереднього стиснення → хибне «БРАКУЄ». Л0 REV-5: лише свіжий переказ (≤ FRESH_S), інакше «не перевірено».
 #   Подію PostCompact (поле compact_summary, code.claude.com/docs/en/hooks.md, 18.11.2026) НЕ беремо: її треба вписати в setup script середовища (рішення Konst),
 #   а журнал дає той самий текст без правки середовища.
-# Запуск: echo '<json SessionStart>' | python3 postcompact_check.py hook     ·     python3 postcompact_check.py selftest  (зуби — 12 випадків на тимчасових репо)
+# Запуск: echo '<json SessionStart>' | python3 postcompact_check.py hook     ·     python3 postcompact_check.py selftest  (зуби — 15 випадків на тимчасових репо; PC_INJECT=race → ✗ 1: стара гонка Л0)
 import glob, json, os, subprocess, sys, tempfile
 
 CAP = 10000
@@ -36,14 +37,24 @@ def facts(root, sid):
         head = git(r, 'rev-parse', '--short', 'HEAD')
         if not head: continue
         up = git(r, 'rev-parse', '--short', '@{u}')
-        dirty = [ln[3:] for ln in git(r, 'status', '--porcelain', '--untracked-files=normal').splitlines() if ln[3:]]
+        st = subprocess.run(['git', '-C', r, 'status', '--porcelain', '--untracked-files=normal'], capture_output=True, text=True).stdout   # не git(): strip() з'їдав пробіл першого рядка « M …» → «ools/…» (AE S155)
+        dirty = [ln[3:] for ln in st.splitlines() if ln[3:]]
         commits = git(r, 'log', '-20', '--grep', 'Claude-Session: .*' + sid, '--format=%h').split() if sid else []
         out.append(dict(repo=os.path.basename(r.rstrip('/')), head=head, branch=git(r, 'branch', '--show-current'),
                         pushed=(up == head) if up else None, dirty=dirty, commits=commits, summary=live_summary(r)))
     return out
 
-def from_transcript(path):
-    last = ''
+FRESH_S, WAIT_S = 120, 5   # Л0 REV-5: переказ цього стиснення — не старший за 2 хв; нема — чекаємо до 5 с, далі «не перевірено»
+
+def _ts(r):
+    try:
+        from datetime import datetime
+        return datetime.fromisoformat(r['timestamp'].replace('Z', '+00:00')).timestamp()
+    except (KeyError, ValueError, AttributeError, TypeError): return None
+
+def read_summary(path):
+    """Останній переказ журналу: (текст, час або None)."""
+    last, ts = '', None
     if path and os.path.exists(path):
         for ln in open(path, encoding='utf-8', errors='replace'):
             if '"isCompactSummary"' not in ln: continue
@@ -52,7 +63,22 @@ def from_transcript(path):
             if r.get('isCompactSummary'):
                 c = (r.get('message') or {}).get('content', '')
                 last = c if isinstance(c, str) else ' '.join(x.get('text', '') for x in c if isinstance(x, dict))
-    return last
+                ts = _ts(r)
+    return last, ts
+
+def from_transcript(path, now=None, wait=WAIT_S):
+    """Переказ САМЕ цього стиснення. Гонка (AE S155, стиснення 3, 18.11.2026): гачок прочитав переказ попереднього стиснення
+    (рядок 1904, 2 год тому), бо новий (рядок 2746) ще не був у файлі, — і видав хибне «БРАКУЄ HEAD … нема 19 з 20».
+    Тепер: переказ старший за FRESH_S → чекаємо до wait с; однаково старий → ('', вік) — звіт каже «не перевірено», не «БРАКУЄ».
+    Без часу в рядку (старий формат, фікстура) — приймаємо як є. Повертає (текст, вік_с або None)."""
+    import time
+    t0 = time.time()
+    while True:
+        text, ts = read_summary(path)
+        age = None if ts is None else (now or time.time()) - ts
+        if age is None or age <= FRESH_S: return text, None
+        if time.time() - t0 >= wait: return '', age
+        time.sleep(0.5)
 
 def missing(text, fs):
     m = []
@@ -65,7 +91,7 @@ def missing(text, fs):
             m.append(f"незакомічене в {f['repo']} ({len(f['dirty'])}: {', '.join(f['dirty'][:3])})")
     return m
 
-def report(text, fs):
+def report(text, fs, stale=None):
     L = ['Після стиснення: переказ — не джерело; джерело — репо. Факти від програми (postcompact_check, на цю мить):']
     if not fs: return L[0] + '\nⓘ репо сесії не знайдено — звіряти нема з чим.'
     for f in fs:
@@ -75,7 +101,8 @@ def report(text, fs):
         if f['commits']: s += f" · комітів сесії {len(f['commits'])}"
         if f['summary']: s += f" · живе самері {f['summary']}"
         L.append(s)
-    if not text: L.append('ⓘ тексту переказу в журналі сесії нема — звірити не було з чим; прочитай §0 живого самері.')
+    if stale is not None: L.append(f'ⓘ переказу ЦЬОГО стиснення ще нема в журналі (останній — {int(stale // 60)} хв тому, від попереднього) — переказ НЕ перевірено машиною; звір його сам із §0 живого самері й фактами вище.')
+    elif not text: L.append('ⓘ тексту переказу в журналі сесії нема — звірити не було з чим; прочитай §0 живого самері.')
     else:
         m = missing(text, fs)
         L.append('✓ переказ тримає HEAD кожного репо, коміти сесії й живе самері.' if not m else
@@ -84,7 +111,9 @@ def report(text, fs):
 
 def hook(inp, root, sid):
     if inp.get('source') != 'compact': return ''
-    t = report(from_transcript(inp.get('transcript_path', '')), facts(root, sid))
+    text, stale = from_transcript(inp.get('transcript_path', ''), wait=float(os.environ.get('LENS_PC_WAIT', WAIT_S)))
+    if os.environ.get('PC_INJECT') == 'race': text, stale = read_summary(inp.get('transcript_path', ''))[0], None   # зуб Л0: стара поведінка
+    t = report(text, facts(root, sid), stale)
     return json.dumps({'hookSpecificOutput': {'hookEventName': 'SessionStart', 'additionalContext': t}}, ensure_ascii=False)
 
 def env_sid():
@@ -117,6 +146,9 @@ def selftest():
     case('живе самері — за комітом, не за mtime (свіжий клон)', 'AE_SUMMARY_2026-01-01.md' in rep('') and 'AE_SUMMARY_2026-01-02' not in rep(''))
     open(f'{r}/draft_x.py', 'w').write('x')
     case('незакомічене, про яке переказ мовчить → ⚠ з назвою файла', 'незакомічене в repoA (1: draft_x.py)' in rep(good))
+    open(f'{r}/docs/summary/AE_SUMMARY_2026-01-01.md', 'a').write('x')   # змінений відстежуваний файл першим рядком « M …»
+    case('змінений файл першим рядком status — шлях цілий, без з\'їденої літери (AE S155: «ools/…»)', ': docs/summary/AE_SUMMARY_2026-01-01.md' in rep(good))
+    sh(r, 'git', 'checkout', '-q', '--', 'docs/summary/AE_SUMMARY_2026-01-01.md')
     case('незакомічене, назване в переказі → ✓', '✓ переказ тримає' in rep(good + ' · не закомічено draft_x.py'))
     os.remove(f'{r}/draft_x.py')
     bare = t + '/remote.git'; subprocess.run(['git', 'init', '-q', '--bare', bare], check=True, capture_output=True)
@@ -132,6 +164,16 @@ def selftest():
     case('гачок: переказ із журналу сесії (isCompactSummary) → чинний JSON SessionStart ≤ 10 000, ✓',
          (lambda d: d['hookSpecificOutput']['hookEventName'] == 'SessionStart' and len(d['hookSpecificOutput']['additionalContext']) <= CAP
           and '✓ переказ тримає' in d['hookSpecificOutput']['additionalContext'])(json.loads(o)))
+    old_row = lambda txt, ts: json.dumps({'type': 'user', 'timestamp': ts, 'isCompactSummary': True, 'message': {'content': [{'type': 'text', 'text': txt}]}}) + '\n'
+    tr2 = t + '/tr2.jsonl'; open(tr2, 'w').write(old_row('щось робили', '2020-01-01T00:00:00.000Z'))
+    os.environ['LENS_PC_WAIT'] = '0'
+    o2 = json.loads(hook({'source': 'compact', 'transcript_path': tr2}, w, 'TESTSID'))['hookSpecificOutput']['additionalContext']
+    case('Л0 гонка: у журналі лише переказ ПОПЕРЕДНЬОГО стиснення → «НЕ перевірено», без хибного «БРАКУЄ» (AE S155)', 'НЕ перевірено' in o2 and 'БРАКУЄ' not in o2)
+    from datetime import datetime, timezone
+    fresh = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+    open(tr2, 'a').write(old_row('щось робили', fresh))
+    o3 = json.loads(hook({'source': 'compact', 'transcript_path': tr2}, w, 'TESTSID'))['hookSpecificOutput']['additionalContext']
+    case('Л0: свіжий переказ без HEAD → «БРАКУЄ», як і раніше (свіжість не глушить справжню тривогу)', 'БРАКУЄ' in o3 and 'НЕ перевірено' not in o3)
     case('SessionStart не після стиснення (startup · resume) → тиша', hook({'source': 'startup'}, w, 'TESTSID') == '' == hook({'source': 'resume'}, w, 'TESTSID'))
     case('репо нема → «ⓘ репо не знайдено», не мовчазне ✓', 'не знайдено' in report(good, facts(t + '/none', 'TESTSID')))
     print(f'─── postcompact_check selftest: {n - bad}/{n} ───'); return 1 if bad else 0
