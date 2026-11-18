@@ -192,7 +192,7 @@ display-only елементи з inline `<em>` → `pointer-events:none` (double
 
 ## A27. Reduce-motion + no-transition при init
 
-`@media(prefers-reduced-motion:reduce){ animation:none }`. Anti-fade на launch (CSS vars міняються при applyTheme): додати `.no-transition` (`transition:none!important`) → `applyTheme()` → зняти через **double `requestAnimationFrame`** (гарантія, що клас додано й знято в різних frames). Косметичний uplift.
+`@media(prefers-reduced-motion:reduce){ animation:none }`. Anti-fade на launch (CSS vars міняються при applyTheme): додати `.no-transition` (`transition:none!important`) → `applyTheme()` → зняти через **double `requestAnimationFrame`** (гарантія, що клас додано й знято в різних frames). Косметичний uplift. **Те саме — на кожне перемикання теми** (не лише на старті): без глушника кожна transition-властивість анімується — розмазка по екрану; у стенді це шум у кадрі, який судимо, — вада приладу, не продукту (лоток `К-6`, перегляд 18.11.2026).
 
 ## A28. Storage event — multi-window sync
 
