@@ -24,7 +24,7 @@
 html.pwa-full .nav-i{ padding-top:8px; padding-bottom:calc(8px + var(--sab)); }  /* PWA: padding на ЕЛЕМЕНТ */
 ```
 
-Інакше: порожнеча між іконками і home indicator АБО іконки під ним (нетапаються). Anti-pattern: padding на контейнер у PWA.
+Інакше: порожнеча між іконками і home indicator АБО іконки під ним (нетапаються). Anti-pattern: padding на контейнер у PWA. **Межа:** це про бар **у потоці**; бар **поверх вмісту** (A55, A56 — `.bottom-nav` overlay) тримає відступ саме на контейнері — там це еталон, не анти (FAB-1 С1, 18.11.2026).
 
 ## A16. App-bar scroll elevation
 
@@ -32,7 +32,7 @@ html.pwa-full .nav-i{ padding-top:8px; padding-bottom:calc(8px + var(--sab)); } 
 
 ## A17. Bottom sheet — структура
 
-`.sh-bg` (fixed inset:0, backdrop, flex-end, z:300) → `.sh-box` (`border-radius:16px 16px 0 0`, `max-height:85dvh`, `overflow-y:auto`, `padding-bottom:env(safe-area-inset-bottom)`) → `.sh-grip-w/.sh-grip` + `.sh-head`(title+×).
+`.sh-bg` (fixed inset:0, backdrop, flex-end, z:300) → `.sh-box` (`border-radius:16px 16px 0 0`, `max-height:85dvh`, рама **не** гортається — `overflow:hidden` + flex-колонка, гортається лише середина `.sh-list` (будова — A108), `padding-bottom:env(safe-area-inset-bottom)`) → `.sh-grip-w/.sh-grip` + `.sh-head`(title+×).
 
 ## A18. Bottom sheet — enter/exit анімація
 
@@ -97,7 +97,8 @@ function addSwipeClose(bgId, closeFn){
   const box = document.querySelector('#'+bgId+' .sh-box');
   if(!box || box._sw) return; box._sw = true;                 // guard (A21)
   let sy=0, ss=0, gt=false, ig=false;
-  box.addEventListener('touchstart', e=>{ sy=e.touches[0].clientY; ss=box.scrollTop;
+  const sc = box.querySelector('.sh-list') || box;            // скролер — середина (A108), не рама: у рами scrollTop завжди 0
+  box.addEventListener('touchstart', e=>{ sy=e.touches[0].clientY; ss=sc.scrollTop;
     gt=!!e.target.closest('.sh-grip-w');
     ig=!!e.target.closest('.fg-grid')||!!e.target.closest('.pk-list')||!!e.target.closest('.cal-grid')||!!e.target.closest('.mg-grid')||!!e.target.closest('.mg-y');
   },{passive:true});
@@ -107,7 +108,7 @@ function addSwipeClose(bgId, closeFn){
 }
 ```
 
-Grip `dy>40` завжди; контент закриває ТІЛЬКИ якщо `scrollTop===0` на старті AND `dy>64`. **Не** просте `dy>N` без scrollTop — агресивне закриття при скролі вгору.
+Grip `dy>40` завжди; контент закриває ТІЛЬКИ якщо `scrollTop===0` **скролера** на старті AND `dy>64` (скролер — `.sh-list` за A108; до 18.11.2026 тут стояв `box.scrollTop`, що в шіті A108 завжди 0 — свайп униз у прокрученому списку закривав би шіт; FAB-1 С2, **пристроєм не перевірено** — перший продукт, що візьме, звіряє на телефоні). **Не** просте `dy>N` без scrollTop — агресивне закриття при скролі вгору.
 
 **❗ Прапор `ig` (ignore-list) — обов’язкова частина, не опція (batch41).** Якщо touchstart почався на внутрішньому скрольному/інтерактивному елементі (`.fg-grid` гейдж · `.pk-list` тап-селект · `.cal-grid`/`.mg-grid` сітки календаря · `.mg-y` рік-пігулка) — вертикальний свайп там НЕ закриває шіт (`!ig`-гард). Без нього скрол списку всередині шіта або горизонт-свайп по сітці тягне шіт донизу й закриває його. **При порту/новому шіті:** будь-який доданий усередину скрольний список або власний-свайп елемент (A44) ОБОВ’ЯЗКОВО додати в `ig`-набір. Крос-реф: A33 (cal/mg-grid), A44 (горизонт-свайп), A53 (pk-list), A50/A60 (рік-пігулка). *(Drive Lens, підтверджено аудитом batch41 Round 3.)*
 
