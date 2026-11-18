@@ -171,7 +171,7 @@ Guard через property на DOM-елементі: `if(box._sw) return; box._s
 **iOS / пастка:** swipe-to-close sheet (A19) МУСИТЬ тримати `.cal-grid` (і `.mg-grid`) у прапорі `ig` (`touchstart`), інакше вертикальний свайп по гриду закриває sheet. Власний горизонт-свайп календаря (A44) із цим не конфліктує: горизонталь → `preventDefault`+`calStep`; вертикаль → ax=‘y’, без preventDefault, але `.cal-grid` в `ig` → sheet не закривається (нейтрально). Tap-target клітинки `height:42px`.
 
 **Reuse:** KPI Lens періоди, QR Lens вікно візитів — будь-який Lens із date-range scope. Drop-in: грид+state-machine+хедер+свайп+фікс-висота+вікенд-тинт — цілісний компонент.
-*(Tap/sweep/ignore — Drive Lens Batch 11, device-валідовано iPhone dark+light. Хедер/межі — Batch 24. Свайп/фікс-висота/вікенд-тинт — Batch 25, **device-test pending**.)*
+*(Tap/sweep/ignore — Drive Lens Batch 11, device-валідовано iPhone dark+light. Хедер/межі — Batch 24. Свайп/фікс-висота/вікенд-тинт — Batch 25, **device-test pending** (стан і дата звірки — том 5, A44).)*
 
 -----
 
