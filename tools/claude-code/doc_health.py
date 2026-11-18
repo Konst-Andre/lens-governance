@@ -102,6 +102,7 @@ def scan(root):
     found += dead_sections(root)
     found += unchecked_rules(root)
     found += orphan_tools(root)
+    found += hook_rows(root)
     found += cookbook(root)
     found += copies(root)
     found += spread(root)
@@ -264,6 +265,19 @@ def cookbook(root, now=None):
     return out
 
 
+def hook_rows(root):
+    """M16: гачок, якого кличе диспетчер, без рядка в реєстрі «Гачки» `tools/claude-code/CLAUDE_CODE.md` (FAB-1 F3, 18.11.2026:
+    реєстр відстав від шапок мовчки — рядок `review-remind` описував зняте нагадування). Лише в ядрі (є диспетчер і реєстр)."""
+    disp, reg = os.path.join(root, 'tools/claude-code/hooks/lens-hooks.sh'), os.path.join(root, 'tools/claude-code/CLAUDE_CODE.md')
+    if not (os.path.isfile(disp) and os.path.isfile(reg)): return []
+    code = '\n'.join(l for l in open(disp, encoding='utf-8', errors='replace') if not l.lstrip().startswith('#'))
+    names = sorted({n for n in re.findall(r'([A-Za-z_-]+\.(?:sh|py))', code) if os.path.isfile(os.path.join(root, 'tools/claude-code/hooks', n))})
+    sec = re.search(r'(?ms)^## Гачки.*?(?=^## |\Z)', open(reg, encoding='utf-8', errors='replace').read())
+    t = sec.group(0) if sec else ''
+    return [('M16', f'tools/claude-code/hooks/{n}', 'гачок диспетчера без рядка в реєстрі «Гачки» CLAUDE_CODE.md — рядок: подія · що робить · зуби')
+            for n in names if f'hooks/{n}' not in t]
+
+
 def orphan_tools(root):
     """M9: прилад (tools/ · .claude/ · .github/), про який не каже жоден живий .md — ім'я без розширення."""
     ls = subprocess.run(['git', '-c', 'core.quotePath=false', 'ls-files', 'tools', '.claude', '.github'], cwd=root, capture_output=True, text=True).stdout.split('\n')
@@ -372,7 +386,7 @@ def line(root):
     if not f: return '✓', f'документи: ✓ щосесійні ≤ {M1_LINES} рядків і {M1_CHARS} знаків · старт ≤ {M2_KB} КБ · розділи ≤ {M3_KB} КБ · великі з маршрутом · копій нема' + note
     by = {}
     for m, *_ in f: by[m] = by.get(m, 0) + 1
-    name = {'M1': 'щосесійні задовгі', 'M2': 'файли старту завеликі', 'M3': f'розділів > {M3_KB} КБ', 'M4': f'> {M4_KB} КБ без маршруту', 'M5': 'мертвих шляхів', 'M9': 'приладів без згадки', 'M6': 'черга відстала від самері', 'M7': 'мертвих адрес §', 'M8': 'правил без «Як перевірити»', 'M10': 'свіжих рецептів без дати джерела', 'M11': f'рецептів > {M11_DAYS} дн. без звірки', 'M13': 'копій між щосесійними', 'M14': 'копій щосесійного шару в документах', 'M12': 'посилань на неіснуючий рецепт'}
+    name = {'M1': 'щосесійні задовгі', 'M2': 'файли старту завеликі', 'M3': f'розділів > {M3_KB} КБ', 'M4': f'> {M4_KB} КБ без маршруту', 'M5': 'мертвих шляхів', 'M9': 'приладів без згадки', 'M16': 'гачків без рядка в реєстрі', 'M6': 'черга відстала від самері', 'M7': 'мертвих адрес §', 'M8': 'правил без «Як перевірити»', 'M10': 'свіжих рецептів без дати джерела', 'M11': f'рецептів > {M11_DAYS} дн. без звірки', 'M13': 'копій між щосесійними', 'M14': 'копій щосесійного шару в документах', 'M12': 'посилань на неіснуючий рецепт'}
     worst = max((x for x in f if x[0] == 'M3'), key=lambda x: float(re.search(r'(\d+) КБ', x[2])[1]), default=None)
     return '⚠', 'документи: ' + ' · '.join(f'{name[m]} {n}' for m, n in sorted(by.items())) + (f' (найбільший — {worst[1]} {worst[2]})' if worst else '') + ' — деталі: doc_health.py --list' + note
 
@@ -398,6 +412,8 @@ def selftest():
              ('## з двома ### по 10 КБ → ✓ (точково береться ###)', {'lens/D.md': '## Великий\n' + sec(1) + '### А\n' + 'х' * 5120 + '\n### Б\n' + 'х' * 5120 + '\n'}, '✓', ''),
              ('профіль 18 КБ одним розділом (читається цілком) → ✓, не M3', {'tools/claude-code/PROFILE.md': sec(18)}, '✓', ''),
              ('архів не рахується → ✓', {'archive/X_CHERGA.md': sec(40)}, '✓', ''),
+             ('гачок диспетчера без рядка в реєстрі → ⚠ M16 (FAB-1 F3; коментар — не виклик)', {'tools/claude-code/hooks/lens-hooks.sh': 'bash "$d/foo-guard.sh"\n# bar.sh — лише коментар\n', 'tools/claude-code/hooks/foo-guard.sh': 'x', 'tools/claude-code/hooks/bar.sh': 'x', 'tools/claude-code/CLAUDE_CODE.md': '## Гачки\n| `hooks/lens-hooks.sh` | — |\n## Інше\nfoo-guard bar\n'}, '⚠', 'гачків без рядка в реєстрі 1'),
+             ('гачок з рядком у реєстрі → ✓', {'tools/claude-code/hooks/lens-hooks.sh': 'bash "$d/foo-guard.sh"\n# bar.sh — лише коментар\n', 'tools/claude-code/hooks/foo-guard.sh': 'x', 'tools/claude-code/hooks/bar.sh': 'x', 'tools/claude-code/CLAUDE_CODE.md': '## Гачки\n| `hooks/lens-hooks.sh` | — |\n| `hooks/foo-guard.sh` | Stop |\n## Інше\nbar\n'}, '✓', ''),
              ('M3: журнал історії (AUDIT) 20 КБ одним розділом → ✓', {'lens/P_AUDIT.md': sec(20)}, '✓', ''),
              ('M3: розділ — блок коду 20 КБ → ✓; той самий обсяг текстом → ⚠', {'lens/M.md': '## Код\n```css\n' + 'a' * 20480 + '\n```\n', 'lens/T.md': sec(20)}, '⚠', 'розділів > 16 КБ 1'),
              ('не-Lens: найновіше самері 30 КБ → ⚠ M2', {'docs/summary/P_SUMMARY_2026-10-01.md': sec(3), 'docs/summary/P_SUMMARY_2026-10-18_s2.md': sec(30)}, '⚠', 'файли старту завеликі 1'),
