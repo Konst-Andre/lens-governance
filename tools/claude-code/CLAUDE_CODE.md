@@ -45,7 +45,7 @@
 Поруч — `tools/cloudflare/` (`CLOUDFLARE.md` правила й бюджет спільного акаунта · `cf_budget.sh` замір для `env_check`): потрібен
 кожному репо, що живе на Cloudflare.
 
-Живі зразки: `AirLens` (воркер + Mini App, документація в `docs/`), `AE-Simulator` (сайт на Cloudflare Pages у `site/`, редактор через воркер).
+Живі зразки: `AirLens` (воркер + Mini App, документація в `docs/`), `AE-Simulator` (сайт — воркер Cloudflare з `site/`, редактор через воркер `ae-edit`).
 
 ## Прилади продуктів — зразки для інших (кандидати в ядро)
 
