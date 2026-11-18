@@ -10,7 +10,7 @@
 #          python3 tools/claude-code/handoff_check.py revision [<корінь>] [--table]    → ревізія + печатка «ревізія ✓ · HEAD … · ✗ 0» (REV-1 · REV-4); --table — заготовка таблиці з git log
 #          HC_INJECT=rev4 … selftest → ✗ (зуб REV-4: коміти без запису не бачить, печатку не звіряє)
 # «Свої» коміти — за трейлером Claude-Session ≡ CLAUDE_CODE_REMOTE_SESSION_ID (cse_X ↔ session_X); нема змінної — усі коміти агента.
-import glob, os, re, subprocess, sys, tempfile, time
+import glob, json, os, re, subprocess, sys, tempfile, time
 
 KERNEL_NAMES = ('lens-governance',)
 EXT = r'(?:md|sh|py|mjs|js|json|toml|ya?ml|html|htm|css|xlsx|txt|csv)'
@@ -97,6 +97,91 @@ def check_paths(repo, text, where, lines):
     if bare: lines.append(('✗', f'{where}: голі назви (новий агент не знайде) — ' + ' · '.join(bare[:8]) + ' → дай повний шлях'))
     if other: lines.append(('ⓘ', f'{where}: шляхи інших репо не звірено (нема поруч) — ' + ', '.join(sorted(other))))
     if not dead and not bare: lines.append(('✓', f'{where}: шляхи живі ({n})'))
+
+
+ID_RE = r'[A-Z][A-Z0-9]*-[A-Z0-9]+(?:\.\d+)?'
+NOW_RE = re.compile(r'ЗАРАЗ|ПЕРШИЙ|ПЕРШИМ|першим кроком')
+
+def absence(repo, text, s0, st, sm, qf, tail, L):
+    """REV-5 Л1: (11) рішення сесії ⇒ черга чи бриф · (13) стартове не старше за §0 · (14) id відкритого пункту не був закритий · (15) §1 по порядку.
+    (12) зображення Konst ⇒ файл у репо — рівень сесії, у report() (журнал сесії один на всі репо)."""
+    qtxt = open(qf[0], encoding='utf-8').read() if qf else ''
+    # (11) В-N, доданий комітами сесії, ⇒ згаданий у ЧЕРЗІ (Л1 як прийняв Konst 18.11: «рішення ⇒ рядок черги тієї ж сесії») або позначений
+    #      виконаним (✅ у тексті рішення). Бриф і §0 — не дім: S155 В-408 · В-409 стояли в брифах і §0, а черга (її «ЧИННИЙ ПОРЯДОК») їх не знала —
+    #      новий агент іде з черги. Повтор на AE 214c2f1: з брифом як домом діра ① мовчала.
+    for dp in ('docs/DECISIONS.md', 'lens/DECISIONS.md'):
+        fp = os.path.join(repo, dp)
+        if not os.path.isfile(fp): continue
+        if not tail: L.append(('ⓘ', '(11) рішення сесії ⇒ черга: не перевірено — нема ідентифікатора сесії')); continue
+        added = sorted(set(re.findall(r'^\+- \*\*([ВB]-\d+)\*\*', git(repo, 'log', f'--grep=session_{tail}', '-p', '--format=', '--', dp), re.M)), key=lambda x: int(x[2:]))
+        dtext = open(fp, encoding='utf-8').read()
+        def entry(v):
+            m = re.search(r'^- \*\*' + re.escape(v) + r'\*\*.*?(?=^- \*\*[ВB]-\d+\*\*|\Z)', dtext, re.M | re.S); return m.group(0) if m else ''
+        lost = [v for v in added if entry(v) and '✅' not in entry(v) and not re.search(r'(?<![\w-])' + re.escape(v) + r'(?!\d)', qtxt)]
+        if lost: L.append(('✗', f'(11) рішення сесії без рядка черги: {", ".join(lost)} — новий агент іде з черги (бриф і §0 — не дім); В-N у рядок пункту черги, або «✅ виконано» в самому рішенні'))
+        elif added: L.append(('✓', f'(11) рішення сесії в черзі: {len(added)}'))
+    # (13) стартове не старше за §0: (а) id із заголовка рядка §0 з «ЗАРАЗ / ПЕРШИЙ» — у стартовому; (б) §0 мінявся комітами сесії після
+    #      останньої зміни стартового → ⚠ (тиша — «стартове: без змін» у коміті, як «бриф: без змін»)
+    if s0 and st:
+        need = sorted({i for ln in s0.splitlines() for head in [ln.split(':**', 1)[0] if ':**' in ln else ''] if NOW_RE.search(head)
+                       for i in re.findall(r'(?<![\w-])' + ID_RE + r'(?![\w-])', head)})
+        miss = [i for i in need if i not in st]
+        if miss: L.append(('✗', f'(13) стартове мовчить про те, що §0 називає першим: {", ".join(miss)} — новий агент почне не з того'))
+        if tail:
+            n, seen_st = 0, False
+            for c in git(repo, 'log', '--format=%H', f'--grep=session_{tail}', '--', sm).split():
+                cur, prev = git(repo, 'show', f'{c}:{sm}'), git(repo, 'show', f'{c}^:{sm}')
+                if (starter(cur) or '') != (starter(prev) or ''): seen_st = True; break
+                if (section(cur, r'^## §0') or '') != (section(prev, r'^## §0') or '') and not re.search(r'стартове\s*:\s*без змін', git(repo, 'log', '-1', '--format=%B', c), re.I): n += 1
+            if n and seen_st: L.append(('✗' if n >= 3 else '⚠', f'(13) стартове старше за §0 на {n} коміт(ів) сесії — перечитай його «як є» (або «стартове: без змін — чому» у коміті)'))
+    # (14) id відкритого пункту вже був і закрився (S155: `REV-2` узято вдруге — новий агент знайшов закритий з тим самим id): історія файла черги —
+    #      рядок `| `id` |` додано → прибрано → додано знову. git log -S рахує зміну ЧИСЛА входжень (правка рядка число не міняє); --pickaxe-regex —
+    #      POSIX ERE, тому без \s (git-scm diffcore-pickaxe; baeldung.com/ops/git-commit-search-string, 18.11.2026)
+    if qf:
+        op = qtxt[qtxt.find('## Відкрите'):] if '## Відкрите' in qtxt else ''
+        k = op.find('\n## ', 5); op = op[:k] if k > 0 else op
+        rel = os.path.relpath(qf[0], repo)
+        again = []
+        for i in sorted(set(re.findall(r'(?m)^\|\s*\*{0,2}`(' + ID_RE + r')`', op))):
+            hist = git(repo, 'log', '--format=%h', '--pickaxe-regex', '-S', r'\| *\*{0,2}`' + i.replace('.', r'\.') + r'`\*{0,2} *\|', '--', rel).split()
+            if len(hist) >= 3: again.append(f'{i} ({len(hist)} змін)')
+        if again: L.append(('✗', '(14) id відкритого пункту вже був закритий раніше — новий агент сплутає: ' + ' · '.join(again[:5]) + ' → наступний вільний id (повтор старої вади — назви його в рядку)'))
+    # (15) рядки §1 по порядку (S155: «історія §1 не по порядку»)
+    s1 = section(text, r'^## §1')
+    if s1:
+        nums = [int(m.group(1)) for m in re.finditer(r'(?m)^(\d+)\. ', s1)]
+        br = next((f'{a} → {b}' for a, b in zip(nums, nums[1:]) if b <= a), None)
+        if br: L.append(('✗', f'(15) §1 не по порядку: {br} — новий агент читає історію навпаки'))
+
+def session_transcript():
+    """Журнал сесії Claude Code: LENS_TRANSCRIPT або найсвіжіший ~/.claude/projects/*/*.jsonl (поточна сесія пише в нього просто зараз)."""
+    p = os.environ.get('LENS_TRANSCRIPT')
+    if p: return p if os.path.isfile(p) else None
+    xs = glob.glob(os.path.expanduser('~/.claude/projects/*/*.jsonl'))
+    return max(xs, key=os.path.getmtime) if xs else None
+
+IMG_EXT = ('.png', '.jpg', '.jpeg', '.webp', '.gif', '.avif')
+
+def attachments(repos, tr=None):
+    """(12) REV-5 Л1: зображення, які Konst прислав у чат (блок image у повідомленні user, не знімки інструментів), ⇒ стільки ж файлів-зображень
+    у комітах сесії або рядок «не зберігаємо — <чому>» у самері (S155: концепти Konst жили лише в чаті). → (знак, текст) або None."""
+    if os.environ.get('HC_INJECT') == 'rev5': return None   # зуб selftest
+    tr = tr or session_transcript()
+    if not tr or not os.path.isfile(tr): return ('ⓘ', '(12) вкладення Konst: не перевірено — журналу сесії нема')
+    n = 0
+    for ln in open(tr, encoding='utf-8', errors='replace'):
+        if '"image"' not in ln: continue
+        try: r = json.loads(ln)
+        except ValueError: continue
+        c = (r.get('message') or {}).get('content')
+        if r.get('type') == 'user' and not r.get('isCompactSummary') and isinstance(c, list): n += sum(1 for x in c if isinstance(x, dict) and x.get('type') == 'image')
+    if not n: return None
+    tail = mine_tail()
+    if not tail: return ('ⓘ', f'(12) вкладення Konst: {n} у чаті — не перевірено, чи в репо (нема ідентифікатора сесії)')
+    saved = sum(1 for r in repos for f in git(r, 'log', f'--grep=session_{tail}', '--diff-filter=A', '--name-only', '--format=').split('\n') if f.lower().endswith(IMG_EXT))
+    said = any(re.search(r'не зберігаємо', open(s, encoding='utf-8').read(), re.I) for s in filter(None, (latest_summary(r) for r in repos)))
+    if saved >= n or said: return ('✓', f'(12) вкладення Konst: {n} у чаті · {saved} у репо' + (' · «не зберігаємо» у самері' if said else ''))
+    return ('✗', f'(12) вкладення Konst лише в чаті: {n} зображень, у комітах сесії — {saved} → копія в репо (docs/shots/…) або рядок «не зберігаємо — чому» в самері')
 
 
 def mine_tail():
@@ -269,6 +354,11 @@ def check_repo(repo, now=None):
         #   «не загубитись» (В-397) тримає свій рядок «Відкрите» + «бриф-сирота»; тут — лише рядок > 2000 знаків без брифу (тригер «рядок черги > 2000»)
         nob = [m.group(1) for l in op.splitlines() for m in [re.match(r'^\|\s*\*{0,2}`([^`]+)`', l)] if m and len(l) > 2000 and not re.search(r'_brief\.md', l)]
         if nob: L.append(('⚠', 'рядок черги > 2000 знаків без брифу — час для брифу (тригер `CLAUDE.md` ядра): ' + ' · '.join(nob[:6]) + ' → tools/claude-code/templates/BRIEF_template.md'))
+    # (11)–(15) REV-5 Л1 (Konst AE S155, 18.11.2026: «ревізія ✓, а купа дірок… ліки»): перевірки ВІДСУТНОСТІ. Корінь: (1)–(10) судять те, що є
+    #   (шлях живий, самері не відстає), а діра S155 — те, чого нема (рішення без рядка черги, стартове старе, id уже був). Світ: «Handoff Debt»
+    #   (arXiv 2606.02875, 06.2026; 18.11.2026) — передачу губить саме відсутнє: непояснені зміни й докази перевірки. HC_INJECT=rev5 вимикає — зуб selftest.
+    if os.environ.get('HC_INJECT') != 'rev5':
+        absence(repo, text, s0, st, sm, qf, tail, L)
     # (7) незбережене: контейнер скинеться — пропаде
     dirty = [x for x in subprocess.run(['git', '-C', repo, 'status', '--porcelain'], capture_output=True, text=True).stdout.split('\n') if x.strip()]
     if dirty: L.append(('✗', f'незакомічене: {len(dirty)} ({", ".join(x[3:] for x in dirty[:4])}) — коміт і push до переїзду'))
@@ -376,6 +466,8 @@ def report(repos):
         print(f'— {name}')
         for s, t in L:
             print(f'  {s} {t}'); bad |= s == '✗'
+    a = attachments([os.path.abspath(r) for r in repos])
+    if a: print('— сесія'); print(f'  {a[0]} {a[1]}'); bad |= a[0] == '✗'
     print('— гачки')
     for s, t in hooks_journal([os.path.abspath(r) for r in repos]):
         print(f'  {s} {t}'); bad |= s == '✗'
@@ -491,6 +583,7 @@ NOT_CODE = ('.md', '.json', '.webp', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.
 
 def selftest():
     os.environ['LENS_KERNEL_TMP'] = os.path.join(tempfile.gettempdir(), 'hc-no-kernel-clone')   # фікстури не бачать /tmp/lens-governance контейнера
+    _e = tempfile.mkstemp(suffix='.jsonl')[1]; os.environ['LENS_TRANSCRIPT'] = _e   # REV-5 (12): фікстури не бачать справжній журнал сесії (у ньому зображення Konst)
     def sh(d, *c): subprocess.run(c, cwd=d, check=True, capture_output=True)
     def mk(summary, extra=None, commit_after=False, new_after=False, both=False, dirty=False, code_after=False, data_after=False):
         d = tempfile.mkdtemp(prefix='hc-'); r = os.path.join(d, 'Prod'); os.makedirs(os.path.join(r, 'sessions')); os.makedirs(os.path.join(r, 'lens'))
@@ -599,6 +692,33 @@ def selftest():
         ('(10) короткий рядок без брифу → тиша (AE S155: бриф за тригером, не на кожен пункт)', mk_nl(good_nl, '## Відкрите\n| `AE-W` | x | 18.10.2026 | y |\n'), '!без брифу'),
         ('(10) рядок «Відкрите» зі шляхом брифу → без «без брифу»', mk_nl(good_nl), '!без брифу'),
     ]
+    # REV-5 Л1 (11)(13)(14)(15): діри AE S155 — кожна мусить дати ✗ (13б — ⚠); чиста фікстура — тиша (справа вгорі: mk_nl(good_nl))
+    def mk5(summary=None, q=Q10, dec=None, steps=()):
+        r = mk_nl(summary or good_nl, q)
+        if dec is not None:   # В-1 — від попередньої сесії, В-2 — додано цією
+            open(os.path.join(r, 'docs/DECISIONS.md'), 'w').write(dec.split('\n', 1)[1]); sh(r, 'git', 'add', '-A'); sh(r, 'git', 'commit', '-qm', 'старе\n\nClaude-Session: https://claude.ai/code/session_OLD')
+            open(os.path.join(r, 'docs/DECISIONS.md'), 'w').write(dec); sh(r, 'git', 'commit', '-qam', 'рішення\n\nClaude-Session: https://claude.ai/code/session_T')
+        for path, body, msg in steps:
+            fp = os.path.join(r, path); os.makedirs(os.path.dirname(fp), exist_ok=True); open(fp, 'w').write(body)
+            sh(r, 'git', 'add', '-A'); sh(r, 'git', 'commit', '-qm', msg + '\n\nClaude-Session: https://claude.ai/code/session_T')
+        return r
+    S5 = lambda s0, st='Старт: docs/CHERGA.md', s1='': f'# S\n## §0 ВІДКРИТЕ\n{s0}\n## §1 ХОДИ\n{s1}\n## §6 Стартове\n```text\n{st}\n```\n'
+    SM = 'docs/summary/P_SUMMARY_2026-10-18.md'
+    D5 = '- **В-2** · **нове рішення** про екран\n- **В-1** · старе\n'
+    cases += [
+        ('(11) S155 ①: рішення сесії (В-2) без рядка черги й брифу, лише в §0 → ✗', mk5(S5('- **0.1 · В-2:** далі'), dec=D5), '(11) рішення сесії без рядка черги'),
+        ('(11) рішення сесії названо в черзі → тиша', mk5(q=Q10 + '| `AE-Q` | за В-2 | 18.10.2026 | y |\n', dec=D5), '!(11)'),
+        ('(11) рішення сесії з «✅ виконано» → тиша', mk5(dec=D5.replace('про екран', 'про екран ✅ виконано `abc1234`')), '!(11)'),
+        ('(13а) S155 ③/⑤: §0 «ЗАРАЗ» називає AE-W, стартове — ні → ✗', mk5(S5('- **0.1 · AE-W — ЗАРАЗ:** крок 2')), '(13) стартове мовчить'),
+        ('(13а) стартове називає AE-W → тиша', mk5(S5('- **0.1 · AE-W — ЗАРАЗ:** крок 2', 'Старт: AE-W крок 2; docs/CHERGA.md')), '!(13) стартове мовчить'),
+        ('(13б) S155 ③: §0 змінено 2 комітами після стартового → ⚠ «старше за §0 на 2»', mk5(steps=[(SM, S5('- a'), 'с1'), (SM, S5('- b'), 'с2'), (SM, S5('- c'), 'с3')]), 'старше за §0 на 2'),
+        ('(13б) S155 ③ (повтор на AE 6c0a4db — 12 комітів): §0 змінено 3 комітами після стартового → ✗, не лише ⚠', mk5(steps=[(SM, S5('- a'), 'с1'), (SM, S5('- b'), 'с2'), (SM, S5('- c'), 'с3'), (SM, S5('- d'), 'с4')]), '✗:старше за §0 на 3'),
+        ('(13б) ті самі коміти з «стартове: без змін — …» → тиша', mk5(steps=[(SM, S5('- a'), 'с1'), (SM, S5('- b'), 'с2 стартове: без змін — дрібне'), (SM, S5('- c'), 'с3 стартове: без змін — дрібне')]), '!старше за §0'),
+        ('(14) S155 ④: id `AE-Q` додано → закрито → узято знову → ✗', mk5(steps=[('docs/CHERGA.md', Q10 + '| `AE-Q` | перше | 1 | y |\n', 'додав'), ('docs/CHERGA.md', Q10, 'закрив'), ('docs/CHERGA.md', Q10 + '| `AE-Q` | інше | 2 | y |\n', 'знову')]), '(14) id відкритого пункту'),
+        ('(14) рядок `AE-Q` лише правився (число входжень те саме) → тиша', mk5(steps=[('docs/CHERGA.md', Q10 + '| `AE-Q` | перше | 1 | y |\n', 'додав'), ('docs/CHERGA.md', Q10 + '| `AE-Q` | правка | 1 | y |\n', 'правка'), ('docs/CHERGA.md', Q10 + '| `AE-Q` | ще | 1 | y |\n', 'ще')]), '!(14)'),
+        ('(15) S155 ⑦: §1 «1 · 3 · 2» → ✗', mk5(S5('- a', s1='1. перший\n3. третій\n2. другий')), '(15) §1 не по порядку'),
+        ('(15) §1 по порядку → тиша', mk5(S5('- a', s1='1. перший\n2. другий\n3. третій')), '!(15)'),
+    ]
     bad = 0
     for name, r, want in cases:
         _, L = check_repo(r)
@@ -662,6 +782,20 @@ def selftest():
                ('REV-4 (б): записав коміт у самері → печатка «ревізія ✓ · HEAD … · ✗ 0» і в мітці', not bb and tb.splitlines()[-1].startswith('ревізія ✓') and tb.splitlines()[-1].endswith('✗ 0') and okb),
                ('REV-4 (г): новий коміт після ревізії → печатка стара', not stale),
                ('REV-4 (в): --table — заголовок «що · дім · коміт» і кожен коміт сесії', '| що | дім | коміт |' in tab and h4 in tab and 'ще прилад' in tab)]
+    # REV-5 Л1 (12): вкладення Konst — журнал сесії з 2 зображеннями user (і 1 зображенням у tool_result — не рахується)
+    trp = os.path.join(tf, 'tr.jsonl'); img = {'type': 'image', 'source': {'type': 'base64', 'data': 'x'}}
+    open(trp, 'w').write(json.dumps({'type': 'user', 'message': {'content': [{'type': 'text', 'text': 'концепти'}, img, img]}}) + '\n'
+                         + json.dumps({'type': 'user', 'message': {'content': [{'type': 'tool_result', 'content': [img]}]}}) + '\n')
+    ra = mk_nl(good_nl); a0 = attachments([ra], trp)
+    os.makedirs(os.path.join(ra, 'docs/shots')); [open(os.path.join(ra, f'docs/shots/c{i}.webp'), 'w').write('x') for i in (1, 2)]
+    sh(ra, 'git', 'add', '-A'); sh(ra, 'git', 'commit', '-qm', 'концепти\n\nClaude-Session: https://claude.ai/code/session_T'); a1 = attachments([ra], trp)
+    rb = mk_nl(good_nl.replace('- далі', '- скриншот вади — не зберігаємо: лише показ; далі')); a2 = attachments([rb], trp)
+    open(os.path.join(tf, 'tr0.jsonl'), 'w').write(json.dumps({'type': 'user', 'message': {'content': 'текст'}}) + '\n')
+    rcases += [('(12) S155 ②: 2 зображення Konst у чаті, у репо 0 → ✗ (зображення з tool_result не рахуються)', a0 and a0[0] == '✗' and '2 зображень' in a0[1]),
+               ('(12) 2 зображення збережено комітом сесії → ✓', a1 and a1[0] == '✓'),
+               ('(12) «не зберігаємо» в самері → ✓', a2 and a2[0] == '✓'),
+               ('(12) зображень нема → тиша', attachments([ra], os.path.join(tf, 'tr0.jsonl')) is None),
+               ('(12) журналу нема → ⓘ «не перевірено», не ✓', (attachments([ra], os.path.join(tf, 'none.jsonl')) or ('',))[0] == 'ⓘ')]
     os.environ.pop('LENS_REV_MARK')
     for name, ok in rcases:
         print(('✓' if ok else '✗') + ' ' + name); bad += not ok

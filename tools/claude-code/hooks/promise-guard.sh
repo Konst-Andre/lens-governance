@@ -313,7 +313,7 @@ def selftest_seal():
     G('init', '-q'); G('config', 'user.email', 't@t'); G('config', 'user.name', 't')
     open(os.path.join(r, 'docs', 'summary', 'P_SUMMARY_X.md'), 'w').write('# s\n## §0 ВІДКРИТЕ\n- далі x\n## Стартове\n```text\nСтарт: x\n```\n'); G('add', '.'); G('commit', '-qm', 'base')
     old = {k: os.environ.get(k) for k in ('LENS_ROOT', 'LENS_REV_MARK', 'LENS_SELFTEST_LOG', 'LENS_KERNEL_TMP', 'CLAUDE_CODE_SESSION_ID')}
-    os.environ.update(LENS_ROOT=root, LENS_REV_MARK=os.path.join(t, 'mark'), LENS_SELFTEST_LOG=os.path.join(t, 'no-selftest.log'), LENS_KERNEL_TMP=os.path.join(t, 'no-kernel'), CLAUDE_CODE_SESSION_ID='pgsealfixture')   # AE S150: revision у фікстурі читав справжні журнали сесії — selftest (там ✗) і спрацювання гачків (ui-guard без вердикту) → печатка ✗ ≠ очікуваної; тепер фікстура свого журналу не має
+    os.environ.update(LENS_ROOT=root, LENS_REV_MARK=os.path.join(t, 'mark'), LENS_SELFTEST_LOG=os.path.join(t, 'no-selftest.log'), LENS_KERNEL_TMP=os.path.join(t, 'no-kernel'), CLAUDE_CODE_SESSION_ID='pgsealfixture', LENS_TRANSCRIPT=os.path.join(t, 'no-transcript.jsonl'))   # REV-5 (12): фікстура не бачить справжній журнал сесії (там зображення Konst)   # AE S150: revision у фікстурі читав справжні журнали сесії — selftest (там ✗) і спрацювання гачків (ui-guard без вердикту) → печатка ✗ ≠ очікуваної; тепер фікстура свого журналу не має
     h = hck(); want = h.seal([r], 0); v = lambda m: seal_gap(m) is not None
     out = []
     out.append(('④ «ревізія ✓» без печатки → block', v('Що ти побачиш: ревізія ✓, усе в домах.')))

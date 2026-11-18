@@ -9,7 +9,7 @@
  "env_drift.py selftest": 7,
  "frame_init.sh selftest": 5,
  "handoff-remind.sh selftest": 31,
- "handoff_check.py selftest": 63,
+ "handoff_check.py selftest": 80,
  "konst-miss.sh selftest": 23,
  "lens-hooks.sh profile-test": 11,
  "lens-hooks.sh start-test": 16,
