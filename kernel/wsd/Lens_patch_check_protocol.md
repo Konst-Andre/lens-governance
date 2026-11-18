@@ -545,7 +545,7 @@ device-арбітраж (1.5) — він лише розширює набір к
 
 **Тригер.** видаю preview HTML.
 
-Перед видачею preview HTML — **переглянути файл ментально як юзер**:
+Перед видачею preview HTML — **переглянути файл ментально як юзер** (Claude Code: не «ментально» — знімок і прилад: `ui_lint`, гачок огляду UI):
 
 1. **Layout sanity** — основні блоки на правильних місцях (app-bar зверху, bottom-nav знизу, content між).
 1. **Sheet positioning** — bottom sheets / drawers не виходять за viewport, grip handle присутній.
