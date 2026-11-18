@@ -528,7 +528,7 @@ def session_log(r):
     s = os.environ.get('CLAUDE_CODE_REMOTE_SESSION_ID', ''); tail = s.split('_', 1)[1] if '_' in s else ''
     if not tail: return []
     out = []
-    for ln in git(r, 'log', '--format=%h\x1f%s', '--abbrev=7', f'--grep=session_{tail}').splitlines():
+    for ln in git(r, 'log', '--first-parent', '--format=%h\x1f%s', '--abbrev=7', f'--grep=session_{tail}').splitlines():   # --first-parent: гілку в main представляє коміт злиття (PR), його й записує самері (S155: 4 коміти AE-FAB з PR #1 — хибне «без запису»)
         h, subj = ln.split('\x1f', 1)
         out.append((h, subj, any(SUMF.search(f) for f in git(r, 'show', '--name-only', '--format=', h).split())))
     return out
@@ -537,7 +537,11 @@ def uncovered_commits(rs, text=''):
     """Коміти сесії, яких нема ні в text (відповідь агента), ні в найновішому самері жодного репо сесії. Коміт, що правив самері, — записаний
     ним самим (свій хеш у самері вписати не може). → ['репо h7', …]"""
     if os.environ.get('HC_INJECT') == 'rev4': return []
-    mem = text + ''.join(open(f, encoding='utf-8').read() for f in filter(None, (latest_summary(r) for r in rs)))
+    tail = (os.environ.get('CLAUDE_CODE_REMOTE_SESSION_ID', '').split('_', 1) + [''])[1]
+    fs = {f for f in filter(None, (latest_summary(r) for r in rs))}
+    for r in rs:   # REV-5: і всі самері, які правила ця сесія (S155: ранкові коміти — у першому самері дня, живе — `_s2`; вибір за комітом зробив їх «без запису»)
+        if tail: fs |= {os.path.join(r, f) for f in git(r, 'log', f'--grep=session_{tail}', '--name-only', '--format=').split('\n') if f and SUMF.search(f) and os.path.isfile(os.path.join(r, f))}
+    mem = text + ''.join(open(f, encoding='utf-8').read() for f in sorted(fs))
     return [f'{os.path.basename(r)} {h}' for r in rs for h, _, s in session_log(r) if not s and h not in mem]
 
 def exam_state(rs):
