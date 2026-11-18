@@ -10,6 +10,7 @@
 #   SessionStart               — профіль Konst з репо (tools/claude-code/PROFILE.md) як контекст сесії, ЛИШЕ коли в середовищі LENS_PROFILE=1: спільний акаунт, де поле
 #                                профілю в налаштуваннях бачили б і чужі чати (слово Konst 18.10.2026, QR CC-18; ACCOUNT_MOVE.md п.1-б). Старт і повтор після стиснення (без matcher —
 #                                на всі source). З 22.10.2026 (ACC-1) — на обох акаунтах; у полі акаунта тоді лише ядро (6 рядків), інакше профіль двічі. Зуби: bash lens-hooks.sh profile-test
+#                                Після стиснення (source compact) — ще ctx_watch (рядок контексту) і postcompact_check (переказ ⟂ факти git, Ж3, AE S153).
 #   PreCompact — сторож стиснення (precompact_guard.sh, нижче) · PostToolUseFailure · SubagentStop · SessionEnd — поки без гачків: вихід одразу
 # Ціна: подія без гачка й інструмент поза фільтром — лише bash, без Python (заміряно 09.10: подія без гачка ~6 мс, інструмент поза фільтром ~13 мс; повний ланцюг ~140 мс — як у CLAUDE_CODE.md).
 h="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -86,7 +87,7 @@ open(sys.argv[1],"w").write(json.dumps(r[0])+"\n"); open(sys.argv[2],"w").write(
   o="$(printf '{"session_id":"c2","hook_event_name":"UserPromptSubmit","prompt":"далі","transcript_path":"%s"}' "$t/big.jsonl" | env $e LENS_REPOS_ROOT="$t/repos" LENS_ENV_DIR="$t" LENS_MARK_DIR="$t" bash "${BASH_SOURCE[0]}" UserPromptSubmit)"
   ok "$o" "⚠ контекст 330 тис." && echo "✓ ctx_watch на повідомлення Konst: ⚠ у контексті" || { echo "✗ ctx_watch на повідомлення: «$(printf '%s' "$o" | cut -c1-120)»"; bad=1; }
   o="$(printf '{"session_id":"c3","hook_event_name":"SessionStart","source":"compact","transcript_path":"%s"}' "$t/cmp.jsonl" | env $e LENS_PROFILE=1 LENS_REPOS_ROOT="$t/repos" LENS_ENV_DIR="$t" LENS_MARK_DIR="$t" LENS_SKILLS_DIR="$t/skills" bash "${BASH_SOURCE[0]}" SessionStart)"
-  ok "$o" "Частина 1/2" "371 тис. → 14 тис." && echo "✓ ctx_watch після стиснення: «371 тис. → 14 тис.» і профіль в одному JSON" || { echo "✗ ctx_watch після стиснення: «$(printf '%s' "$o" | tail -c 160)»"; bad=1; }
+  ok "$o" "Частина 1/2" "371 тис. → 14 тис." "Факти від програми (postcompact_check" && echo "✓ ctx_watch і postcompact_check після стиснення: «371 тис. → 14 тис.», факти git і профіль в одному JSON" || { echo "✗ ctx_watch після стиснення: «$(printf '%s' "$o" | tail -c 160)»"; bad=1; }
   # В-373 (AE S145): сторож відклав автостиснення → агент чує на наступному кроці (будь-який інструмент) і лише раз на спробу
   printf 'tries=1\nctx=400000\ncap=430000\ndirty= ревізії-після-стиснення-не-було\n' > "$t/held"
   o="$(printf '{"session_id":"c4","hook_event_name":"PostToolUse","tool_name":"Edit","tool_input":{}}' | env $e LENS_HELD="$t/held" LENS_FLAG="$t/nf" LENS_MARK_DIR="$t" bash "${BASH_SOURCE[0]}" PostToolUse)"
@@ -125,6 +126,7 @@ if [ "$ev" = SessionStart ] || [ "$ev" = profile-test ]; then
   rs=0; for d in "$h"/../skills/*/; do [ -f "$d/SKILL.md" ] || continue; sd="${LENS_SKILLS_DIR:-$HOME/.claude/skills}/$(basename "$d")"
     cmp -s "$d/SKILL.md" "$sd/SKILL.md" 2>/dev/null || { mkdir -p "$sd" && cp "$d/SKILL.md" "$sd/SKILL.md" && rs=1; }; done 2>/dev/null
   o="$(prof)"; [ "$ss_src" = compact ] && o="$(mrg "$o" "$(printf '%s' "$ss_in" | python3 "$h/ctx_watch.py" hook 2>/dev/null)")"   # AE S141 (В-352): після стиснення — рядок «контекст · стиснення на · ревізія на»
+  [ "$ss_src" = compact ] && o="$(mrg "$o" "$(printf '%s' "$ss_in" | python3 "$h/postcompact_check.py" hook 2>/dev/null)")"   # AE S153 (Ж3 FAB-2, «так» Konst 18.11): переказ ⟂ факти git — «✓ тримає» або «⚠ БРАКУЄ …»
   if [ "$rs" = 1 ]; then [ -n "$o" ] || o='{"hookSpecificOutput":{"hookEventName":"SessionStart"}}'; printf '%s' "$o" | python3 -c 'import json,sys; d=json.load(sys.stdin); d["hookSpecificOutput"]["reloadSkills"]=True; print(json.dumps(d,ensure_ascii=False))'
   elif [ -n "$o" ]; then printf '%s\n' "$o"; fi; [ "${LENS_PROFILE:-}" = 1 ] && { date +%H:%M > /tmp/lens-profile-loaded; : > "$md/lens-profile-part2-${ss_sid:-nosession}"; } 2>/dev/null; exit 0   # позначка для profile_check.sh (рядок «профіль» в env_check)
 fi

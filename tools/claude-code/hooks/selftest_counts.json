@@ -17,6 +17,7 @@
  "memory-guard.sh selftest": 22,
  "plan-web.sh selftest": 14,
  "port_same.py selftest": 8,
+ "postcompact_check.py selftest": 12,
  "precompact_guard.sh selftest": 20,
  "profile_check.sh selftest": 3,
  "promise-guard.sh selftest": 54,
