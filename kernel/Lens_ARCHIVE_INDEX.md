@@ -73,7 +73,7 @@ archive/
 | старе ім'я (лишилось в архіві) | чинне ім'я | коли · чому |
 |---|---|---|
 | `StockCheck_island_glass_FINDINGS.md` | **`kernel/Lens_glass_FINDINGS.md`** | 21.08.2026, EquipLens S6. Знахідки виявились крос-Lens: §1–§6 виросли на StockCheck-острівці, §9 «Виріз у склі» — на EquipLens-бульбашці. Числа лишились прив'язані до продукту, закони — ні. **17 входжень старого імені в `archive/` залишено навмисно** |
-| `wsd_TODO_running.md` | **`kernel/wsd/wsd_delta_running.md`** (процес-кандидати) · решта — продуктовий план QR Lens | розділено (`kernel/wsd/Work_Standard_HISTORY.md`); рядок — 18.10.2026, AE S91 (гейт G8) |
+| `wsd_TODO_running.md` | **`archive/superseded/wsd_delta_running.md`** (процес-кандидати; лоток знято 18.11.2026) · решта — продуктовий план QR Lens | розділено (`kernel/wsd/Work_Standard_HISTORY.md`); рядок — 18.10.2026, AE S91 (гейт G8) |
 | `Lens_module_maint_v1.md` | **`kernel/modules/Lens_module_1_maint_v1.md`** | номер модуля в імені; рядок — 18.10.2026, AE S91 (гейт G8) |
 
 **Правило:** перейменував вічний файл → рядок сюди **в тій самій сесії**.
@@ -254,11 +254,12 @@ archive/
 
 Теки `archive/stands/` у ядрі більше нема (05–06.10.2026, журнал GW кроки 3–4): стенди StockCheck і Фармастора — `stock-check:archive/stands/`, QR Lens — `QR-Lens:archive/stands/`. Перелік до виїзду — історія git цього файла.
 
-### `archive/superseded/` — 4 файли *(звірено `git ls-files` 06.10.2026)*
+### `archive/superseded/` — 5 файлів *(звірено `git ls-files` 06.10.2026; + лоток wsd 18.11.2026)*
 
 Продуктове витіснене виїхало з продуктами: Drive Lens концепти → `Drive-Lens:archive/superseded/`, KPI → `KPI-Lens:archive/superseded/`
 (05.10.2026), `farmastor_v2_data.js` · `StockCheck_B32_STAGEBENCH_HANDOFF.md` · `StockCheck_collapse_C_CANON_delta.md` — зі StockCheck у `stock-check` (06.10.2026).
 
+- `wsd_delta_running.md` — 🗄 18.11.2026 (FAB-1 W7 · З3). Лоток wsd: порожній з 17.09.2026, правила йдуть одразу в дім (INTAKE). Таблиці «✅ спорожнено» — історія злиттів v2.27–G-C.
 - `canon_delta_A45_material_lever_manifest.md` — 🗄 01.08.2026. Буфер **пережив ціль**: A45 канонізовано в `Lens_iOS_cookbook_3_material.md`. Йти сюди тільки за **сирими важелями компера** матеріальності, яких канон не зберіг
 
 - `lens-gh_SPEC_v1.2.md` · 27.09.2026 · Lens (інструменти чату) · ТЗ конектора lens-gh v1.2 «квиток» (контейнер ↔ воркер ↔ GitHub повз контекст), ред. 3 · задеплоєно й прийнято Konst (LGH-2), зміст влито в `tools/lens-gh/README.md` і `tools/CHAT_TOOLS.md` §2-б; до архіву лежав у теці tools/lens-gh/ під іменем SPEC_v1.2.md

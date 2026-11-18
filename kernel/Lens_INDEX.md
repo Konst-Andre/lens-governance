@@ -170,7 +170,6 @@ Project не читає файлів репо як інструкцію, а `CLA
 |---|---|---|
 | `Lens_cookbook_delta_running.md` | Cookbook | 🟡 **непорожній** — скільки записів і що їх тримає: рядок `ЛОТОК` у шапці буфера (`G11` звіряє, `G5` нагадує) |
 | `Lens_stagebench_delta_running.md` | `Lens_stagebench_manifest.md` | 🟢 **порожній** (`G11` ✓) · куди влито — рядок `ЛОТОК` буфера |
-| `wsd_delta_running.md` *(фізично `kernel/wsd/`, **не** `kernel/`)* | `Work_Standard.md` | 🟢 **порожній** (`G11` ✓) · куди влито — рядок `ЛОТОК` буфера |
 
 **Правило:** буфер — не архів. Лежить довше 2–3 сесій → мерджити як є.
 
@@ -336,7 +335,7 @@ GATE 06.10.2026 ще: `G8` — шляхи й у черзі ядра · `G10` —
 | місце | що там живе | хто і як править |
 |---|---|---|
 | **репо `kernel/`** *(корінь)* | маршрутизатори й інструмент: `Lens_INDEX` · `Lens_validate.py` · `Lens_ARCHIVE_INDEX` · `Lens_PROFILE` · `Lens_PROJECT_instruction` · `Lens_NEWPROJECT_bootstrap` · маніфести стендів | **джерело правди.** Канон правиться тут |
-| **репо `kernel/wsd/`** | `Work_Standard.md` · `Lens_governance_protocol.md` · `Lens_verdict_protocol.md` · `Lens_patch_check_protocol.md` · `Work_Standard_HISTORY.md` · `wsd_delta_running.md` | те саме |
+| **репо `kernel/wsd/`** | `Work_Standard.md` · `Lens_governance_protocol.md` · `Lens_verdict_protocol.md` · `Lens_patch_check_protocol.md` · `Work_Standard_HISTORY.md` | те саме |
 | **репо `kernel/cookbook/`** | `Lens_cookbook_INDEX.md` · 6 томів · `Lens_cookbook_delta_running.md` | те саме |
 | **репо `kernel/modules/`** | донор-модулі коду: `Lens_module_*.md` | те саме |
 | **репо `tools/` · `sessions/Lens_gov/` · `.claude/`** | інструменти обох дверей · живі самері governance (Ф2) · хук старту Claude Code | те саме |
