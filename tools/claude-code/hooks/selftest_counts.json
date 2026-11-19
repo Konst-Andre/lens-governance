@@ -26,6 +26,7 @@
  "review-remind.sh selftest": 9,
  "route-remind.sh selftest": 15,
  "rules-guard.py selftest": 15,
+ "run-guard.sh selftest": 13,
  "shots_check.py selftest": 16,
  "shots_same.py selftest": 3,
  "ui-guard.sh selftest": 32,

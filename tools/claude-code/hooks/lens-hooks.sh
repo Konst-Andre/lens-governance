@@ -3,7 +3,7 @@
 # Диспетчер: setup script середовища (v4, tools/claude-code/ENVIRONMENT.md §3) реєструє ВСІ 9 подій без фільтра інструментів на обгортку ~/.claude/lens-hooks.sh, а та кличе цей файл (HOOK-4).
 # Новий гачок на одну з 9 подій — рядок тут (подія → файл, фільтр інструмента — тут же), setup script не чіпати; нова подія поза 9 — тоді й setup script.
 # Аргумент — подія (setup script v2–v4) або старе ім'я v1 (pre · post · stop — середовища з текстом 08.10 працюють і далі):
-#   pre  | PreToolUse          — Write|Edit|Bash: по черзі brief-guard (BRIEF-2) · ui-guard check · commit-gate · ui-review-gate (HOOK-2 п.4) · review-remind stand — перший з відповіддю (deny/ask) перемагає; далі rules-guard (S142) — останнім. Read|Grep|Glob — лише rules-guard
+#   pre  | PreToolUse          — Write|Edit|Bash: по черзі run-guard (фоновий прогін судить теку — не правити, AE S156) · brief-guard (BRIEF-2) · ui-guard check · commit-gate · ui-review-gate (HOOK-2 п.4) · review-remind stand — перший з відповіддю (deny/ask) перемагає; далі rules-guard (S142) — останнім. Read|Grep|Glob — лише rules-guard
 #   post | PostToolUse         — будь-який інструмент: held (сторож стиснення, В-373); Read|Bash|Grep|WebSearch|WebFetch: ui-guard mark · після коміту review-remind post + brief-guard post одним повідомленням, інакше на Bash handoff-remind post / env-remind post · ctx_watch після коміту (В-352)
 #   stop | Stop                — тінь promise-guard shadow (лише пише вирок у /tmp/lens-shadow-<сесія>.tsv), далі перший з відповіддю: гачок пам'яті (memory-guard, HOOK-3) · перевірка перед переїздом (handoff-remind stop, HOOK-3.2) · «сказав — перевір» (promise-guard, AE S146) · «план без світу» (plan-web, HOOK-2.5)
 #   UserPromptSubmit           — перший з відповіддю: handoff-remind (HOOK-3.2) · env-remind (ENV-1) · konst-miss (HOOK-5, лише на слово-тригер; Python — grep -i на кирилиці залежить від локалі); додаються: konst-miss yes (В-372) · held (В-373) · promise-guard open (AE S146) · route-remind (AE S135) · ctx_watch (В-352) · ⚠ / ✗ env_check зі старту й частина 2 профілю — у перше повідомлення. Стеля події — 30 с на весь диспетчер (code.claude.com/docs/en/hooks, 19.11.2026)
@@ -168,7 +168,7 @@ case "$ev" in
     # S142 (Konst: «50 на 50, що агент знайде ui.md»): правило з paths: — текстом у контекст, коли виклик зачіпає його шляхи (rules-guard.py);
     #   Read · Grep · Glob — лише сторож правил; Write · Edit · Bash — він останнім, щоб не затулити гачки, що блокують
     case "$tool" in Write|Edit|Bash) ;; Read|Grep|Glob) o="$(printf '%s' "$in" | python3 "$h/rules-guard.py" pre 2>>"$E")"; [ -n "$o" ] && fire rules-guard "$o"; exit 0;; *) exit 0;; esac
-    for g in "brief-guard.sh pre" "ui-guard.sh check" "commit-gate.sh" "ui-review-gate.sh gate" "review-remind.sh stand"; do
+    for g in "run-guard.sh pre" "brief-guard.sh pre" "ui-guard.sh check" "commit-gate.sh" "ui-review-gate.sh gate" "review-remind.sh stand"; do
       read -r f a <<<"$g"
       run "$f" "$a" && exit 0
     done
