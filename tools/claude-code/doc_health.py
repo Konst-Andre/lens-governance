@@ -86,15 +86,12 @@ def scan(root):
             n = txt.count('\n') + 1
             if n > M1_LINES: found.append(('M1', f, f'{n} рядків > {M1_LINES}'))
             elif len(txt) > M1_CHARS: found.append(('M1', f, f'{len(txt)} знаків > {M1_CHARS} ({n} рядків — довгі рядки-абзаци; стеля обрізання {M1_CAP})'))
-        whole = f in ('CLAUDE.md', 'tools/claude-code/PROFILE.md') or bool(re.search(r'_CHERGA\.md$', f)) or (f.startswith('sessions/') and 'summary' in f) or f == newest_nl   # не-Lens: лише найновіше самері читається на старті (AE S91)
+        whole = f in ('CLAUDE.md', 'tools/claude-code/PROFILE.md') or bool(WHOLE_Q.search(f)) or (f.startswith('sessions/') and 'summary' in f) or f == newest_nl   # не-Lens: лише найновіше самері читається на старті (AE S91)
         if whole and f not in ('CLAUDE.md', 'tools/claude-code/PROFILE.md') and kb > M2_KB:
             found.append(('M2', f, f'{kb:.0f} КБ > {M2_KB} — читається цілком на старті'))
         if whole: continue   # читається цілком за задумом — розмір розділу не важить, стережуть M1/M2 (перший прогін 10.10: профіль і черга — 2 хибних M3)
-        for s in re.split(r'(?m)^(?=#{1,3} )', txt):   # до ### — найменший розділ, який агент бере окремо (грепом «§3-г»); до ## давало хибне: план адмінки QR §3 = 12 КБ таблиця + 4 × 3–6 КБ (10.10)
-            sk = len(s.encode()) / 1024
-            code = sum(len(b.encode()) for b in re.findall(r'(?ms)^```.*?^```', s))
-            if sk > M3_KB and s.lstrip().startswith('#') and not M5_HIST.search(f) and code < 0.8 * len(s.encode()):   # історія — грепом (як M5); блок коду — неподільний (Twig «code splitting», MDKeyChunker arXiv 2603.23533, 19.10.2026)
-                found.append(('M3', f, f'розділ {sk:.0f} КБ «{s.splitlines()[0][:60].strip()}»'))
+        for head, b in m3_sections(f, txt):
+            if b / 1024 > M3_KB: found.append(('M3', f, f'розділ {b / 1024:.0f} КБ «{head[:60].strip()}»'))
         if kb > M4_KB and 'читається' not in '\n'.join(txt.splitlines()[:12]).lower():
             found.append(('M4', f, f'{kb:.0f} КБ без «читається коли» — одним Read не взяти'))
     found += dead_paths(root)
@@ -314,6 +311,21 @@ M5_PLAN = re.compile(r'\s*\((?:буде|ще нема|створить|planned)'
 M5_PATH = re.compile(r'^[\w.-]+(/[\w.-]+)+\.(md|js|mjs|py|sh|html|json|toml|yml|yaml|css|txt)$')
 
 
+WHOLE_Q = re.compile(r'(^|/|_)CHERGA\.md$')   # черга читається цілком на старті: Lens `lens/*_CHERGA.md`, не-Lens `docs/CHERGA.md` (AE S156: 67 КБ черги AE M2 не бачив — регекс знав лише «_CHERGA»)
+
+def m3_sections(f, txt):
+    """M3 — розділи документа, які міряємо: [(заголовок, байти)]. Одна мірка для старту (M3 ⚠) і для «храповика» сторожа коміту
+    (hooks/commit_files.py п. 13, AE S156). До ### — найменший розділ, який агент бере окремо (грепом «§3-г»; до ## давало хибне: план адмінки
+    QR §3 — 12 КБ таблиця); історія — грепом (як M5); блок коду — неподільний (Twig «code splitting», MDKeyChunker arXiv 2603.23533, 19.10.2026)."""
+    if M5_HIST.search(f) or WHOLE_Q.search(f) or f in ('CLAUDE.md', 'tools/claude-code/PROFILE.md'): return []   # цілком — M1 / M2, не M3
+    out = []
+    for s in re.split(r'(?m)^(?=#{1,3} )', txt):
+        if not s.lstrip().startswith('#'): continue
+        code = sum(len(b.encode()) for b in re.findall(r'(?ms)^```.*?^```', s))
+        if code < 0.8 * len(s.encode()): out.append((s.splitlines()[0], len(s.encode())))
+    return out
+
+
 def dead_paths(root):
     """M5: `шлях/до/файла.розш` у живому .md, якого нема в репо (правила — шапка файла)."""
     known = [k for k in subprocess.run(['git', '-c', 'core.quotePath=false', 'ls-files'], cwd=root, capture_output=True, text=True).stdout.split('\n') if k]
@@ -408,6 +420,7 @@ def selftest():
              ('CLAUDE.md 120 рядків по 300 знаків (36 тис.) → ⚠ M1 (AE S134: мірка рядками сліпла)', {'CLAUDE.md': ('ж' * 299 + '\n') * 120}, '⚠', 'щосесійні задовгі 1'),
              ('CLAUDE.md 120 рядків по 100 знаків → ✓', {'CLAUDE.md': ('ж' * 99 + '\n') * 120}, '✓', ''),
              ('черга 30 КБ → ⚠ M2', {'lens/P_CHERGA.md': sec(30)}, '⚠', 'файли старту завеликі 1'),
+             ('черга не-Lens docs/CHERGA.md 30 КБ → ⚠ M2, не M3 (AE S156: 67 КБ не бачив)', {'docs/CHERGA.md': sec(30)}, '⚠', 'файли старту завеликі 1'),
              ('M5: `lens/Z.md` (буде) — запланований файл → ✓ (AE S156); той самий без позначки → ⚠', {'lens/A.md': 'див. `lens/Z.md` (буде)\n'}, '✓', ''),
              ('M5: мертвий `lens/Z.md` без позначки → ⚠', {'lens/A.md': 'див. `lens/Z.md` тут\n'}, '⚠', 'мертвих шляхів 1'),
              ('розділ 20 КБ → ⚠ M3', {'lens/B.md': sec(20)}, '⚠', 'розділів > 16 КБ 1'),

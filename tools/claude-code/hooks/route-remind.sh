@@ -19,8 +19,8 @@ EVERY = int(os.environ.get('ROUTE_EVERY') or 3)
 MARK = re.compile(r"(\*\*|^|\n)\s*" + re.escape(os.environ.get('ROUTE_MARK') or 'Маршрут') + r"\s*[:*]", re.I)
 ASK = re.compile(r"(?<![\w'’])(маршрут(?!изац)\w*|куди (ми )?рухаємось|який план|нагадай (мені )?план|загуби\w*|що далі|де ми зараз)(?![\w'’])", re.I)
 
-def reports(path):
-    """Звіти агента: текст відповідей між повідомленнями людини, лише суттєві (≥ 400 знаків)."""
+def reports(path, short=False):
+    """Звіти агента: текст відповідей між повідомленнями людини, лише суттєві (≥ 400 знаків); short=True — усі (для «перша відповідь сесії»)."""
     out, cur = [], []
     try: lines = pathlib.Path(path).read_text(encoding='utf-8', errors='ignore').splitlines()
     except Exception: return out
@@ -34,15 +34,22 @@ def reports(path):
         elif role == 'assistant' and isinstance(c, list):
             cur += [x.get('text', '') for x in c if isinstance(x, dict) and x.get('type') == 'text']
     if cur: out.append('\n'.join(cur))
-    return [r for r in out if len(r) >= 400]
+    return out if short else [r for r in out if len(r) >= 400]
 
 def route_text(cwd):
-    roots = [pathlib.Path(cwd or '.')]
-    roots += [p for p in roots[0].parent.iterdir() if p.is_dir()] if roots[0].parent.exists() else []
+    """Самері — за рівнями: сама тека · її репо (хмарна сесія: cwd = корінь сесії з репо всередині) · сусіди; перший рівень, де є самері, —
+    і в ньому репо продукту раніше за ядро (аудит AE S156 №3: max(mtime) по всіх сусідах давав самері ядра без «МАРШРУТ» сесії продукту)."""
+    c = pathlib.Path(cwd or '.')
+    kids = lambda p: sorted(x for x in p.iterdir() if x.is_dir() and not x.name.startswith('.')) if p.exists() else []
     files = []
-    for r in roots:
-        for g in ('docs/summary/*SUMMARY*.md', 'sessions/**/*summary*.md'):
-            files += [pathlib.Path(f) for f in glob.glob(str(r / g), recursive=True)]
+    for level in ([c], kids(c), [x for x in kids(c.parent) if x != c]):
+        found = {}
+        for r in level:
+            fs = [pathlib.Path(f) for g in ('docs/summary/*SUMMARY*.md', 'sessions/**/*summary*.md') for f in glob.glob(str(r / g), recursive=True)]
+            if fs: found[r] = fs
+        prod = [f for r, fs in found.items() if not (r / 'kernel' / 'Lens_INDEX.md').exists() for f in fs]
+        files = prod or [f for fs in found.values() for f in fs]
+        if files: break
     if not files: return None, None
     f = max(files, key=lambda x: x.stat().st_mtime)
     t = f.read_text(encoding='utf-8', errors='ignore')
@@ -52,19 +59,27 @@ def route_text(cwd):
     end = min(x for x in (j, k, i + 1200) if x > 0)
     return str(f), t[t.rfind('\n', 0, i) + 1:end].strip()
 
+PASTE = re.compile(r'(?s)<pasted_content id="[^"]*">.*?</pasted_content id="[^"]*">')   # вставлене Konst — не його питання (аудит S156 №4; code.claude.com/docs/en/hooks, 19.11.2026)
+
 def run(d, rep=None, src=None):
-    rep = reports(d.get('transcript_path') or '') if rep is None else [r for r in rep if len(r) >= 400]
-    asked = bool(ASK.search(d.get('prompt') or ''))
+    asked = bool(ASK.search(PASTE.sub(' ', d.get('prompt') or '')))
+    if rep is None:
+        tp = d.get('transcript_path')
+        if not tp and not asked: return None   # без журналу «перша відповідь» не визначити — тиша (як memory-guard, plan-web; аудит S156 №1)
+        allr = reports(tp, short=True) if tp else []
+    else: allr = rep
+    rep = [r for r in allr if len(r) >= 400]
+    first = not allr   # перша — коли відповідей агента ще нема ЗОВСІМ, не «довгих нема» (аудит S156 №1: «Прийняв:» вимагався щоходу до першого довгого звіту)
     last = rep[-EVERY:]
     shown_recent = any(MARK.search(r) for r in rep[-2:])
-    if rep and not asked and (shown_recent or len(last) < EVERY or any(MARK.search(r) for r in last)): return None
-    why = 'Konst питає про маршрут' if asked else ('перша відповідь сесії' if not rep else f'у {EVERY} останніх звітах блоку «Маршрут» нема')
+    if not first and not asked and (shown_recent or len(last) < EVERY or any(MARK.search(r) for r in last)): return None
+    why = 'Konst питає про маршрут' if asked else ('перша відповідь сесії' if first else f'у {EVERY} останніх звітах блоку «Маршрут» нема')
     f, rt = route_text(d.get('cwd')) if src is None else src
     body = (f"Маршрут для Konst ({why}): у цій відповіді — блок «**Маршрут:**» 3–5 рядків: де ми (пункт черги й крок) · далі (1–3 кроки) · попутно · що чекає Konst. "
             "Бери з самері §0 і черги репо, не з пам'яті чату; змінилось — спершу онови самері §0, тоді показуй.")
     if f: body += f" Самері: {f}."
     if rt: body += "\nЗ самері зараз:\n" + rt[:1200]
-    if not rep: body = readback() + '\n' + body
+    if first: body = readback() + '\n' + body
     return body
 
 def readback():
@@ -74,8 +89,9 @@ def readback():
     qf = pathlib.Path(os.environ.get('LENS_HOOK_DIR') or '.') / '..' / 'handoff_exam_questions.md'
     try: qs = [ln.strip() for ln in re.findall(r'(?ms)^## \d+\n(.*?)(?=^## \d+\n|\Z)', qf.read_text(encoding='utf-8'))]
     except OSError: qs = []
-    qs = ' · '.join(f'{i}) ' + q.split('?')[0].split('.')[0][:70] for i, q in enumerate(qs, 1)) or 'що першим · рішення попередньої сесії й де · що чекає Konst · чого не робити · де код і гілка · що незрозуміло чи суперечить'
-    return ("Переказ прийому (REV-5 Л2-б, перша відповідь сесії): одразу після «що ти побачиш» — блок «**Прийняв:**» ≤ 6 рядків, своїми словами, з `файл:рядок`, "
+    qs = ' · '.join(f'{i}) ' + q.split('?')[0].strip()   # питання цілим: обрізання на 70 знаках губило «публікація» з п. 4 (аудит S156 №2, бачено на старті S156)
+                      for i, q in enumerate(qs, 1)) or 'що першим · рішення попередньої сесії й де · що чекає Konst · чого не робити · де код і гілка · що незрозуміло чи суперечить'
+    return ("Переказ прийому (перша відповідь сесії): після «що ти побачиш» і рядків ⚠ / ✗ стану репо, якщо вони є, — блок «**Прийняв:**» ≤ 6 рядків, своїми словами, з `файл:рядок`, "
             f"лише з репо (не з пам'яті й не дослівно зі стартового): {qs}. Суперечність чи застаріле — назви й виправ у репо першим ходом.")
 
 def selftest():
@@ -87,7 +103,10 @@ def selftest():
              ('Konst питає «куди рухаємось» → нагадування навіть одразу після показу', {'prompt': 'нагадай, куди рухаємось?'}, [R + '\n**Маршрут:** a'], True),
              ('«я загубився в брифах» → нагадування', {'prompt': 'я вже трішки загубився в брифах'}, [R + '\n**Маршрут:** a'], True),
              ('«маршрутизація» в коді — не питання про план → тиша', {'prompt': 'поправ маршрутизацію запитів'}, [R + '\n**Маршрут:** a'], False),
-             ('короткі відповіді (< 400) не рахуються як звіти → тиша', {'prompt': 'так'}, [R + '\n**Маршрут:** a'] + ['ок'] * 5, False)]
+             ('короткі відповіді (< 400) не рахуються як звіти → тиша', {'prompt': 'так'}, [R + '\n**Маршрут:** a'] + ['ок'] * 5, False),
+             ('аудит S156 №1: три короткі відповіді — уже не перша відповідь → тиша', {'prompt': 'роби'}, ['ок', 'так', 'добре'], False),
+             ('аудит S156 №4: «що далі» лише у вставленому тексті → тиша', {'prompt': 'глянь <pasted_content id="a1">\nщо далі?\n</pasted_content id="a1"> ок'}, [R + '\n**Маршрут:** a'], False),
+             ('«що далі» поза вставкою → нагадування', {'prompt': '<pasted_content id="a1">\nлог\n</pasted_content id="a1"> що далі?'}, [R + '\n**Маршрут:** a'], True)]
     bad = 0
     for name, d, rep, want in cases:
         got = run(d, rep, (None, None)) is not None; ok = got == want; bad += not ok; print(('✓ ' if ok else '✗ ') + name)
@@ -98,9 +117,17 @@ def selftest():
     f, rt = route_text(str(tmp)); ok = bool(rt) and 'Крок два' in rt and 'ВІД KONST' not in rt; bad += not ok
     print(('✓ ' if ok else '✗ ') + 'маршрут береться з самері §0.2 (до наступного пункту §0)')
     b1 = run({'prompt': 'роби далі'}, [], (None, None)) or ''; b2 = run({'prompt': 'нагадай, куди рухаємось?'}, [R], (None, None)) or ''
-    ok2 = 'Прийняв' in b1 and 'суперечить' in b1 and 'Прийняв' not in b2; bad += not ok2
-    print(('✓ ' if ok2 else '✗ ') + 'REV-5 Л2-б: перша відповідь сесії → «Прийняв:» з питаннями іспиту (6-те — суперечності); далі — без нього')
-    print(f'─── route-remind selftest: {len(cases) + 2 - bad}/{len(cases) + 2} ───'); return 1 if bad else 0
+    ok2 = 'Прийняв' in b1 and 'суперечить' in b1 and 'публікація' in b1 and 'рядків ⚠ / ✗' in b1 and 'Прийняв' not in b2; bad += not ok2
+    print(('✓ ' if ok2 else '✗ ') + 'REV-5 Л2-б: перша відповідь сесії → «Прийняв:» з питаннями іспиту цілими («публікація» в п. 4 — аудит S156 №2), після рядків ⚠ / ✗ (№5); далі — без нього')
+    ok3 = run({'prompt': 'роби далі'}) is None; bad += not ok3
+    print(('✓ ' if ok3 else '✗ ') + 'аудит S156 №1: журналу сесії нема (transcript_path) і питання нема → тиша')
+    # аудит S156 №3: корінь сесії з двома репо — продукт раніше за ядро, навіть коли самері ядра новіше
+    ses = pathlib.Path(tempfile.mkdtemp()); (ses / 'Prod/docs/summary').mkdir(parents=True); (ses / 'lens-governance/sessions/x').mkdir(parents=True); (ses / 'lens-governance/kernel').mkdir()
+    (ses / 'lens-governance/kernel/Lens_INDEX.md').write_text('x'); (ses / 'Prod/docs/summary/P_SUMMARY_2026-11-19.md').write_text('**0.2 · МАРШРУТ:** продукт\n')
+    kf = ses / 'lens-governance/sessions/x/K_session_summary_X.md'; kf.write_text('ядро'); os.utime(kf, (4e9, 4e9))
+    f3, rt3 = route_text(str(ses)); ok4 = bool(f3) and 'Prod' in f3 and 'продукт' in (rt3 or ''); bad += not ok4
+    print(('✓ ' if ok4 else '✗ ') + 'аудит S156 №3: корінь сесії → самері продукту, не новіше самері ядра')
+    print(f'─── route-remind selftest: {len(cases) + 4 - bad}/{len(cases) + 4} ───'); return 1 if bad else 0
 
 if sys.argv[1] == 'selftest': sys.exit(selftest())
 try: out = run(json.loads(os.environ.get('HOOK_IN') or '{}'))

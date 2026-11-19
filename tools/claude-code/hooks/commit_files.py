@@ -37,6 +37,11 @@
   11. нова копія між щосесійними файлами (doc_health M13) у зміненому CLAUDE.md · профілі · шаблоні · rules/*.md (AE S142).
   12. нова копія в ДОДАНИХ рядках будь-якого .md репо, крім знімків і журналів (doc_health M14 — копія щосесійного шару ·
      M15 — дубль іншого документа; AE S143). Старий борг файла не блокує; свідомий виняток — <!-- copy-ok: причина --> у рядку.
+  13. «храповик» розділів (AE S156, 💡 Konst «приймаю з підсиленням»): коміт, що ЗБІЛЬШУЄ розділ .md, уже більший за 16 КБ (doc_health M3 —
+     та сама мірка `m3_sections`), або вносить новий такий розділ → ✗; зменшити чи не чіпати — тиша. Подія: 11 розділів > 16 КБ в AE висіли з S147 —
+     M3 лише ⚠ на старті, а «Коротко» брифів дописувались далі (AE-AI §0: 16 → 19 КБ за S155). Практика — ratchet: старий борг дозволено, ріст —
+     ні, поріг лише опускається (Notion «ratcheting system», Flutter Quality Ratchet, ratchets DESIGN.md — 19.11.2026). Свідомий виняток —
+     <!-- ratchet-ok: причина --> у доданих рядках (як copy-ok).
 Не беремо з pre-commit-hooks: пробіли й кінці файлів (шум у диффах даних), no-commit-to-branch (ми свідомо комітимо в main),
 submodules (їх нема).
 
@@ -201,6 +206,23 @@ def check(top, cmd):
             for m, where, what in dh.spread(top, only, old) if only else []:
                 bad.append(f'нова копія в документі (doc_health {m}): {where} — {what}')
         except Exception: pass   # прилад ядра недоступний — сторож мовчить, M14 скаже на старті
+    # 13. «храповик» розділів > 16 КБ (AE S156): ріст великого розділу чи новий великий — ✗ (мірка — doc_health.m3_sections)
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__)))); import doc_health as dh
+        for f in sorted(x for x in changed if x.endswith('.md')):
+            fp = os.path.join(top, f)
+            if not os.path.isfile(fp): continue
+            new = open(fp, encoding='utf-8', errors='replace').read()
+            if 'ratchet-ok:' in new and 'ratchet-ok:' not in subprocess.run(['git', '-C', top, 'show', 'HEAD:' + f], capture_output=True, text=True).stdout: continue
+            prev = subprocess.run(['git', '-C', top, 'show', 'HEAD:' + f], capture_output=True, text=True).stdout
+            key = lambda secs: {(h, sum(1 for x in secs[:i] if x[0] == h)): b for i, (h, b) in enumerate(secs)}   # однакові заголовки — за порядковим номером
+            was = key(dh.m3_sections(f, prev)) if prev else {}
+            for (h, _), b in key(dh.m3_sections(f, new)).items():
+                o = was.get((h, _), 0)
+                if b / 1024 > dh.M3_KB and b > o:
+                    bad.append(f'розділ «{h[:60].strip()}» у {f}: {b / 1024:.1f} КБ > {dh.M3_KB}' + (f' і виріс на {(b - o) / 1024:.1f} КБ' if o else ' — новий') +
+                               ' (храповик, AE S156): спершу стисни розділ «як є» (закрите — в archive/ з вказівником), тоді дописуй; свідомо — <!-- ratchet-ok: причина -->')
+    except Exception: pass   # прилад ядра недоступний — сторож мовчить, M3 скаже на старті
     # 10. шапка наявного приладу змінилась, карта — ні (AE S104)
     head_re = re.compile(r'(Запуск|Usage|Вихід|живе доки)\s*:', re.I)
     for f in sorted(changed - added):
@@ -325,6 +347,18 @@ def selftest():
         g('checkout', '--', 'tools/x/G.md')
         os.makedirs(d + '/docs/summary', exist_ok=True); open(d + '/docs/summary/P_SUMMARY_2026-11-13.md', 'w').write('- ' + S + '\n')
         say(not any('M14' in x for x in check(d, "git add -A && git commit -m 'ядро: ні'")), 'копія в самері (знімок) → тиша')
+        # 13. храповик розділів > 16 КБ (AE S156)
+        g('add', '-A'); g('-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'o3')
+        big = '## Великий\n' + 'ж' * (17 * 512) + '\n'; small = '## Малий\nx\n'
+        open(d + '/lens/R.md', 'w').write(big + small); g('add', '-A'); g('-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'r0')
+        R = lambda: [x for x in check(d, "git add -A && git commit -m 'ядро: ні'") if 'храповик' in x]
+        open(d + '/lens/R.md', 'w').write(big + 'ще абзац\n' + small); say(len(R()) == 1 and 'виріс' in R()[0], 'храповик: розділ > 16 КБ виріс → ✗ (AE S156)')
+        open(d + '/lens/R.md', 'w').write(big[:-200] + '\n' + small); say(R() == [], 'храповик: великий розділ зменшився → тиша')
+        open(d + '/lens/R.md', 'w').write(big + small + 'ще\n'); say(R() == [], 'храповик: виріс малий розділ → тиша')
+        open(d + '/lens/R.md', 'w').write(big + small + '## Новий великий\n' + 'ж' * (17 * 512) + '\n'); say(len(R()) == 1 and 'новий' in R()[0], 'храповик: новий розділ > 16 КБ → ✗')
+        open(d + '/lens/R.md', 'w').write(big + 'ще абзац <!-- ratchet-ok: перенос перед стисненням -->\n' + small); say(R() == [], 'храповик: свідомий виняток ratchet-ok → тиша')
+        os.makedirs(d + '/archive', exist_ok=True); open(d + '/archive/old.md', 'w').write(big); say(R() == [], 'храповик: archive/ (історія) не міряється')
+        g('checkout', '--', 'lens/R.md'); os.remove(d + '/archive/old.md')
         os.environ.pop('LENS_KERNEL', None)
     finally:
         shutil.rmtree(d)
