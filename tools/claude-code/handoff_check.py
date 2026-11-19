@@ -9,6 +9,7 @@
 #          python3 tools/claude-code/handoff_check.py selftest                         → зуби: тимчасові репо, усі випадки брифу
 #          python3 tools/claude-code/handoff_check.py revision [<корінь>] [--table]    → ревізія + печатка «ревізія ✓ · HEAD … · ✗ 0» (REV-1 · REV-4); --table — заготовка таблиці з git log
 #          HC_INJECT=rev4 … selftest → ✗ (зуб REV-4: коміти без запису не бачить, печатку не звіряє)
+#          HC_INJECT=envx … selftest → ✗ (зуб (16): ✗ свіжого env_check ревізія не бачить) · HC_ENV=0 — вимкнути (16) · HC_ENV_TIMEOUT=<с> (20)
 # «Свої» коміти — за трейлером Claude-Session ≡ CLAUDE_CODE_REMOTE_SESSION_ID (cse_X ↔ session_X); нема змінної — усі коміти агента.
 import glob, json, os, re, subprocess, sys, tempfile, time
 
@@ -580,6 +581,35 @@ def rev_table(rs):
     rows = [f"| {subj[:90].replace('|', '/')} | ? | {os.path.basename(r)} `{h}` |" for r in rs for h, subj, _ in reversed(session_log(r))]
     return '| що | дім | коміт |\n|---|---|---|\n' + ('\n'.join(rows) if rows else '| (комітів сесії нема) | — | — |')
 
+ENV_BAD = re.compile(r'^\s*✗|✗ ?[1-9]')   # ✗-частина фільтра env_all гачка старту (hooks/lens-hooks.sh): рядок з ✗ або «✗ N», N > 0; «✗ 0» — не тривога
+
+def env_lines(repos, budget=None):
+    """(16) REV-5 Л5 (Konst AE S156, 19.11.2026: 💡 «приймаю з підсиленням… ширше»): ✗ СВІЖОГО env_check кожного репо — ✗ ревізії.
+    Корінь: AE S155 поклала концепти в docs/shots/ зі станом поза SHOTS §5 — ✗ env_check, але (1)–(15) його не бачать; діру знайшов
+    лише старт наступної сесії, тобто після переїзду. Ширше за shots: будь-який ✗ репо (прод ≠ репо, гейт даних, примірка…) — те, що
+    новий агент отримає першим рядком. Лише в revision (gate для PreCompact лишається швидким). Паралельно з бюджетом: ревізію кличе й
+    гачок UserPromptSubmit (стеля 30 с — hooks/lens-hooks.sh env_all), заміри 19.11.2026: AE 12 с · ядро 6 с · сама ревізія 7,7 с.
+    Не встиг — ⓘ «не перевірено» (лічиться в печатці), не тиша."""
+    if os.environ.get('HC_ENV') == '0': return []
+    budget = budget or float(os.environ.get('HC_ENV_TIMEOUT', '20'))
+    ps = []
+    for r in repos:
+        if not os.path.isfile(os.path.join(r, 'tools', 'env_check.sh')) or os.path.exists(os.path.join(r, '.git', 'lens-readonly')): continue
+        ps.append((os.path.basename(os.path.abspath(r)), subprocess.Popen(['bash', 'tools/env_check.sh'], cwd=r, stdin=subprocess.DEVNULL,
+                   stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, start_new_session=True)))
+    out, t0 = [], time.time()
+    for name, p in ps:
+        try: o, _ = p.communicate(timeout=max(0.5, budget - (time.time() - t0)))
+        except subprocess.TimeoutExpired:
+            try: os.killpg(p.pid, 9)
+            except Exception: p.kill()
+            p.communicate(); out.append(('ⓘ', f'{name}: env_check не перевірено — не встиг за {budget:g} с (руками: bash tools/env_check.sh)')); continue
+        if os.environ.get('HC_INJECT') == 'envx': continue   # зуб selftest: стара поведінка — ✗ env_check не бачимо
+        bad = [l.strip() for l in o.splitlines() if ENV_BAD.search(l)]
+        out += [('✗', f'{name}: env_check — {l[:300]}') for l in bad[:8]]
+        if len(bad) > 8: out.append(('✗', f'{name}: env_check — ще {len(bad) - 8} ✗ (bash tools/env_check.sh)'))
+    return out
+
 def revision(root='/home/user', once=None):
     """→ (текст, є ✗). once — файл-позначка: той самий HEAD усіх репо, що й минулого разу → ('', False) (повтор не шумить)."""
     import contextlib, io
@@ -590,6 +620,8 @@ def revision(root='/home/user', once=None):
     buf = io.StringIO()
     with contextlib.redirect_stdout(buf): bad = report(rs)
     txt = buf.getvalue().strip()
+    ev = env_lines(rs)   # (16) REV-5 Л5: ✗ свіжого env_check — ✗ ревізії
+    if ev: txt += '\n— env_check (свіжий прогін)\n' + '\n'.join(f'  {g} {t}' for g, t in ev); bad = bad or any(g == '✗' for g, _ in ev)
     miss = uncovered_commits(rs)   # REV-4 (а): те саме, що судить гачок Stop REV-2 на переїзді
     if miss: txt += (f'\n  ✗ коміти сесії без запису в самері — {len(miss)}: ' + ' · '.join(miss[:10]) + (' …' if len(miss) > 10 else '')
                      + ' → рядком §1 самері (що · дім · коміт)')
@@ -838,6 +870,18 @@ def selftest():
                ('(12) «не зберігаємо» в самері → ✓', a2 and a2[0] == '✓'),
                ('(12) зображень нема → тиша', attachments([ra], os.path.join(tf, 'tr0.jsonl')) is None),
                ('(12) журналу нема → ⓘ «не перевірено», не ✓', (attachments([ra], os.path.join(tf, 'none.jsonl')) or ('',))[0] == 'ⓘ')]
+    # (16) REV-5 Л5: ✗ свіжого env_check → ✗ ревізії; «✗ 0» і ⚠ — ні; не встиг → ⓘ «не перевірено»; клон лише для читання — не судиться
+    re_ = mk_nl(good_nl); os.makedirs(os.path.join(re_, 'tools'), exist_ok=True)
+    open(os.path.join(re_, 'tools/env_check.sh'), 'w').write('echo "база: ok"\necho "⚠ примірка: стара"\necho "гейт: ✓ 5 · ✗ 0"\necho "✗ примірка: стан поза SHOTS §5"\necho "дані: ✗ 2 у гейті"\n')
+    e1 = env_lines([re_]); rslow = mk_nl(good_nl); os.makedirs(os.path.join(rslow, 'tools'), exist_ok=True)
+    open(os.path.join(rslow, 'tools/env_check.sh'), 'w').write('sleep 5\necho "✗ пізно"\n'); t_ = time.time(); e2 = env_lines([rslow], 1); dt = time.time() - t_
+    rro = mk_nl(good_nl); os.makedirs(os.path.join(rro, 'tools'), exist_ok=True); open(os.path.join(rro, 'tools/env_check.sh'), 'w').write('echo "✗ чуже"\n'); open(os.path.join(rro, '.git/lens-readonly'), 'w').write('')
+    sh(re_, 'git', 'add', '-A'); sh(re_, 'git', 'commit', '-qm', 'env\n\nClaude-Session: https://claude.ai/code/session_T')
+    os.environ['LENS_REV_MARK'] = os.path.join(tf, 'rev16'); t16, b16 = revision(os.path.dirname(re_))
+    rcases += [('(16) S156: ✗ env_check репо → 2 рядки ✗ («✗ …» і «✗ 2»), «✗ 0» і ⚠ — ні', [g for g, _ in e1] == ['✗', '✗'] and 'SHOTS' in e1[0][1] and '✗ 2' in e1[1][1]),
+               ('(16) env_check не встиг за бюджет → ⓘ «не перевірено», процес убито (< 3 с), не тиша', e2 and e2[0][0] == 'ⓘ' and 'не перевірено' in e2[0][1] and dt < 3),
+               ('(16) клон лише для читання (.git/lens-readonly) не судиться', env_lines([rro]) == []),
+               ('(16) revision: ✗ env_check → розділ «env_check» і печатка «ревізія ✗»', b16 and '— env_check' in t16 and t16.splitlines()[-1].startswith('ревізія ✗'))]
     os.environ.pop('LENS_REV_MARK'); os.environ.pop('LENS_EXAM_MARK', None)
     for name, ok in rcases:
         print(('✓' if ok else '✗') + ' ' + name); bad += not ok

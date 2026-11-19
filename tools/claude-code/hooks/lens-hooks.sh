@@ -134,6 +134,9 @@ fi
 #   10.11.2026; ≤ 10 000 знаків) — один файл ядра на всі репо замість розділу «Compact instructions» у кожному CLAUDE.md
 [ "$ev" = PreCompact ] && { LENS_HOOKS="$h" bash "$h/precompact_guard.sh"; exit $?; }   # AE S140 (FAB-2, «так» Konst): сторож «ревізія → /compact» — ручне стиснення з незакоміченим / незапушеним → вихід 2 (зупинено), авто — відкладає до ревізії, нижче стелі (AE S145, В-373); інструкції переказу + факти git — його stdout
 case "$ev" in pre|PreToolUse) ev=pre;; post|PostToolUse) ev=post;; stop|Stop) ev=stop;; UserPromptSubmit) ev=prompt;; *) exit 0;; esac
+# REV-5 Л5 (AE S156): ревізія судить і свіжий env_check кожного репо (handoff_check.py (16)) — на UserPromptSubmit стеля 30 с на ВЕСЬ диспетчер
+#   (code.claude.com/docs/en/hooks «Common fields», 19.11.2026), а ревізія сама 7,7 с, env_check AE 12 с → бюджет 8 с: не встиг — ⓘ «не перевірено», агент — руками.
+[ "$ev" = prompt ] && export HC_ENV_TIMEOUT="${HC_ENV_TIMEOUT:-8}"
 in="$(cat)"
 tool="$(printf '%s' "$in" | grep -o '"tool_name" *: *"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/')"
 sid="$(printf '%s' "$in" | grep -o '"session_id" *: *"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/' | tr -cd 'A-Za-z0-9_-')"

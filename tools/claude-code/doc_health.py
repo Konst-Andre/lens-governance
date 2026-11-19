@@ -310,6 +310,7 @@ def queue_behind(root):
 
 M5_HIST = re.compile(r'(^|/)(archive|sessions|summary|journal)/|DECISIONS|AUDIT|HOOK_JOURNAL|ADOPTIONS|FINDINGS|ARCHIVE_INDEX')
 M5_SECT = re.compile(r'(?i)переїзд|старий|старі|істор|було|history')
+M5_PLAN = re.compile(r'\s*\((?:буде|ще нема|створить|planned)', re.I)   # позначка запланованого файла одразу після шляху
 M5_PATH = re.compile(r'^[\w.-]+(/[\w.-]+)+\.(md|js|mjs|py|sh|html|json|toml|yml|yaml|css|txt)$')
 
 
@@ -334,6 +335,7 @@ def dead_paths(root):
                 if re.match(r'^[A-Za-z][\w.-]*:', p) or not M5_PATH.match(p): continue
                 if any(c in ks or c in alld for c in (p, os.path.normpath(os.path.join(os.path.dirname(f), p)))): continue
                 if any(k.endswith('/' + p) for k in known): continue
+                if M5_PLAN.match(s, m.end()): continue   # «`шлях` (буде)» — запланований файл, не мертвий (AE S156: `site/data/models.json` (буде), В-408 п. 6)
                 out.append(('M5', f, p))
     return out
 
@@ -406,6 +408,8 @@ def selftest():
              ('CLAUDE.md 120 рядків по 300 знаків (36 тис.) → ⚠ M1 (AE S134: мірка рядками сліпла)', {'CLAUDE.md': ('ж' * 299 + '\n') * 120}, '⚠', 'щосесійні задовгі 1'),
              ('CLAUDE.md 120 рядків по 100 знаків → ✓', {'CLAUDE.md': ('ж' * 99 + '\n') * 120}, '✓', ''),
              ('черга 30 КБ → ⚠ M2', {'lens/P_CHERGA.md': sec(30)}, '⚠', 'файли старту завеликі 1'),
+             ('M5: `lens/Z.md` (буде) — запланований файл → ✓ (AE S156); той самий без позначки → ⚠', {'lens/A.md': 'див. `lens/Z.md` (буде)\n'}, '✓', ''),
+             ('M5: мертвий `lens/Z.md` без позначки → ⚠', {'lens/A.md': 'див. `lens/Z.md` тут\n'}, '⚠', 'мертвих шляхів 1'),
              ('розділ 20 КБ → ⚠ M3', {'lens/B.md': sec(20)}, '⚠', 'розділів > 16 КБ 1'),
              ('файл 90 КБ без маршруту (розділи малі) → ⚠ M4', {'lens/C.md': ''.join(sec(9) for _ in range(10))}, '⚠', '> 80 КБ без маршруту 1'),
              ('файл 90 КБ з «Читається ТОЧКОВО» → ✓', {'lens/C.md': '> Читається ТОЧКОВО\n' + ''.join(sec(9) for _ in range(10))}, '✓', ''),
