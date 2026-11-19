@@ -59,6 +59,9 @@
      (SNAP: самері, аудит, рішення, черга, журнал гачків, файли з датою в імені, archive/ · sessions/ · site/), без `коду`, шляхів і заголовків
      (вказівник на дім — не копія). Сторож коміту commit_files п. 12 — ✗ на нову копію в доданих рядках. Замір 13.11 (AE S143): ядро — M14 8 · M15 65,
      AE — M14 6 · M15 38; хибні до зрізу шляхів — 12 (усі «`шлях` «розділ»»), після — 0 у вибірці 9 з 14. Konst AE S143: «думав, що він працює на весь репо».
+  M17 черга не-Lens (`docs/CHERGA.md`) — та сама мірка CQ-1, що G17 / G14 для ядра й Lens (`Lens_validate`: queue_open · Q_MAX · Q_AGE · Q_ROW):
+     пункт «Відкрите» старший за 30 дн., пунктів > 12, рядок > 2000 знаків → ⚠. Чому (AE S156, іспит нового агента): черга AE виросла до 67 КБ, злитий пункт
+     `AE-PORT` · `AE-HDR` — 31 день без ⚠: `--gov` AE не бачить (AE поза Lens), env_check AE черги не міряв, `queue_open` злитого рядка не бачив.
 Лише ⚠ (не блокує): один рядок для env_check; адреси — --list.
   python3 doc_health.py [<репо>] [--list] | selftest
 """
@@ -96,6 +99,7 @@ def scan(root):
             found.append(('M4', f, f'{kb:.0f} КБ без «читається коли» — одним Read не взяти'))
     found += dead_paths(root)
     found += queue_behind(root)
+    found += queue_ceiling(root)
     found += dead_sections(root)
     found += unchecked_rules(root)
     found += orphan_tools(root)
@@ -305,6 +309,25 @@ def queue_behind(root):
             if re.search(r'`' + re.escape(i) + r'`\**\s*[·—–-]?\s*(✅|закрит)', txt)]
 
 
+def queue_ceiling(root):
+    """M17: черга не-Lens `docs/CHERGA.md` — вік · стеля · довжина рядка (CQ-1; Lens і ядро — G17 / G14 гейта, тут не дублюємо)."""
+    q = os.path.join(root, 'docs', 'CHERGA.md')
+    if not os.path.isfile(q): return []
+    try:
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'kernel'))
+        from Lens_validate import queue_open, Q_MAX, Q_AGE, Q_ROW, Q_ID
+    except Exception:
+        return []
+    txt = open(q, encoding='utf-8').read(); rows = queue_open(txt); f = 'docs/CHERGA.md'
+    out = [('M17', f, f'`{i}` відкритий {a} дн. (> {Q_AGE}) — виконати, розрізати або відкласти з датою перегляду') for i, a in rows if a is not None and a > Q_AGE]
+    if len(rows) > Q_MAX: out.append(('M17', f, f'відкритих {len(rows)} > {Q_MAX} — новий пункт спершу виштовхує старий'))
+    sec = txt.split('## Відкрите', 1)[1].split('\n-----', 1)[0] if '## Відкрите' in txt else txt
+    for l in sec.splitlines():
+        m = re.match(r'\|\s*' + Q_ID, l) if l.startswith('|') and len(l) > Q_ROW else None
+        if m: out.append(('M17', f, f'`{m.group(1)}` — рядок {len(l)} знаків > {Q_ROW}: у черзі — стан · далі · дім, історія — у бриф'))
+    return out
+
+
 M5_HIST = re.compile(r'(^|/)(archive|sessions|summary|journal)/|DECISIONS|AUDIT|HOOK_JOURNAL|ADOPTIONS|FINDINGS|ARCHIVE_INDEX')
 M5_SECT = re.compile(r'(?i)переїзд|старий|старі|істор|було|history')
 M5_PLAN = re.compile(r'\s*\((?:буде|ще нема|створить|planned)', re.I)   # позначка запланованого файла одразу після шляху
@@ -400,7 +423,7 @@ def line(root):
     if not f: return '✓', f'документи: ✓ щосесійні ≤ {M1_LINES} рядків і {M1_CHARS} знаків · старт ≤ {M2_KB} КБ · розділи ≤ {M3_KB} КБ · великі з маршрутом · копій нема' + note
     by = {}
     for m, *_ in f: by[m] = by.get(m, 0) + 1
-    name = {'M1': 'щосесійні задовгі', 'M2': 'файли старту завеликі', 'M3': f'розділів > {M3_KB} КБ', 'M4': f'> {M4_KB} КБ без маршруту', 'M5': 'мертвих шляхів', 'M9': 'приладів без згадки', 'M16': 'гачків без рядка в реєстрі', 'M6': 'черга відстала від самері', 'M7': 'мертвих адрес §', 'M8': 'правил без «Як перевірити»', 'M10': 'свіжих рецептів без дати джерела', 'M11': f'рецептів > {M11_DAYS} дн. без звірки', 'M13': 'копій між щосесійними', 'M14': 'копій щосесійного шару в документах', 'M12': 'посилань на неіснуючий рецепт'}
+    name = {'M1': 'щосесійні задовгі', 'M2': 'файли старту завеликі', 'M3': f'розділів > {M3_KB} КБ', 'M4': f'> {M4_KB} КБ без маршруту', 'M5': 'мертвих шляхів', 'M9': 'приладів без згадки', 'M16': 'гачків без рядка в реєстрі', 'M6': 'черга відстала від самері', 'M17': 'черга: вік · стеля · довгий рядок', 'M7': 'мертвих адрес §', 'M8': 'правил без «Як перевірити»', 'M10': 'свіжих рецептів без дати джерела', 'M11': f'рецептів > {M11_DAYS} дн. без звірки', 'M13': 'копій між щосесійними', 'M14': 'копій щосесійного шару в документах', 'M12': 'посилань на неіснуючий рецепт'}
     worst = max((x for x in f if x[0] == 'M3'), key=lambda x: float(re.search(r'(\d+) КБ', x[2])[1]), default=None)
     return '⚠', 'документи: ' + ' · '.join(f'{name[m]} {n}' for m, n in sorted(by.items())) + (f' (найбільший — {worst[1]} {worst[2]})' if worst else '') + ' — деталі: doc_health.py --list' + note
 
@@ -414,7 +437,8 @@ def selftest():
         subprocess.run(['git', 'add', '-A'], cwd=d, check=True)
         subprocess.run(['git', '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 't', '--allow-empty'], cwd=d, check=True, env=dict(os.environ, **ENV)); return d
     sec = lambda kb: '## Розділ\n' + 'х' * (kb * 512) + '\n'   # кирилиця — 2 байти на знак
-    Q = '## Відкрите\n| id | предмет | відкрито | умова |\n|---|---|---|---|\n| `AE-X` | x | 18.10.2026 | y |\n| `AE-Y` | y | 18.10.2026 | z |\n\n-----\n'
+    import datetime; D = datetime.date.today().strftime('%d.%m.%Y'); OLD = (datetime.date.today() - datetime.timedelta(days=40)).strftime('%d.%m.%Y')   # M17: фікстура M6 — свіжа дата, інакше старіє з календарем
+    Q = '## Відкрите\n| id | предмет | відкрито | умова |\n|---|---|---|---|\n| `AE-X` | x | D | y |\n| `AE-Y` | y | D | z |\n\n-----\n'.replace('| D |', '| ' + D + ' |')
     cases = [('чисте репо → ✓', {'CLAUDE.md': 'x\n' * 50, 'lens/A.md': sec(4)}, '✓', ''),
              ('CLAUDE.md 250 рядків → ⚠ M1', {'CLAUDE.md': 'x\n' * 250}, '⚠', 'щосесійні задовгі 1'),
              ('CLAUDE.md 120 рядків по 300 знаків (36 тис.) → ⚠ M1 (AE S134: мірка рядками сліпла)', {'CLAUDE.md': ('ж' * 299 + '\n') * 120}, '⚠', 'щосесійні задовгі 1'),
@@ -442,7 +466,12 @@ def selftest():
              ('M5: шлях від теки документа → ✓', {'docs/a/b.md': 'поруч — `c/d.md`\n', 'docs/a/c/d.md': 'x'}, '✓', ''),
              ('M5: блок коду, розділ історії, Репо:шлях, гола назва, DECISIONS → ✓', {'README.md': '```\n`tools/x/y.py`\n```\n## Переїзд — старий шлях\n`old/a.md`\n## Далі\n`QR-Lens:tools/q.py` · `gone.py`\n', 'docs/DECISIONS.md': '`tools/dead/z.py`\n'}, '✓', ''),
              ('M6: `AE-X` ✅ у самері, у черзі відкритий → ⚠', {'docs/CHERGA.md': Q, 'docs/summary/P_SUMMARY_2026-10-18.md': '## §0\n- `AE-X` ✅ зроблено\n'}, '⚠', 'черга відстала від самері 1'),
-             ('M6: «`AE-X`: підкрок ✅» і закритий у черзі `AE-Y` → ✓', {'docs/CHERGA.md': Q.replace('| `AE-Y` | y | 18.10.2026 | z |', '| `AE-Y` | y | закрито | z |'), 'docs/summary/P_SUMMARY_2026-10-18.md': '## §0\n- `AE-X`: знімок ✅\n- `AE-Y` ✅\n'}, '✓', '')]
+             ('M6: «`AE-X`: підкрок ✅» і закритий у черзі `AE-Y` → ✓', {'docs/CHERGA.md': Q.replace('| `AE-Y` | y | ' + D + ' | z |', '| `AE-Y` | y | закрито | z |'), 'docs/summary/P_SUMMARY_2026-10-18.md': '## §0\n- `AE-X`: знімок ✅\n- `AE-Y` ✅\n'}, '✓', '')]
+    QH = '## Відкрите\n| id | предмет | відкрито | умова |\n|---|---|---|---|\n'; QT = '\n-----\n## Відкладено\n| `AE-Z` | старе | 01.01.2020 | x |\n'
+    cases += [('M17: злитий пункт «`AE-P` · `AE-H`» 40 дн. → ⚠ (AE S156: був невидимий)', {'docs/CHERGA.md': QH + f'| `AE-P` · `AE-H` | x | {OLD} | y |' + QT}, '⚠', 'черга: вік · стеля · довгий рядок 1'),
+              ('M17: рядок 2100 знаків → ⚠', {'docs/CHERGA.md': QH + f'| `AE-L` | {"ж" * 2100} | {D} | y |' + QT}, '⚠', 'черга: вік · стеля · довгий рядок 1'),
+              ('M17: 13 пунктів → ⚠', {'docs/CHERGA.md': QH + ''.join(f'| `AE-{n}` | x | {D} | y |\n' for n in range(13)) + QT}, '⚠', 'черга: вік · стеля · довгий рядок 1'),
+              ('M17: свіжі короткі 12 · старе й довге лише у «Відкладено» → ✓', {'docs/CHERGA.md': QH + ''.join(f'| `AE-{n}` | x | {D} | y |\n' for n in range(12)) + QT + f'| `AE-W` | {"ж" * 2100} | 01.01.2020 | y |\n'}, '✓', '')]
     cases += [('M7: «§13-д» без заголовка §13 → ⚠', {'lens/S.md': '## §1 А\nx\n## §2 Б\nx\n## §3 В\nдив. §13-д\n'}, '⚠', 'мертвих адрес § 1'),
               ('M7: «§3-п.2» є заголовок · «gov §12.4» · «Бібліотека §7.1» → ✓', {'lens/S.md': '## §1 А\nx\n## §2 Б\nx\n## §3 В\nдив. §3-п.2 · gov §12.4 · Бібліотека §7.1\n'}, '✓', '')]
     cases += [('M9: прилад, про який не каже жоден .md → ⚠', {'tools/gone_v1.py': 'x', 'README.md': 'нічого\n'}, '⚠', 'приладів без згадки 1'),

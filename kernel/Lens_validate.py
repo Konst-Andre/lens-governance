@@ -1153,6 +1153,7 @@ Q_CEIL = 8192             # колишня стеля в байтах — лиш
 Q_THR = Q_CEIL * 9 // 10  # колишній поріг Ф-10 — лише ⓘ
 Q_ROW = 2000              # рядок черги довший — «наріс шарами»: винести в бриф/план, у черзі — вказівник (BRIEF-1; урок QR CC-4 09.10: QRL-10 3,9 тис. знаків)
 
+Q_ID = r'\*{0,2}`([^`]+)`\*{0,2}(?:\s*·\s*\*{0,2}`[^`]+`\*{0,2})*'   # клітинка `id`; злитий пункт «`AE-PORT` · `AE-HDR`» — за першим (AE S156: такий рядок 31 день був невидимий для стелі й віку)
 def queue_open(txt):
     """Відкриті пункти черги (CQ-1): рядок таблиці, де `id` у 1-й або 2-й комірці (як check_cherga.ids), без «| закрито |»
     → [(id, вік у днях або None)]. Дата — остання комірка-дата рядка: dd.mm.yyyy або dd.mm (рік — поточний, у майбутньому — минулий).
@@ -1163,7 +1164,7 @@ def queue_open(txt):
     for l in sec.splitlines():
         if not l.startswith('|') or '| закрито |' in l: continue
         cells = [c.strip() for c in l.strip().strip('|').split('|')]
-        m = next((re.fullmatch(r'\*{0,2}`([^`]+)`\*{0,2}', c) for c in cells[:2] if re.fullmatch(r'\*{0,2}`([^`]+)`\*{0,2}', c)), None)
+        m = next((re.fullmatch(Q_ID, c) for c in cells[:2] if re.fullmatch(Q_ID, c)), None)
         if not m: continue
         age = None
         for c in reversed(cells):
@@ -1187,7 +1188,7 @@ def _q_ids(txt):
         if not l.startswith('|'):
             continue
         for c in [x.strip() for x in l.strip('|').split('|')][:2]:
-            m = re.fullmatch(r'\*{0,2}`([^`]+)`\*{0,2}', c)
+            m = re.fullmatch(Q_ID, c)
             if m:
                 out.append(m.group(1)); break
     return out
