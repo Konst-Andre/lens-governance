@@ -76,6 +76,8 @@ def repo_dir(repo, name):
     return None
 
 
+PLAN_RE = re.compile(r'\s*\((?:буде|ще нема|створить|planned)', re.I)   # ≡ doc_health.M5_PLAN
+
 def check_paths(repo, text, where, lines):
     dead, bare, other, seen = [], [], set(), set()
     for m in PATH_RE.finditer(text):
@@ -85,6 +87,7 @@ def check_paths(repo, text, where, lines):
         key = (rp or '') + ':' + p
         if key in seen: continue
         seen.add(key)
+        if PLAN_RE.match(text, m.end() + (1 if text[m.end():m.end() + 1] == '`' else 0)): continue   # «`шлях` (буде)» — запланований файл, не мертвий; та сама позначка, що doc_health M5 (AE S156)
         if rp:
             d = repo_dir(repo, rp)
             if d is None: other.add(rp); continue
@@ -713,6 +716,7 @@ def selftest():
         ('самері без стартового → ✗', mk(good.split('## §6')[0]), 'стартове повідомлення нема'),
         ('гола назва ui-review-gate.sh → ✗', mk(good.replace('правила — CLAUDE.md', 'гачок `ui-review-gate.sh`')), 'голі назви'),
         ('мертвий lens/X.md → ✗', mk(good.replace('правила — CLAUDE.md', 'план `lens/X.md`')), 'мертві шляхи'),
+        ('запланований `lens/X.md` (буде) → тиша (≡ doc_health M5, AE S156)', mk(good.replace('правила — CLAUDE.md', 'прилад `lens/X.md` (буде)')), None),
         ('адреса без https:// (dash.cloudflare.com/…) — не шлях → тиша', mk(good.replace('правила — CLAUDE.md', 'посилання dash.cloudflare.com/?to=/:account/x')), None),
         ('мертвий шлях у «Коротко» плану → ✗', mk(good, {'lens/A.md': '## 0. Коротко\n- `lens/Gone.md`\n'}), 'мертві шляхи'),
         ('номер рішення двічі (В-348 ×2, AE S140) → ✗', mk(good, {'lens/DECISIONS.md': '- **В-348** · a\n- **В-348** · b\n- **В-347** · c\n'}), 'номер рішення двічі'),
