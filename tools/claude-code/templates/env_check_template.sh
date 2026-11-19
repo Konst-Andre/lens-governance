@@ -21,6 +21,7 @@ echo "база: HEAD $(git rev-parse --short HEAD) · origin/main $(git rev-pars
 g=$(code https://api.github.com/); c=$(code https://api.cloudflare.com/client/v4/)
 vars=""; for v in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID GH_TOKEN $EXTRA_VARS; do [ -n "${!v:-}" ] && vars+="$v=так " || vars+="$v=ні "; done
 gate=$(bash -c "$GATE_CMD" 2>&1 | tail -1)
+case "$gate" in *"✗ 0"*) ;; *) fail=1 ;; esac   # ✗ гейта продукту — вихід 1 (EquipLens S36, 19.11.2026: без цього ✗ гейта не червонив env_check)
 last=$(grep -m1 -oE "^\| 20[0-9]{2}-[0-9]{2}-[0-9]{2}" "$AUDITF" 2>/dev/null | tr -d '| ')
 if [ -n "$last" ]; then days=$(( ( $(date +%s) - $(date -d "$last" +%s) ) / 86400 )); [ "$days" -gt 30 ] && aud="аудит правил: $days дн. — ПОРА" || aud="аудит правил: $days дн. тому"; else aud="аудит правил: журналу нема"; fi
 INSTR="CLAUDE.md"                # файли інструкцій репо (skills, профіль у репо — дописати)
@@ -54,7 +55,7 @@ else n=$(git rev-list --count --grep='Claude-Session' "$sm"..HEAD 2>/dev/null); 
 # case "$pyb $ndb" in *✗*) echo "⚠ браузер: $pyb · $ndb";; *) echo "браузер: $pyb · $ndb";; esac
 
 # прод (лише читання): <живий код ≡ репо; тека публікації; службове не видно — судити за ВМІСТОМ, не за HTTP-кодом>
-#   GitHub Pages: запит з ?cb=<час> (обхід кешу); розбіжність ≤ 15 хв після коміту в main — ⚠ «кеш Pages», не ✗ (Cache-Control max-age=600; EquipLens S36, 19.11.2026; зразок — EquipLens:tools/env_check.sh)
+#   GitHub Pages: запит з ?cb=<час> (обхід кешу); розбіжність ≤ 15 хв після коміту в main — ⚠ «кеш Pages», не ✗ (вікно — лише без ENV_INJECT: `&& [ -z "${ENV_INJECT:-}" ]`, інакше глушить зуб) (Cache-Control max-age=600; EquipLens S36, 19.11.2026; зразок — EquipLens:tools/env_check.sh)
 echo "прод: — (додати: живий код ≡ репо; тека публікації; службове не видно — за ВМІСТОМ)"
 
 # Спільні інструменти ядра — з КЛОНУ ядра поруч ($K, як профіль вище): виклик, не копія. Клон кладе setup script v3 середовища; нема клону — рядки «ядра поруч нема»: налаштувати середовище, не обходити curl-ом
