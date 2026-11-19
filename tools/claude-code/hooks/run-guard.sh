@@ -51,19 +51,33 @@ if tool in ("Write", "Edit", "NotebookEdit"):
 elif tool == "Bash":
     c = ti.get("command") or ""
     if "run-guard: ok" not in c:
-        W = re.compile(r"(\btee\b|\bsed\s+-i|\bcp\b|\bmv\b|\brm\b|\binstall\b|\btruncate\b|open\([^)]*[\x27\"][wa]|writeFile|write_text)")
+        # ЦІЛЬ запису, не згадка теки (S156: правка docs/DECISIONS.md з текстом «tools/…» — хибний deny). Тіло heredoc — дані програми, не оболонка:
+        #   у ньому шукаємо лише open(…,'w'|'a') / writeFile / write_text; перенаправлення й дієслова (sed -i · mv · rm · tee · truncate; cp · install —
+        #   останній аргумент) — лише в самій оболонці. Шлях — літерал або змінна з присвоєння; «cd <тека> && …» — далі відносно неї.
+        sh, body, tag = [], [], None
+        for ln in c.split("\n"):
+            if tag is not None:
+                if ln.strip() == tag: tag = None
+                else: body.append(ln)
+                continue
+            sh.append(ln); m = re.search(r"<<-?\s*[\x27\"]?(\w+)[\x27\"]?", ln)
+            if m: tag = m.group(1)
+        S, B = "\n".join(sh), "\n".join(body)
+        cds = re.findall(r"(?:^|[;&|]\s*|\n\s*)cd\s+([^\s;&|]+)", S)
+        if cds: cwd = os.path.normpath(os.path.join(cwd, os.path.expanduser(cds[0].strip("\x27\""))))
         G = re.compile(r"\bgit\s+(checkout|stash|restore|reset|pull|merge|rebase|apply|am|cherry-pick|switch)\b")
-        for m in re.finditer(r"(?<![0-9&])>>?\s*([^\s&|;<>()]+)", c):   # перенаправлення: судить ЦІЛЬ (node tools/x.js > /tmp/o — можна)
-            why = hit(m.group(1).strip("\x27\""))
+        tg = [m.group(1) for m in re.finditer(r"(?<![0-9&<])>>?\s*([^\s&|;<>()]+)", S)]
+        for m in re.finditer(r"\b(sed\s+-i\S*|mv|rm|tee|truncate|cp|install)\b([^;&|\n#]*)", S):
+            a = [x.strip("\x27\"") for x in m.group(2).split() if not x.startswith("-")]
+            tg += a[-1:] if m.group(1) in ("cp", "install") else a
+        names = dict(re.findall(r"\b(\w+)\s*=\s*[\x27\"]([^\x27\"\n]+)[\x27\"]", c))
+        for m in re.finditer(r"(?:open\(\s*([^,\)]+)\s*,\s*[\x27\"][wa]|writeFileSync\(\s*([^,\)]+)|writeFile\(\s*([^,\)]+)|(\w+|[\x27\"][^\x27\"]+[\x27\"])\.write_text)", c):
+            a = next(g for g in m.groups() if g).strip()
+            tg.append(a.strip("\x27\"") if a[:1] in "\x27\"" else names.get(a, ""))
+        for x in tg:
+            why = hit(x)
             if why: break
-        if not why and W.search(c):
-            for pid, root, dirs, t in locks:
-                rel = os.path.relpath(root, cwd)
-                for x in dirs:
-                    pats = [root + "/" + x + "/", (x + "/") if rel == "." else None, (rel + "/" + x + "/") if not rel.startswith("..") and rel != "." else None]
-                    if any(p and p in c for p in pats): why = (pid, root, x, t); break
-                if why: break
-        if not why and G.search(c):
+        if not why and G.search(S):
             for pid, root, dirs, t in locks:
                 if os.path.normpath(cwd).startswith(root) or root in c: why = (pid, root, " · ".join(dirs), t); break
 if why:
@@ -92,6 +106,11 @@ EOF" 1
     t "Bash: запис у чуже репо з іншого кореня → можна" Bash "echo x > site/a.txt" 0 "$T"
     t "Bash: прилад з tools/ пише вивід у /tmp → можна"  Bash "node tools/x.js site > /tmp/out.log 2>&1" 0
     t "Bash: перенаправлення в site/ → deny"            Bash "echo x > site/a.txt" 1
+    t "Bash: python пише docs/, а текст згадує tools/ і «> site/» (S156) → можна" Bash "python3 - <<'EOF'
+p='docs/D.md'; open(p,'w').write('див. tools/gates_v1.sh; echo x > site/a')
+EOF" 0
+    t "Bash: cp -r site /tmp/копія (читання) → можна"   Bash "cp -r site /tmp/site_old" 0
+    t "Bash: cd <корінь> && sed -i tools/… з чужого cwd → deny" Bash "cd $R && sed -i s/a/b/ tools/x.py" 1 "$T"
     kill $SP 2>/dev/null; wait $SP 2>/dev/null
     t "процес прогону помер → замок геть, правка можна" Edit "$R/site/tools/ae_rules.js" 0
     [ -e "$LENS_RUN_GUARD_DIR/$SP" ] && echo "  ✗ мертвий замок лишився" || { n=$((n+1)); ok=$((ok+1)); echo "  ✓ мертвий замок прибрано"; }
