@@ -177,4 +177,4 @@
 - **«Поверніть телефон»** — `A23` (том 1, нижня межа ширини). **Анімація** — лише `opacity`/`transform` (A116 «i» tip-popover).
 ❌ `await fetch()` → `clipboard.writeText()` в одному обробнику — iOS відмовляє. ✅ Текст уже в пам'яті до дотику.
 **Детектор (К2).** Смоук прев'ю в Chromium `AirLens:tools/miniapp/smoke.js` (вкладки видно поза Telegram; адмін-панель: «Скопіювати стан» без мережі в дотику); код `AirLens:miniapp/app/index.html` `copyText`.
-*(AirLens Р-41 · Р-64 · Р-65.)*
+*Прецедент: AirLens Р-41 · Р-64 · Р-65.*

@@ -228,7 +228,7 @@ def spread(root, only=None, old=None):
     return found
 
 REC = re.compile(r'(?m)^## ([AT]\d+)\.')
-PREC = re.compile(r'\*\*Прецедент')   # внутрішнє джерело — наш випадок (продукт · batch / сесія), не зовнішня сторінка: дата не обов'язкова (Konst AE S129, варіант Б — A45)
+PREC = re.compile(r'\*{1,2}\(?Прецедент')   # і курсивом «*Прецедент: …*» — та сама форма (EquipLens S38: A63 мав курсив, M10 бив хибно)   # внутрішнє джерело — наш випадок (продукт · batch / сесія), не зовнішня сторінка: дата не обов'язкова (Konst AE S129, варіант Б — A45)
 DATED = re.compile(r'\b\d{2}\.\d{2}\.20\d{2}\b|\b20\d{2}-\d{2}-\d{2}\b')
 def cookbook(root, now=None):
     """M10–M12: рецепти кукбука — свіжість (git blame) і посилання між рецептами."""
@@ -242,6 +242,7 @@ def cookbook(root, now=None):
     for f in cb:
         txt = open(os.path.join(root, f), encoding='utf-8', errors='replace').read(); lines = txt.split('\n')
         for m in re.finditer(r'\b([AT]\d+)\b\**\s*[—–-]\s*зарезерв', txt): reserved.add(m[1])
+        for m in re.finditer(r'(?m)^#{2,4} ([AT]\d+) \(cand\.\)', txt): reserved.add(m[1])   # кандидат лотка delta_running — номер зайнятий, посилання «`A121` (cand.)» живе (EquipLens S38: M12 бив хибно)
         if re.search(r'cookbook_(\d|INDEX)', f):   # тома й індекс; лоток delta_running тримає кандидатів і старі номери свідомо
             for i, l in enumerate(lines): refs += [(f, i + 1, r) for r in re.findall(r'\b([AT]\d{1,3})\b', l)]
         heads = [(i, m[1]) for i, l in enumerate(lines) for m in [REC.match(l)] if m]
@@ -484,7 +485,8 @@ def selftest():
     cases += [('M10: свіжий рецепт без дати джерела → ⚠', {C: '# Том\n## A1. Кнопка\nтекст без дати\n## A2. Поле\nджерело web.dev, 05.11.2026\n'}, '⚠', 'свіжих рецептів без дати джерела 1'),
               ('M10–M12: дати є · посилання живе · A9 зарезервовано → ✓', {C: '# Том\n## A1. Кнопка\nпара — A2; A9 — зарезервований номер\n(2026-11-05)\n## A2. Поле\nweb.dev, 05.11.2026\n'}, '✓', ''),
               ('M10: рецепт з «**Прецедент:**» (наш випадок) без дати → ✓ (Konst S129, варіант Б)', {C: '# Том\n## A1. Кнопка\nтекст\n**Прецедент:** Drive Lens Batch 26.\n'}, '✓', ''),
-              ('M12: посилання на рецепт, якого нема → ⚠', {C: '# Том\n## A1. Кнопка\nдив. A77 · 05.11.2026\n'}, '⚠', 'посилань на неіснуючий рецепт 1')]
+              ('M12: посилання на рецепт, якого нема → ⚠', {C: '# Том\n## A1. Кнопка\nдив. A77 · 05.11.2026\n'}, '⚠', 'посилань на неіснуючий рецепт 1'),
+              ('M10: «*Прецедент: …*» курсивом без дати → ✓ · M12: кандидат лотка «A121 (cand.)» → живе (S38)', {C: '# Том\n## A1. Кнопка\nтекст; лоток — A121 (cand.)\n*Прецедент: QR Lens Batch 25.2.*\n', 'kernel/cookbook/Lens_cookbook_delta_running.md': '# Лоток\n### A121 (cand.) · Пружина\nx\n'}, '✓', '')]
     S = 'перед будь-якою правкою покажи план мікроскоп і дочекайся слова так від konst'
     PR = {'tools/claude-code/PROFILE.md': '# Профіль\n```text\n· ' + S + '\n```\n'}
     R = '---\npaths:\n  - "site/**"\n---\nправило\n'

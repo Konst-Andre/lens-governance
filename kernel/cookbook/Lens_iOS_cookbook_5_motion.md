@@ -458,6 +458,8 @@ function onScrollFrame(){
 смуга проходить `translateX(-160%) → translateX(400%)` з нахилом і плавним входом/виходом
 за непрозорістю. Тільки `transform` + `opacity` → composite-only, без repaint.
 
+*Прецедент: StockCheck b27–b28 — значення нижче.*
+
 **Device-locked значення** (StockCheck b27, обидві теми, iPhone XS + 15 Pro):
 ```
 --swDur   1400ms      ← БАЛАНС, не «повільно»: коротші (≈650) око не встигає зареєструвати
