@@ -19,17 +19,21 @@ CLOUDFLARE_API_TOKEN=<токен Cloudflare — у Konst>   # змінна, не
 CLOUDFLARE_ACCOUNT_ID=<id акаунта Cloudflare — у Konst>
 LENS_PROFILE=1
 CLAUDE_CODE_AUTO_COMPACT_WINDOW=450000
+AE_EDIT_CODE=<код дверей куратора AE — у Konst>   # AE: env_check і детектори дверей (AE-Simulator:CLAUDE.md «Секрети»)
 ```
+
+- **Network secret (не змінна):** ключ Gemini для AE — хост `generativelanguage.googleapis.com`, заголовок `Authorization` (назва «Gemini API key (AE)»; меню середовища → Network secrets; `AE-Simulator:docs/DECISIONS.md` В-407).
 
 - `LENS_PROFILE=1` — профіль з репо (`tools/claude-code/PROFILE.md`) кладе гачок старту. **З 22.10.2026 — і на своєму акаунті** (рішення `ACC-1`, `tools/claude-code/ACCOUNT_MOVE.md`): у полі акаунта тоді лише ядро (6 рядків). <!-- copy-ok: перелік змінних; дім рішення — ACCOUNT_MOVE.md ACC-1 -->
 - `CLAUDE_CODE_AUTO_COMPACT_WINDOW=450000` — **лише руками в Settings** (з сесії `update_environment` відхиляє: змінна керує сесією; AE S141) — межа автостиснення 450 тис. токенів (типово в хмарі 1 млн); стиснення спрацьовує на 92 % від (межа − 20 тис.) = 395,6 тис. — 92 ставить платформа (`CLAUDE_AUTOCOMPACT_PCT_OVERRIDE`, у змінних середовища його нема); одна на день і ніч; діє з перезапуску процесу Claude Code (AE S141 — уже в тій самій сесії); перевірка — `get_session` → `autocompact_state.threshold`, контекст — `hooks/ctx_watch.py line` (AE S141, В-351; `tools/claude-code/CLAUDE_CODE.md` «Ревізія → `/compact`»).
 - Навички ядра (`/night`) ставить не setup script, а диспетчер `hooks/lens-hooks.sh` на старті (`tools/claude-code/skills/`).
 - `GH_TOKEN` руками не ставити: доступ до GitHub дає під'єднаний GitHub (п.3б там же).
 
-## 3 · Setup script (поле «Setup script»), v4 (13.11.2026: обгортка у файлі, PreCompact пропускає вихід 2; рядки ≤ 200 байт — межа поля)
+## 3 · Setup script (поле «Setup script»), v5 (19.11.2026, AE S157 В-416: + вузькі `permissions.allow` приладам ядра — Auto не відхиляє їх у сесії з одним репо; v4 13.11 — обгортка у файлі, PreCompact пропускає вихід 2; рядки ≤ 200 байт)
 
 ```bash
-# Гачки Lens v4 (13.11.2026): 9 подій → обгортка ~/.claude/lens-hooks.sh → диспетчер ядра
+# Гачки Lens v5 (19.11.2026, AE S157): 9 подій → обгортка ~/.claude/lens-hooks.sh → диспетчер ядра
+# + вузькі правила дозволу приладам ядра (Auto відхиляв скрипти ядра в сесії з одним репо — EquipLens S36, В-416)
 # Ядро — серед репо сесії або в /tmp/lens-governance (гачки діють і в сесії лише з продуктом)
 pip install -q shellcheck-py 2>/dev/null || true   # shellcheck для сторожа коміту, 22.10.2026
 K=https://github.com/Konst-Andre/lens-governance
@@ -55,9 +59,18 @@ cat > ~/.claude/settings.json <<'JSON'
 "SubagentStop":[{"hooks":[{"type":"command","command":"bash ~/.claude/lens-hooks.sh SubagentStop"}]}],
 "PreCompact":[{"hooks":[{"type":"command","command":"bash ~/.claude/lens-hooks.sh PreCompact"}]}],
 "SessionEnd":[{"hooks":[{"type":"command","command":"bash ~/.claude/lens-hooks.sh SessionEnd"}]}]
-}}
+},
+"permissions":{"allow":[
+"Bash(bash tools/env_check.sh)",
+"Bash(bash /tmp/lens-governance/tools/claude-code/frame_check.sh *)",
+"Bash(python3 /tmp/lens-governance/kernel/Lens_validate.py *)",
+"Bash(python3 /tmp/lens-governance/tools/claude-code/doc_health.py *)",
+"Bash(python3 /tmp/lens-governance/tools/claude-code/shots_check.py *)",
+"Bash(python3 /tmp/lens-governance/tools/claude-code/handoff_check.py *)",
+"Bash(python3 /tmp/lens-governance/tools/claude-code/hooks/ctx_watch.py *)"
+]}}
 JSON
-
+```
 
 ## 4 · Інструменти, які ставить setup script
 
