@@ -9,6 +9,7 @@
 #   selftest (лічбу друкує сам прогін; серед випадків — сітка review-remind post і done ⟂ ui_lint) у тимчасовому репо (зуби: UI без позначки → deny; позначка → тиша; правка після позначки → deny; done без ui_lint → ✗).
 #   hash  — хеш диффу UI репо (для ui_lint: позначка /tmp/lens-uilint-<хеш> — машинна частина огляду; закритий бриф `archive/summaries/Lens_gov/Lens_kernel_BRIEF_HOOK-2.5_closed.md`).
 #   done вимагає позначку ui_lint САМЕ ЦЬОГО диффу (✗ 0 у темах продукту — типово обидві, --themes light|dark для продукту з однією схемою) або --no-lint "<причина ≥ 30 знаків>" (сторінку не запустити) — причина пишеться в позначку.
+#   --no-lint не приймається, коли дифф ДОДАЄ текст людині (рядок у лапках чи текст між тегами, ≥ 2 слова кирилицею; коментарі зрізано) — пропуск Konst EquipLens S40.
 # Діє в усіх репо, де підключено гачки ядра (tools/claude-code/CLAUDE_CODE.md «Гачки»), — не лише в QR.
 mode="$1"; shift
 [ "$mode" = gate ] && HOOK_IN="$(cat)" || HOOK_IN="{}"   # stdin — тут: heredoc нижче займає stdin python
@@ -55,6 +56,20 @@ def human_js(top):
         tracked = bool(git(top, "ls-files", "--", f))
         lines = [l[1:] for l in git(top, "diff", "-U0", "HEAD", "--", f).splitlines() if l.startswith("+") and not l.startswith("+++")] if tracked else open(p, encoding="utf-8", errors="replace").read().splitlines()
         if any(HUMAN.search(re.sub(r"/\*.*?(\*/|$)|//.*$", "", l)) for l in lines): out.append(f)
+    return out
+
+HTML_TXT = re.compile("[>][^<>\\n]*[А-ЯІЇЄҐа-яіїєґʼ’']{2,}[\\s,.:;—–-]+[А-ЯІЇЄҐа-яіїєґʼ’']{2,}[^<>\\n]*[<]")
+def human_added(top, files):   # ДОДАНИЙ текст людині в диффі UI (рядок у лапках або текст між тегами) — для заборони --no-lint (пропуск Konst EquipLens S40)
+    out = []
+    for f in files:
+        p = os.path.join(top, f)
+        if not os.path.isfile(p): continue
+        lines = [l[1:] for l in git(top, "diff", "-U0", "HEAD", "--", f).splitlines() if l.startswith("+") and not l.startswith("+++")] \
+            if git(top, "ls-files", "--", f) else open(p, encoding="utf-8", errors="replace").read().splitlines()
+        for l in lines:
+            l = re.sub(r"/\*.*?(\*/|$)|<!--.*?(-->|$)|(^|\s)//.*$", "", l)
+            m = HUMAN.search(l) or HTML_TXT.search(l)
+            if m: out.append(f"{f}: {m.group(0)[:60]}")
     return out
 
 def ui_state(top):   # (файли UI, хеш диффу) — дифф проти HEAD + нові неігноровані файли
@@ -149,6 +164,12 @@ if mode == "done":
     if not files: print("ⓘ змін UI нема — позначка не потрібна"); sys.exit(0)
     # машинна частина огляду (HOOK-2.5): ui_lint на ЦЬОМУ диффі дав ✗ 0 у темах продукту — типово обидві, --themes light|dark для продукту з однією схемою — або чесна причина, чому сторінку не запустити
     lint = os.path.exists(lint_mark(hx))
+    # пропуск Konst EquipLens S40 (журнал гачків 20.11 (8)): огляд пройшов з --no-lint «лише перефарбовує фон», а дифф ніс панель з абзацом пояснення —
+    # ui_lint №38 «пояснення — за «i»» спіймав би. Новий текст людині в диффі → --no-lint не приймається: ui_lint бере й файл (`node ui_lint.mjs <файл.html>`)
+    said = [] if lint else human_added(top, files)
+    if nolint and said:
+        print(f"✗ --no-lint не приймається: у диффі новий текст людині ({len(said)}: " + " · ".join(said[:3]) + ("…" if len(said) > 3 else "") +
+              ") — машина мусить бачити, де й як він стоїть на екрані (ui_lint №38: пояснення — за «i»). Прожени ui_lint на сторінці або файлі цього диффу"); sys.exit(1)
     if not lint and not (nolint and len(nolint) >= 30):
         ul = os.path.join(os.path.dirname(os.path.dirname(os.environ.get("UI_GATE_SELF", "x/x"))), "ui_lint.mjs")
         print(f"✗ ui_lint цього диффу ({hx[:8]}) не пройдено: node {ul} <url|файл> [--state \"<js>\"]… --repo {top} → ✗ 0 у темах продукту — типово обидві, --themes light|dark для продукту з однією схемою (старі ✗, що були до правки, — `--baseline <файл>`: перший прогін ДО правки записує базу, блокує лише нове); "
@@ -224,6 +245,14 @@ if mode == "selftest":
         r = dn(note, tmp, "--no-lint", "коротко"); say(r.returncode == 1, "зуби: --no-lint без причини (< 30 знаків) → ✗")
         r = dn(note, tmp, "--no-lint", "CSS листа, сторінки в браузері немає — лише шаблон"); say(r.returncode == 0 and "без ui_lint" in open(mark(hx)).read(), "--no-lint з причиною → ✓, причина в позначці")
         os.remove(mark(hx))
+        # пропуск Konst EquipLens S40: новий текст людині + --no-lint → ✗ (рядок у лапках і текст між тегами); коментар — тиша
+        open(f"{tmp}/a.html", "w").write("<p>Пояснення, звідки цей варіант</p>")
+        r = dn(note, tmp, "--no-lint", "лише перефарбовує фон — сторінку не запустити"); say(r.returncode == 1 and "текст людині" in r.stdout and not os.path.exists(mark(ui_state(tmp)[1])), "зуби (EquipLens S40): текст між тегами + --no-lint → ✗")
+        open(f"{tmp}/a.html", "w").write("<script>const s = 'Фон для примірки обох тем';</script>")
+        r = dn(note, tmp, "--no-lint", "лише перефарбовує фон — сторінку не запустити"); say(r.returncode == 1 and "текст людині" in r.stdout, "зуби (EquipLens S40): рядок у лапках + --no-lint → ✗")
+        open(f"{tmp}/a.html", "w").write("<p>5</p><!-- коментар для розробника тут -->")
+        r = dn(note, tmp, "--no-lint", "лише перефарбовує фон — сторінку не запустити"); say(r.returncode == 0, "кирилиця лише в коментарі HTML + --no-lint з причиною → ✓")
+        os.remove(mark(ui_state(tmp)[1])); open(f"{tmp}/a.html", "w").write("<p>3</p>")
         # ⑥ рух → кліп (Konst AE S140)
         open(f"{tmp}/m.css", "w").write(".r{transition:transform .3s}"); files, hx = ui_state(tmp); open(lint_mark(hx), "w").write("✗0")
         if os.path.exists(mark(hx)): os.remove(mark(hx))   # позначка минулого прогону з тим самим хешем
