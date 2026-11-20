@@ -23,6 +23,7 @@
  "profile_check.sh selftest": 3,
  "promise-guard.sh selftest": 56,
  "pw_quiet.py selftest": 8,
+ "pwa_icon.py selftest": 9,
  "review-remind.sh selftest": 9,
  "route-remind.sh selftest": 15,
  "rules-guard.py selftest": 15,
