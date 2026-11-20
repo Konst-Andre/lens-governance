@@ -1284,6 +1284,10 @@ def product(root):
             seen.setdefault(os.path.basename(r), []).append(r)
     dups = {n: ps for n, ps in seen.items() if len(ps) > 1 and n != 'README.md'}
     for n, ps in sorted(dups.items()):
+        if n == 'index.html' and sorted(ps) == ['docs/index.html', 'index.html']:
+            # перехід Р-7: сайт у docs/ зібрано, старий сайт кореня ще живий до переїзду хостингу (EquipLens S37)
+            warn(f'`index.html` — корінь і docs/: перехід Р-7 — старий сайт кореня прибрати з переїздом хостингу')
+            continue
         fail(f'`{n}` — {len(ps)} копії: {", ".join(ps)}')
     if not dups:
         ok('дублів імен немає')
