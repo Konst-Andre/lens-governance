@@ -74,7 +74,7 @@ fresh_days=30
    (`workers_dev = true`); прев'ю гілок — Worker Previews (`preview_urls` + `previews`, адреса `<прев'ю>-<воркер>.<субдомен>.workers.dev`, `X-Robots-Tag: noindex`);
    власний домен — лише в зоні Cloudflare. Перед переїздом — `migrate_pages_to_workers_guide` конектора Cloudflare (MCP) як чекліст.
    Cloudflare радить прод на власному домені, `workers.dev` — «для хобі-проєктів» (…/routing/workers-dev, 22.09.2026) — прийнятий ризик, доки домену нема.
-10. **Воркер під'єднаний до гіта (Workers Builds) з першого дня.** Ручний `wrangler deploy` з сесії — лише перший раз: інакше файл,
+10. **Воркер під'єднаний до гіта (Workers Builds) з першого дня.** Ручний `wrangler deploy` з сесії — лише перший раз (*перший `wrangler deploy` нового воркера може впасти з 10007 «This Worker does not exist» на кроці `workers/workers/<ім'я>` уже після завантаження — повтор тієї ж команди проходить; EquipLens S37, 20.11.2026, wrangler 4*): інакше файл,
    завантажений з телефона (GitHub web), до сайту не доходить (QR 06.10). Фільтр — правило 1 (include `*`, exclude документів).
    Під'єднати може й сесія через API: `builds/repos/connections` → `builds/triggers` (06.10, QR-Lens) — токеном з правом Workers Builds
    Configuration Edit (токен середовища сесії ядра його має, перевірено 06.10), не токеном лише на читання з §4. Перевірка — два коміти: лише
