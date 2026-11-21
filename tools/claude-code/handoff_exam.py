@@ -12,6 +12,14 @@
 #          python3 tools/claude-code/handoff_exam.py selftest                                 → зуби на підставній моделі (LENS_EXAM_CMD), без витрат
 # Вихід:   run — 0, якщо відповіді повні (6 блоків); 1 — модель не відповіла чи формат зламано. Оцінку «правда з репо» робить агент таблицею.
 # Інша модель (профіль «ІНША МОДЕЛЬ»): перед run агент називає в чаті модель · effort · навіщо. Інструменти моделі — лише Read · Grep · Glob.
+# Вирок (💡 S36 п.7-б, «так з підсиленням» Konst EquipLens S40 21.11.2026): haiku дає 6–7 пунктів «незрозуміло», справжніх 2–3, решта —
+#   рядки історії, прочитані як стан → «незрозуміло 0» недосяжне, печатка втрачала сенс. Тепер агент судить КОЖЕН пункт блоку 6:
+#     python3 tools/claude-code/handoff_exam.py verdict <файл> [<корінь>]   рядки «N ✓|✗|? <шлях:рядок> <чому>» (порядок пунктів блоку 6)
+#   ✓ справжній · ? не певен — рахується як справжній · ✗ не справжній — лише з доказом: `шлях:рядок` існує (від кореня сесії чи репо), «чому» ≥ 10 знаків;
+#   бракує пункту — вирок не прийнято (практика сортування знахідок: справжнє · хибне · не певен, хибне — з доказом контексту, людина звіряє —
+#   sei.cmu.edu «Evaluating static analysis alerts with LLMs» · arxiv 2510.02534 ZeroFalse, 21.11.2026).
+#   Печатка: «справжніх 0 з K» = ✓ (K видно — скільки відкинуто, Konst може звірити); «справжніх R з K» — ні; вирок не дано — як було, «незрозуміло K».
+#   Справжні виправляються → новий HEAD → новий іспит: вирок живе лише на HEAD своєї мітки.
 # Effort — завжди явно (S40 21.11.2026: без --effort рівень обирав CLI, і його не видно ні в init stream-json, ні в --debug-file — Konst не знав,
 #   на чому йшли 4 іспити). Обирає агент, не питаючи («так» Konst 21.11.2026): medium — типово (новий агент сесії працює на medium,
 #   профіль EFFORT — іспит міряє саме його); high — щоб розвести «діра у файлах» ⟂ «слабке читання», коли пункт «незрозумілого»
@@ -97,6 +105,41 @@ def run(root='/home/user', model='haiku', effort='medium'):
     if meta.get('error'): tail += f" · помилка: {meta['error'][-200:]}"
     return f"{ans}\n\n{line}{tail}\n(мітка: {mark_path()} — звір кожну відповідь з репо таблицею «питання · відповідь · правда з репо · ✓/✗»)", 0 if ok else 1
 
+VLINE = re.compile(r'^\s*(\d+)\s*[|·.)]?\s*(✓|✗|\?)\s*[|·]?\s*`?([^\s`|]+:\d+)?`?\s*[|·—-]?\s*(.*)$')
+
+def _ref_ok(ref, root, rs):
+    path, line = ref.rsplit(':', 1)
+    for base in [root] + list(rs):
+        f = path if os.path.isabs(path) else os.path.join(base, path)
+        if os.path.isfile(f):
+            try: return 1 <= int(line) <= sum(1 for _ in open(f, encoding='utf-8', errors='replace'))
+            except OSError: return False
+    return False
+
+def verdict(src, root='/home/user'):
+    """Вирок агента на кожен пункт блоку 6 мітки (той самий HEAD) → дописується в мітку. → (рядок, код)."""
+    rs = hc.session_repos(root)
+    try: txt = open(mark_path(), encoding='utf-8').read().split('\n<!--VERDICT-->')[0]
+    except OSError: return 'вирок: мітки іспиту нема — спершу run', 1
+    ls = txt.split('\n'); k = unclear(txt.split('\n\n', 1)[-1])
+    if ls[0] != hc.heads(rs): return 'вирок: мітка іспиту — не на поточному HEAD (новий коміт після іспиту) → спершу run', 1
+    if not k: return 'вирок: у блоці 6 нема пунктів — судити нічого', 1
+    items, errs = {}, []
+    for l in open(src, encoding='utf-8').read().splitlines():
+        m = VLINE.match(l)
+        if not m: continue
+        n, v, ref, why = int(m.group(1)), m.group(2), m.group(3), m.group(4).strip()
+        if v == '✗' and not ref: errs.append(f'{n}: ✗ без `шлях:рядок`')
+        elif ref and not _ref_ok(ref, root, rs): errs.append(f'{n}: `{ref}` — нема такого файла чи рядка')
+        elif v == '✗' and len(why) < 10: errs.append(f'{n}: ✗ без «чому» (≥ 10 знаків)')
+        items[n] = dict(v=v, ref=ref, why=why)
+    miss = [n for n in range(1, k + 1) if n not in items]
+    if miss: errs.append(f'бракує пунктів {miss} з {k}')
+    if errs: return 'вирок не прийнято: ' + ' · '.join(errs), 1
+    real = sum(1 for n in range(1, k + 1) if items[n]['v'] != '✗')   # ? — не певен = справжній
+    open(mark_path(), 'w', encoding='utf-8').write(txt + '\n<!--VERDICT-->\n' + json.dumps({'head': ls[0], 'k': k, 'real': real, 'items': items}, ensure_ascii=False) + '\n')
+    return f'вирок прийнято: справжніх {real} з {k}' + (' — виправ, закоміть, новий іспит' if real else ' — печатка «іспит ✓»'), 0
+
 def state(rs):
     """→ (на_HEAD, K або None, рядок). Для печатки ревізії (Л3)."""
     try: ls = open(mark_path(), encoding='utf-8').read().split('\n')
@@ -104,6 +147,12 @@ def state(rs):
     m = re.search(r'незрозуміло (\d+)', ls[1] if len(ls) > 1 else '')
     k = int(m.group(1)) if m else None
     if ls[0] != hc.heads(rs) or os.environ.get('EXAM_INJECT') == 'stale': return False, k, 'іспит застарів (HEAD змінився після нього)'
+    vj = '\n'.join(ls).split('\n<!--VERDICT-->\n')
+    if k and len(vj) > 1:
+        try: v = json.loads(vj[1].strip().split('\n')[0])
+        except ValueError: v = {}
+        if v.get('head') == ls[0] and v.get('k') == k:   # вирок на k пунктів цього HEAD → печатку судить кількість справжніх
+            return True, v['real'], (f'іспит ✓ · справжніх 0 з {k} (✗ {k} з доказом)' if v['real'] == 0 else f'іспит · справжніх {v["real"]} з {k}')
     return True, k, (f'іспит ✓ · незрозуміло 0' if k == 0 else f'іспит · незрозуміло {k}' if k is not None else 'іспит неповний')
 
 def selftest():
@@ -133,6 +182,14 @@ def selftest():
     case('стан на тому самому HEAD → «іспит ✓ · незрозуміло 0»', state(rs)[2] == 'іспит ✓ · незрозуміло 0')
     fake(full + '- черга каже X · `docs/CHERGA.md:3` ⟂ `docs/summary/P.md:5`\n- застаріле «чекає» · `a.md:2`\n'); out, code = run(d)
     case('2 суперечності в блоці 6 → «незрозуміло 2», стан без ✓', 'незрозуміло 2' in out and state(rs)[2] == 'іспит · незрозуміло 2')
+    vf = os.path.join(d, 'v.md'); W = lambda t: (open(vf, 'w').write(t), vf)[1]
+    S = 'Prod/docs/summary/P_SUMMARY_2026-11-18.md'
+    case('вирок: ✗ з неіснуючим рядком → не прийнято, стан без ✓', verdict(W(f'1 ✗ {S}:99 рядок історії, не стан\n2 ✗ {S}:2 рядок історії, не стан\n'), d)[1] == 1 and state(rs)[2] == 'іспит · незрозуміло 2')
+    case('вирок: бракує пункту → не прийнято', verdict(W(f'1 ✗ {S}:2 рядок історії, не стан\n'), d)[1] == 1)
+    case('вирок: ✗ без «чому» → не прийнято', verdict(W(f'1 ✗ {S}:2 так\n2 ✗ {S}:3 рядок історії, не стан\n'), d)[1] == 1)
+    case('вирок: обидва ✗ з доказом → «іспит ✓ · справжніх 0 з 2», печатка ✓', verdict(W(f'1 ✗ `{S}:2` рядок історії, не стан\n2 · ✗ · docs/summary/P_SUMMARY_2026-11-18.md:3 · читач не дочитав\n'), d)[1] == 0 and state(rs)[:2] == (True, 0) and 'справжніх 0 з 2' in state(rs)[2])
+    case('вирок: «?» не певен → рахується справжнім, не ✓', verdict(W(f'1 ? не певен, чи стан\n2 ✗ {S}:3 рядок історії, не стан\n'), d)[1] == 0 and state(rs)[:2] == (True, 1))
+    case('вирок: один ✓ → «справжніх 1 з 2», не ✓', verdict(W(f'1 ✓ {S}:2 справжнє\n2 ✗ {S}:3 рядок історії, не стан\n'), d)[1] == 0 and state(rs)[2] == 'іспит · справжніх 1 з 2')
     fake('## 1\nлише одне'); out, code = run(d)
     case('модель не дала всі блоки → «іспит неповний», вихід 1', code == 1 and 'неповний' in out and state(rs)[2] == 'іспит неповний')
     fake(full + '—\n'); run(d); open(os.path.join(r, 'x'), 'w').write('1'); sh('git', 'add', '-A'); sh('git', 'commit', '-qm', 'новий')
@@ -151,6 +208,8 @@ def selftest():
 if __name__ == '__main__':
     a = sys.argv[1:]
     if a[:1] == ['selftest']: sys.exit(selftest())
+    if a[:1] == ['verdict'] and len(a) > 1:
+        out, code = verdict(a[1], a[2] if len(a) > 2 else '/home/user'); print(out); sys.exit(code)
     if a[:1] == ['state']:
         print(state(hc.session_repos(a[1] if len(a) > 1 else '/home/user'))[2]); sys.exit(0)
     if a[:1] == ['run']:
@@ -158,4 +217,4 @@ if __name__ == '__main__':
         effort = a[a.index('--effort') + 1] if '--effort' in a else 'medium'
         rest = [x for x in a[1:] if not x.startswith('--') and x not in (model, effort)]
         out, code = run(rest[0] if rest else '/home/user', model, effort); print(out); sys.exit(code)
-    print('handoff_exam.py run [<корінь>] [--model haiku] [--effort medium] | state [<корінь>] | selftest'); sys.exit(2)
+    print('handoff_exam.py run [<корінь>] [--model haiku] [--effort medium] | verdict <файл> [<корінь>] | state [<корінь>] | selftest'); sys.exit(2)
