@@ -77,6 +77,7 @@ def targets(d):
 # such as cat or head on a single file» — code.claude.com/docs/en/memory, 12.11.2026) → лише позначка, без дубля (S142, замість InstructionsLoaded)
 NATIVE = re.compile(r'\s*(?:cd\s+[^\s;&|]+\s*&&\s*)?(?:cat|head)(?:\s+-n\s*\d+|\s+-\d+)?\s+[^\s;&|<>*]+\s*')
 
+BIG = 100 * 1024   # «великий файл» для нагадування про читача haiku: 100 КБ ≈ 25–35 тис. токенів (EquipLens S40: 177–231 КБ джерел GlassKit)
 def mark(sid, rule): return os.path.join(MARK, f'lens-rules-{sid}-{hashlib.md5(rule.encode()).hexdigest()[:10]}')
 
 
@@ -95,6 +96,17 @@ def pre(d):
     # кілька правил на тих самих шляхах (AE: site/ — editor-worker · gates · ui, разом > стелі): цілим — від найменшого, доки влазить;
     # решта — вказівник «прочитай Read», без позначки: повторюється, доки агент не прочитає (S142, наживо — ui.md обрізався б)
     full, ptr, room = [], [], CAP
+    # EquipLens S40 (Konst 21.11.2026: «великі об'ємні документи… віддавати субагенту Haiku… а ти перевір його роботу, як батько дитину»):
+    # Read великого файла цілком (> BIG, без limit) → правило «читач haiku» в контекст, раз на файл за сесію
+    ti = d.get('tool_input') or {}; fp = ti.get('file_path') or ''
+    if tool == 'Read' and not ti.get('limit') and os.path.isfile(fp) and os.path.getsize(fp) > BIG:
+        bm = os.path.join(MARK, f"lens-bigread-{sid}-{hashlib.md5(os.path.abspath(fp).encode()).hexdigest()[:10]}")
+        if not os.path.exists(bm):
+            open(bm, 'w').close()
+            full.append(f"Великий файл ({os.path.getsize(fp) // 1024} КБ) читається цілком — він ляже в контекст сесії й лишиться там до стиснення. "
+                        "Коли треба знайти чи перенести дослівно (CSS, код, таблиці, документацію): читач — Haiku (`claude -p --model haiku --effort medium --tools \"\"`, файл у запиті; "
+                        "назви в чаті до запуску), у контекст — лише його витяг; дослівність — `python3 <ядро>/tools/claude-code/extract_check.py <витяг.md> <джерело>…`; "
+                        "2–3 місця — прочитай сам (offset/limit). Правило й ціна — `tools/claude-code/CLAUDE_CODE.md` «Велике джерело». Точкове читання — Read з offset/limit або grep.")
     for name, rel, body, m in sorted(due.values(), key=lambda x: len(x[2])):
         if len(body) + 300 <= room: full.append(f'Правило `{name}` діє для `{rel}` (його `paths:`), а в цій сесії ще не приходило — Claude Code вантажить його лише на Read / Edit, не на Grep чи Bash (S142). Текст:\n\n{body}'); room -= len(body) + 300; open(m, 'w').close()
         else: ptr.append(f'`{name}` ({len(body)} знаків)')
@@ -127,6 +139,8 @@ def selftest():
              ('Bash heredoc, що лише згадує шлях у тексті → тиша (AE S143, хибне)', lambda: run('Bash', {'command': "python3 - <<'PY'\ns = 'правка: див. `site/index.html` і site/a.js'\nPY"}, 's11') == ''),
              ('Bash heredoc з open(шлях у лапках) → текст (правка файла через python)', lambda: 'Одна мова' in run('Bash', {'command': "python3 - <<'PY'\nopen('site/index.html','w').write('x')\nPY"}, 's12')),
              ('Bash git commit -m «… шлях …» → тиша (згадка в повідомленні)', lambda: run('Bash', {'command': 'git add docs/a.md && git commit -m "правка поруч із site/index.html"'}, 's13') == ''),
+             ('зуби (EquipLens S40): Read великого файла цілком → правило «читач haiku», раз за сесію', lambda: (open(f'{d}/big.css', 'w').write('a{b:c}\n' * 20000), 'extract_check' in run('Read', {'file_path': f'{d}/big.css'}, 'sb1'))[1] and run('Read', {'file_path': f'{d}/big.css'}, 'sb1') == ''),
+             ('Read великого з limit (точково) → тиша', lambda: run('Read', {'file_path': f'{d}/big.css', 'limit': 50}, 'sb2') == ''),
              ('правило без paths — не чіпає', lambda: 'без paths' not in run('Edit', {'file_path': f'{d}/site/index.html'}, 's7'))]
     bad = 0
     for n, f in cases:
