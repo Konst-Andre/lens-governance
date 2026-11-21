@@ -7,6 +7,14 @@
 #   done  — `bash ui-review-gate.sh done "<що переглянуто>" [тека репо]` (відмова gate дає готову команду з текою репо коміту) → позначка /tmp/lens-uireview-<хеш диффу> (рядок ≥ 40 знаків:
 #           які стани, які теми, що бачить людина після дії). Самоствердження, але в потрібну мить і по конкретному диффу.
 #   selftest (лічбу друкує сам прогін; серед випадків — сітка review-remind post і done ⟂ ui_lint) у тимчасовому репо (зуби: UI без позначки → deny; позначка → тиша; правка після позначки → deny; done без ui_lint → ✗).
+#   gate (push) — `git push` у репо з origin `…/sandbox` (прев'ю Konst; «так з підсиленням» Konst EquipLens S40, 21.11.2026 — v10 пішов у sandbox ДО огляду,
+#           v11 пройшов повз ворота коміту, бо `cp && git commit && git push` — одна команда, а гачок бачить стан ДО неї): кожен новий / змінений *.html комітів, що
+#           їдуть (upstream..HEAD), має позначку видачі ЦЬОГО вмісту (/tmp/lens-issue-<blob sha>) — інакше deny з готовою командою; push разом з комітом, cp / mv /
+#           записом в одній команді → deny «окремою командою»; змінений наявний *_vN.html чи кореневий index.html → deny (профіль «ПРЕВ'Ю»: новий N, корінь не чіпати).
+#           Практика: Review Board — зберігати SHA схвалених файлів, пройти може лише схвалений вміст (reviews.reviewboard.org/r/13282, 21.11.2026).
+#   issue — `bash ui-review-gate.sh issue <файл.html> "<огляд ≥ 40>" "<перед видачею: 1 ✓ доказ … 7 н/з, бо …>"` → позначка видачі за git hash-object файла;
+#           вимагає позначку ui_lint САМЕ ЦЬОГО вмісту (`node ui_lint.mjs <файл> [--baseline <база>]` → ✗ 0; --no-lint нема: файл ui_lint бере завжди) і всі пункти
+#           «Перед видачею» маніфесту (номери читаються з маніфесту): ✓ з доказом ≥ 8 знаків або «н/з, бо …». Коміт файла з позначкою видачі ворота огляду пропускають.
 #   hash  — хеш диффу UI репо (для ui_lint: позначка /tmp/lens-uilint-<хеш> — машинна частина огляду; закритий бриф `archive/summaries/Lens_gov/Lens_kernel_BRIEF_HOOK-2.5_closed.md`).
 #   done вимагає позначку ui_lint САМЕ ЦЬОГО диффу (✗ 0 у темах продукту — типово обидві, --themes light|dark для продукту з однією схемою) або --no-lint "<причина ≥ 30 знаків>" (сторінку не запустити) — причина пишеться в позначку.
 #   --no-lint не приймається, коли дифф ДОДАЄ текст людині (рядок у лапках чи текст між тегами, ≥ 2 слова кирилицею; коментарі зрізано) — пропуск Konst EquipLens S40.
@@ -103,7 +111,55 @@ def motion_in(top, files):   # рух у ДОДАНИХ рядках диффу 
     return any(MOTION.search(l) for l in add)
 
 GITC = r"^\s*(?:\w+=\S*\s+)*git\b(?:\s+-[cC]\s+\S+)*\s+commit\b"   # git … commit на початку команди (як commit-gate.sh)
+GITP = r"^\s*(?:\w+=\S*\s+)*git\b(?:\s+-[cC]\s+\S+)*\s+push\b"
+SANDBOX = re.compile(r"/sandbox(\.git)?/?$")   # origin прев'ю Konst (як review-remind.sh stand)
 def mark(hx): return f"/tmp/lens-uireview-{hx}"
+def issue_mark(blob): return f"/tmp/lens-issue-{blob}"
+def blob_of(p):
+    r = subprocess.run(["git", "hash-object", p], capture_output=True, text=True); return r.stdout.strip()
+
+def pre_items():   # пункти «Перед видачею» — з самого маніфесту (копія тухне; той самий розбір, що review-remind.sh stand)
+    man = os.path.join(os.path.dirname(os.environ.get("UI_GATE_SELF", "x/x")), "..", "..", "..", "kernel", "Lens_stagebench_manifest.md")
+    try: sec = open(man, encoding="utf-8").read().split("## Перед видачею", 1)[1].split("\n## ", 1)[0]
+    except Exception: return []
+    return re.findall(r"(?m)^\| (\d) \| \*\*(.+?)\*\*", sec)
+
+def push_files(top):   # [(статус, файл)] *.html у комітах, що поїдуть: upstream..HEAD; гілки на origin нема — усе дерево HEAD
+    up = git(top, "rev-parse", "--verify", "-q", "@{u}") or git(top, "rev-parse", "--verify", "-q", "refs/remotes/origin/" + (git(top, "rev-parse", "--abbrev-ref", "HEAD") or "main"))
+    rows = git(top, "diff", "--name-status", "--no-renames", up, "HEAD", "--", "*.html", "*.htm").splitlines() if up else \
+        ["A\t" + f for f in git(top, "ls-tree", "-r", "--name-only", "HEAD", "--", "*.html", "*.htm").splitlines()]
+    return [tuple(r.split("\t", 1)) for r in rows if "\t" in r]
+
+def push_gate(cmd, cwd):
+    segs, tops = re.split(r"&&|\|\||;|\n", cmd), []
+    for seg in segs:
+        m = re.match(r"\s*cd\s+(\"[^\"]+\"|'[^']+'|\S+)", seg)
+        if m:
+            p = os.path.expanduser(m.group(1).strip("\"'")); cwd = p if os.path.isabs(p) else os.path.join(cwd, p)
+        if re.match(GITP, seg):
+            c = re.search(r"\bgit\s+-C\s+(\S+)", seg); top = git(os.path.join(cwd, c.group(1)) if c else cwd, "rev-parse", "--show-toplevel")
+            if top and SANDBOX.search(git(top, "remote", "get-url", "origin")): tops.append(top)
+    if not tops: return None
+    deny = lambda why: {"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": why}}
+    quiet = re.sub(r"\d*>>?\s*(&\d|/dev/null)", "", cmd)
+    if any(re.match(GITC, s) for s in segs) or re.search(r"(^|[\s;&|(])(cp|mv|rsync|tee|install|sed\s+-i)\s", quiet) or ">" in quiet:
+        return deny("Push у sandbox — окремою командою: у цій ще коміт, копіювання чи запис, а гачок бачить стан ДО команди (так v11 EquipLens S40 пройшов повз ворота). "
+                    "Спершу файл і коміт, тоді `ui-review-gate.sh issue …` на виданий файл, тоді лише `git push`.")
+    over, bad = [], []
+    for top in dict.fromkeys(tops):
+        for st, f in push_files(top):
+            if st.startswith("D"): continue
+            if st.startswith("M") and (f == "index.html" or re.search(r"_v\d+\.html?$", f)): over.append(f); continue
+            if not os.path.exists(issue_mark(git(top, "rev-parse", f"HEAD:{f}"))): bad.append((top, f))
+    if over:
+        return deny(f"Sandbox: змінено наявне — {', '.join(over[:4])}. Нова версія = новий N, наявний vN не перезаписується, кореневий index.html sandbox не чіпається "
+                    "(профіль «ПРЕВ'Ю»). Поверни файл (git checkout @{u} -- <файл> і коміт) і видай як _v<N+1>.html.")
+    if not bad: return None
+    items = " · ".join(f"{n}) {t}" for n, t in pre_items()) or "розділ «Перед видачею» в маніфесті не знайдено — скажи Konst"
+    return deny("Видача без позначки ЦЬОГО вмісту: " + ", ".join(f for _, f in bad[:4]) + (" …" if len(bad) > 4 else "") + ". Прев'ю публічне з першої секунди — огляд і пауза «Перед видачею» до push. "
+                f"Кроки: node {os.path.join(os.path.dirname(os.path.dirname(os.environ.get('UI_GATE_SELF', 'x/x'))), 'ui_lint.mjs')} <файл> [--baseline <база відомих ✗>] → ✗ 0; "
+                + " · ".join(f"bash {os.environ.get('UI_GATE_SELF', 'tools/claude-code/hooks/ui-review-gate.sh')} issue {os.path.join(t, f)} \"<огляд: стани, теми, що бачить людина після дії>\" \"<перед видачею: 1 ✓ доказ … 7 н/з, бо …>\"" for t, f in bad[:4])
+                + f" — і push знову. Пункти: {items}. Той самий блок — у повідомленні Konst з посиланням.")
 
 def gate(d):
     if d.get("tool_name") != "Bash": return None
@@ -115,6 +171,8 @@ def gate(d):
         if m:
             while i < len(L) and L[i].strip() != m.group(1): i += 1
     cmd = "\n".join(keep)
+    pg = push_gate(cmd, d.get("cwd") or os.getcwd())
+    if pg: return pg
     if not any(re.match(GITC, s) for s in re.split(r"&&|\|\||;|\||\n", cmd)): return None
     cwd, dirs = d.get("cwd") or os.getcwd(), []
     for seg in re.split(r"&&|\|\||;|\n", cmd):   # тека коміту — як у commit-gate: останній cd перед ним, git -C, або cwd
@@ -128,6 +186,8 @@ def gate(d):
         top = git(dd, "rev-parse", "--show-toplevel")
         if not top: continue
         files, hx = ui_state(top)
+        # файл з позначкою видачі ЦЬОГО вмісту (issue) уже оглянуто — коміт його в sandbox не вимагає ще однієї позначки (EquipLens S40)
+        if files and all(os.path.isfile(os.path.join(top, f)) and os.path.exists(issue_mark(blob_of(os.path.join(top, f)))) for f in files): continue
         if files and not os.path.exists(mark(hx)): bad.append((top, files, hx))
     if not bad: return None
     if re.search(r"ui-review-gate\.sh\s+done\b", cmd):   # AE S117 (Konst: «збалансувати старе правило, не нове»): огляд уже написано, але тією ж командою — гачок бачить стан ДО неї;
@@ -150,6 +210,29 @@ if mode == "hash":   # для ui_lint: той самий хеш диффу UI, �
     print(ui_state(top)[1] if top else ""); sys.exit(0)
 
 def lint_mark(hx): return f"/tmp/lens-uilint-{hx}"
+
+if mode == "issue":   # позначка видачі в sandbox — за вмістом файла (EquipLens S40)
+    if len(args) < 3: print("issue <файл.html> \"<огляд ≥ 40>\" \"<перед видачею: 1 ✓ доказ … 7 н/з, бо …>\""); sys.exit(2)
+    f, note, pre = args[0], args[1], args[2]
+    if not os.path.isfile(f): print(f"✗ файла нема: {f}"); sys.exit(1)
+    if len(note) < 40: print("✗ рядок огляду < 40 знаків — назви стани, теми й що бачить людина після дії"); sys.exit(1)
+    items = pre_items()
+    if not items: print("✗ розділ «Перед видачею» в маніфесті не знайдено — гачок відстав від маніфесту, скажи Konst"); sys.exit(1)
+    marks = list(re.finditer(r"(?<![\d.,])([1-9])\s*[).:]?\s*(✓|н/з)", pre))
+    weak = []
+    for n, t in items:
+        hit = [m for m in marks if m.group(1) == n]
+        if not hit: weak.append(f"{n} (нема)"); continue
+        m = hit[0]; nxt = [k.start() for k in marks if k.start() > m.start()]; body = pre[m.end():(nxt[0] if nxt else len(pre))]
+        if m.group(2) == "н/з" and not re.match(r"\s*,?\s*бо\s+\S", body): weak.append(f"{n} (н/з без «бо …»)")
+        elif m.group(2) == "✓" and len(re.sub(r"[\s·,;—–-]", "", body)) < 8: weak.append(f"{n} (✓ без доказу)")
+    if weak: print("✗ «Перед видачею»: " + " · ".join(weak) + " — кожен пункт: «N ✓ доказ (число · вивід · знімок)» або «N н/з, бо …». Пункти: " + " · ".join(f"{n}) {t}" for n, t in items)); sys.exit(1)
+    b = blob_of(f)
+    if not os.path.exists(f"/tmp/lens-uilint-blob-{b}"):
+        ul = os.path.join(os.path.dirname(os.path.dirname(os.environ.get("UI_GATE_SELF", "x/x"))), "ui_lint.mjs")
+        print(f"✗ ui_lint цього вмісту ({b[:8]}) не пройдено: node {ul} {f} [--baseline <база відомих ✗>] → ✗ 0 (правка після прогону міняє вміст — прожени знову)"); sys.exit(1)
+    open(issue_mark(b), "w").write(f"{note}\n[перед видачею] {pre}\n{os.path.abspath(f)}\n")
+    print(f"✓ позначка видачі {b[:8]} · {os.path.basename(f)} — push у sandbox пропустить саме цей вміст"); sys.exit(0)
 
 if mode == "done":
     opt = lambda k: args[args.index(k) + 1] if k in args and args.index(k) + 1 < len(args) else None
@@ -316,6 +399,59 @@ if mode == "selftest":
         say(gate(ev("python3 - <<'EOF'\nprint('git commit -m x')\nEOF")) is None, "«git commit» лише в тілі heredoc → не коміт, тиша (аудит S134)")
         say(gate(ev("cd " + tmp + " && git -C . commit -am x")) is None, "git -C … commit з позначкою → тиша")
         os.remove(mark(hx)); subprocess.run(["git", "-C", tmp, "checkout", "-q", "--", "."], check=True)
+        # сторож push у sandbox (EquipLens S40): позначка видачі за вмістом файла
+        sbx = tempfile.mkdtemp(); bare, sb = f"{sbx}/sandbox.git", f"{sbx}/sb"
+        G = lambda *a: subprocess.run(["git", "-C", sb, *a], check=True, capture_output=True)
+        subprocess.run(["git", "init", "-q", "--bare", bare], check=True); subprocess.run(["git", "init", "-q", sb], check=True)
+        for c in (["config", "user.email", "t@t"], ["config", "user.name", "t"], ["remote", "add", "origin", bare]): G(*c)
+        os.makedirs(f"{sb}/P"); open(f"{sb}/index.html", "w").write("<p>root</p>"); open(f"{sb}/P/s_v1.html", "w").write("<p>v1</p>")
+        G("add", "-A"); G("commit", "-qm", "0"); G("push", "-q", "-u", "origin", "HEAD")
+        pe = lambda cmd: {"tool_name": "Bash", "cwd": sb, "tool_input": {"command": cmd}}
+        say(gate(pe("git push -q origin HEAD")) is None, "sandbox: нічого нового в push → тиша")
+        open(f"{sb}/P/s_v2.html", "w").write("<p>v2</p>"); G("add", "-A"); G("commit", "-qm", "v2")
+        r = gate(pe("git push -q origin HEAD 2>&1 | tail -1"))
+        say(r is not None and "s_v2.html" in r["hookSpecificOutput"]["permissionDecisionReason"] and "issue" in r["hookSpecificOutput"]["permissionDecisionReason"], "зуби: новий *_vN.html у push без позначки видачі → deny з командою issue (2>&1 — не запис)")
+        say(gate({"tool_name": "Bash", "cwd": tmp, "tool_input": {"command": f"git -C {tmp} push -q"}}) is None, "push в інше репо (origin не sandbox) → тиша")
+        b2 = blob_of(f"{sb}/P/s_v2.html"); open(issue_mark(b2), "w").write("x\n")
+        say(gate(pe(f"cd {sb} && git -c push.negotiate=true push -q origin HEAD")) is None, "позначка видачі цього вмісту → тиша (git -c … push)")
+        open(f"{sb}/P/s_v3.html", "w").write("<p>v3</p>")
+        say(gate(pe("git add -A && git commit -qm v3 && git push -q origin HEAD")) is not None, "зуби (v11): коміт і push однією командою → deny «окремою командою»")
+        say(gate(pe(f"cp {sb}/P/s_v3.html {sb}/P/s_v4.html; git push -q origin HEAD")) is not None, "зуби: cp і push однією командою → deny")
+        os.remove(f"{sb}/P/s_v3.html"); open(f"{sb}/P/s_v2.html", "w").write("<p>v2 правка після позначки</p>"); G("commit", "-qam", "v2b")
+        r = gate(pe("git push -q origin HEAD"))
+        say(r is not None and "без позначки" in r["hookSpecificOutput"]["permissionDecisionReason"], "зуби: правка після позначки видачі → deny (вміст інший — інший хеш)")
+        G("reset", "-q", "--hard", "HEAD~1"); G("push", "-q", "origin", "HEAD"); os.remove(issue_mark(b2))
+        open(f"{sb}/P/s_v1.html", "w").write("<p>v1 перезапис</p>"); G("commit", "-qam", "v1b"); open(issue_mark(blob_of(f"{sb}/P/s_v1.html")), "w").write("x\n")
+        r = gate(pe("git push -q origin HEAD"))
+        say(r is not None and "перезаписується" in r["hookSpecificOutput"]["permissionDecisionReason"], "зуби: перезапис наявного _v1.html (навіть з позначкою) → deny «новий N»")
+        os.remove(issue_mark(blob_of(f"{sb}/P/s_v1.html"))); G("reset", "-q", "--hard", "HEAD~1")
+        open(f"{sb}/index.html", "w").write("<p>root2</p>"); G("commit", "-qam", "root")
+        say(gate(pe("git push -q origin HEAD")) is not None, "зуби: кореневий index.html sandbox змінено → deny")
+        G("reset", "-q", "--hard", "HEAD~1"); G("rm", "-q", "P/s_v1.html"); G("commit", "-qm", "rm")
+        say(gate(pe("git push -q origin HEAD")) is None, "лише видалення (знято витік) → тиша")
+        G("reset", "-q", "--hard", "HEAD~1")
+        open(f"{sb}/P/s_v5.html", "w").write("<p>v5</p>"); G("add", "-A"); G("commit", "-qm", "v5")
+        r = subprocess.run(["bash", os.environ["UI_GATE_SELF"], "gate"], input=json.dumps(pe("git push -q origin HEAD")), capture_output=True, text=True)
+        say('"deny"' in r.stdout, "зуби: справжній виклик гачка на push у sandbox (JSON через stdin) → deny")
+        # issue: огляд · пункти «Перед видачею» з маніфесту · ui_lint цього вмісту
+        iss = lambda *a: subprocess.run(["bash", os.environ["UI_GATE_SELF"], "issue", *a], capture_output=True, text=True)
+        n_items = len(pre_items()); f5 = f"{sb}/P/s_v5.html"; b5 = blob_of(f5)
+        full = " ".join(f"{k} ✓ доказ пункту {k}: вивід смоуку" for k in range(1, n_items)) + f" {n_items} н/з, бо дотик глянь на пристрої"
+        say(n_items >= 5, f"пункти «Перед видачею» читаються з маніфесту ({n_items})")
+        r = iss(f5, "коротко", full); say(r.returncode == 1 and not os.path.exists(issue_mark(b5)), "зуби: issue з оглядом < 40 знаків → ✗")
+        r = iss(f5, note, full.replace(" 2 ✓", " 2 —")); say(r.returncode == 1 and "2 (нема)" in r.stdout, "зуби: issue без пункту 2 → ✗ «нема»")
+        r = iss(f5, note, full.replace(f"{n_items} н/з, бо", f"{n_items} н/з")); say(r.returncode == 1 and "без «бо" in r.stdout, "зуби: «н/з» без причини → ✗")
+        r = iss(f5, note, full.replace("3 ✓ доказ пункту 3: вивід смоуку", "3 ✓")); say(r.returncode == 1 and "3 (✓ без доказу)" in r.stdout, "зуби: «✓» без доказу → ✗")
+        r = iss(f5, note, full); say(r.returncode == 1 and "ui_lint" in r.stdout and not os.path.exists(issue_mark(b5)), "зуби: issue без ui_lint цього вмісту → ✗")
+        open(f"/tmp/lens-uilint-blob-{b5}", "w").write("✗0"); r = iss(f5, note, full)
+        say(r.returncode == 0 and os.path.exists(issue_mark(b5)) and gate(pe("git push -q origin HEAD")) is None, "issue повний + ui_lint вмісту → ✓, push у sandbox → тиша")
+        open(f"{sb}/P/s_v6.html", "w").write("<p>v6</p>"); open(issue_mark(blob_of(f"{sb}/P/s_v6.html")), "w").write("x\n")
+        say(gate(pe("git add -A && git commit -qm v6")) is None, "коміт у sandbox файла з позначкою видачі → ворота огляду мовчать")
+        os.remove(f"{sb}/P/s_v6.html"); open(f"{sb}/P/s_v7.html", "w").write("<p>v7</p>")
+        say(gate(pe("git add -A && git commit -qm v7")) is not None, "зуби: коміт у sandbox нового .html без позначок → deny огляду")
+        for p in (issue_mark(b5), f"/tmp/lens-uilint-blob-{b5}"):
+            if os.path.exists(p): os.remove(p)
+        shutil.rmtree(sbx, ignore_errors=True)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     print(f"─── ui-review-gate selftest: {n - bad}/{n} ───"); sys.exit(1 if bad else 0)

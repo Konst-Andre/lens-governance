@@ -824,4 +824,7 @@ if (opt.repo && !x) {   // позначка для воріт: той самий
   const hx = execFileSync('bash', [join(here, 'hooks/ui-review-gate.sh'), 'hash', resolve(opt.repo)], { encoding: 'utf8' }).trim();
   if (hx) { writeFileSync(`/tmp/lens-uilint-${hx}`, `${new Date().toISOString()} ✗0 ⚠${w} ${target} states=${states.length || 1} themes=${THEMES.join('+')}\n`); say(`✓ позначка ui_lint для диффу ${hx.slice(0, 8)} — ворота огляду приймуть done`); }
 }
+// EquipLens S40 (сторож push у sandbox): ✗ 0 на ЛОКАЛЬНОМУ файлі → позначка за хешем вмісту (git hash-object = blob у коміті sandbox) — її вимагає `ui-review-gate.sh issue`
+if (!x && target.startsWith('file://')) { try { const f = fileURLToPath(target.split(/[?#]/)[0]), b = execFileSync('git', ['hash-object', f], { encoding: 'utf8' }).trim();
+  writeFileSync(`/tmp/lens-uilint-blob-${b}`, `${new Date().toISOString()} ✗0 ⚠${w} ${f} states=${states.length || 1} themes=${THEMES.join('+')}${opt.base ? ' baseline=' + opt.base : ''}\n`); say(`✓ позначка ui_lint вмісту ${b.slice(0, 8)} — видача (issue) прийме цей файл`); } catch { } }
 process.exit(x ? 1 : 0);

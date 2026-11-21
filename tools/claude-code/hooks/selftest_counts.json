@@ -31,7 +31,7 @@
  "shots_check.py selftest": 16,
  "shots_same.py selftest": 3,
  "ui-guard.sh selftest": 32,
- "ui-review-gate.sh selftest": 38,
+ "ui-review-gate.sh selftest": 58,
  "version_check.py selftest": 6,
  "webkit_ensure.sh selftest": 7
 }
