@@ -100,6 +100,7 @@ if [ "$ev" = SessionStart ] || [ "$ev" = profile-test ]; then
   ss_in=""; [ "$ev" = SessionStart ] && ss_in="$(cat 2>/dev/null)"   # JSON події — читаємо ПЕРШИМ: хук репо міг би з'їсти stdin
   [ "$ev" = SessionStart ] && repo_hooks
   [ "$ev" = SessionStart ] && [ -z "${LENS_NO_SELFTEST:-}" ] && python3 "$h/selftest_all.py" bg 2>/dev/null   # AE S143: усі selftest у фоні (~60 с, старт не чекає); ✗ — у handoff_check і після першого коміту
+  [ "$ev" = SessionStart ] && [ -z "${LENS_NO_WEBKIT:-}" ] && bash "$h/../webkit_ensure.sh" bg 2>/dev/null   # EquipLens S40: WebKit (родина Safari) — сам, як Chromium; лише в хмарі, у фоні (≈15 с), пара до Playwright образу
   # профіль — двома частинами ≤ 10 000 знаків кожна (стеля additionalContext Claude Code; понад — лише прев'ю 2 000): 1 — тут, 2 — у перше повідомлення Konst (profile_parts.py)
   prof() { [ "${LENS_PROFILE:-}" = 1 ] && [ -f "$h/../PROFILE.md" ] || return 0
     python3 -c 'import json,sys,subprocess; t=subprocess.run([sys.executable,sys.argv[1],"1"],capture_output=True,text=True).stdout; print(json.dumps({"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":t}},ensure_ascii=False))' "$h/profile_parts.py"; }
