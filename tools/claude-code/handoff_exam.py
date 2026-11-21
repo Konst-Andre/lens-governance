@@ -87,7 +87,8 @@ def unclear(ans):
     """Пункти блоку 6: None — блоку нема (відповідь неповна); 0 — «—»."""
     m = re.search(r'(?ms)^## 6\b[^\n]*\n(.*?)(?=^## \d+\b|\Z)', ans)
     if not m: return None
-    return len([l for l in m.group(1).splitlines() if re.match(r'\s*[-*•]\s+\S', l) and not re.match(r'\s*[-*•]\s+—\s*$', l)])
+    return len([l for l in m.group(1).splitlines() if re.match(r'\s*[-*•]\s+\S', l) and not re.match(r'\s*[-*•]\s+—\s*$', l)
+                and not re.match(r'\s*[-*•]\s+свідомо пропущено\b', l, re.I)])   # лічильник «Свідомо лишено» — не пункт (питання 6, EquipLens S40)
 
 def complete(ans, qs): return all(re.search(rf'(?m)^## {n}\b', ans) for n, _ in qs)
 
@@ -180,8 +181,8 @@ def selftest():
     case('повна відповідь, блок 6 «—» → «незрозуміло 0», вихід 0, мітка з HEAD', code == 0 and 'незрозуміло 0' in out and state(rs)[:2] == (True, 0))
     case('рівень у рядку «іспит …» і в мітці', 'effort medium' in out and '"effort": "medium"' in open(mark_path()).read())
     case('стан на тому самому HEAD → «іспит ✓ · незрозуміло 0»', state(rs)[2] == 'іспит ✓ · незрозуміло 0')
-    fake(full + '- черга каже X · `docs/CHERGA.md:3` ⟂ `docs/summary/P.md:5`\n- застаріле «чекає» · `a.md:2`\n'); out, code = run(d)
-    case('2 суперечності в блоці 6 → «незрозуміло 2», стан без ✓', 'незрозуміло 2' in out and state(rs)[2] == 'іспит · незрозуміло 2')
+    fake(full + '- черга каже X · `docs/CHERGA.md:3` ⟂ `docs/summary/P.md:5`\n- застаріле «чекає» · `a.md:2`\n- свідомо пропущено: 7\n'); out, code = run(d)
+    case('2 суперечності + рядок «свідомо пропущено: 7» у блоці 6 → «незрозуміло 2» (лічильник — не пункт), стан без ✓', 'незрозуміло 2' in out and state(rs)[2] == 'іспит · незрозуміло 2')
     vf = os.path.join(d, 'v.md'); W = lambda t: (open(vf, 'w').write(t), vf)[1]
     S = 'Prod/docs/summary/P_SUMMARY_2026-11-18.md'
     case('вирок: ✗ з неіснуючим рядком → не прийнято, стан без ✓', verdict(W(f'1 ✗ {S}:99 рядок історії, не стан\n2 ✗ {S}:2 рядок історії, не стан\n'), d)[1] == 1 and state(rs)[2] == 'іспит · незрозуміло 2')
