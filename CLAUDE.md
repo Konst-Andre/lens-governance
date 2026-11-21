@@ -32,7 +32,7 @@
 | питання з варіантами, двійне пояснення (`13.1`–`13.3`) | `kernel/Lens_PROFILE.md` §7; форма 💡 — профіль «ЗВІТ» (одна на обидві двері; §7 — історія форми) |
 | **рух / анімація** — будую, правлю чи планую рух; порт екрана (рядок «інвентар руху»); **закрив екран чи функцію з інтерфейсом** (будь-який продукт: PWA, веб) — сам пропоную Konst наступний крок руху: інвентар — завжди, план руху — коли екрани фази готові (Konst AE S103) | рецепти — кукбук том 5 через `kernel/cookbook/Lens_cookbook_INDEX.md`; метод (інвентар → фаза «дизайн і рух» → прилад `motion_lint`) і стан приладу — бриф `kernel/Lens_MOTION-1_brief.md`. `ui_lint` рух **не судить** — лише статичні кадри |
 | **пишу текст людині** — порада, попередження, «i», порожній стан, помилка, рядок стану (будь-який продукт) | `tools/claude-code/VOICE.md` — чотири питання читача й пари «було → стало»; огляд UI ③ вимагає його й на JS з текстом людині (Konst AE S133: «щоб не схоже на опис інструменту») |
-| зовнішній візуальний ефект · скло й острівець | `kernel/Lens_fx_candidates.md` · `kernel/Lens_glass_FINDINGS.md` |
+| зовнішній візуальний ефект · скло й острівець · **як побудовано скляний елемент** (капсула, таби й крапля, випадайки, щити, фокус поля — дослівно GlassKit) | `kernel/Lens_fx_candidates.md` · `kernel/Lens_glass_FINDINGS.md` · `kernel/Lens_glass_RECIPES.md` |
 | Excel, Power Query, VBA (KPI · QR Lens) | `kernel/Lens_excel_protocol.md` |
 | порт блоку «Обслуговування» | `kernel/modules/Lens_module_1_maint_v1.md` (пара — кукбук A79) |
 | Cloudflare · каркас репо під Claude Code | `tools/cloudflare/CLOUDFLARE.md` · `tools/claude-code/CLAUDE_CODE.md` |
