@@ -10,7 +10,7 @@
  "frame_init.sh selftest": 5,
  "handoff-remind.sh selftest": 31,
  "handoff_check.py selftest": 88,
- "handoff_exam.py selftest": 10,
+ "handoff_exam.py selftest": 13,
  "konst-miss.sh selftest": 27,
  "lens-hooks.sh profile-test": 11,
  "lens-hooks.sh start-test": 16,

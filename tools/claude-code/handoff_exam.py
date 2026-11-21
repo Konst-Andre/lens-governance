@@ -7,15 +7,20 @@
 # Світ: I-PASS — приймальник переказує сам (UCSF, 2012; 18.11.2026); «Handoff Debt» — ціну передачі міряє наступник (arXiv 2606.02875, 06.2026).
 #   `claude -p`: --allowedTools лише схвалює, НЕ обмежує — тому ще --permission-mode dontAsk (решту відхиляє) і --disallowedTools;
 #   --max-budget-usd — стеля (оцінка клієнта, може перейти — запас); total_cost_usd у JSON (code.claude.com/docs/en/headless · best-practices, 18.11.2026).
-# Запуск:  python3 tools/claude-code/handoff_exam.py run [<корінь з репо>] [--model haiku]   → відповіді + рядок «іспит …», мітка /tmp/lens-exam-<сесія>.md
+# Запуск:  python3 tools/claude-code/handoff_exam.py run [<корінь з репо>] [--model haiku] [--effort medium]   → відповіді + рядок «іспит … · модель · effort», мітка /tmp/lens-exam-<сесія>.md
 #          python3 tools/claude-code/handoff_exam.py state [<корінь>]                         → рядок стану мітки (на HEAD? незрозуміло K)
 #          python3 tools/claude-code/handoff_exam.py selftest                                 → зуби на підставній моделі (LENS_EXAM_CMD), без витрат
 # Вихід:   run — 0, якщо відповіді повні (6 блоків); 1 — модель не відповіла чи формат зламано. Оцінку «правда з репо» робить агент таблицею.
 # Інша модель (профіль «ІНША МОДЕЛЬ»): перед run агент називає в чаті модель · effort · навіщо. Інструменти моделі — лише Read · Grep · Glob.
+# Effort — завжди явно (S40 21.11.2026: без --effort рівень обирав CLI, і його не видно ні в init stream-json, ні в --debug-file — Konst не знав,
+#   на чому йшли 4 іспити). Обирає агент, не питаючи («так» Konst 21.11.2026): medium — типово (новий агент сесії працює на medium,
+#   профіль EFFORT — іспит міряє саме його); high — щоб розвести «діра у файлах» ⟂ «слабке читання», коли пункт «незрозумілого»
+#   спірний чи повторився після виправлення. Рівень — у рядку «іспит …» і в мітці.
 import json, os, re, shlex, subprocess, sys, tempfile, time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 QFILE = os.path.join(HERE, 'handoff_exam_questions.md')
+EFFORTS = ('low', 'medium', 'high', 'xhigh', 'max')   # claude --help, 2.1.330, 21.11.2026
 BUDGET = '1.00'   # $ на один іспит — стеля; haiku на AE ≈ заміряно в брифі REV-5 §5 крок 4
 sys.path.insert(0, HERE)
 import handoff_check as hc   # одна правда: репо сесії, HEAD, стартове, самері
@@ -45,14 +50,17 @@ def prompt(root, repo, rs, qs):
 EXAMINEE = ("Ти — екзаменований новий агент, не працівник сесії: нічого не правиш, не комітиш, не пишеш звіт, маркер чи рядок «пам'ять». "
             "Уся відповідь — ОДНИМ останнім повідомленням: блоки «## 1» … «## 6» цілком.")
 
-def run_model(root, text, model):
+def exam_argv(model, effort):
+    return ['claude', '-p', '--model', model, '--effort', effort, '--output-format', 'stream-json', '--verbose', '--max-turns', '40',
+            '--max-budget-usd', BUDGET, '--setting-sources', 'local', '--disable-slash-commands', '--no-session-persistence',
+            '--append-system-prompt', EXAMINEE, '--permission-mode', 'dontAsk', '--allowedTools', 'Read', 'Grep', 'Glob',
+            '--disallowedTools', 'Bash', 'Edit', 'Write', 'NotebookEdit', 'WebFetch', 'WebSearch', 'Agent', 'Task']
+
+def run_model(root, text, model, effort='medium'):
     """claude -p у stream-json: усі повідомлення моделі (не лише останнє — прогін на зуби 18.11: `result` дав лише приписку після відповіді).
     --setting-sources local — без гачків користувача (профіль середовища робив з екзаменованого працівника: «Пам'ять: нового нема»)."""
     cmd = os.environ.get('LENS_EXAM_CMD')
-    argv = shlex.split(cmd) if cmd else ['claude', '-p', '--model', model, '--output-format', 'stream-json', '--verbose', '--max-turns', '40',
-                                         '--max-budget-usd', BUDGET, '--setting-sources', 'local', '--disable-slash-commands', '--no-session-persistence',
-                                         '--append-system-prompt', EXAMINEE, '--permission-mode', 'dontAsk', '--allowedTools', 'Read', 'Grep', 'Glob',
-                                         '--disallowedTools', 'Bash', 'Edit', 'Write', 'NotebookEdit', 'WebFetch', 'WebSearch', 'Agent', 'Task']
+    argv = shlex.split(cmd) if cmd else exam_argv(model, effort)
     p = subprocess.run(argv, input=text, capture_output=True, text=True, cwd=root, timeout=900)
     texts, meta = [], {}
     for ln in p.stdout.splitlines():
@@ -75,16 +83,17 @@ def unclear(ans):
 
 def complete(ans, qs): return all(re.search(rf'(?m)^## {n}\b', ans) for n, _ in qs)
 
-def run(root='/home/user', model='haiku'):
+def run(root='/home/user', model='haiku', effort='medium'):
+    if effort not in EFFORTS: return f'іспит: effort «{effort}» — не з {EFFORTS}', 2
     rs = hc.session_repos(root); repo = subject(rs)
     if not repo: return 'іспит: репо з самері не знайдено', 1
     qs = questions(); t0 = time.time()
-    ans, meta = run_model(root, prompt(root, repo, rs, qs), model)
+    ans, meta = run_model(root, prompt(root, repo, rs, qs), model, effort)
     k = unclear(ans); ok = complete(ans, qs)
     line = f"іспит {heads_short(rs)} · незрозуміло {k}" if ok and k is not None else 'іспит неповний (модель не дала всі блоки)'
-    open(mark_path(), 'w', encoding='utf-8').write(f"{hc.heads(rs)}\n{line}\n{json.dumps(meta, ensure_ascii=False)}\n\n{ans}\n")
+    open(mark_path(), 'w', encoding='utf-8').write(f"{hc.heads(rs)}\n{line}\n{json.dumps(dict(meta, model=model, effort=effort), ensure_ascii=False)}\n\n{ans}\n")
     cost = meta.get('total_cost_usd'); turns = meta.get('num_turns')
-    tail = f" · модель {model} · {int(time.time() - t0)} с" + (f" · ≈${cost:.3f}" if isinstance(cost, (int, float)) else '') + (f' · ходів {turns}' if turns else '')
+    tail = f" · модель {model} · effort {effort} · {int(time.time() - t0)} с" + (f" · ≈${cost:.3f}" if isinstance(cost, (int, float)) else '') + (f' · ходів {turns}' if turns else '')
     if meta.get('error'): tail += f" · помилка: {meta['error'][-200:]}"
     return f"{ans}\n\n{line}{tail}\n(мітка: {mark_path()} — звір кожну відповідь з репо таблицею «питання · відповідь · правда з репо · ✓/✗»)", 0 if ok else 1
 
@@ -120,6 +129,7 @@ def selftest():
     case('prompt: стартове самері + усі 6 питань + «`файл:рядок`»', 'СТАРТ: AE-Q крок 2' in p and all(f'## {i}' in p for i in range(1, 7)) and '`файл:рядок`' in p)
     case('відповідь у середньому повідомленні, останнє — приписка (прогін 18.11) → береться повна', code == 0)
     case('повна відповідь, блок 6 «—» → «незрозуміло 0», вихід 0, мітка з HEAD', code == 0 and 'незрозуміло 0' in out and state(rs)[:2] == (True, 0))
+    case('рівень у рядку «іспит …» і в мітці', 'effort medium' in out and '"effort": "medium"' in open(mark_path()).read())
     case('стан на тому самому HEAD → «іспит ✓ · незрозуміло 0»', state(rs)[2] == 'іспит ✓ · незрозуміло 0')
     fake(full + '- черга каже X · `docs/CHERGA.md:3` ⟂ `docs/summary/P.md:5`\n- застаріле «чекає» · `a.md:2`\n'); out, code = run(d)
     case('2 суперечності в блоці 6 → «незрозуміло 2», стан без ✓', 'незрозуміло 2' in out and state(rs)[2] == 'іспит · незрозуміло 2')
@@ -128,6 +138,8 @@ def selftest():
     fake(full + '—\n'); run(d); open(os.path.join(r, 'x'), 'w').write('1'); sh('git', 'add', '-A'); sh('git', 'commit', '-qm', 'новий')
     case('новий коміт після іспиту → «іспит застарів», не ✓', not state(rs)[0] and 'застарів' in state(rs)[2])
     os.remove(mark_path())
+    case('effort явно в команді моделі (S40: без нього рівень не видно)', exam_argv('haiku', 'medium')[3:6] == ['haiku', '--effort', 'medium'])
+    case('effort не з переліку → вихід 2, моделі не кличе', run(d, 'haiku', 'ultra')[1] == 2)
     case('мітки нема → «іспит не робився»', state(rs)[2] == 'іспит не робився')
     os.environ['EXAM_INJECT'] = 'stale'; fake(full + '—\n'); run(d)
     case('зуб: EXAM_INJECT=stale → «застарів» на тому самому HEAD (перевірка HEAD справді діє)', not state(rs)[0])
@@ -143,6 +155,7 @@ if __name__ == '__main__':
         print(state(hc.session_repos(a[1] if len(a) > 1 else '/home/user'))[2]); sys.exit(0)
     if a[:1] == ['run']:
         model = a[a.index('--model') + 1] if '--model' in a else 'haiku'
-        rest = [x for x in a[1:] if not x.startswith('--') and x != model]
-        out, code = run(rest[0] if rest else '/home/user', model); print(out); sys.exit(code)
-    print('handoff_exam.py run [<корінь>] [--model haiku] | state [<корінь>] | selftest'); sys.exit(2)
+        effort = a[a.index('--effort') + 1] if '--effort' in a else 'medium'
+        rest = [x for x in a[1:] if not x.startswith('--') and x not in (model, effort)]
+        out, code = run(rest[0] if rest else '/home/user', model, effort); print(out); sys.exit(code)
+    print('handoff_exam.py run [<корінь>] [--model haiku] [--effort medium] | state [<корінь>] | selftest'); sys.exit(2)
