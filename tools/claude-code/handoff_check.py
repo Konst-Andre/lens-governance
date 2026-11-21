@@ -10,6 +10,7 @@
 #          python3 tools/claude-code/handoff_check.py revision [<корінь>] [--table]    → ревізія + печатка «ревізія ✓ · HEAD … · ✗ 0» (REV-1 · REV-4); --table — заготовка таблиці з git log
 #          HC_INJECT=rev4 … selftest → ✗ (зуб REV-4: коміти без запису не бачить, печатку не звіряє)
 #          HC_INJECT=envx … selftest → ✗ (зуб (16): ✗ свіжого env_check ревізія не бачить) · HC_ENV=0 — вимкнути (16) · HC_ENV_TIMEOUT=<с> (20)
+#          HC_INJECT=kept … selftest → ✗ (зуб (17) REV-6: мертвий якір «Свідомо лишено» не бачить)
 # «Свої» коміти — за трейлером Claude-Session ≡ CLAUDE_CODE_REMOTE_SESSION_ID (cse_X ↔ session_X); нема змінної — усі коміти агента.
 import glob, json, os, re, subprocess, sys, tempfile, time
 
@@ -156,6 +157,62 @@ def absence(repo, text, s0, st, sm, qf, tail, L):
         nums = [int(m.group(1)) for m in re.finditer(r'(?m)^(\d+)\. ', s1)]
         br = next((f'{a} → {b}' for a, b in zip(nums, nums[1:]) if b <= a), None)
         if br: L.append(('✗', f'(15) §1 не по порядку: {br} — новий агент читає історію навпаки'))
+
+KEPT_HEAD = re.compile(r'^(?:#{2,4}\s*)?\*{0,2}Свідомо лишено')
+
+def kept_items(text):
+    """Пункти розділу «Свідомо лишено» живого самері (жирний абзац чи заголовок ##–####): рядки «- …» одразу після нього.
+    → (пункти, текст самері без розділу) або (None, text), коли розділу нема."""
+    ls = text.splitlines(); i = next((k for k, l in enumerate(ls) if KEPT_HEAD.match(l)), None)
+    if i is None: return None, text
+    j = i + 1
+    while j < len(ls) and not ls[j].startswith('- ') and not ls[j].strip(): j += 1
+    k = j
+    while k < len(ls) and ls[k].startswith('- '): k += 1
+    return ls[j:k], '\n'.join(ls[:i] + ls[k:])
+
+def kept_anchor(item, exists=lambda f: True):
+    """«`файл` «якір»» у пункті → (файл, якір) або None. Якір — збалансовані «…» (усередині бувають свої лапки: ««так» на Б …»).
+    Частина «що» теж буває «`x` «y»» (S40: «`dark.webp` «v8»», «бриф `ADMIN-1` «ще не відкрито»») → остання пара з наявним файлом, інакше остання."""
+    pairs = []
+    for m in re.finditer(r'`([^`]+)`\s*«', item):
+        d, p = 0, m.end() - 1
+        for q in range(p, len(item)):
+            d += {'«': 1, '»': -1}.get(item[q], 0)
+            if d == 0: pairs.append((m.group(1), item[p + 1:q])); break
+    return next((x for x in reversed(pairs) if exists(x[0])), pairs[-1] if pairs else None)
+
+def kept(repo, sm, text, L):
+    """(17) REV-6 (Konst EquipLens S40, 21.11.2026 «так з підсиленням»): якір кожного пункту «Свідомо лишено» живий — фраза є в названому файлі.
+    Мертвий якір (нема файла чи фрази) і пункт без якоря — ⚠; сам не видаляє (тиха автоправка сховала б зміну стану — рішення за агентом).
+    Якір у самому самері шукається поза розділом (інакше пункт знаходить сам себе). Практика: ESLint попереджає про невживані придушення,
+    чистить лише окремий `--prune-suppressions` (eslint.org/docs/v9.x/use/suppressions); Pyrefly `--error-stale-baseline` — для CI
+    (pyrefly.org/en/docs/error-suppressions, 21.11.2026). Беремо попередження без автоочистки; ✗ — ні (Konst: ⚠). Розділу нема — тиша. HC_INJECT=kept — зуб."""
+    if os.environ.get('HC_INJECT') == 'kept': return
+    items, rest = kept_items(text)
+    if items is None: return
+    live, dead, bare, other = 0, [], [], set()
+    norm = lambda s: re.sub(r'\s+', ' ', s)
+    split = lambda f: f.split(':', 1) if re.match(r'^[A-Za-z][\w.-]*:[^/]', f) else (None, f)
+    def where(f):
+        rp, p = split(f); d = repo_dir(repo, rp) if rp else repo
+        return d and os.path.isfile(os.path.join(d, p))
+    for it in items:
+        a = kept_anchor(it, where)
+        if not a: bare.append(it[2:42].strip()); continue
+        f, ph = a; rp, p = split(f)
+        d = repo_dir(repo, rp) if rp else repo
+        if d is None: other.add(rp); continue
+        fp = os.path.join(d, p)
+        if os.path.normpath(fp) == os.path.normpath(os.path.join(repo, sm)): body = rest
+        elif os.path.isfile(fp): body = open(fp, encoding='utf-8', errors='replace').read()
+        else: dead.append(f'`{f}` — файла нема'); continue
+        if norm(ph) in norm(body): live += 1
+        else: dead.append(f'`{f}` «{ph[:50]}»')
+    head = f'свідомо лишено: {live} живих · {len(dead)} мертвих' + (f' · {len(bare)} без якоря' if bare else '') + (f' · не звірено {len(other)} (нема поруч: {", ".join(sorted(other))})' if other else '')
+    if dead or bare:
+        L.append(('⚠', head + ' — ' + ' · '.join(dead[:5] + [f'без якоря: «{b}…»' for b in bare[:3]]) + ' → пункт застарів: прибрати або дати новий якір (сам не видаляю)'))
+    else: L.append(('✓', head))
 
 def session_transcript():
     """Журнал сесії Claude Code: LENS_TRANSCRIPT або найсвіжіший ~/.claude/projects/*/*.jsonl (поточна сесія пише в нього просто зараз)."""
@@ -363,6 +420,7 @@ def check_repo(repo, now=None):
     #   (arXiv 2606.02875, 06.2026; 18.11.2026) — передачу губить саме відсутнє: непояснені зміни й докази перевірки. HC_INJECT=rev5 вимикає — зуб selftest.
     if os.environ.get('HC_INJECT') != 'rev5':
         absence(repo, text, s0, st, sm, qf, tail, L)
+    kept(repo, sm, text, L)   # (17) REV-6: якорі «Свідомо лишено» — і в revision, і в гачку після коміту (handoff-remind.sh post: нове ⚠ — одразу)
     # (7) незбережене: контейнер скинеться — пропаде
     dirty = [x for x in subprocess.run(['git', '-C', repo, 'status', '--porcelain'], capture_output=True, text=True).stdout.split('\n') if x.strip()]
     if dirty: L.append(('✗', f'незакомічене: {len(dirty)} ({", ".join(x[3:] for x in dirty[:4])}) — коміт і push до переїзду'))
@@ -886,6 +944,25 @@ def selftest():
                ('(16) env_check не встиг за бюджет → ⓘ «не перевірено», процес убито (< 3 с), не тиша', e2 and e2[0][0] == 'ⓘ' and 'не перевірено' in e2[0][1] and dt < 3),
                ('(16) клон лише для читання (.git/lens-readonly) не судиться', env_lines([rro]) == []),
                ('(16) revision: ✗ env_check → розділ «env_check» і печатка «ревізія ✗»', b16 and '— env_check' in t16 and t16.splitlines()[-1].startswith('ревізія ✗'))]
+    # (17) REV-6: якорі «Свідомо лишено» — живий ✓ · мертва фраза ⚠ · нема файла ⚠ · без якоря ⚠ · нема розділу — тиша; сам не видаляє
+    rk = tempfile.mkdtemp(prefix='hc-kept-'); os.makedirs(os.path.join(rk, 'lens')); open(os.path.join(rk, 'lens/B.md'), 'w').write('Умова   порядку\nвиконана; ««так» на Б» дано\n')
+    def kp(items, own=''):
+        t = '## §0\n' + own + '\n**Свідомо лишено (іспит не піднімає)** — формат\n' + ''.join(f'- {x}\n' for x in items) + '\n## §1\n'; L = []; kept(rk, 's.md', t, L); return L, t
+    open(os.path.join(rk, 's.md'), 'w').write('x')
+    k_live, _ = kp(['порядок · `lens/B.md` «Умова порядку виконана» · чому · 21.11.2026', 'лапки · `lens/B.md` ««так» на Б» · чому · 21.11.2026',
+                    '`x.webp` · `y.webp` «v8» · `lens/B.md` «дано» · «що» схоже на якір · 21.11.2026'])
+    k_dead, _ = kp(['порядок · `lens/B.md` «фрази вже нема» · чому · 21.11.2026'])
+    k_file, _ = kp(['порядок · `lens/Gone.md` «будь-що» · чому · 21.11.2026'])
+    k_bare, _ = kp(['пункт без якоря · чому · 21.11.2026'])
+    k_self, t_self = kp(['стан · `s.md` «лише в розділі» · пункт знаходить сам себе — не живий · 21.11.2026'])
+    k_own, _ = kp(['стан · `s.md` «живе в §0» · чому · 21.11.2026'], own='1. живе в §0')
+    k_none = []; kept(rk, 's.md', '## §0\n- щось\n', k_none)
+    rcases += [('(17) REV-6: живі якорі (пробіли й перенос — байдуже, вкладені «», «що» схоже на якір) → ✓ «3 живих · 0 мертвих»', k_live == [('✓', 'свідомо лишено: 3 живих · 0 мертвих')]),
+               ('(17) мертва фраза → ⚠ «1 мертвих», рядок пункту лишився (сам не видаляє)', k_dead and k_dead[0][0] == '⚠' and '0 живих · 1 мертвих' in k_dead[0][1]),
+               ('(17) нема файла → ⚠ «файла нема»', k_file and k_file[0][0] == '⚠' and 'файла нема' in k_file[0][1]),
+               ('(17) пункт без якоря → ⚠ «без якоря»', k_bare and k_bare[0][0] == '⚠' and '1 без якоря' in k_bare[0][1]),
+               ('(17) якір у самому самері — лише поза розділом: сам себе не живить → ⚠; є в §0 → ✓', k_self and k_self[0][0] == '⚠' and k_own and k_own[0][0] == '✓'),
+               ('(17) нема розділу → тиша', k_none == [])]
     os.environ.pop('LENS_REV_MARK'); os.environ.pop('LENS_EXAM_MARK', None)
     for name, ok in rcases:
         print(('✓' if ok else '✗') + ' ' + name); bad += not ok
