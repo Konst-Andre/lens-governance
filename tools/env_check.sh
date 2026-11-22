@@ -8,6 +8,13 @@ set -u
 cd "$(dirname "$0")/.."
 code() { curl -sS -m 10 -o /dev/null -w '%{http_code}' "$1" 2>/dev/null || true; }
 rc=0
+# WARN-1 (EquipLens S41): увесь вивід — через фільтр власників ⚠ (`tools/claude-code/warn_owner.py`, реєстр `tools/claude-code/WARN_OWNERS.md`):
+#   ⚠ без власника / прострочене → ✗ і exit 1; прийняте → ⓘ. Себе викликає вдруге з WO_INNER=1. Зуб — ENV_INJECT=1 → «--inject ЗЛОВИВ».
+if [ -z "${WO_INNER:-}" ] && [ -f tools/claude-code/warn_owner.py ]; then
+  out="$(WO_INNER=1 bash tools/env_check.sh "$@" 2>&1)"; rc=$?
+  printf '%s\n' "$out" | python3 tools/claude-code/warn_owner.py filter lens-governance --repo . --kernel . ${ENV_INJECT:+--inject}; wo=$?
+  [ "$rc" -ne 0 ] && exit "$rc"; exit "$wo"
+fi
 
 # база
 git fetch -q origin main 2>/dev/null || true
@@ -38,6 +45,7 @@ if [ "$debt" -gt 0 ]; then nf=$(printf '%s\n' $dfiles | sort -u | grep -c .); ag
   aud="$aud · ⚠ борг аудиту: $debt коміт(ів), $nf файл(ів), найстаріший $age дн."
   { [ "$nf" -ge 5 ] || [ "$age" -ge 7 ]; } && aud="$aud — ПОРА пакет за класом (lens-governance:tools/claude-code/templates/AUDIT_template.md)"; fi
 echo "env: github=${g:-000} cloudflare=${c:-000} · ${vars% } · гейт --gov: $gate · $aud"
+echo "$gout" | awk '/^\[G[0-9]+\]/{h=$0} /^  ⚠/{sub(/^[[:space:]]+/,""); print "⚠ гейт: " h " — " substr($0, index($0,"⚠")+4)}' | cut -c1-300   # текст ⚠ гейта окремим рядком — власника шукає warn_owner
 bash tools/claude-code/profile_check.sh   # профіль: звідки в цій сесії (як git config --show-origin) — з репо (LENS_PROFILE=1) чи з налаштувань; ACC-1 (ACCOUNT_MOVE.md)
 python3 tools/claude-code/env_drift.py --short   # середовище ⟂ аркуш tools/claude-code/ENVIRONMENT.md (ENV-1): змінні · setup script · мережа; ⚠ — з рядком, що вставити
 

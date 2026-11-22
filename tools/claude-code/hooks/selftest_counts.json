@@ -4,7 +4,7 @@
  "commit-gate.sh selftest": 5,
  "commit_files.py selftest": 44,
  "ctx_watch.py selftest": 41,
- "doc_health.py selftest": 60,
+ "doc_health.py selftest": 64,
  "env-remind.sh selftest": 10,
  "env_drift.py selftest": 7,
  "extract_check.py selftest": 6,
@@ -36,5 +36,6 @@
  "ui-guard.sh selftest": 32,
  "ui-review-gate.sh selftest": 58,
  "version_check.py selftest": 6,
+ "warn_owner.py selftest": 12,
  "webkit_ensure.sh selftest": 7
 }

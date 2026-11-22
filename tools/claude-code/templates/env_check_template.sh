@@ -12,6 +12,14 @@ GATE_CMD="echo гейт не задано"  # головний гейт; ост�
 SUMDIR="docs/summary"           # тека самері (продукт Lens — sessions)
 AUDITF="docs/AUDIT.md"          # журнал аудиту правил (продукт Lens — lens/<Продукт>_AUDIT.md)
 code() { curl -sS -m 10 -o /dev/null -w '%{http_code}' "$1" 2>/dev/null || true; }
+# WARN-1 (ядро): увесь вивід — через фільтр власників ⚠ ядра (`tools/claude-code/warn_owner.py`, реєстр `tools/claude-code/WARN_OWNERS.md` — рядок з ім'ям репо):
+#   ⚠ без власника / прострочене → ✗ і exit 1; прийняте → ⓘ. Себе викликає вдруге з WO_INNER=1. Зуб — ENV_INJECT=1 → «--inject ЗЛОВИВ». Ім'я репо — <Репо>.
+WK=../lens-governance; [ -d "$WK" ] || WK=/tmp/lens-governance
+if [ -z "${WO_INNER:-}" ] && [ -f "$WK/tools/claude-code/warn_owner.py" ]; then
+  out="$(WO_INNER=1 bash tools/env_check.sh "$@" 2>&1)"; rc=$?
+  printf '%s\n' "$out" | python3 "$WK/tools/claude-code/warn_owner.py" filter "$(basename "$PWD")" --repo . --kernel "$WK" ${ENV_INJECT:+--inject}; wo=$?
+  [ "$rc" -ne 0 ] && exit "$rc"; exit "$wo"
+fi
 
 # база
 git fetch -q origin main 2>/dev/null || true
@@ -20,7 +28,8 @@ echo "база: HEAD $(git rev-parse --short HEAD) · origin/main $(git rev-pars
 # мережа · змінні · гейти · аудит
 g=$(code https://api.github.com/); c=$(code https://api.cloudflare.com/client/v4/)
 vars=""; for v in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID GH_TOKEN $EXTRA_VARS; do [ -n "${!v:-}" ] && vars+="$v=так " || vars+="$v=ні "; done
-gate=$(bash -c "$GATE_CMD" 2>&1 | tail -1)
+gout=$(bash -c "$GATE_CMD" 2>&1); gate=$(printf '%s\n' "$gout" | tail -1)
+printf '%s\n' "$gout" | awk '/^\[/{h=$0} /^[[:space:]]+⚠/{sub(/^[[:space:]]+/,""); print "⚠ гейт: " h " — " substr($0, index($0,"⚠")+4)}' | cut -c1-300   # текст ⚠ — окремим рядком (за «⚠ N» підсумку ховався, EquipLens S41)
 case "$gate" in *"✗ 0"*) ;; *) fail=1 ;; esac   # ✗ гейта продукту — вихід 1 (EquipLens S36, 19.11.2026: без цього ✗ гейта не червонив env_check)
 last=$(grep -m1 -oE "^\| 20[0-9]{2}-[0-9]{2}-[0-9]{2}" "$AUDITF" 2>/dev/null | tr -d '| ')
 if [ -n "$last" ]; then days=$(( ( $(date +%s) - $(date -d "$last" +%s) ) / 86400 )); [ "$days" -gt 30 ] && aud="аудит правил: $days дн. — ПОРА" || aud="аудит правил: $days дн. тому"; elif grep -qE "^\| [0-9]" "$AUDITF" 2>/dev/null; then aud="⚠ аудит правил: дата верхнього рядка журналу не ISO рррр-мм-дд — нагадування «30 днів» не бачить її (EquipLens S38)"; else aud="аудит правил: журналу нема"; fi

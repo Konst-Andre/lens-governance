@@ -1157,12 +1157,14 @@ Q_ID = r'\*{0,2}`([^`]+)`\*{0,2}(?:\s*·\s*\*{0,2}`[^`]+`\*{0,2})*'   # кліт
 def queue_open(txt):
     """Відкриті пункти черги (CQ-1): рядок таблиці, де `id` у 1-й або 2-й комірці (як check_cherga.ids), без «| закрито |»
     → [(id, вік у днях або None)]. Дата — остання комірка-дата рядка: dd.mm.yyyy або dd.mm (рік — поточний, у майбутньому — минулий).
-    Черга з розділом «## Відкрите» — лише він; без нього — увесь файл."""
+    Черга з розділом «## Відкрите» — лише він; без нього — увесь файл. Розділ «… карта кроків» (до заголовка того ж чи вищого рівня) — не пункти."""
     import datetime
     sec = txt.split('## Відкрите', 1)[1].split('\n-----', 1)[0] if '## Відкрите' in txt else txt
-    out, today = [], datetime.date.today()
+    out, today, lvl = [], datetime.date.today(), 0
     for l in sec.splitlines():
-        if not l.startswith('|') or '| закрито |' in l: continue
+        h = re.match(r'(#{1,6})\s', l)   # карта маршруту («… · карта кроків», ROUTE-1) — кроки пунктів, не пункти: судить route_check (EquipLens S41: 13 кроків давали «22 > 12»)
+        if h: lvl = len(h[1]) if re.search(r'карта кроків', l, re.I) else (0 if lvl and len(h[1]) <= lvl else lvl)
+        if lvl or not l.startswith('|') or '| закрито |' in l: continue
         cells = [c.strip() for c in l.strip().strip('|').split('|')]
         m = next((re.fullmatch(Q_ID, c) for c in cells[:2] if re.fullmatch(Q_ID, c)), None)
         if not m: continue

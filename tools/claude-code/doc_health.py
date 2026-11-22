@@ -62,12 +62,15 @@
   M17 черга не-Lens (`docs/CHERGA.md`) — та сама мірка CQ-1, що G17 / G14 для ядра й Lens (`Lens_validate`: queue_open · Q_MAX · Q_AGE · Q_ROW):
      пункт «Відкрите» старший за 30 дн., пунктів > 12, рядок > 2000 знаків → ⚠. Чому (AE S156, іспит нового агента): черга AE виросла до 67 КБ, злитий пункт
      `AE-PORT` · `AE-HDR` — 31 день без ⚠: `--gov` AE не бачить (AE поза Lens), env_check AE черги не міряв, `queue_open` злитого рядка не бачив.
+  M18 вказівник «S<N> §0 п.K» — у §0 самері S<N> цього репо такого пункту нема (WARN-1 (4-б), іспит 27 EquipLens S41: нове самері рве нумерацію).
+  ⓘ самері ≥ 80 % стелі M2 — «на переїзді нове самері» (WARN-1 (3)).
 Лише ⚠ (не блокує): один рядок для env_check; адреси — --list.
   python3 doc_health.py [<репо>] [--list] | selftest
 """
 import os, re, subprocess, sys, tempfile
 
 M1_LINES, M2_KB, M3_KB, M4_KB = 200, 25, 16, 80
+M2_EARLY = 0.8   # WARN-1 (3), EquipLens S41: самері ≥ 80 % стелі → ⓘ «на переїзді — нове самері» (S40 росло до 132 КБ: ⚠ прийшло запізно)
 M1_CHARS, M1_CAP = 20000, 40000
 M10_DAYS, M11_DAYS = 14, 180
 
@@ -92,6 +95,8 @@ def scan(root):
         whole = f in ('CLAUDE.md', 'tools/claude-code/PROFILE.md') or bool(WHOLE_Q.search(f)) or (f.startswith('sessions/') and 'summary' in f) or f == newest_nl   # не-Lens: лише найновіше самері читається на старті (AE S91)
         if whole and f not in ('CLAUDE.md', 'tools/claude-code/PROFILE.md') and kb > M2_KB:
             found.append(('M2', f, f'{kb:.0f} КБ > {M2_KB} — читається цілком на старті'))
+        elif whole and 'summary' in f and kb >= M2_KB * M2_EARLY:   # WARN-1 (3): ранній поріг — нове самері плануємо, а не вимушує ✗ храповика (commit_files п.14)
+            found.append(('ⓘ', f, f'самері {kb:.1f} КБ ≥ {M2_EARLY:.0%} стелі {M2_KB} — на переїзді нове самері (`sessions/README.md`)'))
         if whole: continue   # читається цілком за задумом — розмір розділу не важить, стережуть M1/M2 (перший прогін 10.10: профіль і черга — 2 хибних M3)
         for head, b in m3_sections(f, txt):
             if b / 1024 > M3_KB: found.append(('M3', f, f'розділ {b / 1024:.0f} КБ «{head[:60].strip()}»'))
@@ -106,6 +111,7 @@ def scan(root):
     found += hook_rows(root)
     found += cookbook(root)
     found += copies(root)
+    found += s0_pointers(root)
     found += spread(root)
     return found
 
@@ -413,6 +419,36 @@ def unchecked_rules(root):
     return out
 
 
+
+S0_PTR = re.compile(r'\bS(\d+) §0 п\. ?(\d+(?:-[а-яa-z0-9]+)?)')
+
+
+def s0_pointers(root):
+    """M18 (WARN-1 (4-б), іспит 27 EquipLens S41): вказівник «S<N> §0 п.K» веде на пункт, якого в §0 того самері нема
+    (перехід на нове самері рве нумерацію). Самері шукається в цьому репо (`sessions/` · `archive/summaries/`, ім'я `*_S<N>_*`);
+    нема тут (чуже репо, давнє) — не судиться. Пункт §0 — рядок «K.» або «K-x.» (з `- ` чи `**` попереду) від «## §0» до наступного «## »."""
+    import glob
+    out, cache = [], {}
+    def items(n):
+        if n not in cache:
+            fs = [x for d in ('sessions', 'archive/summaries') for x in glob.glob(os.path.join(root, d, f'*_S{n}_*.md'))]
+            if not fs: cache[n] = None
+            else:
+                s = open(fs[0], encoding='utf-8', errors='replace').read(); s = s.split('\n## §0', 1)[1] if '\n## §0' in s else ''
+                s = re.split(r'\n## ', s, maxsplit=1)[0]
+                cache[n] = {m[1] for m in re.finditer(r'^\s*(?:- )?\**(\d+(?:-[а-яa-z0-9]+)?)\.', s, re.M)}
+        return cache[n]
+    for f in files(root):
+        if f.startswith('archive/'): continue
+        p = os.path.join(root, f)
+        if not f.endswith('.md') or not os.path.isfile(p): continue
+        for i, l in enumerate(open(p, encoding='utf-8', errors='replace'), 1):
+            for m in S0_PTR.finditer(l):
+                have = items(m[1])
+                if have is not None and m[2] not in have:
+                    out.append(('M18', f'{f}:{i}', f'«S{m[1]} §0 п.{m[2]}» — у §0 самері S{m[1]} такого пункту нема (нове самері перенумерувало? вказівник — на живий пункт)'))
+    return out
+
 def line(root):
     f = scan(root)
     sh = subprocess.run(['git', 'rev-parse', '--is-shallow-repository'], cwd=root, capture_output=True, text=True).stdout.strip() == 'true'
@@ -424,7 +460,7 @@ def line(root):
     if not f: return '✓', f'документи: ✓ щосесійні ≤ {M1_LINES} рядків і {M1_CHARS} знаків · старт ≤ {M2_KB} КБ · розділи ≤ {M3_KB} КБ · великі з маршрутом · копій нема' + note
     by = {}
     for m, *_ in f: by[m] = by.get(m, 0) + 1
-    name = {'M1': 'щосесійні задовгі', 'M2': 'файли старту завеликі', 'M3': f'розділів > {M3_KB} КБ', 'M4': f'> {M4_KB} КБ без маршруту', 'M5': 'мертвих шляхів', 'M9': 'приладів без згадки', 'M16': 'гачків без рядка в реєстрі', 'M6': 'черга відстала від самері', 'M17': 'черга: вік · стеля · довгий рядок', 'M7': 'мертвих адрес §', 'M8': 'правил без «Як перевірити»', 'M10': 'свіжих рецептів без дати джерела', 'M11': f'рецептів > {M11_DAYS} дн. без звірки', 'M13': 'копій між щосесійними', 'M14': 'копій щосесійного шару в документах', 'M12': 'посилань на неіснуючий рецепт'}
+    name = {'M1': 'щосесійні задовгі', 'M2': 'файли старту завеликі', 'M3': f'розділів > {M3_KB} КБ', 'M4': f'> {M4_KB} КБ без маршруту', 'M5': 'мертвих шляхів', 'M9': 'приладів без згадки', 'M16': 'гачків без рядка в реєстрі', 'M6': 'черга відстала від самері', 'M17': 'черга: вік · стеля · довгий рядок', 'M7': 'мертвих адрес §', 'M8': 'правил без «Як перевірити»', 'M10': 'свіжих рецептів без дати джерела', 'M11': f'рецептів > {M11_DAYS} дн. без звірки', 'M13': 'копій між щосесійними', 'M14': 'копій щосесійного шару в документах', 'M12': 'посилань на неіснуючий рецепт', 'M18': 'вказівників «S<N> §0 п.K» у нікуди'}
     worst = max((x for x in f if x[0] == 'M3'), key=lambda x: float(re.search(r'(\d+) КБ', x[2])[1]), default=None)
     return '⚠', 'документи: ' + ' · '.join(f'{name[m]} {n}' for m, n in sorted(by.items())) + (f' (найбільший — {worst[1]} {worst[2]})' if worst else '') + ' — деталі: doc_health.py --list' + note
 
@@ -471,6 +507,10 @@ def selftest():
     QH = '## Відкрите\n| id | предмет | відкрито | умова |\n|---|---|---|---|\n'; QT = '\n-----\n## Відкладено\n| `AE-Z` | старе | 01.01.2020 | x |\n'
     cases += [('M17: злитий пункт «`AE-P` · `AE-H`» 40 дн. → ⚠ (AE S156: був невидимий)', {'docs/CHERGA.md': QH + f'| `AE-P` · `AE-H` | x | {OLD} | y |' + QT}, '⚠', 'черга: вік · стеля · довгий рядок 1'),
               ('M17: рядок 2100 знаків → ⚠', {'docs/CHERGA.md': QH + f'| `AE-L` | {"ж" * 2100} | {D} | y |' + QT}, '⚠', 'черга: вік · стеля · довгий рядок 1'),
+              ('M17: 13 кроків карти маршруту («### … карта кроків») — не пункти → ✓ (EquipLens S41: «22 > 12» хибне)', {'docs/CHERGA.md': QH + f'| `AE-1` | x | {D} | y |\n### Маршрут · карта кроків\n| крок | що |\n|---|---|\n' + ''.join(f'| `S-{n}` | x | {D} | y |\n' for n in range(13)) + '### Далі\n| `AE-2` | x | {D} | y |'.replace('{D}', D) + QT}, '✓', ''),
+              ('WARN-1 (3): самері 21 КБ (≥ 80 % стелі) → ⓘ «на переїзді нове самері», не ⚠', {'sessions/X_summary_S1.md': 'ж' * 10900}, '✓', 'на переїзді нове самері'),
+              ('M18: «S7 §0 п.4» — у §0 самері S7 лише п.1–3 → ⚠ (іспит 27 S41)', {'sessions/X_summary_S7_T.md': '# x\n\n## §0 · ВІДКРИТЕ\n\n1. a\n2. b\n3. c\n\n## §1\n4. не §0\n', 'lens/B.md': 'див. S7 §0 п.4\n'}, '⚠', 'вказівників «S<N> §0 п.K» у нікуди 1'),
+              ('M18: «S7 §0 п.1-в» живий, «S9 §0 п.2» — самері нема тут → ✓', {'sessions/X_summary_S7_T.md': '# x\n\n## §0\n\n1. a\n1-в. b\n', 'lens/B.md': 'див. S7 §0 п.1-в і S9 §0 п.2\n'}, '✓', ''),
               ('M17: 13 пунктів → ⚠', {'docs/CHERGA.md': QH + ''.join(f'| `AE-{n}` | x | {D} | y |\n' for n in range(13)) + QT}, '⚠', 'черга: вік · стеля · довгий рядок 1'),
               ('M17: свіжі короткі 12 · старе й довге лише у «Відкладено» → ✓', {'docs/CHERGA.md': QH + ''.join(f'| `AE-{n}` | x | {D} | y |\n' for n in range(12)) + QT + f'| `AE-W` | {"ж" * 2100} | 01.01.2020 | y |\n'}, '✓', '')]
     cases += [('M7: «§13-д» без заголовка §13 → ⚠', {'lens/S.md': '## §1 А\nx\n## §2 Б\nx\n## §3 В\nдив. §13-д\n'}, '⚠', 'мертвих адрес § 1'),
