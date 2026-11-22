@@ -118,7 +118,7 @@ def check(top, cmd):
             bad.append(f'файл-секрет за іменем «{f}» — секрети ніколи в репо (змінні середовища сесії); додай у .gitignore')
         p = os.path.join(top, f)
         if os.path.isfile(p) and os.path.getsize(p) > BIG and not explicit(f):
-            bad.append(f'новий файл «{f}» — {os.path.getsize(p) // 1024} КБ > 1 МБ — справді в репо? свідомо — `git add {f}` окремо')
+            bad.append(f'новий файл «{f}» — {os.path.getsize(p) // 1024} КБ > 1 МБ — справді в репо? свідомо — назви його в `git add {f}` у тій самій команді, що й коміт')
     lower = {}
     for f in zlist(top, 'ls-files') + sorted(added):
         lower.setdefault(f.lower(), set()).add(f)
