@@ -53,6 +53,15 @@ def route_text(cwd):
     if not files: return None, None
     f = max(files, key=lambda x: x.stat().st_mtime)
     t = f.read_text(encoding='utf-8', errors='ignore')
+    # ROUTE-1 крок 2 (EquipLens S41, 22.11.2026): є карта кроків у черзі — маршрут дає прилад (одна правда, бриф §5-б), не проза самері
+    repo = next((p for p in f.parents if (p / '.git').exists()), None) or next((p.parent for p in f.parents if p.name in ('sessions', 'docs')), None)
+    rc = pathlib.Path(os.environ.get('LENS_HOOK_DIR') or '.') / '..' / 'route_check.py'
+    if repo and rc.exists():
+        import subprocess
+        try: ln = subprocess.run([sys.executable, str(rc), 'line', str(repo)], capture_output=True, text=True, timeout=20).stdout.strip()
+        except Exception: ln = ''
+        if ln.startswith('маршрут:') and 'карти нема' not in ln:
+            return str(f), f"Рядок машини (route_check, як є — у блок «Маршрут»): {ln}"
     i = t.find('МАРШРУТ')
     if i < 0: return str(f), None
     j = t.find('\n**0.', i + 10); k = t.find('\n## ', i + 10)
@@ -78,7 +87,7 @@ def run(d, rep=None, src=None):
     body = (f"Маршрут для Konst ({why}): у цій відповіді — блок «**Маршрут:**» 3–5 рядків: де ми (пункт черги й крок) · далі (1–3 кроки) · попутно · що чекає Konst. "
             "Бери з самері §0 і черги репо, не з пам'яті чату; змінилось — спершу онови самері §0, тоді показуй.")
     if f: body += f" Самері: {f}."
-    if rt: body += "\nЗ самері зараз:\n" + rt[:1200]
+    if rt: body += "\nЗараз (з репо):\n" + rt[:1200]
     if first: body = readback() + '\n' + body
     return body
 
@@ -127,7 +136,13 @@ def selftest():
     kf = ses / 'lens-governance/sessions/x/K_session_summary_X.md'; kf.write_text('ядро'); os.utime(kf, (4e9, 4e9))
     f3, rt3 = route_text(str(ses)); ok4 = bool(f3) and 'Prod' in f3 and 'продукт' in (rt3 or ''); bad += not ok4
     print(('✓ ' if ok4 else '✗ ') + 'аудит S156 №3: корінь сесії → самері продукту, не новіше самері ядра')
-    print(f'─── route-remind selftest: {len(cases) + 4 - bad}/{len(cases) + 4} ───'); return 1 if bad else 0
+    # ROUTE-1 крок 2: репо з картою кроків → рядок машини route_check, не проза самері
+    rp = pathlib.Path(tempfile.mkdtemp()) / 'P'; (rp / 'sessions').mkdir(parents=True); (rp / 'lens').mkdir(); (rp / '.git').mkdir()
+    (rp / 'sessions/P_session_summary_S1_X.md').write_text('## §0\n\n1. Зараз `B-1`.\n\n**0.2 · МАРШРУТ:** проза\n')
+    (rp / 'lens/P_CHERGA.md').write_text('**Зараз:** крок ▶ карти маршруту.\n\n### М · карта кроків\n\n| крок | що | готово, коли | далі | стан |\n|---|---|---|---|---|\n| `B-1` | x | y | `B-2` | ▶ |\n| `B-2` | x | y | кінець | ○ |\n')
+    f5, rt5 = route_text(str(rp)); ok5 = bool(rt5) and 'маршрут: ▶ B-1' in rt5 and 'проза' not in rt5; bad += not ok5
+    print(('✓ ' if ok5 else '✗ ') + 'ROUTE-1 крок 2: є карта кроків → рядок машини route_check, не «МАРШРУТ» самері')
+    print(f'─── route-remind selftest: {len(cases) + 5 - bad}/{len(cases) + 5} ───'); return 1 if bad else 0
 
 if sys.argv[1] == 'selftest': sys.exit(selftest())
 try: out = run(json.loads(os.environ.get('HOOK_IN') or '{}'))

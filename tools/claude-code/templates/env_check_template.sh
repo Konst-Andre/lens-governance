@@ -72,6 +72,12 @@ if [ -f "$CC/shots_check.py" ]; then python3 "$CC/shots_check.py" . || fail=1; e
 # версія застосунку B · rev (VER-1, lens-governance:tools/claude-code/VERSIONS.md) — лише репо з інтерфейсом; параметри свого продукту:
 #   --code <файл коду застосунку> --re '<мітка: група B, група rev>' [--name '<шлях файлу білда з групою B>']
 # if [ -f "$CC/version_check.py" ]; then python3 "$CC/version_check.py" . --code <файл> --re '<регулярка>' ${ENV_INJECT:+--inject} || fail=1; else echo "версія: — (ядра поруч нема: $K)"; fi
+# маршрут (ROUTE-1, kernel/Lens_ROUTE-1_brief.md): карта кроків у черзі («… · карта кроків») — route_check; карти нема → «маршрут: карти нема», exit 0.
+#   Зразок — EquipLens:tools/env_check.sh (✗ / ⚠ рядками з префіксом «маршрут:», ✗ → fail; зуб ENV_INJECT → --inject two мусить дати ✗).
+if [ -f "$CC/route_check.py" ]; then
+  if [ -n "${ENV_INJECT:-}" ]; then python3 "$CC/route_check.py" check . --inject two >/dev/null 2>&1 && { echo "✗ маршрут --inject не зловив два ▶"; fail=1; } || echo "маршрут --inject: ЗЛОВИВ"
+  else rc_out=$(python3 "$CC/route_check.py" check . 2>&1); rc=$?; printf '%s\n' "$rc_out" | grep -E '^(✗|⚠) ' | sed 's/^/маршрут: /'; printf '%s\n' "$rc_out" | tail -1; [ $rc -ne 0 ] && fail=1; fi
+fi
 # зуби: ENV_INJECT=1 bash tools/env_check.sh — прилади з --inject підкидають ваду й мусять дати ✗ (зразок — QR-Lens:tools/env_check.sh; аудит 24.10.2026).
 # Мітки в коді ще нема (продукт заводить версію) — рядок «⚠ версія: мітки ще нема», не ✗ (зразок — AE-Simulator:tools/env_check.sh).
 
