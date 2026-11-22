@@ -439,6 +439,8 @@ function makePicker(cfg){ // {root,btn,cur,list,options,allowOther,otherInput,fl
 
 **Анти:** нативний `<select>` у PWA (jank + замерзлий color-scheme A41); прямий document-listener на екземпляр, що перебудовується (стек). **Зв’язок:** A41 (native picker замерзлий), A21 (listener once-for-life), B3 (форми/focus), A19 (`ig`-guard свайпу). *Drive Lens Batch 9.1 / 32 (settings-варіант).*
 
+**Прецедент:** звірка кукбуку `FAB-1` Н3 · Н4 · С12 (AE S153, коміт `ace7383`, 18.11.2026) — правки посилань класу 0 (VisualViewport → том 4 B2); механіка — Drive Lens.
+
 ## A59. Мікро-компоненти: toast / sync-pill / sparkline / confirmAction ✅
 
 ### toast (слайд-ап над таб-баром)

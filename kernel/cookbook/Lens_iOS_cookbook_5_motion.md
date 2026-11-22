@@ -151,6 +151,8 @@ function placeAllThumbs(snap){document.querySelectorAll('.seg,.type-seg').forEac
 
 **Тригер:** нова анімована поверхня. **Анти:** магічний час поза драбиною (.19s/.35s); пружина на структурному русі (sheet з овершутом = «гумовий»); забути reduced-motion; ручний slide там, де разом міняється контент/текстура (роз'їзд — бери VT); власна entry-аніма елемента під VT-перехід (competition — гаси, VT володіє морфом); layout-prop (width/height) аніма під VT-композитом на слабкому залізі (thrash A70); судити motion-фікс лише оком без frame-gap-readout (ms — штатна база, wsd 2.4). **Зв’язок:** A18 (sheet enter/exit), A27 (reduce-motion+init), A30 (livePulse), A54 (seg-thumb), A56 (nav-капсула), A70 (layout-prop thrash під рухом/VT), wsd 2.4 (frame-gap трійка + VT-best-practice), wsd 14.20 (banner-motion arc). *Зведено аудитом batch41 (Round 2); banner-reveal→candidate-A + VT-close додано B46/B47 (`batch47_2`, 14.20); seg-канон **per-product**: Drive 450ms/(.34,1.56) з wsd 14.13 (slow-mo показав 300 задовгим навіть для 3-seg), QR A54-капсула розійшлась device-тюном до 500ms/(.34,1.70,.64,1) — `batch44_2` р.73, 14.19.*
 
+**Прецедент:** драбина тривалостей і easing — з продуктів Lens; остання правка — адреса скла `Lens_glass_FINDINGS` §4 (прополка лотка, 18.11.2026).
+
 ## A67. Press-механіка тапу: JS `pointerdown/up`, не чистий `:active`; down швидко / return пружно; scale∝1/розмір ✅
 
 **Симптом.** Чистий `:active{transform:scale(.92)}` показує масштаб **лише поки палець тримає** → на швидкий тап (down+up за <100ms) око не встигає побачити стиск. Фідбек «є в CSS, але непомітний».

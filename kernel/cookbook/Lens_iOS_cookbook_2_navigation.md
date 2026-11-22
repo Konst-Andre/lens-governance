@@ -34,6 +34,8 @@ html.pwa-full .nav-i{ padding-top:8px; padding-bottom:calc(8px + var(--sab)); } 
 
 `.sh-bg` (fixed inset:0, backdrop, flex-end, z:300) → `.sh-box` (`border-radius:16px 16px 0 0`, `max-height:85dvh`, рама **не** гортається — `overflow:hidden` + flex-колонка, гортається лише середина `.sh-list` (будова — A108), `padding-bottom:env(safe-area-inset-bottom)`) → `.sh-grip-w/.sh-grip` + `.sh-head`(title+×).
 
+**Прецедент:** звірка кукбуку `FAB-1` С1 · С5 (AE S153, коміт `7ea9595`, 18.11.2026) — скролер шторки — середина `.sh-list` (A108), рама не гортається; база — Drive Lens Batch 11–25.
+
 ## A18. Bottom sheet — enter/exit анімація
 
 **Проблема:** `display:none↔flex` не анімується («пстрик»). **Default = CSS visibility/opacity/transform:**
