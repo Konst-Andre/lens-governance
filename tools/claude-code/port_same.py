@@ -16,6 +16,7 @@
 #   viewport [w, h] · headers {ім'я: значення} (CSP продукту) · stubs [{url, status, body}] · init — JS до завантаження (обидва боки) · ready — JS-умова «застосунок готовий» · settle (мс)
 #   themes [{name, js}] · states [{name, js, hover?, hover_wait? (мс після наведення, типово 250), wait?}] · roots [{name, sel, pick, tol_px?, pix_tol?, optional?}] · props — обчислені стилі (і самого кореня — ключ @root)
 #     optional (AE S147) — корінь, що є лише в деяких станах (підказка в body): нема в обох — не судиться; є в одному — ✗
+#   frame (EquipLens S40) — у ref / port: селектор рамки, від якої міряти місце (стенд малює телефон у рамці зі зсувом; білд — від краю вікна: "html") · page — файл сторінки боку (типово index.html) · themes[].scheme — light | dark: emulate_media (тема за системою)
 #   tol_px (0,5) · pix_tol (середня різниця каналу 0–255, 2) · motion [{name, setup?, trigger, sample, frames, mode?: time | shape, tol: {ім'я | *: допуск}}]
 #     time — кожен кадр за часом (рівні кадри); shape — пік · западина · кінець (коли перший кадр — важкий render() застосунку)
 #     key (AE S146, П4 порту v7) — значення як функція ключа: "key": <ім'я поля семплера> (напр. ширина рейки); кожен кадр еталону ⟂ значення порту
@@ -23,16 +24,16 @@
 #       значення — функція ключа (хід ключа може бути немонотонним — криві сортуються за ключем); поле, якого в кадрі нема, не судиться; допуск ключа — tol[<ключ>] (типово 1)
 #   inject_css — вада для --inject · debt [...]
 # Межі еволюції (Konst В-371: «щоб адаптувався й покращувався»): вміє — статичні стани, наведення, рух за часом, шрифти;
-#   вміє ще — рух як функція ключа (режим key, AE S146); ще ні — немонотонний ключ (подвійний клік — поки shape),
+#   вміє ще — рух як функція ключа (режим key, AE S146); рамка й файл еталона (frame · page) і тема системою (scheme) — EquipLens S40; ще ні — немонотонний ключ (подвійний клік — поки shape),
 #   фокус клавіатурою (додати "focus": селектор у стан), дотик і WebKit (лише Chromium). Нове вміння — тут, з рядком selftest і зубом;
 #   новий вид предмета — roots/pick, властивість — props, стан — states (сценарій продукту, прилад не чіпати).
 import json, os, sys, subprocess, tempfile, shutil, threading, functools, http.server, socketserver, pathlib, io, contextlib
 
 KEY = "const key = e => { const p = []; for (let n = e; n && n !== r; n = n.parentElement) { const i = [...n.parentElement.children].indexOf(n) + 1; p.unshift(n.tagName.toLowerCase() + ':' + i); } return p.join('>'); };"
-MEAS_JS = "([root, pick, props]) => { const r = document.querySelector(root); if (!r) return null; const out = {}; " + KEY + r"""
+MEAS_JS = "([root, pick, props, frame]) => { const r = document.querySelector(root); if (!r) return null; const out = {}; const fe = frame && document.querySelector(frame), F = fe ? fe.getBoundingClientRect() : {x: 0, y: 0}; " + KEY + r"""
   for (const e of r.querySelectorAll(pick)) { if (!e.getClientRects().length) continue; const b = e.getBoundingClientRect(), c = getComputedStyle(e);
-    const o = { x: b.x, y: b.y, w: b.width, h: b.height }; for (const p of props) o[p] = c.getPropertyValue(p); out[key(e)] = o; }
-  const rb = r.getBoundingClientRect(); out['@root'] = { x: rb.x, y: rb.y, w: rb.width, h: rb.height }; const rc = getComputedStyle(r); for (const p of props) out['@root'][p] = rc.getPropertyValue(p); return out; }   /* AE S147: стилі самого кореня теж — матеріал рейки (тло, тінь за краєм) живе на .sidebar; знімок кореня тінь за краєм обрізає (playwright.dev toHaveCSS, 15.11.2026) */"""
+    const o = { x: b.x - F.x, y: b.y - F.y, w: b.width, h: b.height }; for (const p of props) o[p] = c.getPropertyValue(p); out[key(e)] = o; }
+  const rb = r.getBoundingClientRect(); out['@root'] = { x: rb.x - F.x, y: rb.y - F.y, w: rb.width, h: rb.height }; const rc = getComputedStyle(r); for (const p of props) out['@root'][p] = rc.getPropertyValue(p); return out; }   /* AE S147: стилі самого кореня теж — матеріал рейки (тло, тінь за краєм) живе на .sidebar; знімок кореня тінь за краєм обрізає (playwright.dev toHaveCSS, 15.11.2026) */"""
 SAMPLER_JS = r"""([sample, frames]) => new Promise(res => { const S = []; let n = 0, t0 = null; const f = new Function('return (' + sample + ')');
   const tick = now => { if (t0 === null) t0 = now; let v = {}; try { v = f() || {}; } catch (_) {} S.push({ t: now - t0, ...v }); if (++n < frames) requestAnimationFrame(tick); else res(S); };
   requestAnimationFrame(tick); })"""
@@ -49,14 +50,14 @@ def serve(d, headers):
     threading.Thread(target=s.serve_forever, daemon=True).start(); return f'http://127.0.0.1:{s.server_address[1]}/'
 
 
-def stage(src, base, overlay=(), css=None, tag='x'):
+def stage(src, base, overlay=(), css=None, tag='x', page='index.html'):
     t = pathlib.Path(tempfile.mkdtemp()) / tag; shutil.copytree(src, t)
-    ix = (t / 'index.html').read_text(encoding='utf-8'); add = ''
+    ix = (t / page).read_text(encoding='utf-8'); add = ''
     for f in overlay:
         f = (base / f).resolve(); shutil.copy(f, t / f.name); add += f'<script src="{f.name}"></script>'
     if css:
         (t / 'port_same_inject.css').write_text(css, encoding='utf-8'); ix = ix.replace('</head>', '<link rel="stylesheet" href="port_same_inject.css"></head>', 1)
-    (t / 'index.html').write_text(ix.replace('</body>', add + '</body>', 1), encoding='utf-8'); return t
+    (t / page).write_text(ix.replace('</body>', add + '</body>', 1), encoding='utf-8'); return t
 
 
 def git_site(base, ref):
@@ -93,8 +94,9 @@ def run(scn_path, inject=False, shots=None):
     R = git_site(base, C['ref']) if C['ref'].get('git') else (base / C['ref']['site']).resolve(); T = (base / C['port']['site']).resolve()
     props = C.get('props', []); debt = C.get('debt', [])
     hide = ''.join(f'{x}{{display:none!important}}' for x in C['ref'].get('hide', []))   # кнопки й панель самої примірки — не частина показу (AE S145: кнопка «Значки» лягла на вузьку рейку)
-    dref = stage(R, base, C['ref'].get('overlay', []), css=hide or None, tag='ref'); dport = stage(T, base, (), C.get('inject_css') if inject else None, tag='port')
-    U = {'ref': serve(dref, C.get('headers')) + C['ref'].get('query', ''), 'port': serve(dport, C.get('headers')) + C['port'].get('query', '')}
+    pgn = {s: C[s].get('page', 'index.html') for s in ('ref', 'port')}   # EquipLens S40: еталон — файл стенда, не index.html
+    dref = stage(R, base, C['ref'].get('overlay', []), css=hide or None, tag='ref', page=pgn['ref']); dport = stage(T, base, (), C.get('inject_css') if inject else None, tag='port', page=pgn['port'])
+    U = {'ref': serve(dref, C.get('headers')) + pgn['ref'] + C['ref'].get('query', ''), 'port': serve(dport, C.get('headers')) + pgn['port'] + C['port'].get('query', '')}
     V = []; ok = lambda n, c, x='': V.append(('✓' if c else '✗', n, x))
     is_debt = lambda item, prop: any(d['item'] in item and d.get('prop', prop) == prop for d in debt)
     vw, vh = C.get('viewport', [1920, 1080])
@@ -114,13 +116,14 @@ def run(scn_path, inject=False, shots=None):
                 tag = f"{st['name']} · {th['name']}"; M = {}; shot = {}
                 for side, p in pg.items():
                     p.mouse.move(vw - 2, vh - 2)
+                    if th.get('scheme'): p.emulate_media(color_scheme=th['scheme'])   # EquipLens S40: тема за системою (білд без data-theme)
                     if th['js']: p.evaluate(th['js'])
                     if st.get('js'): p.evaluate(st['js'])
                     p.wait_for_timeout(st.get('wait', 400))
                     if st.get('hover'):
                         h = p.locator(st['hover']).first
                         if h.count(): h.hover(); p.wait_for_timeout(st.get('hover_wait', 250))   # AE S147: підказка з затримкою 0,5 с — 250 мс міряли невидиму
-                    M[side] = {rt['name']: p.evaluate(MEAS_JS, [rt['sel'], rt['pick'], props]) for rt in C['roots']}
+                    M[side] = {rt['name']: p.evaluate(MEAS_JS, [rt['sel'], rt['pick'], props, C[side].get('frame')]) for rt in C['roots']}
                     shot[side] = {rt['name']: (p.locator(rt['sel']).first.screenshot() if p.locator(rt['sel']).count() else None) for rt in C['roots']}
                 for rt in C['roots']:
                     tol = rt.get('tol_px', C.get('tol_px', .5)); ptol = rt.get('pix_tol', C.get('pix_tol', 2.0))
@@ -252,6 +255,11 @@ def selftest():
     # AE S147: стиль самого кореня (матеріал рейки — на .sidebar): примірка фарбує #r, порт — ні → ✗ «@root background-color»
     (t / 'rfit.js').write_text("document.head.insertAdjacentHTML('beforeend','<style>#r .x{color:rgb(200,0,0);margin-left:6px}#r{background-color:rgb(0,90,0)}</style>');" + mv % 200, encoding='utf-8')
     rc = scn('good'); rc['ref']['overlay'] = ['rfit.js']; rc['props'] = ['color', 'margin-left', 'background-color']; rc['motion'] = []; (t / 'rbad.json').write_text(json.dumps(rc), encoding='utf-8')
+    # EquipLens S40: еталон — стенд (свій файл, телефон у рамці зі зсувом 40·30), порт — білд від краю вікна: frame + page → ✓; без frame → ✗ «x»
+    (t / 'fbase').mkdir(); (t / 'fbase' / 'stand.html').write_text(page('#f{position:absolute;left:40px;top:30px;width:300px;height:150px}').replace('<div id=r>', '<div id=f><div id=r>').replace('</div><script>', '</div></div><script>'), encoding='utf-8')
+    fc = scn('good'); fc['ref'] = {'site': 'fbase', 'page': 'stand.html', 'overlay': ['fit.js'], 'frame': '#f'}; fc['port']['frame'] = 'html'; fc['motion'] = []; (t / 'fgood.json').write_text(json.dumps(fc), encoding='utf-8')
+    fn = json.loads(json.dumps(fc)); del fn['ref']['frame']; del fn['port']['frame']; (t / 'fbad.json').write_text(json.dumps(fn), encoding='utf-8')
+    fg, fgo = q('fgood.json'); fb_, fbo = q('fbad.json')
     rb_, rbo = q('rbad.json')
     hg, hgo = q('hgood.json'); hb, hbo = q('hbad.json')
     g, go = q('good.json'); bd, bo = q('bad.json'); gi, gio = q('good.json', inject=True)
@@ -263,6 +271,7 @@ def selftest():
          ('режим «форма»: той самий рух → ✓; коротший рух (кінець 40 ⟂ 50) → ✗', not any('форма' in l for l in xs(q('shape.json')[1])) and any('форма' in l for l in xs(q('shapeb.json')[1])), ''),
          ('підказка після наведення (0,4 с, hover_wait 700, корінь optional): та сама → ✗ 0 (і в спокої, де її нема в обох); інший колір → ✗ «tp»', hg == 0 and any('tp' in l for l in xs(hbo)), hgo[-400:] + hbo[-400:]),
          ('стиль самого кореня (тло на #r лише в примірці) → ✗ «@root background-color»', any('@root background-color' in l for l in xs(rbo)), rbo[-500:]),
+         ('рамка (frame) і файл еталона (page): стенд у рамці зі зсувом ≡ білду від краю → ✗ 0; без frame → ✗ «x»', fg == 0 and any(' x:' in l for l in xs(fbo)), fgo[-500:] + fbo[-500:]),
          ('режим «ключ»: інша швидкість, та сама функція → ✓; інша функція прозорості → ✗', not any('ключі' in l for l in xs(q('kgood.json')[1])) and any('ключі' in l for l in xs(q('kbad.json')[1])), q('kgood.json')[1][-500:] + q('kbad.json')[1][-500:])]
     n = 0
     for name, c, out in T:
