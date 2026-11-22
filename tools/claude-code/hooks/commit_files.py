@@ -42,6 +42,11 @@
      M3 лише ⚠ на старті, а «Коротко» брифів дописувались далі (AE-AI §0: 16 → 19 КБ за S155). Практика — ratchet: старий борг дозволено, ріст —
      ні, поріг лише опускається (Notion «ratcheting system», Flutter Quality Ratchet, ratchets DESIGN.md — 19.11.2026). Свідомий виняток —
      <!-- ratchet-ok: причина --> у доданих рядках (як copy-ok).
+  14. «храповик старту» (EquipLens S41, 22.11.2026; Konst: «повинно було так і працювати… щоб більше не повторювалося»): п.13 свідомо не міряє файли,
+     що читаються ЦІЛКОМ (самері, черга, журнал гачків — doc_health M2 / J_KB), а свого храповика в них не було → самері S40 виросло 30 → 132 КБ
+     за ≈100 комітів, і кожен пройшов (M2 — лише ⚠ на старті). Тепер: коміт, що ЗБІЛЬШУЄ самері (`sessions/*summary*`, `docs/summary/`) чи чергу
+     (`*CHERGA.md`) понад 25 КБ або журнал гачків понад 24 КБ → ✗ з ліками: самері — нове `S<N+1>` (§0 лише відкрите), старе — в архів;
+     черга — прополка; журнал — `tools/claude-code/journal_rotate.py`. Зменшити — тиша; свідомо — <!-- ratchet-ok: причина -->.
 Не беремо з pre-commit-hooks: пробіли й кінці файлів (шум у диффах даних), no-commit-to-branch (ми свідомо комітимо в main),
 submodules (їх нема).
 
@@ -223,6 +228,22 @@ def check(top, cmd):
                     bad.append(f'розділ «{h[:60].strip()}» у {f}: {b / 1024:.1f} КБ > {dh.M3_KB}' + (f' і виріс на {(b - o) / 1024:.1f} КБ' if o else ' — новий') +
                                ' (храповик, AE S156): спершу стисни розділ «як є» (закрите — в archive/ з вказівником), тоді дописуй; свідомо — <!-- ratchet-ok: причина -->')
     except Exception: pass   # прилад ядра недоступний — сторож мовчить, M3 скаже на старті
+    # 14. храповик старту (EquipLens S41): файли, що читаються цілком, не ростуть понад стелю
+    for f in sorted(x for x in changed if x.endswith('.md') and not re.search(r'(^|/)archive/', x)):
+        base = os.path.basename(f)
+        kind = 'самері' if (f.startswith('sessions/') and 'summary' in base.lower()) or f.startswith('docs/summary/') else \
+               'черга' if re.search(r'(^|/|_)CHERGA\.md$', f) else 'журнал' if base == 'HOOK_JOURNAL.md' else None
+        fp = os.path.join(top, f)
+        if not kind or not os.path.isfile(fp): continue
+        new = open(fp, encoding='utf-8', errors='replace').read()
+        prev = subprocess.run(['git', '-C', top, 'show', 'HEAD:' + f], capture_output=True, text=True).stdout
+        if 'ratchet-ok:' in new and 'ratchet-ok:' not in prev: continue
+        cap = 24 if kind == 'журнал' else 25; nb, ob = len(new.encode()), len(prev.encode())
+        if nb / 1024 > cap and nb > ob:
+            cure = {'самері': 'нове самері S<N+1> (§0 — лише відкрите, закрите ✅ — рядком §1), старе — git mv в archive/summaries/ (sessions/README)',
+                    'черга': 'прополка: закрите — геть з таблиці, історія — git; рядок > 2000 знаків — бриф',
+                    'журнал': 'python3 <ядро>/tools/claude-code/journal_rotate.py <репо> — закриті рядки → journal/<місяць>'}[kind]
+            bad.append(f'{kind} {f}: {nb / 1024:.1f} КБ > {cap} і росте (+{(nb - ob) / 1024:.1f} КБ; храповик старту, EquipLens S41) — {cure}; свідомо — <!-- ratchet-ok: причина -->')
     # 10. шапка наявного приладу змінилась, карта — ні (AE S104)
     head_re = re.compile(r'(Запуск|Usage|Вихід|живе доки)\s*:', re.I)
     for f in sorted(changed - added):
@@ -359,6 +380,19 @@ def selftest():
         open(d + '/lens/R.md', 'w').write(big + 'ще абзац <!-- ratchet-ok: перенос перед стисненням -->\n' + small); say(R() == [], 'храповик: свідомий виняток ratchet-ok → тиша')
         os.makedirs(d + '/archive', exist_ok=True); open(d + '/archive/old.md', 'w').write(big); say(R() == [], 'храповик: archive/ (історія) не міряється')
         g('checkout', '--', 'lens/R.md'); os.remove(d + '/archive/old.md')
+        # 14. храповик старту (EquipLens S41): самері / черга / журнал понад стелю не ростуть
+        os.makedirs(d + '/sessions', exist_ok=True); sf = d + '/sessions/P_session_summary_S9_X.md'
+        open(sf, 'w').write('# S9\n' + 'ж\n' * 13500); g('add', '-A'); g('-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 's9')
+        S14 = lambda: [x for x in check(d, "git add -A && git commit -m 'ядро: ні'") if 'храповик старту' in x]
+        open(sf, 'a').write('| 91 | ще хід |\n'); say(len(S14()) == 1 and 'S<N+1>' in S14()[0], 'храповик старту: самері > 25 КБ росте → ✗ з ліками «нове самері» (S40 — 132 КБ)')
+        open(sf, 'w').write('# S9\n' + 'ж\n' * 13000); say(S14() == [], 'храповик старту: самері зменшилось → тиша')
+        open(sf, 'w').write('# S9\n' + 'ж\n' * 13500 + 'ще <!-- ratchet-ok: перенос -->\n'); say(S14() == [], 'храповик старту: ratchet-ok → тиша')
+        g('checkout', '--', 'sessions/P_session_summary_S9_X.md')
+        open(d + '/lens/P_CHERGA.md', 'w').write('ж\n' * 13500); say(len(S14()) == 1 and 'прополка' in S14()[0], 'храповик старту: нова черга > 25 КБ → ✗ (черга ядра — 39 КБ)')
+        os.remove(d + '/lens/P_CHERGA.md')
+        os.makedirs(d + '/tools/claude-code/hooks', exist_ok=True); open(d + '/tools/claude-code/hooks/HOOK_JOURNAL.md', 'w').write('ж\n' * 13000)
+        say(len(S14()) == 1 and 'journal_rotate' in S14()[0], 'храповик старту: журнал гачків > 24 КБ → ✗ з командою ротації')
+        os.remove(d + '/tools/claude-code/hooks/HOOK_JOURNAL.md')
         os.environ.pop('LENS_KERNEL', None)
     finally:
         shutil.rmtree(d)
