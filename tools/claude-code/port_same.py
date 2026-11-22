@@ -17,6 +17,7 @@
 #   themes [{name, js}] · states [{name, js, hover?, hover_wait? (мс після наведення, типово 250), wait?}] · roots [{name, sel, pick, tol_px?, pix_tol?, optional?}] · props — обчислені стилі (і самого кореня — ключ @root)
 #     optional (AE S147) — корінь, що є лише в деяких станах (підказка в body): нема в обох — не судиться; є в одному — ✗
 #   frame (EquipLens S40) — у ref / port: селектор рамки, від якої міряти місце (стенд малює телефон у рамці зі зсувом; білд — від краю вікна: "html") · page — файл сторінки боку (типово index.html) · themes[].scheme — light | dark: emulate_media (тема за системою)
+#   ref/port.viewport [w, h] — свій в'юпорт боку (стенд у широкому вікні ⟂ білд-телефон) · fonts_ignore [родина] — шрифти, яких порт свідомо не має · stubs[].type — тип вмісту (типово JSON)
 #   tol_px (0,5) · pix_tol (середня різниця каналу 0–255, 2) · motion [{name, setup?, trigger, sample, frames, mode?: time | shape, tol: {ім'я | *: допуск}}]
 #     time — кожен кадр за часом (рівні кадри); shape — пік · западина · кінець (коли перший кадр — важкий render() застосунку)
 #     key (AE S146, П4 порту v7) — значення як функція ключа: "key": <ім'я поля семплера> (напр. ширина рейки); кожен кадр еталону ⟂ значення порту
@@ -51,12 +52,12 @@ def serve(d, headers):
 
 
 def stage(src, base, overlay=(), css=None, tag='x', page='index.html'):
-    t = pathlib.Path(tempfile.mkdtemp()) / tag; shutil.copytree(src, t)
+    t = pathlib.Path(tempfile.mkdtemp()) / tag; shutil.copytree(src, t, ignore=shutil.ignore_patterns('.git', 'node_modules'))   # еталон може бути коренем репо
     ix = (t / page).read_text(encoding='utf-8'); add = ''
     for f in overlay:
-        f = (base / f).resolve(); shutil.copy(f, t / f.name); add += f'<script src="{f.name}"></script>'
+        f = (base / f).resolve(); shutil.copy(f, (t / page).parent / f.name); add += f'<script src="{f.name}"></script>'   # поруч зі сторінкою: сторінка може лежати в підтеці (стенд — tools/)
     if css:
-        (t / 'port_same_inject.css').write_text(css, encoding='utf-8'); ix = ix.replace('</head>', '<link rel="stylesheet" href="port_same_inject.css"></head>', 1)
+        ((t / page).parent / 'port_same_inject.css').write_text(css, encoding='utf-8'); ix = ix.replace('</head>', '<link rel="stylesheet" href="port_same_inject.css"></head>', 1)
     (t / page).write_text(ix.replace('</body>', add + '</body>', 1), encoding='utf-8'); return t
 
 
@@ -101,21 +102,22 @@ def run(scn_path, inject=False, shots=None):
     is_debt = lambda item, prop: any(d['item'] in item and d.get('prop', prop) == prop for d in debt)
     vw, vh = C.get('viewport', [1920, 1080])
     with sync_playwright() as pw:
-        b = pw.chromium.launch(); pg = {}; E = {'ref': [], 'port': []}; F = {}
+        b = pw.chromium.launch(); pg = {}; E = {'ref': [], 'port': []}; F = {}; VP = {}
         for side in ('ref', 'port'):
-            ctx = b.new_context(viewport={'width': vw, 'height': vh}); p = ctx.new_page()
+            w_, h_ = C[side].get('viewport', [vw, vh]); VP[side] = (w_, h_)   # EquipLens S40: стенд малює телефон у широкому вікні, білд — сам телефон
+            ctx = b.new_context(viewport={'width': w_, 'height': h_}); p = ctx.new_page()
             if C.get('init'): p.add_init_script(C['init'])   # AE S146: стан до завантаження (квиток, тема) — однаковий обом бокам
             for s in C.get('stubs', []):
-                p.route(s['url'], lambda r, *_, s=s: r.fulfill(status=s.get('status', 200), headers={'access-control-allow-origin': '*'}, content_type='application/json', body=s.get('body', '{}')))
+                p.route(s['url'], lambda r, *_, s=s: r.fulfill(status=s.get('status', 200), headers={'access-control-allow-origin': '*'}, content_type=s.get('type', 'application/json'), body=s.get('body', '{}')))
             p.on('pageerror', lambda e, side=side: E[side].append(str(e)[:160])); p.goto(U[side])
             if C.get('ready'): p.wait_for_function(C['ready'], timeout=15000)
-            F[side] = p.evaluate(FONTS_JS); p.wait_for_timeout(C.get('settle', 800)); pg[side] = p
+            F[side] = ', '.join(x for x in p.evaluate(FONTS_JS).split(', ') if x and x.rsplit(' ', 1)[0] not in C.get('fonts_ignore', []) and ' '.join(x.split(' ')[:-2]) not in C.get('fonts_ignore', [])); p.wait_for_timeout(C.get('settle', 800)); pg[side] = p   # fonts_ignore — родини, яких порт свідомо не має (EquipLens: напис стенда Chillax → у білді контур SVG)
         ok('шрифти обох боків ті самі (підміна шрифту дала б вічні хибні ✗)', F['ref'] == F['port'], f"еталон [{F['ref']}] ⟂ порт [{F['port']}]" if F['ref'] != F['port'] else F['ref'][:80])
         for th in C.get('themes', [{'name': '—', 'js': ''}]):
             for st in C.get('states', [{'name': 'спокій', 'js': ''}]):
                 tag = f"{st['name']} · {th['name']}"; M = {}; shot = {}
                 for side, p in pg.items():
-                    p.mouse.move(vw - 2, vh - 2)
+                    p.mouse.move(VP[side][0] - 2, VP[side][1] - 2)
                     if th.get('scheme'): p.emulate_media(color_scheme=th['scheme'])   # EquipLens S40: тема за системою (білд без data-theme)
                     if th['js']: p.evaluate(th['js'])
                     if st.get('js'): p.evaluate(st['js'])
@@ -148,7 +150,7 @@ def run(scn_path, inject=False, shots=None):
         for mo in C.get('motion', []):
             Sx = {}
             for side, p in pg.items():
-                p.mouse.move(vw - 2, vh - 2)
+                p.mouse.move(VP[side][0] - 2, VP[side][1] - 2)
                 if mo.get('setup'): p.evaluate(mo['setup']); p.wait_for_timeout(500)
                 Sx[side] = p.evaluate("([t, s, f]) => { new Function(t)(); return (" + SAMPLER_JS + ")([s, f]); }", [mo['trigger'], mo['sample'], mo.get('frames', 40)])
                 p.wait_for_timeout(300)
@@ -256,8 +258,9 @@ def selftest():
     (t / 'rfit.js').write_text("document.head.insertAdjacentHTML('beforeend','<style>#r .x{color:rgb(200,0,0);margin-left:6px}#r{background-color:rgb(0,90,0)}</style>');" + mv % 200, encoding='utf-8')
     rc = scn('good'); rc['ref']['overlay'] = ['rfit.js']; rc['props'] = ['color', 'margin-left', 'background-color']; rc['motion'] = []; (t / 'rbad.json').write_text(json.dumps(rc), encoding='utf-8')
     # EquipLens S40: еталон — стенд (свій файл, телефон у рамці зі зсувом 40·30), порт — білд від краю вікна: frame + page → ✓; без frame → ✗ «x»
-    (t / 'fbase').mkdir(); (t / 'fbase' / 'stand.html').write_text(page('#f{position:absolute;left:40px;top:30px;width:300px;height:150px}').replace('<div id=r>', '<div id=f><div id=r>').replace('</div><script>', '</div></div><script>'), encoding='utf-8')
-    fc = scn('good'); fc['ref'] = {'site': 'fbase', 'page': 'stand.html', 'overlay': ['fit.js'], 'frame': '#f'}; fc['port']['frame'] = 'html'; fc['motion'] = []; (t / 'fgood.json').write_text(json.dumps(fc), encoding='utf-8')
+    # сторінка в підтеці (стенд — tools/): накладка й стилі hide мусять лягти поруч із нею; #zz лише в стенді — без hide пікселі #r розійшлись би
+    (t / 'fbase' / 'sub').mkdir(parents=True); (t / 'fbase' / 'sub' / 'stand.html').write_text(page('#f{position:absolute;left:40px;top:30px;width:300px;height:150px}#zz{position:absolute;left:0;top:0;width:200px;height:40px;background:#000}').replace('<div id=r>', '<div id=f><i id=zz></i><div id=r>').replace('</div><script>', '</div></div><script>'), encoding='utf-8')
+    fc = scn('good'); fc['ref'] = {'site': 'fbase', 'page': 'sub/stand.html', 'overlay': ['fit.js'], 'frame': '#f', 'hide': ['#zz']}; fc['port']['frame'] = 'html'; fc['motion'] = []; (t / 'fgood.json').write_text(json.dumps(fc), encoding='utf-8')
     fn = json.loads(json.dumps(fc)); del fn['ref']['frame']; del fn['port']['frame']; (t / 'fbad.json').write_text(json.dumps(fn), encoding='utf-8')
     fg, fgo = q('fgood.json'); fb_, fbo = q('fbad.json')
     rb_, rbo = q('rbad.json')
@@ -271,7 +274,7 @@ def selftest():
          ('режим «форма»: той самий рух → ✓; коротший рух (кінець 40 ⟂ 50) → ✗', not any('форма' in l for l in xs(q('shape.json')[1])) and any('форма' in l for l in xs(q('shapeb.json')[1])), ''),
          ('підказка після наведення (0,4 с, hover_wait 700, корінь optional): та сама → ✗ 0 (і в спокої, де її нема в обох); інший колір → ✗ «tp»', hg == 0 and any('tp' in l for l in xs(hbo)), hgo[-400:] + hbo[-400:]),
          ('стиль самого кореня (тло на #r лише в примірці) → ✗ «@root background-color»', any('@root background-color' in l for l in xs(rbo)), rbo[-500:]),
-         ('рамка (frame) і файл еталона (page): стенд у рамці зі зсувом ≡ білду від краю → ✗ 0; без frame → ✗ «x»', fg == 0 and any(' x:' in l for l in xs(fbo)), fgo[-500:] + fbo[-500:]),
+         ('рамка (frame) і файл еталона в підтеці (page, накладка й hide поруч зі сторінкою): стенд у рамці зі зсувом ≡ білду від краю → ✗ 0; без frame → ✗ «x»', fg == 0 and any(' x:' in l for l in xs(fbo)), fgo[-500:] + fbo[-500:]),
          ('режим «ключ»: інша швидкість, та сама функція → ✓; інша функція прозорості → ✗', not any('ключі' in l for l in xs(q('kgood.json')[1])) and any('ключі' in l for l in xs(q('kbad.json')[1])), q('kgood.json')[1][-500:] + q('kbad.json')[1][-500:])]
     n = 0
     for name, c, out in T:
