@@ -99,7 +99,9 @@ def pre(d):
     # EquipLens S40 (Konst 21.11.2026: «великі об'ємні документи… віддавати субагенту Haiku… а ти перевір його роботу, як батько дитину»):
     # Read великого файла цілком (> BIG, без limit) → правило «читач haiku» в контекст, раз на файл за сесію
     ti = d.get('tool_input') or {}; fp = ti.get('file_path') or ''
-    if tool == 'Read' and not ti.get('limit') and os.path.isfile(fp) and os.path.getsize(fp) > BIG:
+    # зображення й PDF — не текст: Read кладе в контекст картинку, а не байти файла (EquipLens S40 21.11 і 22.11: два хибні спрацювання на PNG)
+    MEDIA = ('.png', '.jpg', '.jpeg', '.webp', '.gif', '.avif', '.heic', '.pdf')
+    if tool == 'Read' and not ti.get('limit') and not fp.lower().endswith(MEDIA) and os.path.isfile(fp) and os.path.getsize(fp) > BIG:
         bm = os.path.join(MARK, f"lens-bigread-{sid}-{hashlib.md5(os.path.abspath(fp).encode()).hexdigest()[:10]}")
         if not os.path.exists(bm):
             open(bm, 'w').close()
@@ -140,6 +142,7 @@ def selftest():
              ('Bash heredoc з open(шлях у лапках) → текст (правка файла через python)', lambda: 'Одна мова' in run('Bash', {'command': "python3 - <<'PY'\nopen('site/index.html','w').write('x')\nPY"}, 's12')),
              ('Bash git commit -m «… шлях …» → тиша (згадка в повідомленні)', lambda: run('Bash', {'command': 'git add docs/a.md && git commit -m "правка поруч із site/index.html"'}, 's13') == ''),
              ('зуби (EquipLens S40): Read великого файла цілком → правило «читач haiku», раз за сесію', lambda: (open(f'{d}/big.css', 'w').write('a{b:c}\n' * 20000), 'extract_check' in run('Read', {'file_path': f'{d}/big.css'}, 'sb1'))[1] and run('Read', {'file_path': f'{d}/big.css'}, 'sb1') == ''),
+             ('Read великого зображення (PNG) цілком → тиша (не текст; EquipLens S40, хибне ×2)', lambda: (open(f'{d}/big.png', 'wb').write(b'\x89PNG' + b'0' * 400000), run('Read', {'file_path': f'{d}/big.png'}, 'sb3') == '')[1]),
              ('Read великого з limit (точково) → тиша', lambda: run('Read', {'file_path': f'{d}/big.css', 'limit': 50}, 'sb2') == ''),
              ('правило без paths — не чіпає', lambda: 'без paths' not in run('Edit', {'file_path': f'{d}/site/index.html'}, 's7'))]
     bad = 0
