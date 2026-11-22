@@ -27,7 +27,7 @@
  "pwa_icon.py selftest": 9,
  "review-remind.sh selftest": 9,
  "route-remind.sh selftest": 15,
- "rules-guard.py selftest": 17,
+ "rules-guard.py selftest": 18,
  "run-guard.sh selftest": 16,
  "shots_check.py selftest": 16,
  "shots_same.py selftest": 3,
