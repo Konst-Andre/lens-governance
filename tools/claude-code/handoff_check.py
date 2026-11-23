@@ -27,6 +27,8 @@ def git(repo, *a):
     return r.stdout.strip() if r.returncode == 0 else ''
 
 
+KOROTKO = r'^##\s+(§\s*0\.?\s*|0\.\s*)?Коротко'   # «## §0 Коротко» · «## 0. Коротко» брифу — не «## Практики коротко» (re.I ловив його: EquipLens S42, 23.11 — 2 хибні ✗ у CLAUDE_CODE.md ядра)
+
 def section(text, head_re):
     """Текст розділу «## …», чий заголовок збігся з head_re, до наступного «## »."""
     out, on = [], False
@@ -299,7 +301,7 @@ def check_repo(repo, now=None):
         if rp or not p.endswith('.md') or 'sessions/' in p or 'docs/summary/' in p: continue
         f = os.path.join(repo, p)
         if not os.path.isfile(f): continue
-        k = section(open(f, encoding='utf-8').read(), r'Коротко')
+        k = section(open(f, encoding='utf-8').read(), KOROTKO)
         if k is not None: check_paths(repo, k, f'{p} «Коротко»', L)
     # (4) історія в §0
     if s0:
@@ -367,7 +369,7 @@ def check_repo(repo, now=None):
     for p in sorted(glob.glob(os.path.join(repo, '**', '*.md'), recursive=True)):
         rel = os.path.relpath(p, repo).replace(os.sep, '/')
         if not re.search(r'(^|/)briefs/[^/]+\.md$|_brief\.md$|BRIEF[^/]*\.md$', rel) or rel.startswith('archive/') or '/archive/' in rel or 'templates/' in rel: continue
-        k = section(open(p, encoding='utf-8', errors='replace').read(), r'Коротко')
+        k = section(open(p, encoding='utf-8', errors='replace').read(), KOROTKO)
         if k is None or not all(re.search(w, k) for w in ('Стан', 'Далі', 'Чекає')):
             L.append(('✗', f'бриф {rel} не за шаблоном: нема §0 «Коротко» зі Стан · Далі · Чекає → tools/claude-code/templates/BRIEF_template.md')); continue
         last = git(repo, 'log', '-1', '--format=%H', '--', rel)
@@ -777,6 +779,7 @@ def selftest():
         ('запланований `lens/X.md` (буде) → тиша (≡ doc_health M5, AE S156)', mk(good.replace('правила — CLAUDE.md', 'прилад `lens/X.md` (буде)')), None),
         ('адреса без https:// (dash.cloudflare.com/…) — не шлях → тиша', mk(good.replace('правила — CLAUDE.md', 'посилання dash.cloudflare.com/?to=/:account/x')), None),
         ('мертвий шлях у «Коротко» плану → ✗', mk(good, {'lens/A.md': '## 0. Коротко\n- `lens/Gone.md`\n'}), 'мертві шляхи'),
+        ('розділ «Практики коротко» — не «Коротко» плану → без ✗', mk(good, {'lens/A.md': '# A\n## Практики коротко\n- `hooks/Gone.py`\n'}), '!мертві шляхи'),
         ('номер рішення двічі (В-348 ×2, AE S140) → ✗', mk(good, {'lens/DECISIONS.md': '- **В-348** · a\n- **В-348** · b\n- **В-347** · c\n'}), 'номер рішення двічі'),
         ('коміт агента після самері → ✗', mk(good, commit_after=True), 'самері відстає'),
         ('«цей коміт» у §0 → ⚠', mk(good.replace('- далі', '- цей коміт; далі')), '§0 має «цей коміт»'),
