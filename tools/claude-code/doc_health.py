@@ -84,6 +84,8 @@ def scan(root):
     found = []   # (мірка, файл, що)
     nl = sorted(f for f in files(root) if f.startswith('docs/summary/') and f.endswith('.md'))
     newest_nl = max(nl, key=lambda f: (re.findall(r'\d{4}-\d{2}-\d{2}', f) or [''])[0] + (re.findall(r'_s(\d+)\.md$', f) or ['0'])[0].zfill(3)) if nl else None
+    ss = [f for f in files(root) if f.startswith('sessions/') and 'summary' in f]   # EquipLens S42: ранній ⓘ — лише найновішому самері (попереднє вже має наступника)
+    newest_ss = max(ss, key=lambda f: int((re.findall(r'_S(\d+)', f) or ['0'])[0])) if ss else None
     for f in files(root):
         p = os.path.join(root, f)
         if not os.path.isfile(p): continue
@@ -95,7 +97,7 @@ def scan(root):
         whole = f in ('CLAUDE.md', 'tools/claude-code/PROFILE.md') or bool(WHOLE_Q.search(f)) or (f.startswith('sessions/') and 'summary' in f) or f == newest_nl   # не-Lens: лише найновіше самері читається на старті (AE S91)
         if whole and f not in ('CLAUDE.md', 'tools/claude-code/PROFILE.md') and kb > M2_KB:
             found.append(('M2', f, f'{kb:.0f} КБ > {M2_KB} — читається цілком на старті'))
-        elif whole and 'summary' in f and kb >= M2_KB * M2_EARLY:   # WARN-1 (3): ранній поріг — нове самері плануємо, а не вимушує ✗ храповика (commit_files п.14)
+        elif whole and 'summary' in f and kb >= M2_KB * M2_EARLY and (not f.startswith('sessions/') or f == newest_ss):   # WARN-1 (3): ранній поріг — нове самері плануємо, а не вимушує ✗ храповика (commit_files п.14)
             found.append(('ⓘ', f, f'самері {kb:.1f} КБ ≥ {M2_EARLY:.0%} стелі {M2_KB} — на переїзді нове самері (`sessions/README.md`)'))
         if whole: continue   # читається цілком за задумом — розмір розділу не важить, стережуть M1/M2 (перший прогін 10.10: профіль і черга — 2 хибних M3)
         for head, b in m3_sections(f, txt):
@@ -545,6 +547,8 @@ def selftest():
     for name, fs, want, part in cases:
         g, t = line(repo(fs)); ok = g == want and part in t
         print(('✓' if ok else '✗') + ' ' + name + ('' if ok else f' → {t}')); bad += not ok
+    g, t = line(repo({'sessions/X_summary_S1.md': 'ж' * 10900, 'sessions/X_summary_S2.md': 'ж' * 100})); ok = g == '✓' and 'на переїзді' not in t; bad += not ok; cases.append(None)   # EquipLens S42
+    print(('✓' if ok else '✗') + ' EquipLens S42: самері S1 21 КБ, але є новіше S2 → без ⓘ «на переїзді» (наступник уже є)' + ('' if ok else f' → {t}'))
     H = '> живе доки: пункт відкритий; закрито — файл переноситься в архів брифів\n'
     r1 = [x for x in spread(repo({'docs/A_brief.md': '# A\n' + H + '## §0\nа\n', 'docs/B_brief.md': '# B\n' + H + '## §0\nб\n'})) if x[0] == 'M15']
     r2 = [x for x in spread(repo({'docs/A_brief.md': '# A\n## §0\n' + H, 'docs/B_brief.md': '# B\n## §0\n' + H})) if x[0] == 'M15']
