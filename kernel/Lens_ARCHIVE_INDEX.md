@@ -243,6 +243,7 @@ archive/
 - `Lens_inventory_GT_v1.md` · 24.09.2026 · Lens governance · інвентар G-T перед переїздом (Ф1–Ф8): «живе доки» виконано (формула — `kernel/Lens_REPO_LAYOUT.md`); виселено з `sessions/Lens_gov/` 06.10.2026 (ХІД-8)
 - `Lens_governance_session_summary_GZ_EQUIPLENS_HOME.md` · 27.09.2026 · Lens governance · G-Z (EquipLens удома, гейт — свій репо: `G25`, `--product`; П-GZ1…3): витіснене H-C 06.10.2026 (стеля 2); §0 — закрито переїздом і ХІД-8, решта → черга ядра `GZ-1` · `PRJ-1`
 - `Lens_governance_session_summary_HB_AUDIT_MIGRATE.md` · 05–06.10.2026 · Lens governance · H-B (ціна аудиту `AUD-2` · переїзд StockCheck і QR · воркер QR з гіта): витіснене H-C 06.10.2026, §0 перенесено в H-C §0
+- `Lens_governance_session_summary_HC_DVOJE_DVEREJ.md` · 06.10.2026 · Lens governance · H-C («двоє дверей» — Claude Code і Project): витіснене самері AUDIT 23.11 з `sessions/Lens_gov/` (G10, коміт `d9be410`; рядок додала сесія EquipLens S42 — G19 IDX-13)
 - `Lens_kernel_BRIEF_SB-1_closed.md` · 19.10.2026 · Lens governance · закритий бриф `SB-1` (перепис маніфесту стендів Х0–Х7, практика N1–N8, Pareto пропусків, «Як спрацював»)
 - `Lens_kernel_BRIEF_HOOK-3.2_closed.md` · 19.10.2026 · Lens governance · закритий бриф `HOOK-3.2` (задум `handoff_check` + `handoff-remind`, зроблено 09.10) — розпил `Lens_kernel_BRIEFS.md`, AE S94
 - `Lens_kernel_BRIEF_HOOK-2.5_closed.md` · 19.10.2026 · Lens governance · закритий бриф `HOOK-2.5` (огляд UI: `ui_lint` + ворота, зроблено 10.10) — розпил `Lens_kernel_BRIEFS.md`, AE S94
