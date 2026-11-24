@@ -15,6 +15,7 @@
 | репо | ключ | власник | з | до |
 |---|---|---|---|---|
 | * | `CPU (airlens\|7 дн)` | `CF-CPU` — лікування в сесії AirLens (у сесію EquipLens і ядра не входить) | 18.11.2026 | 16.12.2026 |
+| lens-governance | `борг аудиту` | Konst — клас 1 (M19 doc_health, приклад маркера в профілі, 24.11) іде пакетом з правкою CLAUDE_CODE за Haiku-звітом; не запускати без слова | 24.11.2026 | 15.12.2026 |
 | lens-governance | `старш(і\|их) за 30 дн` | `MOTION-1` — відкладено сесією ядра AUDIT 24.11 (доручення Konst «розібрати чергу ядра»): прилад `motion_lint` будується, коли продукт дійде фази «дизайн і рух» (`kernel/Lens_MOTION-1_brief.md`); до строку — виконати, розрізати або закрити | 24.11.2026 | 15.12.2026 |
 | EquipLens | `A69 dark-твін` | ⓘ стенд заморожений 19.11 (`EquipLens:lens/BUILD-1_brief.md` §3): тема в ньому — важелями `S`, не `[data-theme]`; режим `data-theme` судить білд (`EquipLens:tools/build_smoke.js`) | 22.11.2026 | 21.12.2026 |
 | EquipLens | `контраст прийнято до рішення` | `AURORA-1` — колір «gk» (помаранч GlassKit) за каноном `EquipLens:lens/EquipLens_head_valuesLOCK.md` §4-в «як є»: 2.2–2.6:1 нижче порога; під затиск машини — лише словом Konst (питання `EquipLens:sessions/EquipLens_session_summary_S43_HANDOFF.md` §0 п.8-в) | 23.11.2026 | 22.12.2026 |
