@@ -2,7 +2,7 @@
 
 > живе доки: існує репо `Konst-Andre/sandbox` з GitHub Pages. Змінився шлях прев'ю — правиться ЦЕЙ файл, Projects перечитують його адаптером (`tools/ADAPT.md`).
 > дім: `lens-governance:tools/PREVIEW.md` · інструменти запису — `tools/CHAT_TOOLS.md`
-> версія: 1.3 · 22.11.2026 (v1.2 · 09.10.2026) · сесія LGH-3 · перенесено з `archive/superseded/Lens_github_push_protocol.md` §8 (О-5, ідея Konst G-X · форма G-Y 25.09.2026) + кроки «деплой зелений» і «промоція»
+> версія: 1.3 · 22.11.2026 (історія — §7) · сесія LGH-3 · перенесено з `archive/superseded/Lens_github_push_protocol.md` §8 (О-5, ідея Konst G-X · форма G-Y 25.09.2026) + кроки «деплой зелений» і «промоція»
 > Файл самодостатній: читається без знання Lens і без інших файлів цього репо, крім `tools/CHAT_TOOLS.md`, `kernel/Lens_sandbox_manifest.md` (синтетика, §3 п.4), (прев'ю з реальними даними, §3 п.8) `tools/cloudflare/CLOUDFLARE.md` §2 п.13 і (Claude Code, §2 крок 1) гачка `tools/claude-code/hooks/ui-review-gate.sh`.
 
 ## §1 Навіщо
