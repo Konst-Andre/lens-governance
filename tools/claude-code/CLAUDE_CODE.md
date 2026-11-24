@@ -149,7 +149,7 @@
 | ☐ | `docs/summary/<Продукт>_SUMMARY_<дата>.md` | `templates/SUMMARY_template.md` |
 | ☐ | `tools/env_check.sh` (з нагадуванням про аудит) | `templates/env_check_template.sh` |
 | ☐ | `tools/audit_prompts.sh` | `audit_prompts.sh` (як є) |
-| ☐ | `.claude/hooks/session-start.sh` + `.claude/settings.json` | `templates/session_start_template.sh` · skill `session-start-hook` |
+| ☐ | `.claude/hooks/session-start.sh` + `.claude/settings.json` | `templates/session_start_template.sh` · skill `session-start-hook`; гачок ядра ще й ставить Python-Playwright — пару до Node-Playwright образу (24.11) |
 | ☐ | тека публікації окремо від службового | `REPO_FRAME.md` §3 |
 
 ## Гачки — правила, які тримає програма, а не пам'ять моделі (`HOOK-1`, `HOOK-2`, `ARCH-1` (д); заміряно 08.10.2026)
