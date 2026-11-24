@@ -39,5 +39,5 @@
  "warn_owner.py selftest": 12,
  "webkit_ensure.sh selftest": 8,
  "ghlink.py selftest": 8,
-  "doc_drift.py selftest": 6
+  "doc_drift.py selftest": 7
 }

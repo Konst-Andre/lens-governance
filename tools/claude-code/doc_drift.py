@@ -64,10 +64,13 @@ def prompt(repo, t, ps):
             "не переказ: її перевірять пошуком. Відповідь — лише JSON-масив без тексту довкола: "
             '[{"pair": 1, "line": <номер рядка>, "verdict": "...", "quote": "...", "why": "одне речення"}]\n\n' + '\n\n'.join(blocks))
 
+def model_argv(model=MODEL, effort=EFFORT):
+    return ['claude', '-p', '--model', model, '--effort', effort, '--tools', '', '--output-format', 'json',
+            '--max-turns', '1', '--setting-sources', 'local', '--no-session-persistence']
+
 def ask(text, model=MODEL, effort=EFFORT):
     cmd = os.environ.get('LENS_DD_CMD')
-    argv = shlex.split(cmd) if cmd else ['claude', '-p', '--model', model, '--effort', effort, '--tools', '', '--output-format', 'json',
-                                         '--max-turns', '1', '--setting-sources', 'local', '--no-session-persistence']
+    argv = shlex.split(cmd) if cmd else model_argv(model, effort)
     r = subprocess.run(argv, input=text, capture_output=True, text=True, timeout=600)
     try: out = json.loads(r.stdout); res, cost = out.get('result', ''), out.get('total_cost_usd')
     except ValueError: res, cost = r.stdout, None
@@ -112,6 +115,7 @@ def selftest():
     g('add', '.'); g('commit', '-qm', 'old')
     open(f'{d}/tools/run_me.sh', 'w').write('echo "${1:?аргумент обовʼязковий}"\n'); g('commit', '-qam', 'тепер з аргументом\n\nClaude-Session: x/session_TEST')
     os.environ['LENS_DD_TAIL'] = 'TEST'
+    c('модель: haiku з effort medium явно (пропуск Konst 24.11: low обрізав міркування)', model_argv()[3:6] == ['haiku', '--effort', 'medium'])
     out, rc = run(d, dry=True); c('--dry: пара B.md ↔ tools/run_me.sh, моделі не кличе', 'B.md:2 ↔ tools/run_me.sh' in out and rc == 0)
     fake = os.path.join(d, 'fake.sh')
     def model(answer):
