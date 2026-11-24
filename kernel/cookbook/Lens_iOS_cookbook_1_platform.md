@@ -655,7 +655,7 @@ iCloud Drive, і зворотно `<input type="file">`. Прямого JS-API �
 
 # Частина C — Чек-лист deploy (перед видачею колегам)
 
-manifest валідний · 7 іконок · cache-bust `?v=` синк HTML(5)+manifest(3) · SW registered · FOUC inline ПЕРЕД CSS · theme auto/light/dark persist · `dvh` всюди · `env()` без зайвих px · bottom nav padding Safari+PWA · sheet: ×/swipe/backdrop · swipe-close grip40/content64+scrollTop · orientation lock landscape · input `font-size:16px` · pinch blocked · numeric inputmode/pattern · (Drive) keyboard handling · offline→pending→online→green · multi-device realtime · system theme live (iOS 18+) · storage event sync.
+Чек-лист deploy живе у `kernel/wsd/Lens_patch_check_protocol.md` 10.9 (переїхав 12.11.2026 — це процес, не патерн); технічні деталі пунктів — A-записи вище. Орієнтація: правило — «landscape не ламає лейаут» (не lock: воно тримається, навіть коли lock не спрацював).
 
 -----
 
