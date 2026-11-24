@@ -77,7 +77,8 @@ def targets(d):
 # such as cat or head on a single file» — code.claude.com/docs/en/memory, 12.11.2026) → лише позначка, без дубля (S142, замість InstructionsLoaded)
 NATIVE = re.compile(r'\s*(?:cd\s+[^\s;&|]+\s*&&\s*)?(?:cat|head)(?:\s+-n\s*\d+|\s+-\d+)?\s+[^\s;&|<>*]+\s*')
 
-BIG = 100 * 1024   # «великий файл» для нагадування про читача haiku: 100 КБ ≈ 25–35 тис. токенів (EquipLens S40: 177–231 КБ джерел GlassKit)
+BIG = 30 * 1024   # Read цілком > 30 КБ (≈ 9 тис. токенів: замір 24.11 — 3,4 байта на токен українського тексту) → нагадування «тип задачі» (Konst 24.11:
+                  # 100 КБ — межа можливості Read (25 тис. токенів ≈ 84 КБ), не вигоди; було 100 КБ — EquipLens S40)
 def mark(sid, rule): return os.path.join(MARK, f'lens-rules-{sid}-{hashlib.md5(rule.encode()).hexdigest()[:10]}')
 
 
@@ -105,10 +106,12 @@ def pre(d):
         bm = os.path.join(MARK, f"lens-bigread-{sid}-{hashlib.md5(os.path.abspath(fp).encode()).hexdigest()[:10]}")
         if not os.path.exists(bm):
             open(bm, 'w').close()
-            full.append(f"Великий файл ({os.path.getsize(fp) // 1024} КБ) читається цілком — він ляже в контекст сесії й лишиться там до стиснення. "
-                        "Коли треба знайти чи перенести дослівно (CSS, код, таблиці, документацію): читач — Haiku (`claude -p --model haiku --effort medium --tools \"\"`, файл у запиті; "
-                        "назви в чаті до запуску), у контекст — лише його витяг; дослівність — `python3 <ядро>/tools/claude-code/extract_check.py <витяг.md> <джерело>…`; "
-                        "2–3 місця — прочитай сам (offset/limit). Правило й ціна — `tools/claude-code/CLAUDE_CODE.md` «Велике джерело». Точкове читання — Read з offset/limit або grep.")
+            full.append(f"Файл {os.path.getsize(fp) // 1024} КБ (≈ {os.path.getsize(fp) * 10 // 34 // 1000} тис. токенів) читається цілком — ляже в контекст до стиснення. Яка задача? "
+                        "(1) огляд цілого — знайти все про X, інвентар, кандидати, перенести дослівно → Haiku-карта (субагент чи `claude -p --model haiku`; назви в чаті до запуску): "
+                        "`рядок + дослівна цитата`, ти звіряєш грепом і читаєш лише свої місця; дослівний перенос — `extract_check.py`; "
+                        "(2) правка відомого місця → grep + Read offset/limit, без Haiku (податок старту ≈ 35 тис. більший за розділ); "
+                        "(3) рішення залежить від точного тексту (правило, аудит, логіка документа) → читай сам, частинами: переказ іншої моделі тут не годиться. "
+                        "Правило — `tools/claude-code/CLAUDE_CODE.md` «Велике джерело».")
     for name, rel, body, m in sorted(due.values(), key=lambda x: len(x[2])):
         if len(body) + 300 <= room: full.append(f'Правило `{name}` діє для `{rel}` (його `paths:`), а в цій сесії ще не приходило — Claude Code вантажить його лише на Read / Edit, не на Grep чи Bash (S142). Текст:\n\n{body}'); room -= len(body) + 300; open(m, 'w').close()
         else: ptr.append(f'`{name}` ({len(body)} знаків)')
