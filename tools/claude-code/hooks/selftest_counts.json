@@ -37,6 +37,6 @@
  "ui-review-gate.sh selftest": 58,
  "version_check.py selftest": 6,
  "warn_owner.py selftest": 12,
- "webkit_ensure.sh selftest": 7,
+ "webkit_ensure.sh selftest": 8,
  "ghlink.py selftest": 8
 }

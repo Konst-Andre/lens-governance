@@ -7,6 +7,8 @@
 # наступний старт поставить нову пару сам. Новіший WebKit, ніж знає цей Playwright, не керується — «актуальна» = найновіша,
 # якою керує Playwright образу (playwright.dev/docs/browsers, 21.11.2026: після оновлення пакета — знову встановлювач).
 # Ставить у $PLAYWRIGHT_BROWSERS_PATH (образ: /opt/pw-browsers, там і Chromium) → require('playwright').webkit без змінних.
+# І Python-пакет playwright тієї ж версії (Konst 24.11.2026: «системне, що по колу із сесії в сесію, — автоматично»): одна бібліотека
+#   на обидва рушії для приладів на Python (clip · port_same · pwa_icon · pw_quiet · tester/explore); зашите число ламалось (AE S103).
 #
 #   bash webkit_ensure.sh bg        — у фоні (SessionStart диспетчера; лише CLAUDE_CODE_REMOTE=true); старт не чекає
 #   bash webkit_ensure.sh install   — встановити, якщо нема (замок flock), тоді пробний запуск; рядок стану
@@ -18,6 +20,7 @@ BR=${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}
 LOG=${LENS_WEBKIT_LOG:-/tmp/lens-webkit.log}
 ST=${LENS_WEBKIT_STATUS:-/tmp/lens-webkit.status}
 LOCK=${LENS_WEBKIT_LOCK:-/tmp/lens-webkit.lock}
+PIP=${LENS_PIP:-pip}
 
 want() {   # друкує «<rev> <версія WebKit> <версія Playwright>» або нічого
   python3 - "$PW_DIR" <<'PY' 2>/dev/null
@@ -47,6 +50,13 @@ state() {   # рядок стану без встановлення
   echo "⚠ WebKit $ver (rev $rev) нема — bash webkit_ensure.sh install (≈1 хв)"; return 1
 }
 
+pyensure() {   # Python-пакет ≡ версії Playwright образу; є — нічого (замір 24.11: pip 5 с)
+  local pv=$1
+  python3 -c "import importlib.metadata as m,sys; sys.exit(m.version('playwright')!='$pv')" 2>/dev/null && return 0
+  if timeout 120 $PIP install -q --break-system-packages "playwright==$pv" >>"$LOG" 2>&1; then echo "== Python-Playwright $pv поставлено" >>"$LOG"
+  else echo "⚠ Python-Playwright $pv не поставився — руками: pip install playwright==$pv" >>"$LOG"; fi
+}
+
 install() {
   local w rev ver pv
   w=$(want) || { state; return 0; }
@@ -65,6 +75,7 @@ install() {
     else echo "⚠ WebKit rev $rev: пробний запуск не вдався — лог $LOG" >"$ST"; fi
     rm -f "$LOCK.busy"
   fi
+  pyensure "$pv"
   cat "$ST"
 }
 
@@ -90,6 +101,8 @@ case "${1:-check}" in
     s=$(env $E bash "${BASH_SOURCE[0]}" check); chk "потрібна ревізія → ✓" "$s" "✓ WebKit 30.1 (rev 77) ≡ Playwright 9.9.0"
     echo "✓ WebKit 30.1 (rev 77) ≡ Playwright 9.9.0 — пробний запуск ✓ 12:00" >"$t/st"
     s=$(env $E bash "${BASH_SOURCE[0]}" check); chk "стан пробного запуску читається" "$s" "пробний запуск ✓"
+    printf '#!/bin/sh\necho "$@" >%s/pip.args\n' "$t" >"$t/pip"; chmod +x "$t/pip"
+    s=$(env $E LENS_PIP="$t/pip" LENS_WEBKIT_LOG="$t/log" bash "${BASH_SOURCE[0]}" install; cat "$t/pip.args" 2>/dev/null); chk "Python-пакет не тієї версії → pip playwright==<версія образу>" "$s" "playwright==9.9.0"
     s=$(env LENS_PW_DIR="$t/none" bash "${BASH_SOURCE[0]}" check); chk "нема Playwright → ⓘ, не падає" "$s" "ⓘ WebKit: Playwright образу не знайдено"
     s=$(env -u CLAUDE_CODE_REMOTE $E bash "${BASH_SOURCE[0]}" bg; echo "rc=$?"); chk "bg поза хмарою — нічого не робить" "$s" "rc=0"
     rm -rf "$t"; echo "$ok/$n"; [ "$ok" = "$n" ] ;;
