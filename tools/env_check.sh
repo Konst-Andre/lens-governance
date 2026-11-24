@@ -45,7 +45,7 @@ if [ "$debt" -gt 0 ]; then nf=$(printf '%s\n' $dfiles | sort -u | grep -c .); ag
   aud="$aud · ⚠ борг аудиту: $debt коміт(ів), $nf файл(ів), найстаріший $age дн."
   { [ "$nf" -ge 5 ] || [ "$age" -ge 7 ]; } && aud="$aud — ПОРА пакет за класом (lens-governance:tools/claude-code/templates/AUDIT_template.md)"; fi
 echo "env: github=${g:-000} cloudflare=${c:-000} · ${vars% } · гейт --gov: $gate · $aud"
-echo "$gout" | awk '/^\[G[0-9]+\]/{h=$0} /^  ⚠/{sub(/^[[:space:]]+/,""); print "⚠ гейт: " h " — " substr($0, index($0,"⚠")+4)}' | cut -c1-300   # текст ⚠ гейта окремим рядком — власника шукає warn_owner
+echo "$gout" | awk '/^\[G[0-9]+\]/{h=$0} /^  ⚠/{sub(/^[[:space:]]+/,""); sub(/^⚠ /,""); print "⚠ гейт: " h " — " $0}' | cut -c1-300   # текст ⚠ гейта окремим рядком — власника шукає warn_owner
 bash tools/claude-code/profile_check.sh   # профіль: звідки в цій сесії (як git config --show-origin) — з репо (LENS_PROFILE=1) чи з налаштувань; ACC-1 (ACCOUNT_MOVE.md)
 python3 tools/claude-code/env_drift.py --short   # середовище ⟂ аркуш tools/claude-code/ENVIRONMENT.md (ENV-1): змінні · setup script · мережа; ⚠ — з рядком, що вставити
 

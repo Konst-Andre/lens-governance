@@ -8,12 +8,12 @@ cd "$(dirname "$0")/.."
 
 # ── налаштувати під репо ──
 EXTRA_VARS=""                  # імена змінних середовища через пробіл (значення не друкуються), напр. "GROQ_KEY BOT_TOKEN"
-GATE_CMD="echo гейт не задано"  # головний гейт; останній рядок виводу — підсумок, напр. "node tools/validate.js"
+GATE_CMD="echo гейт не задано"  # головний гейт; останній рядок виводу — підсумок, чистий містить «✗ 0» (формат Lens_validate: «ПІДСУМОК: ✓ N · ⚠ N · ✗ N»); інакше exit 1, незаданий теж. Напр. "node tools/validate.js"
 SUMDIR="docs/summary"           # тека самері (продукт Lens — sessions)
 AUDITF="docs/AUDIT.md"          # журнал аудиту правил (продукт Lens — lens/<Продукт>_AUDIT.md)
 code() { curl -sS -m 10 -o /dev/null -w '%{http_code}' "$1" 2>/dev/null || true; }
 # WARN-1 (ядро): увесь вивід — через фільтр власників ⚠ ядра (`tools/claude-code/warn_owner.py`, реєстр `tools/claude-code/WARN_OWNERS.md` — рядок з ім'ям репо):
-#   ⚠ без власника / прострочене → ✗ і exit 1; прийняте → ⓘ. Себе викликає вдруге з WO_INNER=1. Зуб — ENV_INJECT=1 → «--inject ЗЛОВИВ». Ім'я репо — <Репо>.
+#   ⚠ без власника / прострочене → ✗ і exit 1; прийняте → ⓘ. Себе викликає вдруге з WO_INNER=1. Зуб — ENV_INJECT=1 → «--inject ЗЛОВИВ». Ім'я репо — назва теки клону (basename $PWD) ≡ рядок реєстру.
 WK=../lens-governance; [ -d "$WK" ] || WK=/tmp/lens-governance
 if [ -z "${WO_INNER:-}" ] && [ -f "$WK/tools/claude-code/warn_owner.py" ]; then
   out="$(WO_INNER=1 bash tools/env_check.sh "$@" 2>&1)"; rc=$?
@@ -29,8 +29,8 @@ echo "база: HEAD $(git rev-parse --short HEAD) · origin/main $(git rev-pars
 g=$(code https://api.github.com/); c=$(code https://api.cloudflare.com/client/v4/)
 vars=""; for v in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID GH_TOKEN $EXTRA_VARS; do [ -n "${!v:-}" ] && vars+="$v=так " || vars+="$v=ні "; done
 gout=$(bash -c "$GATE_CMD" 2>&1); gate=$(printf '%s\n' "$gout" | tail -1)
-printf '%s\n' "$gout" | awk '/^\[/{h=$0} /^[[:space:]]+⚠/{sub(/^[[:space:]]+/,""); print "⚠ гейт: " h " — " substr($0, index($0,"⚠")+4)}' | cut -c1-300   # текст ⚠ — окремим рядком (за «⚠ N» підсумку ховався, EquipLens S41)
-case "$gate" in *"✗ 0"*) ;; *) fail=1 ;; esac   # ✗ гейта продукту — вихід 1 (EquipLens S36, 19.11.2026: без цього ✗ гейта не червонив env_check)
+printf '%s\n' "$gout" | awk '/^\[/{h=$0} /^[[:space:]]+⚠/{sub(/^[[:space:]]+/,""); sub(/^⚠ /,""); print "⚠ гейт: " h " — " $0}' | cut -c1-300   # текст ⚠ — окремим рядком (за «⚠ N» підсумку ховався, EquipLens S41)
+case "$gate" in *"✗ 0"*) ;; *) fail=1 ;; esac   # ✗ гейта продукту — exit 1
 last=$(grep -m1 -oE "^\| 20[0-9]{2}-[0-9]{2}-[0-9]{2}" "$AUDITF" 2>/dev/null | tr -d '| ')
 if [ -n "$last" ]; then days=$(( ( $(date +%s) - $(date -d "$last" +%s) ) / 86400 )); [ "$days" -gt 30 ] && aud="аудит правил: $days дн. — ПОРА" || aud="аудит правил: $days дн. тому"; elif grep -qE "^\| [0-9]" "$AUDITF" 2>/dev/null; then aud="⚠ аудит правил: дата верхнього рядка журналу не ISO рррр-мм-дд — нагадування «30 днів» не бачить її (EquipLens S38)"; else aud="аудит правил: журналу нема"; fi
 INSTR="CLAUDE.md"                # файли інструкцій репо (skills, профіль у репо — дописати)
@@ -56,8 +56,8 @@ sm=$(git log -1 --format=%h -- "$SUMDIR" 2>/dev/null)
 if [ -z "$sm" ]; then echo "самері: — (у $SUMDIR ще нема)"
 else n=$(git rev-list --count --grep='Claude-Session' "$sm"..HEAD 2>/dev/null); [ "${n:-0}" -gt 0 ] && echo "⚠ самері відстає: після $sm комітів агента без самері — $n (git log $sm..HEAD)" || echo "самері: ≡ (останнє оновлення $sm)"; fi
 
-# браузер гейтів (wsd 1.21 п.4, AE S103) — лишити, якщо в репо є прилади Playwright: справжній запуск Chromium з Python і Node; розбіжність пакета
-#   й образу видно тут, а не падінням гейтів за 1 с через пів години (AE S103: образ дав chromium-1243, хук ставив зашите 1.56.0 під 1194)
+# браузер гейтів (wsd 1.21 п.4) — лишити, якщо в репо є прилади Playwright: справжній запуск Chromium з Python і Node; розбіжність пакета й образу
+#   видно тут, а не падінням гейтів посеред роботи.
 # pyb=$(timeout 60 python3 -c "from playwright.sync_api import sync_playwright as s
 # with s() as p: b=p.chromium.launch(); print(b.version.split('.')[0]); b.close()" 2>/dev/null) && pyb="python ✓ $pyb" || pyb="python ✗ — хук старту не поставив пару образу"
 # ndb=$(cd /tmp && timeout 60 node -e "import('/opt/node-tools/node_modules/playwright/index.mjs').then(async({chromium})=>{const b=await chromium.launch();console.log(b.version().split('.')[0]);await b.close()})" 2>/dev/null) && ndb="node ✓ $ndb" || ndb="node ✗"
@@ -67,10 +67,8 @@ else n=$(git rev-list --count --grep='Claude-Session' "$sm"..HEAD 2>/dev/null); 
 #   GitHub Pages: запит з ?cb=<час> (обхід кешу); розбіжність ≤ 15 хв після коміту в main — ⚠ «кеш Pages», не ✗ (вікно — лише без ENV_INJECT: `&& [ -z "${ENV_INJECT:-}" ]`, інакше глушить зуб) (Cache-Control max-age=600; EquipLens S36, 19.11.2026; зразок — EquipLens:tools/env_check.sh)
 echo "прод: — (додати: живий код ≡ репо; тека публікації; службове не видно — за ВМІСТОМ)"
 
-# Спільні інструменти ядра — з КЛОНУ ядра поруч ($K, як профіль вище): виклик, не копія. Клон кладе setup script v3 середовища; нема клону — рядки «ядра поруч нема»: налаштувати середовище, не обходити curl-ом
-# (lens-governance:tools/claude-code/CLAUDE_CODE.md «Гачки»: ядро серед репо сесії або /tmp/lens-governance), тож «curl | python» з main — зайвий шлях
-# виконання віддаленого коду (скрипт з гілки — ризик ланцюга постачання; випадок —
-# lens-governance:tools/claude-code/ADOPTIONS.md, рядок AE 18.10.2026).
+# Спільні інструменти ядра — з КЛОНУ ядра поруч ($K, як профіль вище): виклик, не копія. Клон кладе setup script v3+ (lens-governance:tools/claude-code/CLAUDE_CODE.md «Гачки»); нема клону — рядок «ядра поруч нема»:
+# налаштувати середовище, не обходити curl | python з main — виконання віддаленого коду з гілки, auto-режим його відхиляє (lens-governance:tools/claude-code/ADOPTIONS.md, рядок AE 18.10.2026).
 CC="$K/tools/claude-code"
 # документи — ціна читання в Claude Code (ядро DOC-1: щосесійні ≤ 200 рядків · старт ≤ 25 КБ · розділ ≤ 16 КБ · > 80 КБ з маршрутом); лише ⚠, exit 0
 if [ -f "$CC/doc_health.py" ]; then python3 "$CC/doc_health.py" .; else echo "документи: — (ядра поруч нема: $K)"; fi
@@ -88,12 +86,12 @@ if [ -f "$CC/route_check.py" ]; then
   else rc_out=$(python3 "$CC/route_check.py" check . 2>&1); rc=$?; printf '%s\n' "$rc_out" | grep -E '^(✗|⚠) ' | sed 's/^/маршрут: /'; printf '%s\n' "$rc_out" | tail -1; [ $rc -ne 0 ] && fail=1; fi
 fi
 # зуби: ENV_INJECT=1 bash tools/env_check.sh — прилади з --inject підкидають ваду й мусять дати ✗ (зразок — QR-Lens:tools/env_check.sh; аудит 24.10.2026).
-# Мітки в коді ще нема (продукт заводить версію) — рядок «⚠ версія: мітки ще нема», не ✗ (зразок — AE-Simulator:tools/env_check.sh).
+# Мітки в коді ще нема — version_check дає ✗: до першої мітки рядок вище лишити закоментованим або вписати echo "⚠ версія: мітки ще нема" (зразок — AE-Simulator:tools/env_check.sh).
 
 # Cloudflare — СПІЛЬНИЙ акаунт усіх проєктів: бюджет (запити · збірки · прогноз) і свіжість правил. Рядки «⚠» — читати й діяти
 # за lens-governance:tools/cloudflare/CLOUDFLARE.md. Скрипт лише читає й завжди exit 0. Репо без Cloudflare — прибрати цей рядок, а також c= / cloudflare= у «мережа» і CLOUDFLARE_* у vars вище.
 if [ -f "$K/tools/cloudflare/cf_budget.sh" ]; then bash "$K/tools/cloudflare/cf_budget.sh"; else echo "cloudflare: — (ядра поруч нема: $K)"; fi
 
 [ "${g:-000}" = "000" ] && exit 1
-[ "${fail:-0}" = 1 ] && exit 1   # ✗ спільного інструмента (примірка, версія) — «exit 1 — розібратись до роботи» (CLAUDE.md репо; зразок — lens-governance:tools/claude-code/templates/CLAUDE_template.md)
+[ "${fail:-0}" = 1 ] && exit 1   # fail=1 ставлять гейт, примірка, версія, маршрут — exit 1: розібратись до роботи
 exit 0
