@@ -2,7 +2,7 @@
  "brief-guard.sh selftest": 12,
  "clip.py selftest": 13,
  "commit-gate.sh selftest": 5,
- "commit_files.py selftest": 44,
+ "commit_files.py selftest": 45,
  "ctx_watch.py selftest": 45,
  "doc_health.py selftest": 67,
  "env-remind.sh selftest": 10,

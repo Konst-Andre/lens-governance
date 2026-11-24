@@ -7,7 +7,7 @@
 що додасть `git add -A` / `.` / `--all` / `-u` тієї ж команди.
 
 Що ловить (кожне — ✗, коміт зупинено; решта — тиша):
-  1. ім'я, яке Windows не створить: <>:"|?* і керівні символи, пробіл/крапка в кінці, CON PRN AUX NUL COM1–9 LPT1–9
+  1. ім'я, яке Windows не створить: <>:"|?* і керівні символи, пробіл/крапка в кінці, CON PRN AUX NUL COM1–9 LPT1–9 (і COM¹–³ LPT¹–³), «\»
      (клон на Windows ламається; pre-commit-hooks `check-illegal-windows-names`)
   2. новий файл у КОРЕНІ репо, не названий явно в `git add <ім'я>` тієї ж команди (законні нові файли в корені —
      0 за видиму історію QR і ядра; явна назва = свідомий намір, тоді тиша)
@@ -55,8 +55,8 @@ submodules (їх нема).
 """
 import os, re, subprocess, sys, json
 
-WIN_BAD = re.compile(r'[<>:"|?*\x00-\x1f]')
-WIN_RESERVED = re.compile(r'^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\..*)?$', re.I)
+WIN_BAD = re.compile(r'[<>:"|?*\\\x00-\x1f]')   # + «\» (learn.microsoft.com naming-a-file, 24.11.2026)
+WIN_RESERVED = re.compile(r'^(con|prn|aux|nul|com[1-9¹²³]|lpt[1-9¹²³])(\..*)?$', re.I)
 BIG = 1024 * 1024
 KEY = re.compile(rb'-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY')
 SECRET_NAME = re.compile(r'(^|/)(\.env(\..*)?|\.dev\.vars|id_(rsa|ed25519|ecdsa)[^/]*|[^/]*\.(pem|p12|pfx|key)|credentials\.json)$', re.I)
@@ -143,8 +143,9 @@ def check(top, cmd):
             if f.endswith('.json'):
                 json.loads(b.decode('utf-8-sig'))
             elif f.endswith('.toml'):
-                import tomllib
-                tomllib.loads(b.decode('utf-8'))
+                try: import tomllib
+                except ImportError: tomllib = None   # Python < 3.11 — перевірки TOML нема, тиша (не «зламаний синтаксис»)
+                if tomllib: tomllib.loads(b.decode('utf-8'))
         except Exception as e:
             bad.append(f'зламаний синтаксис «{f}»: {str(e)[:80]}')
         if f.endswith('.sh') or b.startswith(b'#!/bin/bash') or b.startswith(b'#!/usr/bin/env bash'):
@@ -218,15 +219,15 @@ def check(top, cmd):
             fp = os.path.join(top, f)
             if not os.path.isfile(fp): continue
             new = open(fp, encoding='utf-8', errors='replace').read()
-            if 'ratchet-ok:' in new and 'ratchet-ok:' not in subprocess.run(['git', '-C', top, 'show', 'HEAD:' + f], capture_output=True, text=True).stdout: continue
             prev = subprocess.run(['git', '-C', top, 'show', 'HEAD:' + f], capture_output=True, text=True).stdout
+            if new.count('ratchet-ok:') > prev.count('ratchet-ok:'): continue   # новий виняток — за кількістю, як copy-ok рядком (аудит 24.11: «один раз на файл» заціклював агента)
             key = lambda secs: {(h, sum(1 for x in secs[:i] if x[0] == h)): b for i, (h, b) in enumerate(secs)}   # однакові заголовки — за порядковим номером
             was = key(dh.m3_sections(f, prev)) if prev else {}
             for (h, _), b in key(dh.m3_sections(f, new)).items():
                 o = was.get((h, _), 0)
                 if b / 1024 > dh.M3_KB and b > o:
                     bad.append(f'розділ «{h[:60].strip()}» у {f}: {b / 1024:.1f} КБ > {dh.M3_KB}' + (f' і виріс на {(b - o) / 1024:.1f} КБ' if o else ' — новий') +
-                               ' (храповик, AE S156): спершу стисни розділ «як є» (закрите — в archive/ з вказівником), тоді дописуй; свідомо — <!-- ratchet-ok: причина -->')
+                               ' (храповик): спершу стисни розділ «як є» (закрите — в archive/ з вказівником), тоді дописуй; свідомо — <!-- ratchet-ok: причина -->')
     except Exception: pass   # прилад ядра недоступний — сторож мовчить, M3 скаже на старті
     # 14. храповик старту (EquipLens S41): файли, що читаються цілком, не ростуть понад стелю
     for f in sorted(x for x in changed if x.endswith('.md') and not re.search(r'(^|/)archive/', x)):
@@ -237,13 +238,13 @@ def check(top, cmd):
         if not kind or not os.path.isfile(fp): continue
         new = open(fp, encoding='utf-8', errors='replace').read()
         prev = subprocess.run(['git', '-C', top, 'show', 'HEAD:' + f], capture_output=True, text=True).stdout
-        if 'ratchet-ok:' in new and 'ratchet-ok:' not in prev: continue
+        if new.count('ratchet-ok:') > prev.count('ratchet-ok:'): continue
         cap = 24 if kind == 'журнал' else 25; nb, ob = len(new.encode()), len(prev.encode())
         if nb / 1024 > cap and nb > ob:
             cure = {'самері': 'нове самері S<N+1> (§0 — лише відкрите, закрите ✅ — рядком §1), старе — git mv в archive/summaries/ (sessions/README)',
                     'черга': 'прополка: закрите — геть з таблиці, історія — git; рядок > 2000 знаків — бриф',
                     'журнал': 'python3 <ядро>/tools/claude-code/journal_rotate.py <репо> — закриті рядки → journal/<місяць>'}[kind]
-            bad.append(f'{kind} {f}: {nb / 1024:.1f} КБ > {cap} і росте (+{(nb - ob) / 1024:.1f} КБ; храповик старту, EquipLens S41) — {cure}; свідомо — <!-- ratchet-ok: причина -->')
+            bad.append(f'{kind} {f}: {nb / 1024:.1f} КБ > {cap} і росте (+{(nb - ob) / 1024:.1f} КБ; храповик старту) — {cure}; свідомо — <!-- ratchet-ok: причина -->')
     # 10. шапка наявного приладу змінилась, карта — ні (AE S104)
     head_re = re.compile(r'(Запуск|Usage|Вихід|живе доки)\s*:', re.I)
     for f in sorted(changed - added):
@@ -387,6 +388,7 @@ def selftest():
         open(sf, 'a').write('| 91 | ще хід |\n'); say(len(S14()) == 1 and 'S<N+1>' in S14()[0], 'храповик старту: самері > 25 КБ росте → ✗ з ліками «нове самері» (S40 — 132 КБ)')
         open(sf, 'w').write('# S9\n' + 'ж\n' * 13000); say(S14() == [], 'храповик старту: самері зменшилось → тиша')
         open(sf, 'w').write('# S9\n' + 'ж\n' * 13500 + 'ще <!-- ratchet-ok: перенос -->\n'); say(S14() == [], 'храповик старту: ratchet-ok → тиша')
+        g('add', '-A'); g('-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'з маркером'); open(sf, 'a').write('ще рядок <!-- ratchet-ok: другий перенос -->\n'); say(S14() == [], 'храповик старту: другий ratchet-ok у файлі, де вже є маркер → тиша (аудит 24.11)')
         g('checkout', '--', 'sessions/P_session_summary_S9_X.md')
         open(d + '/lens/P_CHERGA.md', 'w').write('ж\n' * 13500); say(len(S14()) == 1 and 'прополка' in S14()[0], 'храповик старту: нова черга > 25 КБ → ✗ (черга ядра — 39 КБ)')
         os.remove(d + '/lens/P_CHERGA.md')
