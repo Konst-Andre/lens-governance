@@ -6,7 +6,7 @@
 #   граф зв'язків → підозрілі розділи → LLM-верифікатор; режим `--suspects-only` без моделі = наш `--dry`), understandingdata.com «Doc Drift
 #   Detection in CI»; «LLM не годиться як самостійний детектор дрейфу» (arxiv 2604.03447) → Haiku лише позначає, вирок — Opus, читаючи свої рядки.
 #   Не беремо: автоправки (DocPulse комітить сам) — правка опису йде звичайним ходом агента.
-# Відбір пар — `handoff_check.stale_docs` (одне правило з ⚠ ревізії). Модель — haiku effort low, без інструментів, один виклик на всі пари
+# Відбір пар — `handoff_check.stale_docs` (одне правило з ⚠ ревізії). Модель — haiku effort medium (замовчування; low — лише механіка), без інструментів, один виклик на всі пари
 #   (податок старту ≈ 17 тис. без інструментів — замір 24.11); цитата, якої нема в описі дослівно, — «?», не ⚠ (зуб на вигадку моделі).
 # Запуск:  python3 tools/claude-code/doc_drift.py run [<репо>] [--dry] [--max N]   (перед run — у чат: модель · effort · навіщо)
 #          python3 tools/claude-code/doc_drift.py selftest
@@ -15,7 +15,7 @@ import json, os, re, shlex, subprocess, sys, tempfile
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import handoff_check as hc
 
-MODEL, EFFORT, MAX = 'haiku', 'low', 25
+MODEL, EFFORT, MAX = 'haiku', 'medium', 25   # medium — замовчування Haiku; звірка — судження, не механіка (Konst 24.11: «low обрізав їй міркування»)
 VERDICTS = ('суперечить', 'застаріло', 'ок', 'не стосується')
 
 def tail():
