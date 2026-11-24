@@ -252,6 +252,23 @@ def mine_tail():
     return sid.split('_', 1)[1] if '_' in sid else ''
 
 
+def stale_docs(repo, tail):
+    """(6) пари «опис ↔ код»: код, змінений комітами сесії `tail`, і живі .md, що його згадують, а сесія їх не міняла.
+    Спільна для `handoff_check` (⚠ «описи») і `doc_drift.py` (Haiku-звірка цих пар) — правило відбору в одному місці."""
+    ch = [x for x in git(repo, 'log', f'--grep=session_{tail}', '--name-only', '--format=').split('\n') if x]
+    code = sorted({x for x in ch if not x.endswith('.md') and not x.startswith(('sessions/', 'docs/summary/', 'archive/')) and os.path.isfile(os.path.join(repo, x))})
+    touched = {x for x in ch if x.endswith('.md')}
+    docs = [d for d in git(repo, 'ls-files', '*.md').split('\n') if d and not d.startswith(('sessions/', 'docs/summary/', 'archive/')) and '/journal/' not in d]   # журнал — знімок, не опис (24.11)
+    stale = {}
+    for d in docs:
+        if d in touched: continue
+        try: t = open(os.path.join(repo, d), encoding='utf-8').read()
+        except OSError: continue
+        hits = [c for c in code if c in t or (len(os.path.basename(c)) >= 8 and os.path.basename(c) in t)]
+        if hits: stale[d] = hits
+    return code, stale
+
+
 def check_repo(repo, now=None):
     now = now or time.time()
     repo = os.path.abspath(repo)
@@ -318,17 +335,7 @@ def check_repo(repo, now=None):
     # (6) описи відстали від змін (уточнення Konst 09.10, CC-6: README був прикладом, суть — «новий агент не зрозуміє»):
     # код, змінений комітами цієї сесії → усі .md, що його згадують (README · ARCHITECTURE · план · INDEX · CLAUDE.md …), а сесія їх не міняла → ⚠ перевір
     if tail:
-        ch = [x for x in git(repo, 'log', f'--grep=session_{tail}', '--name-only', '--format=').split('\n') if x]
-        code = sorted({x for x in ch if not x.endswith('.md') and not x.startswith(('sessions/', 'docs/summary/', 'archive/')) and os.path.isfile(os.path.join(repo, x))})
-        touched = {x for x in ch if x.endswith('.md')}
-        docs = [d for d in git(repo, 'ls-files', '*.md').split('\n') if d and not d.startswith(('sessions/', 'docs/summary/', 'archive/'))]
-        stale = {}
-        for d in docs:
-            if d in touched: continue
-            try: t = open(os.path.join(repo, d), encoding='utf-8').read()
-            except OSError: continue
-            hits = [c for c in code if c in t or (len(os.path.basename(c)) >= 8 and os.path.basename(c) in t)]
-            if hits: stale[d] = hits
+        code, stale = stale_docs(repo, tail)
         # вузловий файл (його згадують > 4 описів, що не мінялись) — згадки довідкові: один рядок ⓘ замість ⚠ на кожен документ
         # (еволюція гачка 10.10: Lens_validate.py дав ⚠ на 10 документів ядра — шум; слово Konst «гачок має самопокращуватись»)
         cnt = {c: sum(c in v for v in stale.values()) for c in code}
@@ -339,7 +346,7 @@ def check_repo(repo, now=None):
         if stale:
             top = sorted(stale, key=lambda d: -len(stale[d]))[:6]
             L.append(('⚠', 'описи, що згадують змінений у сесії код, але не мінялись: ' + ' · '.join(f"{d} ({', '.join(os.path.basename(c) for c in stale[d][:3])})" for d in top) +
-                      (f' (+{len(stale) - 6})' if len(stale) > 6 else '') + ' — перевір, чи новий агент не піде за протухлим описом'))
+                      (f' (+{len(stale) - 6})' if len(stale) > 6 else '') + ' — перевір, чи новий агент не піде за протухлим описом (звірка Haiku: `python3 <ядро>/tools/claude-code/doc_drift.py run`)'))
         elif code: L.append(('✓', f'описи змін сесії оновлено (код: {len(code)} файлів)'))
     # (8) кандидат у бриф (BRIEF-1, розширення 10.10): id відкритої черги згадано в самері ≥ N_BRIEF різних сесій, а брифу / плану з цим id нема.
     #     BRIEF-2 5б–5в (AE S94, заміри на AE): поріг 3 → 2 (= шаблон); id з літерами (`AE-PORT`) раніше були невидимі; «бриф є» = id у назві
