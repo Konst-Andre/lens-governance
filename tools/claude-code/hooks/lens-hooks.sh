@@ -1,6 +1,6 @@
 #!/bin/bash
 # живе доки: гачки Lens вмикаються через налаштування користувача (tools/claude-code/CLAUDE_CODE.md «Гачки»).
-# Диспетчер: setup script середовища (v4, tools/claude-code/ENVIRONMENT.md §3) реєструє ВСІ 9 подій без фільтра інструментів на обгортку ~/.claude/lens-hooks.sh, а та кличе цей файл (HOOK-4).
+# Диспетчер: setup script середовища (tools/claude-code/ENVIRONMENT.md §3, версія — у заголовку) реєструє ВСІ 9 подій без фільтра інструментів на обгортку ~/.claude/lens-hooks.sh, а та кличе цей файл (HOOK-4).
 # Новий гачок на одну з 9 подій — рядок тут (подія → файл, фільтр інструмента — тут же), setup script не чіпати; нова подія поза 9 — тоді й setup script.
 # Аргумент — подія (setup script v2–v4) або старе ім'я v1 (pre · post · stop — середовища з текстом 08.10 працюють і далі):
 #   pre  | PreToolUse          — Write|Edit|Bash: по черзі run-guard (фоновий прогін судить теку — не правити, AE S156) · brief-guard (BRIEF-2) · ui-guard check · commit-gate · ui-review-gate (HOOK-2 п.4) · review-remind stand — перший з відповіддю (deny/ask) перемагає; далі rules-guard (S142) — останнім. Read|Grep|Glob — лише rules-guard
