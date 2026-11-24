@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # ctx_watch.py · гачок ядра (чернетка FAB-2 AE S140 `AE-Simulator:docs/fab/drafts/ctx_watch.py` → перенесено AE S141, «так» Konst 12.11.2026, В-352)
-# живе доки: діє правило «ревізія → /compact» (`tools/claude-code/CLAUDE_CODE.md` «Практики») і поріг контексту нічної зміни (`tools/claude-code/NIGHT_SHIFT.md` §3);
+# живе доки: діє правило «ревізія на порозі, стиснення — автоматичне» (`tools/claude-code/CLAUDE_CODE.md` «Практики»; /compact агент не просить — Konst 21.11, підтверджено 24.11) і поріг контексту нічної зміни (`tools/claude-code/NIGHT_SHIFT.md` §3);
 #   виклик — диспетчер `hooks/lens-hooks.sh` (UserPromptSubmit · PostToolUse Bash після `git commit` · SessionStart compact).
 # Що робить: лічить контекст із журналу сесії й каже, коли пора ревізія — раніше, ніж Claude Code стисне сам. Нічого не блокує («тінню», FAB-2 рядок 4).
 #   контекст = остання відповідь основної гілки: usage.input + cache_read + cache_creation (формула statusline). Звірено AE S141: 371 612 проти
@@ -164,11 +164,11 @@ def verdict(n, now, event):
     k = lambda x: f'{x // 1000} тис.'
     tail = f"(стиснення на {k(n['t'])}, ревізія на {k(n['r'])}; найбільший крок {k(n['step'])} — ctx_watch)"
     if event == 'UserPromptSubmit' and gap > ttl and ctx >= SOFT:
-        return f"⚠ кеш холодний (пауза {gap / 60:.0f} хв > {ttl // 60}) · контекст {k(ctx)} — перший запит перепише його весь. Ревізію зроблено → нова сесія зі стартового; ні → коротка ревізія → /compact {tail}"
+        return f"⚠ кеш холодний (пауза {gap / 60:.0f} хв > {ttl // 60}) · контекст {k(ctx)} — перший запит перепише його весь. Ревізію зроблено → нова сесія зі стартового; ні → ревізія однаково (Konst 24.11) → рядок «ревізію зроблено»; /compact — рішення Konst {tail}"
     if ctx >= n['r']:
-        return f"⚠ контекст {k(ctx)} ≥ порога ревізії — зараз: ревізія (усе в коміти, самері §0) → вдень запропонуй Konst /compact, вночі — далі за NIGHT_SHIFT §3 {tail}" + cap(n)
+        return f"⚠ контекст {k(ctx)} ≥ порога ревізії — зараз: ревізія (усе в коміти, самері §0) → працюй далі: стиснення — автоматичне, /compact не проси (Konst 21.11); вночі — за NIGHT_SHIFT §3 {tail}" + cap(n)
     if event == 'UserPromptSubmit' and ctx >= n['soft']:
-        return f"ⓘ контекст {k(ctx)} — на найближчій межі предмета: ревізія → /compact {tail}" + cap(n)
+        return f"ⓘ контекст {k(ctx)} — на найближчій межі предмета: ревізія (стиснення прийде саме) {tail}" + cap(n)
     if event == 'UserPromptSubmit':   # В-353: рядок щоповідомлення — маркер навантаження береться з нього, без окремого виклику інструмента
         return f"контекст {k(ctx)} · {ctx * 100 // n['w']}% вікна {k(n['w'])} · ревізія на {k(n['r'])} · стиснень у сесії {n['comp']} (ctx_watch)" + cache(n, now) + cap(n)
     return None
@@ -224,7 +224,7 @@ def hook(inp, now=None):
         if v and v.startswith(('⚠ контекст', '⚠ кеш холодний')): v += revise()   # REV-1: на порозі — та сама ревізія, що й на слово Konst (і вночі: після коміту)
         if ev == 'UserPromptSubmit' and os.path.exists(inp.get('transcript_path') or ''):   # В-364 п. 2: ліміти — лише на повідомлення Konst, не після коміту
             v = (v or 'ctx_watch') + lim(inp.get('transcript_path', ''), now or time.time()) + \
-                '\nмаркер (S147) — наприкінці відповіді: list_events kinds ["rate_limit_event"] → python3 <ядро>/tools/claude-code/hooks/ctx_watch.py marker "<причина>" → останній рядок звіту як є'
+                '\nмаркер (S147) — наприкінці відповіді: list_events kinds ["rate_limit_event"] → python3 <ядро>/tools/claude-code/hooks/ctx_watch.py marker "<причина>" → останнім блоком звіту як є (4 рядки, вигляд Б)'
     return json.dumps({'hookSpecificOutput': {'hookEventName': ev, 'additionalContext': v}}, ensure_ascii=False) if v else ''
 
 def selftest():
@@ -248,6 +248,7 @@ def selftest():
     case('120 тис. після коміту — тиша', v(tr('a2', [a(120_000)]), 'PostToolUse') is None)
     case('260 тис. — ⓘ межа предмета', (v(tr('b', [a(260_000)])) or '').startswith('ⓘ'))
     case('320 тис. (> 395,6 − 55 − 25 = 315,6) — ⚠ ревізія зараз', (v(tr('c', [a(320_000)])) or '').startswith('⚠ контекст'))
+    case('поріг ревізії: /compact не просить (Konst 21.11 · 24.11)', '/compact не проси' in (v(tr('c', [a(320_000)])) or ''))
     p = tr('d', [a(100_000, commit=True), a(190_000, commit=True), a(300_000)])
     case('крок 90 тис. між комітами → поріг ревізії 280,6 тис.; 300 тис. — ⚠', numbers(p)['r'] == 280_600 and (v(p) or '').startswith('⚠ контекст'))
     p = tr('e', [a(100_000, commit=True), a(300_000, commit=True), {'type': 'system', 'subtype': 'compact_boundary'}, a(110_000, commit=True), a(120_000)])

@@ -56,6 +56,12 @@ env_all() {   # $1 — ідентифікатор сесії
   awk '/^── /||!s[$0]++' "$o" > "$o.t" 2>/dev/null && mv "$o.t" "$o"   # однаковий рядок двох репо (спільний Cloudflare) — один раз
   [ -s "$o" ] || printf 'env_check: ⚠ / ✗ нема (репо:%s)\n' "$names" >> "$o"
 }
+# Копія ядра поза репо сесії (/tmp/lens-governance: setup script клонує її раз, коли збирає контейнер) — fast-forward з main на кожному старті
+# й стисненні (24.11.2026, Konst «новий маркер — і в Routes»: живий контейнер жив зі старою копією, правка ядра до нього не доходила). ≤ 10 с, мовчки;
+# ядро серед репо сесії — робоча копія агента, не чіпаємо (там правило ядра: git pull перед правкою). Зуби — start-test «копія ядра».
+# Практика (24.11.2026): pull на старті з короткою стелею й вимикачем — Wyren (ssm-08.github.io/wyren/reference/hooks: 1,5 с, WYREN_SKIP_PULL);
+#   не беремо тротлінг (agentteamland: раз на 30 хв — у нас лише старт і стиснення) і --rebase (chezmoi — копія лише для читання). Заміряно: 0,3 с.
+kpull() { [ -n "${LENS_NO_KPULL:-}" ] && return 0; case "$1" in "${LENS_REPOS_ROOT:-/home/user}"/*) return 0;; esac; [ -d "$1/.git" ] || return 0; timeout 10 git -C "$1" pull -q --ff-only >/dev/null 2>&1 || true; }
 if [ "$ev" = start-test ]; then export LENS_NO_SELFTEST=1   # AE S143: старти тесту не запускають фоновий прогін усіх selftest (було 9 процесів)   # зуби FAB-1: пауза не дублює профіль · стиснення повторює · env_check у файл і в перше повідомлення · текст для стиснення
   t=$(mktemp -d); mkdir -p "$t/repos/a/tools" "$t/repos/b/tools" "$t/repos/c"; bad=0
   printf 'echo "база: ok"\necho "env: гейт ✓19 · ⚠24 · ✗0"\necho "⚠ тест: увага"\necho "✗ тест: червоне"\necho "гейт: ✓ 5 · ✗ 3 — глянь"\necho "⚠ спільне: хмара"\n' > "$t/repos/a/tools/env_check.sh"; printf 'echo "усе гаразд"\necho "⚠ спільне: хмара"\n' > "$t/repos/b/tools/env_check.sh"
@@ -94,10 +100,17 @@ open(sys.argv[1],"w").write(json.dumps(r[0])+"\n"); open(sys.argv[2],"w").write(
   ok "$o" "АВТОСТИСНЕННЯ ВІДКЛАДЕНО" "400 тис." "430 тис." && [ -z "$o2" ] && echo "✓ відкладене автостиснення: агент чує на Edit, повтор без нової спроби — тиша" || { echo "✗ відкладене автостиснення: «$(printf '%s' "$o" | cut -c1-120)» · повтор «$(printf '%s' "$o2" | cut -c1-60)»"; bad=1; }
   sleep 1; touch "$t/nf"; o="$(printf '{"session_id":"c5","hook_event_name":"UserPromptSubmit","prompt":"далі"}' | env $e LENS_HELD="$t/none-held" LENS_FLAG="$t/nf" LENS_MARK_DIR="$t" LENS_REPOS_ROOT="$t/repos" LENS_ENV_DIR="$t" bash "${BASH_SOURCE[0]}" UserPromptSubmit)"
   ok "$o" "Konst пробував /compact" && [ ! -e "$t/nf" ] && echo "✓ зупинений /compact: агент чує на наступне повідомлення, позначку знято" || { echo "✗ зупинений /compact: «$(printf '%s' "$o" | cut -c1-120)»"; bad=1; }
+  # 24.11.2026: копія ядра в /tmp тягнеться з main; ядро серед репо сесії — ні
+  git init -q "$t/o" && git -C "$t/o" -c user.email=t@t -c user.name=t commit -q --allow-empty -m a && git clone -q "$t/o" "$t/copy" && git clone -q "$t/o" "$t/repos/kern"
+  git -C "$t/o" -c user.email=t@t -c user.name=t commit -q --allow-empty -m b; want="$(git -C "$t/o" rev-parse HEAD)"
+  LENS_REPOS_ROOT="$t/repos" kpull "$t/copy"; LENS_REPOS_ROOT="$t/repos" kpull "$t/repos/kern"
+  [ "$(git -C "$t/copy" rev-parse HEAD)" = "$want" ] && echo "✓ копія ядра поза репо сесії: підтягнуто з main" || { echo "✗ копію ядра не підтягнуто"; bad=1; }
+  [ "$(git -C "$t/repos/kern" rev-parse HEAD)" != "$want" ] && echo "✓ ядро серед репо сесії: не чіпаємо (робоча копія агента)" || { echo "✗ kpull чіпав робочу копію агента"; bad=1; }
   rm -rf "$t"; exit $bad
 fi
 if [ "$ev" = SessionStart ] || [ "$ev" = profile-test ]; then
   ss_in=""; [ "$ev" = SessionStart ] && ss_in="$(cat 2>/dev/null)"   # JSON події — читаємо ПЕРШИМ: хук репо міг би з'їсти stdin
+  [ "$ev" = SessionStart ] && kpull "$(cd "$h/../../.." && pwd)"   # 24.11.2026: копія ядра в /tmp — свіжа з main (профіль і маркер беруться вже з неї)
   [ "$ev" = SessionStart ] && repo_hooks
   [ "$ev" = SessionStart ] && [ -z "${LENS_NO_SELFTEST:-}" ] && python3 "$h/selftest_all.py" bg 2>/dev/null   # AE S143: усі selftest у фоні (~60 с, старт не чекає); ✗ — у handoff_check і після першого коміту
   [ "$ev" = SessionStart ] && [ -z "${LENS_NO_WEBKIT:-}" ] && bash "$h/../webkit_ensure.sh" bg 2>/dev/null   # EquipLens S40: WebKit (родина Safari) — сам, як Chromium; лише в хмарі, у фоні (≈15 с), пара до Playwright образу
