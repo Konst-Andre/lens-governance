@@ -20,6 +20,7 @@
 set -u
 cls="${1:-}"; shift || true
 case "$cls" in 1) models="opus";; 2) models="opus sonnet";; *) echo "перший аргумент — клас правки 1 або 2 (клас 0 — без аудиту)"; exit 2;; esac
+[ -n "${AUDIT_MODELS:-}" ] && models="$AUDIT_MODELS"   # явний вибір моделей (Konst 25.11, EquipLens S45: «вирішиш сам, яку модель» — ліміти); назвати в чаті до запуску
 [ -n "${AUDIT_THIRD:-}" ] && models="$models $AUDIT_THIRD"
 [ $# -ge 1 ] || { echo "вкажіть файл(и)"; exit 2; }
 for f in "$@"; do [ -f "$f" ] || { echo "нема файла: $f"; exit 2; }; done

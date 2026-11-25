@@ -35,7 +35,7 @@ def rotate(root, dry=False, today=None):
     if not dry:
         os.makedirs(os.path.dirname(ap), exist_ok=True)
         old = open(ap, encoding='utf-8').read().rstrip('\n') if os.path.isfile(ap) else \
-            f'# Журнал гачків і перевірок — {d:%m.%Y} (ротація з `{J}` §1)\n\nживе доки: живий журнал гачків ядра (історія; нові рядки — лише в HOOK_JOURNAL.md).'
+            f'# Журнал гачків і перевірок — {d:%m.%Y} (ротація з `{J}` §1)\n\nживе доки: живий журнал гачків ядра (історія; нові рядки — лише в HOOK_JOURNAL.md).\nчитається коли: грепом за назвою перевірки чи `session_…` — цілком не читати (M21 doc_health).'
         open(ap, 'w', encoding='utf-8').write(old + f'\n\n## Рядки з §1 — ротація {d:%d.%m.%Y} (машиною, journal_rotate)\n\n'
                                               '| дата | сесія · репо | перевірка | вердикт | що змінено (коміт · тест) |\n|---|---|---|---|---|\n' + '\n'.join(rows) + '\n')
         open(jp, 'w', encoding='utf-8').write(out)
@@ -58,6 +58,7 @@ def selftest():
                  ('відкритий кандидат лишився', 'S2 ' in live and 'S2 ' not in arc),
                  ('рядок живої сесії лишився (його вердикти судить handoff_check тут)', 'S41' in live and 'S41' not in arc),
                  ('шапка таблиці §1 на місці', '| дата | сесія |' in live),
+                 ('новий архів місяця — зі способом читання в шапці (M21)', 'читається коли' in arc),
                  ('зведення каже, скільки перенесено й лишилось', 'перенесено 2 · лишилось 2' in msg)]
         msg2, _ = rotate(tmp, today=datetime.date(2026, 11, 22))
         cases.append(('повтор — закритих нема, нічого не міняє', 'закритих рядків нема' in msg2))
