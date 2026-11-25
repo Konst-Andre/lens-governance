@@ -7,6 +7,8 @@
 it to read the file» (code.claude.com/docs/en/hooks «JSON output», 22.10.2026). Профіль із шапкою — 12 198 знаків: з
 LENS_PROFILE=1 сесії бачили лише прев'ю. Кожен рядок міряється окремо — тож частина 1 іде в SessionStart, частина 2 —
 у перше повідомлення Konst (UserPromptSubmit); після стиснення розмови SessionStart(compact) повторює обидві.
+Шапка файла (до «```text»: правка, розмір, версія, «де діє») у сесію не йде — це довідка для того, хто правит профіль, не правило
+роботи (−3 044 знаки щосесії; 💡 аудиту v23, вирок агента 25.11.2026 — Konst делегував); її єдине правило агентові — рядком у HEAD.
 
   python3 profile_parts.py 1|2            — текст частини (різ — по межі рядка, частина 1 ≤ PART1)
   python3 profile_parts.py merge '<json>' — stdin: частина 2; аргумент: вивід інших гачків prompt (може бути порожнім) → один JSON
@@ -18,11 +20,18 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 PROFILE = os.path.join(HERE, "..", "PROFILE.md")
 CAP, PART1 = 10000, 9000      # стеля Claude Code · запас частині 1 під заголовок; частині 2 — під текст інших гачків prompt
 HEAD = ("ПРОФІЛЬ KONST (з репо ядра, бо поле профілю цього акаунта — лише ядро або чуже; діє як user preferences — "
-        "мова, цикл, звіт, маркер). Частина {n}/2{tail}:\n\n")
+        "мова, цикл, звіт, маркер; шапка — у lens-governance:tools/claude-code/PROFILE.md: правиш профіль чи Konst кинув текст поля "
+        "акаунта — звір із файлом). Частина {n}/2{tail}:\n\n")
 
 
 def full():
     return open(PROFILE, encoding="utf-8").read()
+
+
+def body(t=None):
+    """Те, що йде в сесію: від «```text» до кінця (шапка — лише у файлі); нема маркера — увесь текст."""
+    t = full() if t is None else t; i = t.find("\n```text")
+    return t[i + 1:] if i >= 0 else t
 
 
 def split(t, limit=PART1):
@@ -36,7 +45,7 @@ def split(t, limit=PART1):
 
 
 def part(k, t=None):
-    p1, p2 = split(t if t is not None else full())
+    p1, p2 = split(body(t))
     return (HEAD.format(n=1, tail=" — продовження в першому повідомленні Konst") + p1) if k == 1 else \
            (HEAD.format(n=2, tail=" (початок — у контексті старту сесії)") + p2)
 
@@ -68,10 +77,11 @@ def version_ok(t):
 def test():
     t, bad = full(), 0
     p1, p2 = part(1, t), part(2, t)
-    a, b = split(t)
+    a, b = split(body(t))
     checks = [(f"частина 1 ≤ {CAP} знаків ({len(p1)})", len(p1) <= CAP),
               (f"частина 2 + текст інших гачків ≤ {CAP} ({len(p2)} + запас {CAP - len(p2)})", len(p2) <= CAP - 1500),
-              ("разом ≡ повному профілю (нічого не загублено)", a + b == t),
+              ("разом ≡ тілу профілю від «```text» (нічого не загублено)", a + b == body(t) and body(t).startswith("```text")),
+              ("шапка файла в сесію не йде (−3 тис. знаків)", "> **Розмір:**" not in p1 + p2 and "```text" in p1),
               ("різ — по межі рядка", a.endswith("\n") or not b),
               ("зуби: профіль 25 000 знаків → частина 2 понад стелю ловиться", len(part(2, "x\n" * 12500)) > CAP - 1500),
               ("рядок версії — лише поточна версія (без історії в шапці)", version_ok(t)),

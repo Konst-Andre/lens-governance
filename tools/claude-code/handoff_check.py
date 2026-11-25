@@ -648,7 +648,11 @@ def seal_ok(rs):
 
 def rev_table(rs):
     """`revision --table`: таблиця ревізії з git log сесії (що · коміт); «дім» дописує агент."""
-    rows = [f"| {subj[:90].replace('|', '/')} | ? | {os.path.basename(r)} `{h}` |" for r in rs for h, subj, _ in reversed(session_log(r))]
+    try:   # 💡 аудиту 24.11 (вирок агента 25.11, Konst делегував): коміт — посиланням GitHub (ghlink), без origin чи не запушено — текстом
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from ghlink import link
+    except Exception: link = None
+    ln = lambda r, h: ((link(r, h)[0] if link else None) or f'`{h}`')
+    rows = [f"| {subj[:90].replace('|', '/')} | ? | {os.path.basename(r)} {ln(r, h)} |" for r in rs for h, subj, _ in reversed(session_log(r))]
     return '| що | дім | коміт |\n|---|---|---|\n' + ('\n'.join(rows) if rows else '| (комітів сесії нема) | — | — |')
 
 ENV_BAD = re.compile(r'^\s*✗|✗ ?[1-9]')   # ✗-частина фільтра env_all гачка старту (hooks/lens-hooks.sh): рядок з ✗ або «✗ N», N > 0; «✗ 0» — не тривога
