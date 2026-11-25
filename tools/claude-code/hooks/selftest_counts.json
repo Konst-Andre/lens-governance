@@ -7,7 +7,7 @@
  "ctx_watch.py selftest": 45,
  "doc_drift.py selftest": 7,
  "doc_health.py selftest": 69,
- "doc_prune.py selftest": 10,
+ "doc_prune.py selftest": 15,
  "env-remind.sh selftest": 10,
  "env_drift.py selftest": 7,
  "extract_check.py selftest": 6,

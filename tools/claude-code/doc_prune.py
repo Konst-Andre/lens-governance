@@ -8,7 +8,8 @@
 #   (б) НА СТЕЛІ (файл ≥ 90 % стелі M2): ⚠ і п'ять найдовших відкритих рядків з позначкою, чи є свій бриф `<id>_brief.md` →
 #       агент стискає рядок до «стан + вказівник на бриф» тим самим ходом, теж без питання (правило — ця шапка; рядок у CLAUDE_CODE.md «Що тут лежить»).
 #       Мірило Adobe ai-repo-harness-guide гл.04 (25.11.2026): файл судять, коли він і завеликий, і не виводить назовні; у нас — довгий рядок без брифу.
-# Світ (25.11.2026): Obsidian task-archiver (виконане — з розділом), tada (todo.txt → done.txt, нічого не пише, коли нема що); власний зразок — journal_rotate.py.
+# Світ (25.11.2026): Obsidian task-archiver (виконане — з розділом), tada (todo.txt → done.txt, нічого не пише, коли нема що; на місці — порожній рядок); власний зразок — journal_rotate.py.
+#   Слід прибраного — один рядок `<!-- doc_prune: прибрано … -->` у кінці черги, щоразу заміна (гейт `Lens_validate` «зник без сліду»; SYN-1 №1).
 # Не беремо: запуск за розкладом — ми працюємо сесіями, тригер — закриття й розмір. На старті — лише `--dry` (env_check); пише файл агент у ході коміту.
 #   python3 doc_prune.py <репо> [--dry] [--inject]   → рядок на чергу: «прополка <шлях>: прибрано N (`id`…) · X → Y Б (Z % стелі)» (або «закритих нема»)
 #     + ⚠ на стелі; exit 0 (--inject: 1, якщо підкинутий закритий не прибрано)
@@ -19,6 +20,7 @@ from doc_health import M2_KB   # аудит sonnet 25.11 №7: одна стел
 
 CAP, NEAR = M2_KB * 1024, 0.90
 CLOSED = re.compile(r'✅|(?<!не )(?<!ще не )\bзакрито\b', re.I)   # аудит sonnet 25.11 №4: «не закрито» — відкрите, не чіпати
+MARK = re.compile(r'\n*<!-- doc_prune: прибрано [^\n]*-->\n?')
 DATE = re.compile(r'(\d{1,2})\.(\d{1,2})(?:\.(\d{4}))?')
 
 
@@ -59,7 +61,10 @@ def prune_text(t):
             continue
         k += 1
     out = '\n'.join(l for i, l in enumerate(ls) if i not in {d[0] for d in drop})
-    return out, [d[1] for d in sorted(drop)], sorted(longest, reverse=True)[:5]
+    gone = [d[1] for d in sorted(drop)]
+    if gone:   # SYN-1 №1: Lens_validate ✗ «зник без сліду», якщо id не згадано в черзі; один машинний рядок на партію, щоразу заміна (гейт звіряє лише з HEAD; tada лишає порожній рядок на кожен — нам потрібен id)
+        out = MARK.sub('', out).rstrip('\n') + f"\n\n<!-- doc_prune: прибрано {datetime.date.today():%d.%m.%Y} — {' '.join(f'`{g}`' for g in gone)}; історія — git log -p -->\n"
+    return out, gone, sorted(longest, reverse=True)[:5]
 
 
 def run(repo, dry=False, inject=False):
@@ -95,12 +100,15 @@ def selftest():
         m, _ = run(tmp, dry=True); same = open(p).read() == q
         m2, _ = run(tmp); live = open(p).read()
         cases = [('--dry не пише файл', same and 'прибрано 3' in m),
-                 ('закриті ✅ і «закрито» — геть', '`B-1`' not in live and '`C-1`' not in live),
+                 ('закриті ✅ і «закрито» — геть з таблиці', '| `B-1` |' not in live and '| `C-1` |' not in live),
                  ('відкрите лишилось', '`A-1`' in live and '`S3`' in live),
                  ('«не закрито» — відкрите, лишилось (аудит №4)', '`N-1`' in live),
-                 ('карта: найновіший ✅ лишився, старіший — геть', '`S2`' in live and '`S1`' not in live),
+                 ('карта: найновіший ✅ лишився, старіший — геть', '| `S2` |' in live and '| `S1` |' not in live),
                  ('id прибраного — у виводі (для коміту)', '`B-1`' in m2 and '`S1`' in m2)]
         m3, _ = run(tmp); cases.append(('повтор — нема що, файл не чіпає', 'закритих нема' in m3 and open(p).read() == live))
+        cases.append(('прибрані id лишились згадкою в черзі — гейт «зник без сліду» мовчить (SYN-1 №1)', all(f'`{g}`' in live for g in ('B-1', 'C-1', 'S1')) and live.count('<!-- doc_prune:') == 1))
+        t2, g2, _ = prune_text(live.replace('| `A-1` | відкрите | ○ |', '| `A-1` | відкрите | ✅ 25.11 |'))
+        cases.append(('друга прополка замінює машинний рядок, не множить', g2 == ['A-1'] and t2.count('<!-- doc_prune:') == 1 and '`B-1`' not in t2))
         open(p, 'w').write(live.replace('| `A-1` | відкрите | ○ |', '| `A-1` | відкрите | ○ |\n| `L-1` | ' + 'д' * 12000 + ' | ○ |'))
         m4, _ = run(tmp); cases.append(('на стелі — ⚠ з найдовшим рядком', '⚠' in m4 and '`L-1`' in m4))
         cases.append(('«бриф не треба: стан — `файл`» — дім названо, не «брифу нема»', 'дім: `lens/D.md`' in m4))
