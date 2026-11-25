@@ -1,4 +1,5 @@
 {
+ "audit_class.py selftest": 5,
  "brief-guard.sh selftest": 12,
  "clip.py selftest": 13,
  "commit-gate.sh selftest": 5,
