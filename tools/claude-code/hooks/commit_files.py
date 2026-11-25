@@ -49,6 +49,11 @@
      за ≈100 комітів, і кожен пройшов (M2 — лише ⚠ на старті). Тепер: коміт, що ЗБІЛЬШУЄ самері (`sessions/*summary*`, `docs/summary/`) чи чергу
      (`*CHERGA.md`) понад 25 КБ або журнал гачків понад 24 КБ → ✗ з ліками: самері — нове `S<N+1>` (§0 лише відкрите), старе — в архів;
      черга — прополка; журнал ядра — `tools/claude-code/journal_rotate.py` (інший `HOOK_JOURNAL.md` — закриті рядки в архів руками: ротатор знає лише журнал ядра). Зменшити — тиша; свідомо — <!-- ratchet-ok: причина -->.
+  15. «нова сесія — нове самері» (`SESS-1`, EquipLens S45 25.11.2026; Konst: «я не казав продовжувати S44… як правильно?»): коміт, що чіпає самері
+     `sessions/<P>_session_summary_S<N>_*.md`, — найновіше живе самері має бути додане цим комітом або комітом із трейлером `Claude-Session:` ЦІЄЇ
+     сесії (ключ — `CLAUDE_CODE_REMOTE_SESSION_ID` без `cse_` ≡ трейлер без `session_`; нема ключа — тиша). Подія: стартове «Продовження S44» —
+     нова сесія 4 коміти дописувала в чуже самері (S44 почала `…DxDy`, писала `…E29`). Не контейнер: VM перезапускається й посеред розмови
+     (замір 25.11: старт VM 22:22 при тій самій сесії). Свідомо — `<!-- sess-ok: причина -->` у найновішому самері.
 Не беремо з pre-commit-hooks: пробіли й кінці файлів (шум у диффах даних), no-commit-to-branch (ми свідомо комітимо в main),
 submodules (їх нема).
 
@@ -271,6 +276,20 @@ def check(top, cmd):
                     'журнал': 'python3 <ядро>/tools/claude-code/journal_rotate.py <ядро> — закриті рядки → journal/<місяць>' if f == JOURNAL else
                               'закриті рядки — в архів поруч руками (journal_rotate веде лише журнал ядра ' + JOURNAL + ')'}[kind]
             bad.append(f'{kind} {f}: {nb / 1024:.1f} КБ > {cap} і росте (+{(nb - ob) / 1024:.1f} КБ; храповик старту) — {cure}; свідомо — <!-- ratchet-ok: причина -->')
+    # 15. нова сесія — нове самері (SESS-1, EquipLens S45)
+    key = re.sub(r'^(cse|session)_', '', os.environ.get('LENS_SESSION_KEY') or os.environ.get('CLAUDE_CODE_REMOTE_SESSION_ID') or '')
+    SS = re.compile(r'^sessions/[^/]*_session_summary_S(\d+)_[^/]*\.md$')
+    if key and any(SS.match(f) for f in changed):
+        live = {f for f in zlist(top, 'ls-files', '--', 'sessions') if SS.match(f) and os.path.isfile(os.path.join(top, f))} | {f for f in added if SS.match(f)}
+        newest = max(live, key=lambda f: int(SS.match(f).group(1)), default=None)
+        if newest and newest not in added:
+            body = git(top, 'log', '--diff-filter=A', '--format=%B', '--', newest) or ''
+            now = open(os.path.join(top, newest), encoding='utf-8', errors='replace').read()
+            was = subprocess.run(['git', '-C', top, 'show', 'HEAD:' + newest], capture_output=True, text=True).stdout
+            if key not in body and now.count('sess-ok:') <= was.count('sess-ok:'):
+                n = int(SS.match(newest).group(1))
+                bad.append(f'самері {newest} почала інша сесія (трейлер Claude-Session її коміту ≠ цієї) — нова сесія — нове самері S{n + 1} першим комітом, '
+                           f'§0 — лише відкрите; старе — в archive/summaries/, коли живих стало б 3 (sessions/README, SESS-1); свідомо — <!-- sess-ok: причина -->')
     # 10. шапка наявного приладу змінилась, карта — ні (AE S104)
     head_re = re.compile(r'(Запуск|Usage|Вихід|живе доки)\s*:', re.I)
     for f in sorted(changed - added):
@@ -438,6 +457,19 @@ def selftest():
         open(d + '/lens/HOOK_JOURNAL.md', 'w').write('ж\n' * 13000)
         say(len(S14()) == 1 and 'руками' in S14()[0] and 'journal_rotate.py <' not in S14()[0], 'храповик старту: чужий журнал > 24 КБ → ✗ без команди ротатора ядра (аудит 24.11)')
         os.remove(d + '/lens/HOOK_JOURNAL.md')
+        # 15. нова сесія — нове самері (SESS-1)
+        ci = lambda m: g('-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', m)
+        s9 = d + '/sessions/P_session_summary_S9_X.md'; open(s9, 'w').write('# S9\n'); g('add', '-A'); ci('S9\n\nClaude-Session: https://claude.ai/code/session_AAA')
+        S15 = lambda: [x for x in check(d, "git add -A && git commit -m 'ядро: ні'") if 'SESS-1' in x]
+        os.environ['LENS_SESSION_KEY'] = 'cse_BBB'
+        open(s9, 'a').write('| 1 | хід |\n'); say(len(S15()) == 1 and 'S10' in S15()[0], 'SESS-1: інша сесія дописує в чуже самері → ✗ «нове самері S10» (S44, 25.11)')
+        s10 = d + '/sessions/P_session_summary_S10_Y.md'; open(s10, 'w').write('# S10\n'); say(S15() == [], 'SESS-1: нове самері в цьому ж коміті → тиша')
+        g('add', '-A'); ci('S10\n\nClaude-Session: https://claude.ai/code/session_BBB'); open(s10, 'a').write('| 1 | хід |\n'); say(S15() == [], 'SESS-1: самері цієї сесії (трейлер ≡ ключ) → тиша')
+        os.environ['LENS_SESSION_KEY'] = 'cse_CCC'; say(len(S15()) == 1, 'SESS-1: третя сесія в S10 → ✗')
+        open(s10, 'a').write('<!-- sess-ok: Konst сказав продовжити -->\n'); say(S15() == [], 'SESS-1: sess-ok → тиша')
+        g('checkout', '--', 'sessions/'); os.environ['LENS_SESSION_KEY'] = '-'; open(s10, 'a').write('x\n')
+        os.environ.pop('LENS_SESSION_KEY'); os.environ.pop('CLAUDE_CODE_REMOTE_SESSION_ID', None); say(S15() == [], 'SESS-1: нема ключа сесії (локально) → тиша')
+        g('checkout', '--', 'sessions/')
         os.environ.pop('LENS_KERNEL', None)
     finally:
         shutil.rmtree(d)

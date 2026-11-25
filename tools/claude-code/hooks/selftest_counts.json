@@ -3,7 +3,7 @@
  "brief-guard.sh selftest": 12,
  "clip.py selftest": 13,
  "commit-gate.sh selftest": 5,
- "commit_files.py selftest": 50,
+ "commit_files.py selftest": 56,
  "ctx_watch.py selftest": 45,
  "doc_health.py selftest": 69,
  "doc_prune.py selftest": 10,
