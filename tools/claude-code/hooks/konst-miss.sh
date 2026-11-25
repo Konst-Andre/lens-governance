@@ -12,7 +12,10 @@
 #   нагадування про чек-лист підсилення ①–⑦ (дім — tools/claude-code/CLAUDE_CODE.md «Практики» · «Прийнята 💡»). «як є» · «дослівно» ·
 #   «без підсилення» — тиша. «так» — найчастіше слово: рахується лише першим словом речення й не «так само» / «не так» / вставне «Так, я…» (QR CC-20).
 #   Диспетчер кличе yes окремо й додає до будь-якого іншого гачка (прийняття і вказівка на ваду можуть бути в одному повідомленні).
-# Зуби: bash konst-miss.sh selftest — 15 випадків пропусків + 12 прийняття (один — на файлі розмови).
+#   Режим stop (подія Stop, EquipLens S45 25.11.2026 — Konst: «чи хтось слідкує… що ти дійсно виконуєш цей чек-лист?»; до того — лише нагадування,
+#   Stop-суду не було): останнє повідомлення Konst — прийняття 💡 (той самий yes() на звіт перед ним), а у відповіді нема «Підсилення» → block один раз
+#   на одне повідомлення Konst (позначка /tmp/lens-kmstop-<сесія>; stop_hook_active не годиться — першим міг блокувати memory-guard). Слово «Підсилення» — мінімум, що судить машина; повноту ①–⑦ — ні (не виміряти).
+# Зуби: bash konst-miss.sh selftest — 15 випадків пропусків + 13 прийняття (один — на файлі розмови) + 5 суду Stop.
 mode="${1:-run}"
 [ "$mode" = selftest ] && HOOK_IN="{}" || HOOK_IN="$(cat)"
 export HOOK_IN
@@ -21,7 +24,7 @@ import json, os, re, sys
 CUE = re.compile(r"(?<![\w'’])(не те|не так|чому (ти )?не|знову|ти пропустив\w*|пропустив|не помітив|не побачив|проігнорув\w*|перекіс\w*|перекошен\w*|прилип\w*|обріза\w*|обрізан\w*|погано видно|не видно|ледь (видно|помітн\w*)|губиться|з'їха\w*|з’їха\w*|стрибає|технічн\w+ текст|незрозуміл\w*|не працює|зламал\w*)(?![\w'’])", re.I)
 CALM = re.compile(r"(?<![\w'’])(працює кайф|все працює|подобається|супер|чудов\w*)(?![\w'’])", re.I)
 
-YES = re.compile(r"(?<![\w'’])(приймаю|прийнято|беремо|згоден|згодна|погоджую|з підсиленням)(?![\w'’])|(?:^|[.!?\n]\s*)так(?![\w'’])(?!\s+само)(?!\s*,\s*(?:я|ми|ось|от|значить|отже|дивись|слухай|ну|зараз|стоп|щодо|стосовно)(?![\w'’]))", re.I)   # QR CC-20: «Так, я…» — вставне, не згода
+YES = re.compile(r"(?<![\w'’])(приймаю|прийнято|беремо|згоден|згодна|погоджую|з підсиленням|підсиль|підсили)(?![\w'’])|(?:^|[.!?\n]\s*)так(?![\w'’])(?!\s+само)(?!\s*,\s*(?:я|ми|ось|от|значить|отже|дивись|слухай|ну|зараз|стоп|щодо|стосовно)(?![\w'’]))", re.I)   # QR CC-20: «Так, я…» — вставне, не згода
 ASIS = re.compile(r"(?<![\w'’])(як є|дослівно|без підсилення)(?![\w'’])", re.I)
 IDEA = '💡 Пропоную'
 SERVICE = re.compile(r"\s*(Stop hook feedback|<system-reminder>|<command-|<local-command)")
@@ -43,6 +46,38 @@ def last_report(path, tail=4_000_000):
         elif role == 'assistant' and isinstance(c, list):
             cur += [x.get('text', '') for x in c if isinstance(x, dict) and x.get('type') == 'text']
     return '\n'.join(cur) if cur else last
+
+def turn(path, tail=4_000_000):
+    """(останнє справжнє повідомлення Konst, звіт агента перед ним) — для суду Stop."""
+    try:
+        with open(os.path.expanduser(path), 'rb') as f:
+            f.seek(0, 2); n = f.tell(); f.seek(max(0, n - tail)); raw = f.read().decode('utf-8', 'ignore')
+    except Exception: return '', ''
+    prompt, prev, cur = '', '', []
+    for ln in raw.splitlines():
+        try: e = json.loads(ln)
+        except Exception: continue
+        m = e.get('message') or {}; role = m.get('role') or e.get('type'); c = m.get('content')
+        txt = c if isinstance(c, str) else ' '.join(x.get('text', '') for x in c if isinstance(x, dict) and x.get('type') == 'text') if isinstance(c, list) else ''
+        if role == 'user' and txt and not e.get('isMeta') and not SERVICE.match(txt): prompt, prev, cur = txt, '\n'.join(cur), []
+        elif role == 'assistant' and isinstance(c, list): cur += [x.get('text', '') for x in c if isinstance(x, dict) and x.get('type') == 'text']
+    return prompt, prev
+
+DONE = re.compile(r"Підсилення|konst-yes[^\n]{0,40}хибне", re.I)
+
+def stop(d, tr=None):
+    p, prev = turn(d.get('transcript_path') or '') if tr is None else tr
+    if not p or not yes({'prompt': p}, prev) or DONE.search(d.get('last_assistant_message') or ''): return None
+    import hashlib   # раз на повідомлення Konst: stop_hook_active не годиться — першим міг блокувати інший гачок Stop (memory-guard), і тоді суд мовчав би
+    mk = os.path.join(os.environ.get('LENS_MARK_DIR') or '/tmp', f"lens-kmstop-{d.get('session_id') or 'nosession'}")
+    h = hashlib.sha1(p.encode()).hexdigest()[:12]
+    try:
+        if open(mk).read().strip() == h: return None
+    except Exception: pass
+    try: open(mk, 'w').write(h)
+    except Exception: pass
+    return ("Konst прийняв 💡, а у звіті нема блоку «Підсилення: було → стало» (чек-лист ①–⑦, tools/claude-code/CLAUDE_CODE.md «Практики» · «Прийнята 💡»). "
+            "Пройди чек-лист і допиши блок; дрібний оборотний крок — одним рядком «Підсилення: …»; це не прийняття 💡 — рядок «konst-yes … хибне» в журналі гачків.")
 
 def yes(d, rep=None):
     p = d.get('prompt') or ''
@@ -117,9 +152,25 @@ def selftest():
     for name, p, r, want in yc:
         ok = (yes({'prompt': p}, r) is not None) == want; bad += not ok; print(('✓ ' if ok else '✗ ') + name)
     cases = cases + yc
+    R = 'Звіт.\n\n💡 Пропоную: гачок.'
+    sc = [('Stop: прийняв 💡, у звіті нема «Підсилення» → block', {'last_assistant_message': 'Зробив.'}, ('приймаю з підсиленням', R), True),
+          ('Stop: блок «Підсилення: було → стало» є → тиша', {'last_assistant_message': 'Зробив.\n\n**Підсилення: було → стало** — …'}, ('приймаю', R), False),
+          ('Stop: прийняття без 💡 у звіті перед ним → тиша', {'last_assistant_message': 'Зробив.'}, ('так, роби', 'Звіт без пропозиції.'), False),
+          ('Stop: «Згоден? Підсиль» після 💡 → block', {'last_assistant_message': 'Зробив.'}, ('Згоден? Підсиль.', R), True),
+          ('Stop: те саме повідомлення Konst удруге → тиша (раз на повідомлення, не зациклити)', {'last_assistant_message': 'Зробив.', 'stop_hook_active': True}, ('Згоден? Підсиль.', R), False)]
+    md = tempfile.mkdtemp(prefix='kmstop_'); os.environ['LENS_MARK_DIR'] = md
+    if os.environ.get('KM_INJECT') == 'stop': stop.__globals__['DONE'] = re.compile(r'.')   # зуб: суд «завжди задоволений» має почервоніти
+    for name, d, tr, want in sc:
+        ok = (stop({'session_id': 'st', **d}, tr) is not None) == want; bad += not ok; print(('✓ ' if ok else '✗ ') + name)
+    __import__('shutil').rmtree(md, ignore_errors=True); cases = cases + sc
     print(f'─── konst-miss selftest: {len(cases) - bad}/{len(cases)} ───'); return 1 if bad else 0
 
 if sys.argv[1] == 'selftest': sys.exit(selftest())
+if sys.argv[1] == 'stop':
+    try: r = stop(json.loads(os.environ.get('HOOK_IN') or '{}'))
+    except Exception: __import__('traceback').print_exc(); r = None
+    if r: print(json.dumps({'decision': 'block', 'reason': r}, ensure_ascii=False))
+    sys.exit(0)
 try: out = (yes if sys.argv[1] == 'yes' else run)(json.loads(os.environ.get('HOOK_IN') or '{}'))
 except Exception: __import__('traceback').print_exc(); out = None
 if out: print(json.dumps({'hookSpecificOutput': {'hookEventName': 'UserPromptSubmit', 'additionalContext': out}}, ensure_ascii=False))

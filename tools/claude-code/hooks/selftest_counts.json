@@ -15,7 +15,7 @@
  "handoff_check.py selftest": 95,
  "handoff_exam.py selftest": 19,
  "journal_rotate.py selftest": 7,
- "konst-miss.sh selftest": 28,
+ "konst-miss.sh selftest": 33,
  "lens-hooks.sh profile-test": 12,
  "lens-hooks.sh start-test": 18,
  "live_refs.py selftest": 5,

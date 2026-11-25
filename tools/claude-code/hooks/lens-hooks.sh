@@ -205,7 +205,8 @@ case "$ev" in
     # тінь (FAB-1 10.11 · В-377 14.11.2026): «заява дії = доказ» + рядок «пам'ять: …» (злито з memory_line.py) проти стану git. Лише пише вирок у
     #   /tmp/lens-shadow-<сесія>.tsv, нічого не друкує й не блокує; підсумок сесії — bash promise-guard.sh tally <сесія> (рядком у журнал гачків щосамері)
     printf '%s' "$in" | bash "$h/promise-guard.sh" shadow "${sid:-nosession}" > /dev/null 2>&1
-    run memory-guard.sh stop || run handoff-remind.sh stop || run promise-guard.sh stop || run plan-web.sh stop ;;   # promise-guard (AE S146): «можна /compact» — сам проганяє сторож; «пропуск Konst» — лише з хешем і зубом
+    ks() { o="$(printf '%s' "$in" | bash "$h/konst-miss.sh" stop 2>>"$E")"; [ -n "$o" ] && { fire konst-yes-stop "$o"; return 0; }; return 1; }   # EquipLens S45: прийнята 💡 без блоку «Підсилення» → block
+    run memory-guard.sh stop || run handoff-remind.sh stop || run promise-guard.sh stop || ks || run plan-web.sh stop ;;   # promise-guard (AE S146): «можна /compact» — сам проганяє сторож; «пропуск Konst» — лише з хешем і зубом
   prompt)   # перевірка перед переїздом (HOOK-3.2), інакше — аркуш середовища на прохання (ENV-1), інакше — «пропуск, знайдений Konst» (HOOK-5)
     o="$(run handoff-remind.sh "" || run env-remind.sh "" || run konst-miss.sh "")"
     y="$(printf '%s' "$in" | bash "$h/konst-miss.sh" yes 2>>"$E")"; [ -n "$y" ] && o="$(mrg "$o" "$(fire konst-yes "$y")")"   # В-372 (AE S145): Konst приймає 💡 → чек-лист підсилення; додається, не витісняє
