@@ -64,6 +64,7 @@
      `AE-PORT` · `AE-HDR` — 31 день без ⚠: `--gov` AE не бачить (AE поза Lens), env_check AE черги не міряв, `queue_open` злитого рядка не бачив.
   M18 вказівник «S<N> §0 п.K» — у §0 самері S<N> цього репо такого пункту нема (WARN-1 (4-б), іспит 27 EquipLens S41: нове самері рве нумерацію).
   M19 шапка живого .md (до першого «## ») називає більше однієї версії «vN · дата» / «версія: N · дата» — історія в журнал змін чи git log (Konst 24.11.2026; зразок Routes:tools/lint_repo.py правило 16).
+  M20 дерево «## Дерево» карти репо ≠ верхній рівень git ls-files (обидва боки; друге коло — лише «назване існує»; `<!-- tree-skip: … -->`) (EquipLens S45, TREE).
   ⓘ самері ≥ 80 % стелі M2 — «на переїзді нове самері» (WARN-1 (3)).
 Лише ⚠ (не блокує): один рядок для env_check; адреси — --list.
   python3 doc_health.py [<репо>] [--list] | selftest
@@ -107,6 +108,7 @@ def scan(root):
             found.append(('M4', f, f'{kb:.0f} КБ без «читається коли» — одним Read не взяти'))
     found += dead_paths(root)
     found += history_route(root)
+    found += tree_check(root)
     found += queue_behind(root)
     found += queue_ceiling(root)
     found += dead_sections(root)
@@ -485,9 +487,43 @@ def line(root):
     if not f: return '✓', f'документи: ✓ щосесійні ≤ {M1_LINES} рядків і {M1_CHARS} знаків · старт ≤ {M2_KB} КБ · розділи ≤ {M3_KB} КБ · великі з маршрутом · копій нема' + note
     by = {}
     for m, *_ in f: by[m] = by.get(m, 0) + 1
-    name = {'M1': 'щосесійні задовгі', 'M2': 'файли старту завеликі', 'M3': f'розділів > {M3_KB} КБ', 'M4': f'> {M4_KB} КБ без маршруту', 'M5': 'мертвих шляхів', 'M21': f'історія > {M4_KB} КБ без способу читання', 'M9': 'приладів без згадки', 'M16': 'гачків без рядка в реєстрі', 'M6': 'черга відстала від самері', 'M17': 'черга: вік · стеля · довгий рядок', 'M7': 'мертвих адрес §', 'M8': 'правил без «Як перевірити»', 'M10': 'свіжих рецептів без дати джерела', 'M11': f'рецептів > {M11_DAYS} дн. без звірки', 'M13': 'копій між щосесійними', 'M14': 'копій щосесійного шару в документах', 'M12': 'посилань на неіснуючий рецепт', 'M19': 'шапок з кількома версіями', 'M18': 'вказівників «S<N> §0 п.K» у нікуди'}
+    name = {'M1': 'щосесійні задовгі', 'M2': 'файли старту завеликі', 'M3': f'розділів > {M3_KB} КБ', 'M4': f'> {M4_KB} КБ без маршруту', 'M5': 'мертвих шляхів', 'M21': f'історія > {M4_KB} КБ без способу читання', 'M20': 'дерево карти ≠ git', 'M9': 'приладів без згадки', 'M16': 'гачків без рядка в реєстрі', 'M6': 'черга відстала від самері', 'M17': 'черга: вік · стеля · довгий рядок', 'M7': 'мертвих адрес §', 'M8': 'правил без «Як перевірити»', 'M10': 'свіжих рецептів без дати джерела', 'M11': f'рецептів > {M11_DAYS} дн. без звірки', 'M13': 'копій між щосесійними', 'M14': 'копій щосесійного шару в документах', 'M12': 'посилань на неіснуючий рецепт', 'M19': 'шапок з кількома версіями', 'M18': 'вказівників «S<N> §0 п.K» у нікуди'}
     worst = max((x for x in f if x[0] == 'M3'), key=lambda x: float(re.search(r'(\d+) КБ', x[2])[1]), default=None)
     return '⚠', 'документи: ' + ' · '.join(f'{name[m]} {n}' for m, n in sorted(by.items())) + (f' (найбільший — {worst[1]} {worst[2]})' if worst else '') + ' — деталі: doc_health.py --list' + note
+
+
+def tree_check(root):
+    # M20 TREE (EquipLens S45, 25.11.2026; ідея лінту дерева — паралельна сесія Konst): блок «## Дерево» карти репо
+    #   (`REPO_LAYOUT.md` · `docs/REPO_LAYOUT.md`) ≡ верхній рівень `git ls-files`: у git є, у дереві нема — ⚠; у дереві є, у git нема — ⚠.
+    #   Друге коло (`│  ├─ shots/`) — лише в один бік: назване має існувати (повний перелік глибше — не мета карти). Блоку нема — тиша.
+    #   Свідомо поза деревом — `<!-- tree-skip: ім'я … -->` у карті. Світ (25.11.2026): Chromium OS `common-mk/check-readme.py` — верхній рівень
+    #   з git (`ls-tree HEAD`) ≡ перелік у README, інакше «out of sync»; беремо `ls-files` (індекс бачить і додане до коміту), сортування — ні.
+    p = next((os.path.join(root, x) for x in ('REPO_LAYOUT.md', 'docs/REPO_LAYOUT.md') if os.path.isfile(os.path.join(root, x))), None)
+    if not p: return []
+    t = open(p, encoding='utf-8', errors='replace').read()
+    m = re.search(r'^## Дерево[^\n]*\n+```[^\n]*\n(.*?)\n```', t, re.S | re.M)
+    if not m: return []
+    try: ls = [x for x in subprocess.run(['git', 'ls-files'], cwd=root, capture_output=True, text=True).stdout.split('\n') if x]
+    except Exception: return []
+    skip = set(' '.join(re.findall(r'<!--\s*tree-skip:([^>]*)-->', t)).split())
+    top = {x.split('/')[0] + ('/' if '/' in x else '') for x in ls}
+    one, two = set(), []
+    for ln in m.group(1).splitlines():
+        lv = re.match(r'^(│\s+|\s{3,})?[├└]─\s+(.*)$', ln)
+        if not lv: continue
+        names = []
+        for tok in re.split(r'\s+', lv.group(2).strip()):
+            if re.fullmatch(r'[A-Za-z0-9_.\-]+/|[A-Za-z0-9_\-]*\.[A-Za-z0-9_.\-]+', tok): names.append(tok)   # тека — «/» у кінці, файл — з крапкою; слово опису — ні
+            else: break
+        (two.extend if lv.group(1) else one.update)(names)
+    rel = os.path.relpath(p, root); out = []
+    for n in sorted(top - one - skip): out.append(('M20', rel, f'дерево не називає `{n}` (є в git) — рядок у «## Дерево» або <!-- tree-skip: {n} -->'))
+    for n in sorted(one - top - skip): out.append(('M20', rel, f'дерево називає `{n}`, а в git його нема — прибрати рядок'))
+    dirs = {'/'.join(x.split('/')[:k]) + '/' for x in ls for k in range(1, x.count('/') + 1)}
+    for n in two:   # друге коло — в один бік: шукаємо під будь-якою текою
+        if n not in skip and not any(d.endswith('/' + n) for d in dirs) and not any(x.endswith('/' + n) for x in ls):
+            out.append(('M20', rel, f'дерево (друге коло) називає `{n}`, а в git його нема'))
+    return out
 
 
 def history_route(root):
@@ -528,6 +564,10 @@ def selftest():
              ('M5: мертвий `lens/Z.md` без позначки → ⚠', {'lens/A.md': 'див. `lens/Z.md` тут\n'}, '⚠', 'мертвих шляхів 1'),
              ('розділ 20 КБ → ⚠ M3', {'lens/B.md': sec(20)}, '⚠', 'розділів > 16 КБ 1'),
              ('M21: архів 90 КБ без «грепом» → ⚠ (історію M4 не бачить)', {'archive/old.md': '# old\n' + ''.join(sec(9) for _ in range(10))}, '⚠', 'історія > 80 КБ без способу читання 1'),
+             ('M20: дерево ≡ git → ✓', {'REPO_LAYOUT.md': '## Дерево\n\n```\nR/\n├─ REPO_LAYOUT.md   карта\n├─ a/  b/   теки\n│  └─ s/   підтека\n└─ c/   ще\n```\n', 'a/s/x.md': '', 'b/y.md': '', 'c/z.md': ''}, '✓', ''),
+             ('M20: тека в git без рядка дерева → ⚠ (зуб)', {'REPO_LAYOUT.md': '## Дерево\n\n```\nR/\n├─ REPO_LAYOUT.md   карта\n├─ a/  b/   теки\n│  └─ s/   підтека\n└─ c/   ще\n```\n', 'a/s/x.md': '', 'b/y.md': '', 'c/z.md': '', 'd/n.md': ''}, '⚠', 'дерево карти ≠ git 1'),
+             ('M20: дерево називає теку, якої нема → ⚠', {'REPO_LAYOUT.md': '## Дерево\n\n```\nR/\n├─ REPO_LAYOUT.md   карта\n├─ a/  b/   теки\n│  └─ s/   підтека\n└─ c/   ще\n```\n', 'a/s/x.md': '', 'b/y.md': ''}, '⚠', 'дерево карти ≠ git 1'),
+             ('M20: друге коло без теки → ⚠; tree-skip — тиша', {'REPO_LAYOUT.md': '## Дерево\n\n```\nR/\n├─ REPO_LAYOUT.md   карта\n├─ a/  b/   теки\n│  └─ s/   підтека\n└─ c/   ще\n```\n' + '<!-- tree-skip: d/ -->\n', 'a/x.md': '', 'b/y.md': '', 'c/z.md': '', 'd/n.md': ''}, '⚠', 'дерево карти ≠ git 1'),
              ('M21: архів 90 КБ з «читати грепом» → ✓', {'archive/old.md': '# old\n> читати грепом\n' + ''.join(sec(9) for _ in range(10))}, '✓', ''),
              ('файл 90 КБ без маршруту (розділи малі) → ⚠ M4', {'lens/C.md': ''.join(sec(9) for _ in range(10))}, '⚠', '> 80 КБ без маршруту 1'),
              ('файл 90 КБ з «Читається ТОЧКОВО» → ✓', {'lens/C.md': '> Читається ТОЧКОВО\n' + ''.join(sec(9) for _ in range(10))}, '✓', ''),
