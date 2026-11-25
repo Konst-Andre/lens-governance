@@ -30,13 +30,17 @@ AE_EDIT_CODE=<код дверей куратора AE — у Konst>   # AE: env_
 - Навички ядра (`/night`) ставить не setup script, а диспетчер `hooks/lens-hooks.sh` на старті (`tools/claude-code/skills/`).
 - `GH_TOKEN` руками не ставити: доступ до GitHub дає під'єднаний GitHub (п.3б там же).
 
-## 3 · Setup script (поле «Setup script»), v5 (19.11.2026, AE S157 В-416: + вузькі `permissions.allow` приладам ядра — Auto не відхиляє їх у сесії з одним репо; v4 13.11 — обгортка у файлі, PreCompact пропускає вихід 2; рядки ≤ 200 байт)
+## 3 · Setup script (поле «Setup script»), v6 (25.11.2026: + Python-Playwright версії образу до старту Claude — Konst: «системне — автоматично», гачок — друга лінія; v5 19.11.2026, AE S157 В-416: + вузькі `permissions.allow` приладам ядра — Auto не відхиляє їх у сесії з одним репо; v4 13.11 — обгортка у файлі, PreCompact пропускає вихід 2; рядки ≤ 200 байт)
 
 ```bash
 # Гачки Lens v5 (19.11.2026, AE S157): 9 подій → обгортка ~/.claude/lens-hooks.sh → диспетчер ядра
 # + вузькі правила дозволу приладам ядра (Auto відхиляв скрипти ядра в сесії з одним репо — EquipLens S36, В-416)
 # Ядро — серед репо сесії або в /tmp/lens-governance (гачки діють і в сесії лише з продуктом)
 pip install -q shellcheck-py 2>/dev/null || true   # shellcheck для сторожа коміту, 22.10.2026
+# Python-Playwright тієї ж версії, що Playwright образу (25.11.2026: «системне — автоматично»; гачки — друга лінія)
+PWV=$(python3 -c "import json;print(json.load(open('/opt/node-tools/node_modules/playwright/package.json'))['version'])" 2>/dev/null) && \
+  { python3 -c "import importlib.metadata as m,sys;sys.exit(m.version('playwright')!='$PWV')" 2>/dev/null || \
+    pip install -q --break-system-packages "playwright==$PWV" || true; }
 K=https://github.com/Konst-Andre/lens-governance
 [ -d /home/user/lens-governance ] || [ -d /tmp/lens-governance ] || git clone -q --depth 1 $K /tmp/lens-governance || true
 mkdir -p ~/.claude
@@ -76,7 +80,8 @@ JSON
 ## 4 · Інструменти, які ставить setup script
 
 - `shellcheck` — сторож коміту перевіряє ним змінені `.sh` (без нього — лише `bash -n`). Звіряє `env_drift.py`.
-- **Не тут:** WebKit і Python-пакет `playwright` ставить диспетчер (`tools/claude-code/webkit_ensure.sh`, у фоні щостарту) — версію бере з Playwright образу, діє в кожній сесії й на обох акаунтах (24.11.2026).
+- Python-пакет `playwright` версії Playwright образу — з v6 (25.11.2026): до старту Claude, не залежить від гачків. Друга лінія — диспетчер (`tools/claude-code/webkit_ensure.sh`, у фоні щостарту) і гачок старту EquipLens: вони ж ставлять його там, де setup script ще v5 (резервний акаунт).
+- **Не тут:** WebKit ставить диспетчер (`tools/claude-code/webkit_ensure.sh`, у фоні щостарту) — версію бере з Playwright образу, діє в кожній сесії й на обох акаунтах (24.11.2026).
 
 ## Перевірка після відтворення (перша сесія)
 
