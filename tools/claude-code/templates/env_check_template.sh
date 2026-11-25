@@ -42,10 +42,11 @@ shallow="$(git rev-parse --git-path shallow)"; jc=$(git log -1 --format=%H -- "$
 [ -n "$jc" ] && for h in $(git rev-list "$jc"..HEAD -- $INSTR 2>/dev/null); do
   grep -qx "$h" "$shallow" 2>/dev/null && continue
   git show -s --format=%B "$h" | grep -qiE 'аудит: клас 0|за аудитом' && continue
-  debt=$((debt+1)); dfiles="$dfiles $(git show --name-only --format= "$h" -- $INSTR | tr '\n' ' ')"; oldest=$(git show -s --format=%ct "$h")
+  debt=$((debt+1)); dsha="${dsha:-} $h"; dfiles="$dfiles $(git show --name-only --format= "$h" -- $INSTR | tr '\n' ' ')"; oldest=$(git show -s --format=%ct "$h")
 done
 if [ "$debt" -gt 0 ]; then nf=$(printf '%s\n' $dfiles | sort -u | grep -c .); age=$(( ( $(date +%s) - oldest ) / 86400 ))
   aud="$aud · ⚠ борг аудиту: $debt коміт(ів), $nf файл(ів), найстаріший $age дн."
+  ah=$(python3 "${K:-$([ -d ../lens-governance ] && echo ../lens-governance || echo /tmp/lens-governance)}/tools/claude-code/audit_class.py" hint . $dsha 2>/dev/null); [ -n "$ah" ] && aud="$aud · ⓘ $ah"   # кандидат у клас 0 (ядро audit_class, 25.11.2026)
   { [ "$nf" -ge 5 ] || [ "$age" -ge 7 ]; } && aud="$aud — ПОРА пакет за класом (lens-governance:tools/claude-code/templates/AUDIT_template.md)"; fi
 echo "env: github=${g:-000} cloudflare=${c:-000} · ${vars% } · гейт: $gate · $aud"
 K=../lens-governance; [ -d "$K" ] || K=/tmp/lens-governance; [ -f "$K/tools/claude-code/profile_check.sh" ] && bash "$K/tools/claude-code/profile_check.sh"   # профіль: з репо (LENS_PROFILE=1) чи з налаштувань акаунта — lens-governance:tools/claude-code/ACCOUNT_MOVE.md п.1-а / 1-б
