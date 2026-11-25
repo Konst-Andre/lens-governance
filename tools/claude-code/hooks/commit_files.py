@@ -13,7 +13,8 @@
      0 за видиму історію QR і ядра; явна назва = свідомий намір, тоді тиша)
   3. новий файл більший за 1 МБ, не названий явно (`check-added-large-files`; репо — не склад)
   4. приватний ключ у вмісті (`detect-private-key`) і файл-секрет за іменем: .env · .dev.vars (wrangler) · id_rsa · *.pem/*.key · credentials.json
-     (плагін spac для Claude Code, aitmpl.com/blog/secure-git-workflow, 14.10.2026; секрети — ніколи в репо)
+     (вміст — pre-commit-hooks `detect-private-key`, github.com/pre-commit/pre-commit-hooks, 25.11.2026; імена — свій перелік: aitmpl.com/blog/secure-git-workflow,
+     на яку посилались 14.10, плагіна «spac» і імен файлів не має — лише шаблони токенів провайдерів, перевірено 25.11.2026; секрети — ніколи в репо)
   5. мітки конфлікту злиття `<<<<<<< ` / `>>>>>>> ` на початку рядка (`check-merge-conflict`; у main пишуть кілька агентів)
   6. зламаний синтаксис `.json` / `.toml` (`check-json` · `check-toml`; `wrangler.toml` і `manifest.json` ламають деплой)
   7. два шляхи, що різняться лише регістром (`check-case-conflict`; Windows і Mac їх не розрізнять)
@@ -29,8 +30,9 @@
      Практика: перевірка в коміті за шляхом нового файлу (`git diff --cached --diff-filter=A`) → потрібний документ у тому ж коміті
      (ledgerline-docs «documentation types and rules», 24.10.2026); Danger у CI не беремо — комітить агент, ловити треба до коміту.
      «ядро: кандидат» — рядок у реєстрі ядра вже має бути, коли клон ядра поруч (../lens-governance · /tmp/lens-governance · LENS_KERNEL_DIR); нема клону — не судимо.
-  10. змінено ШАПКУ наявного приладу (ті самі теки й розширення, що п. 9): рядок-назва (перший) або «Запуск:» / «Usage» / «Вихід:» / «живе доки»
-     у перших 40 рядках (коментар чи docstring) — а карта репо (та сама, що п. 9, або .md поруч) у цей коміт не потрапила → ✗: опис у карті відстає
+  10. змінено ШАПКУ наявного приладу (ті самі теки й розширення, що п. 9): рядок-назва (перший рядок шапки) або «Запуск:» / «Usage» / «Вихід:» / «живе доки»
+     у шапці — провідному коментарі чи docstring після шебанга, ≤ 150 рядків (до 25.11 — «перші 40 рядків» за початком шматка диффа: довгу
+     шапку, як у цього файла, не бачив, а «Usage» у тілі на рядку 41+ давав хибне ✗; аудит 24.11) — а карта репо (та сама, що п. 9, або .md поруч) у цей коміт не потрапила → ✗: опис у карті відстає
      від приладу. Правка тіла без шапки — тиша (шапку міняють, коли міняється що міряє чи як кликати). Подія: AE S104 — описи змінених приладів
      двічі за сесію правились руками. Практика: перевірка за диффом рядків використання → документ у тому ж коміті (borghei «doc-drift-detector»,
      bjornmelin «docs-align», 24.10.2026); хмарні ШІ-сервіси звірки (DriftGuard) не беремо — потрібна локальна перевірка до коміту.
@@ -46,7 +48,7 @@
      що читаються ЦІЛКОМ (самері, черга, журнал гачків — doc_health M2 / J_KB), а свого храповика в них не було → самері S40 виросло 30 → 132 КБ
      за ≈100 комітів, і кожен пройшов (M2 — лише ⚠ на старті). Тепер: коміт, що ЗБІЛЬШУЄ самері (`sessions/*summary*`, `docs/summary/`) чи чергу
      (`*CHERGA.md`) понад 25 КБ або журнал гачків понад 24 КБ → ✗ з ліками: самері — нове `S<N+1>` (§0 лише відкрите), старе — в архів;
-     черга — прополка; журнал — `tools/claude-code/journal_rotate.py`. Зменшити — тиша; свідомо — <!-- ratchet-ok: причина -->.
+     черга — прополка; журнал ядра — `tools/claude-code/journal_rotate.py` (інший `HOOK_JOURNAL.md` — закриті рядки в архів руками: ротатор знає лише журнал ядра). Зменшити — тиша; свідомо — <!-- ratchet-ok: причина -->.
 Не беремо з pre-commit-hooks: пробіли й кінці файлів (шум у диффах даних), no-commit-to-branch (ми свідомо комітимо в main),
 submodules (їх нема).
 
@@ -86,9 +88,32 @@ def add_args(cmd):
                 every = True
             elif not t.startswith('-'):
                 named.add(t.rstrip('/'))
-    if re.search(r'\bgit\b[^\n;&|]*\bcommit\b[^\n;&|]*\s-[a-zA-Z]*a[a-zA-Z]*\b', cmd):   # git commit -a / -am (не --amend)
+    if re.search(r'\bgit\b[^\n;&|]*\bcommit\b[^\n;&|]*\s(?:-[a-zA-Z]*a[a-zA-Z]*|--all)\b', cmd):   # git commit -a / -am / --all (не --amend; --all — аудит 24.11)
         every = True
     return every, named
+
+
+HEAD_MAX = 150
+JOURNAL = 'tools/claude-code/hooks/HOOK_JOURNAL.md'
+
+
+def head_zone(text):
+    """Шапка приладу (п. 10): провідний коментар чи docstring після шебанга → (рядки-назви, перший, останній); ≤ HEAD_MAX рядків."""
+    ls = text.split('\n'); j = 1 if ls and ls[0].startswith('#!') else 0
+    names, first, last = set(), None, 0
+    while j < min(len(ls), HEAD_MAX):
+        s = ls[j].lstrip()
+        q = s[:3] if s.startswith(('"""', "'''")) else '*/' if s.startswith('/*') and '*/' not in s else None
+        if q:   # блок: docstring чи /* … */ — до закриття
+            k = j if q != '*/' and s.count(q) >= 2 else next((x for x in range(j + 1, len(ls)) if q in ls[x]), len(ls) - 1)
+            names.add(j + 1); first = first or j + 1; last = k + 1; j = k + 1; continue
+        if s.startswith(('#', '//', '/*', '*')):
+            if first is None: names.add(j + 1)
+            first = first or j + 1; last = j + 1
+        elif s:
+            break
+        j += 1
+    return names, first or 0, min(last, HEAD_MAX)
 
 
 TOOL_RE = re.compile(r'^(tools|\.claude|\.github/workflows)/.+\.(py|sh|js|mjs|cjs|ts)$')
@@ -243,20 +268,23 @@ def check(top, cmd):
         if nb / 1024 > cap and nb > ob:
             cure = {'самері': 'нове самері S<N+1> (§0 — лише відкрите, закрите ✅ — рядком §1), старе — git mv в archive/summaries/ (sessions/README)',
                     'черга': 'прополка: закрите — геть з таблиці, історія — git; рядок > 2000 знаків — бриф',
-                    'журнал': 'python3 <ядро>/tools/claude-code/journal_rotate.py <репо> — закриті рядки → journal/<місяць>'}[kind]
+                    'журнал': 'python3 <ядро>/tools/claude-code/journal_rotate.py <ядро> — закриті рядки → journal/<місяць>' if f == JOURNAL else
+                              'закриті рядки — в архів поруч руками (journal_rotate веде лише журнал ядра ' + JOURNAL + ')'}[kind]
             bad.append(f'{kind} {f}: {nb / 1024:.1f} КБ > {cap} і росте (+{(nb - ob) / 1024:.1f} КБ; храповик старту) — {cure}; свідомо — <!-- ratchet-ok: причина -->')
     # 10. шапка наявного приладу змінилась, карта — ні (AE S104)
     head_re = re.compile(r'(Запуск|Usage|Вихід|живе доки)\s*:', re.I)
     for f in sorted(changed - added):
         if not TOOL_RE.match(f) or re.search(r'(^|/)(archive|__pycache__|fixtures?|testdata)/', f): continue
         diff = subprocess.run(['git', '-C', top, 'diff', 'HEAD', '-U0', '--', f], capture_output=True, text=True).stdout
-        hit = False
-        for h in re.finditer(r'^@@ -(\d+)(?:,\d+)? \+\d+(?:,\d+)? @@[^\n]*\n((?:[-+][^\n]*\n?)*)', diff, re.M):
-            start = int(h.group(1))
-            for ln in h.group(2).splitlines():
-                if ln.startswith(('---', '+++')) or not ln.startswith(('-', '+')): continue
-                t = ln[1:].lstrip()
-                if (start <= 1 and t.startswith(('#', '//', '/*', '*'))) or (start <= 40 and head_re.search(t)): hit = True
+        hit = False   # кожен рядок диффа — своїм номером (старий для «-», новий для «+») проти шапки свого боку (аудит 24.11)
+        zone = {'-': head_zone(subprocess.run(['git', '-C', top, 'show', 'HEAD:' + f], capture_output=True, text=True).stdout),
+                '+': head_zone(open(os.path.join(top, f), encoding='utf-8', errors='replace').read())}
+        for h in re.finditer(r'^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@[^\n]*\n((?:[-+][^\n]*\n?)*)', diff, re.M):
+            no = {'-': int(h.group(1)), '+': int(h.group(2))}
+            for ln in h.group(3).splitlines():
+                if not ln.startswith(('-', '+')): continue
+                sd = ln[0]; n = no[sd]; no[sd] += 1; names, a, b = zone[sd]
+                if n in names or (a <= n <= b and head_re.search(ln[1:])): hit = True
         if not hit: continue
         near = {os.path.join(os.path.dirname(f), x) for x in os.listdir(os.path.join(top, os.path.dirname(f) or '.')) if x.endswith('.md')}
         if not (changed & (set(MAPS) | near)):
@@ -298,6 +326,8 @@ def selftest():
         os.remove(d + '/.dev.vars')
         open(d + '/lens/a.md', 'w').write('<<<<<<< HEAD\nx\n=======\ny\n>>>>>>> main\n')
         say(any('конфлікту' in x for x in check(d, 'git commit -am x')), 'мітки конфлікту у зміненому файлі (commit -a) → ✗')
+        say(any('конфлікту' in x for x in check(d, 'git commit --all -m x')), 'те саме через commit --all → ✗ (аудит 24.11)')
+        say(not any('конфлікту' in x for x in check(d, 'git commit --amend -m x')), 'commit --amend без -a — тиша (не «все»)')
         open(d + '/lens/a.md', 'w').write('x\n')
         open(d + '/wrangler.toml', 'w').write('name = "x\n')
         say(any('синтаксис' in x for x in check(d, 'git add -A && git commit -m x')), 'зламаний wrangler.toml → ✗')
@@ -342,6 +372,16 @@ def selftest():
         open(d + '/tools/stand/walk_v1.py', 'w').write('# walk_v1 · прохід\n# Запуск: python3 walk_v1.py site\nx = 2\n')
         say(not any('шапку' in x for x in check(d, 'git commit -am x')), 'правка тіла приладу без шапки → тиша')
         g('checkout', '--', 'tools/stand/walk_v1.py')
+        L = ['"' * 3 + 'long · прилад'] + [f'рядок {i}' for i in range(2, 50)] + ['Запуск: python3 long.py a', '"' * 3] + ['x = 1'] * 30
+        open(d + '/tools/stand/long.py', 'w').write('\n'.join(L) + '\n'); g('add', '-A'); g('-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'long')
+        open(d + '/tools/stand/long.py', 'w').write('\n'.join(L).replace('long.py a', 'long.py b') + '\n')
+        say(any('шапку' in x for x in check(d, 'git commit -am x')), 'шапка 52 рядки: «Запуск:» на рядку 50 змінено, карти нема → ✗ (аудит 24.11: межа «40 рядків»)')
+        g('checkout', '--', 'tools/stand/long.py')
+        open(d + '/tools/stand/short.py', 'w').write('# short · прилад\n' + 'x = 1\n' * 60); g('add', '-A'); g('-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'short')
+        B = ['# short · прилад'] + ['x = 1'] * 60; B[37:48] = ['y = 2'] * 9 + ['s = "Usage: тіло"', 'y = 2']
+        open(d + '/tools/stand/short.py', 'w').write('\n'.join(B) + '\n')
+        say(not any('шапку' in x for x in check(d, 'git commit -am x')), '«Usage» у тілі (шматок 38–48, шапка 1 рядок) → тиша (аудит 24.11: хибне ✗ за початком шматка)')
+        g('checkout', '--', 'tools/stand/short.py')
         g('rm', '-rq', 'tools', 'docs'); g('-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'clean')
         open(d + '/stray.txt', 'w').write('x')
         say(check(d, 'git add lens/a.md && git commit -m x') == [], 'нестежений файл, якого команда не додає → тиша (у коміт не піде)')
@@ -395,6 +435,9 @@ def selftest():
         os.makedirs(d + '/tools/claude-code/hooks', exist_ok=True); open(d + '/tools/claude-code/hooks/HOOK_JOURNAL.md', 'w').write('ж\n' * 13000)
         say(len(S14()) == 1 and 'journal_rotate' in S14()[0], 'храповик старту: журнал гачків > 24 КБ → ✗ з командою ротації')
         os.remove(d + '/tools/claude-code/hooks/HOOK_JOURNAL.md')
+        open(d + '/lens/HOOK_JOURNAL.md', 'w').write('ж\n' * 13000)
+        say(len(S14()) == 1 and 'руками' in S14()[0] and 'journal_rotate.py <' not in S14()[0], 'храповик старту: чужий журнал > 24 КБ → ✗ без команди ротатора ядра (аудит 24.11)')
+        os.remove(d + '/lens/HOOK_JOURNAL.md')
         os.environ.pop('LENS_KERNEL', None)
     finally:
         shutil.rmtree(d)
