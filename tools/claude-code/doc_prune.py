@@ -1,20 +1,23 @@
 #!/usr/bin/env python3
-# живе доки: черги репо мають стелю `doc_health` M2 (25 КБ, читаються цілком на старті).
+# живе доки: черги репо мають стелю `doc_health` M2 (читаються цілком на старті; число — звідти, `M2_KB`).
 # ROT — прополка закритого машиною, без питання (Konst 25.11.2026, EquipLens S45: «навіщо питати, коли це по замовчуванню логічно?… підсиль»).
 # Що робить з чергою (`lens/*_CHERGA.md` · `kernel/*_CHERGA.md` · `docs/CHERGA.md`):
 #   (а) МЕХАНІЧНО, без питання: рядок таблиці зі станом ✅ / «закрито» — геть (правило обох черг: «закритий пункт — геть, історія — самері й git»);
 #       у таблиці-карті маршруту (стовпець «стан» і «далі») лишається один найновіший ✅ — «звідки прийшли». Ідентифікатори прибраного — у вивід
 #       (агент кладе їх у повідомлення коміту → `git log --grep <id>`). Нема що прибрати — файл не чіпає (як `tada archive`).
-#   (б) НА СТЕЛІ (файл ≥ 90 % від 25 600 Б): ⚠ і п'ять найдовших відкритих рядків з позначкою, чи є свій бриф `<id>_brief.md` →
+#   (б) НА СТЕЛІ (файл ≥ 90 % стелі M2): ⚠ і п'ять найдовших відкритих рядків з позначкою, чи є свій бриф `<id>_brief.md` →
 #       агент стискає рядок до «стан + вказівник на бриф» тим самим ходом, теж без питання (правило — ця шапка; рядок у CLAUDE_CODE.md «Що тут лежить»).
 #       Мірило Adobe ai-repo-harness-guide гл.04 (25.11.2026): файл судять, коли він і завеликий, і не виводить назовні; у нас — довгий рядок без брифу.
 # Світ (25.11.2026): Obsidian task-archiver (виконане — з розділом), tada (todo.txt → done.txt, нічого не пише, коли нема що); власний зразок — journal_rotate.py.
-# Не беремо: запуск за розкладом — ми працюємо сесіями, тригер — закриття й розмір. Прилад ніколи не правлять файли на старті — лише в ході коміту агентом.
-#   python3 doc_prune.py <репо> [--dry] [--inject]   → рядок на чергу: «прополка: прибрано N (`id`…) · X → Y Б (Z %)» + ⚠ на стелі; exit 0
+# Не беремо: запуск за розкладом — ми працюємо сесіями, тригер — закриття й розмір. На старті — лише `--dry` (env_check); пише файл агент у ході коміту.
+#   python3 doc_prune.py <репо> [--dry] [--inject]   → рядок на чергу: «прополка <шлях>: прибрано N (`id`…) · X → Y Б (Z % стелі)» (або «закритих нема»)
+#     + ⚠ на стелі; exit 0 (--inject: 1, якщо підкинутий закритий не прибрано)
 #   python3 doc_prune.py selftest
-import sys, os, re, glob, tempfile, shutil
+import sys, os, re, glob, tempfile, shutil, datetime
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from doc_health import M2_KB   # аудит sonnet 25.11 №7: одна стеля, один дім
 
-CAP, NEAR = 25600, 0.90
+CAP, NEAR = M2_KB * 1024, 0.90
 CLOSED = re.compile(r'✅|(?<!не )(?<!ще не )\bзакрито\b', re.I)   # аудит sonnet 25.11 №4: «не закрито» — відкрите, не чіпати
 DATE = re.compile(r'(\d{1,2})\.(\d{1,2})(?:\.(\d{4}))?')
 
@@ -49,8 +52,8 @@ def prune_text(t):
                         longest.append((len(ls[k].encode()), m.group(1) + (f'|{h.group(1)}' if h else '')))
                 k += 1
             if is_map and done:   # карта: найновіший ✅ лишається
-                def key(x):
-                    d = DATE.search(x[2]); return (int(d.group(3) or 0), int(d.group(2)), int(d.group(1))) if d else (0, 0, 0)
+                def key(x):   # аудит №5: дата без року — цього року, не «найстаріша»
+                    d = DATE.search(x[2]); return (int(d.group(3) or datetime.date.today().year), int(d.group(2)), int(d.group(1))) if d else (0, 0, 0)
                 done.remove(max(done, key=key))
             drop |= {(i, idv) for i, idv, _ in done}
             continue
@@ -74,9 +77,9 @@ def run(repo, dry=False, inject=False):
               f' · {was} → {now} Б ({now * 100 // CAP} % стелі){" · --dry" if dry and gone else ""}'
         lines.append(msg)
         if now >= CAP * NEAR:
-            briefs = {os.path.basename(p).split('_brief')[0] for p in glob.glob(os.path.join(repo, '**', '*_brief.md'), recursive=True) if '/archive/' not in p}
+            briefs = {re.sub(r'^Lens_', '', os.path.basename(p).split('_brief')[0]) for p in glob.glob(os.path.join(repo, '**', '*_brief.md'), recursive=True) if '/archive/' not in p}   # аудит №3: точний збіг id (ядро — Lens_<id>)
             lines.append(f'⚠ {rel} на стелі ({now} / {CAP} Б) — стисни найдовші відкриті до «стан + вказівник» без питання: ' +
-                         ' · '.join(f'`{i.split("|")[0]}` {b} Б (' + (f'дім: `{i.split("|")[1]}`' if '|' in i else 'бриф є' if i in briefs or any(i in x for x in briefs) else 'брифу нема — створи або стисни') + ')' for b, i in top))
+                         ' · '.join(f'`{i.split("|")[0]}` {b} Б (' + (f'дім: `{i.split("|")[1]}`' if '|' in i else 'бриф є' if i in briefs else 'брифу нема — створи або стисни') + ')' for b, i in top))
     if not lines: lines.append('прополка: черг (*_CHERGA.md) не знайдено')
     return '\n'.join(lines), code
 
@@ -101,6 +104,12 @@ def selftest():
         open(p, 'w').write(live.replace('| `A-1` | відкрите | ○ |', '| `A-1` | відкрите | ○ |\n| `L-1` | ' + 'д' * 12000 + ' | ○ |'))
         m4, _ = run(tmp); cases.append(('на стелі — ⚠ з найдовшим рядком', '⚠' in m4 and '`L-1`' in m4))
         cases.append(('«бриф не треба: стан — `файл`» — дім названо, не «брифу нема»', 'дім: `lens/D.md`' in m4))
+        open(os.path.join(tmp, 'lens', 'L-1_brief.md'), 'w').write('б'); open(os.path.join(tmp, 'lens', 'XL-10_brief.md'), 'w').write('б')
+        m6, _ = run(tmp); cases.append(('бриф — точний збіг id: `L-1_brief.md` → «бриф є» (аудит №3)', '`L-1`' in m6 and 'бриф є' in m6))
+        t6 = open(p).read(); open(p, 'w').write(t6.replace('`L-1`', '`L-2`')); os.remove(os.path.join(tmp, 'lens', 'L-1_brief.md'))
+        m7, _ = run(tmp); cases.append(('`L-2` при `XL-10_brief.md` — не «бриф є» (підрядок не рахується)', '`L-2`' in m7 and 'бриф є' not in m7))
+        k = prune_text('| крок | що | далі | стан |\n|---|---|---|---|\n| `S1` | а | `S2` | ✅ 20.11.' + str(datetime.date.today().year - 1) + ' |\n| `S2` | б | `S3` | ✅ 22.11 |\n')
+        cases.append(('карта: «22.11» без року новіше за «20.11.<торік>» (аудит №5)', k[1] == ['S1']))
         m5, c5 = run(tmp, inject=True); cases.append(('--inject: підкинутий закритий → ЗЛОВИВ', 'ЗЛОВИВ' in m5 and c5 == 0))
         for n, ok in cases: bad += not ok; print(f'{"✓" if ok else "✗"} {n}')
     finally:
