@@ -20,8 +20,9 @@
 Конфіг (JSON у репо продукту; шляхи — від `root`, який рахується від теки конфігу):
   name · stand (сторінка, що малює гліф) · glyph (CSS-селектор svg знака) · frame (елемент, чиї фон і змінні беремо) · ink_from (селектор
   предка, чий color = лінії; нема — батько svg) · theme_js (JS перемикання теми, THEME — 'light'/'dark') · vars {g1, g2, canvas} (імена
-  CSS-змінних акценту й полотна) · layers {body, rim, accent} — індекси шляхів гліфа (від'ємні — з кінця), решта — ink · style (пресет
-  STYLES) · styles (перекриття пресетів) · stroke · out {brand, icons, manifest, shell, css} · seal (ключ tEXt) · template (regex мітки
+  CSS-змінних акценту й полотна) · layers {body, rim, accent, fill, fillacc} — індекси фігур гліфа (path · rect · circle; від'ємні — з кінця), решта — ink · style (пресет
+  STYLES) · styles (перекриття пресетів) · look (манера: glass-1 — типова, як було · glass-2026 — блиск по краю шару, ICON-2) · bg (свій
+  фон літералом CSS, коли сторінка аврори не має) · stroke · out {brand, icons, manifest, shell, css} · seal (ключ tEXt) · template (regex мітки
   збірки в маніфесті, група 1 = шлях) · glyph_name (для шапки mark.svg) · icons (список [файл, розмір, any|mask]; нема — ICONS).
 Нова роль шару (гліф інакшої будови) — правка тут разом із selftest, не обхід у продукті.
 Генерація — Chromium (Playwright), Pillow; --check — stdlib + Chromium (лише для сторінки).
@@ -63,6 +64,8 @@ def load(p):
     c.setdefault('style', 'aurora-dark'); c.setdefault('stroke', 1.5); c.setdefault('glyph_name', 'гліф')
     c['icons'] = [tuple(x) for x in c.get('icons', ICONS)]
     c['_styles'] = {k: dict(v, **c.get('styles', {}).get(k, {})) for k, v in STYLES.items()}
+    if c.get('look', 'glass-1') not in LOOKS:
+        raise SystemExit(f'конфіг: манера «{c["look"]}» не з {list(LOOKS)}')
     if c['style'] not in c['_styles']:
         raise SystemExit(f'конфіг: стиль «{c["style"]}» не з {list(c["_styles"])}')
     return c
@@ -145,14 +148,56 @@ def rim_svg():
 def roles(c, n):
     """Індекси шляхів → роль: body (скло: тінь, заливка, обідок) · rim (лише обідок) · accent (градієнт + ореол) · решта ink."""
     r = ['ink'] * n
-    for role in ('body', 'rim', 'accent'):
+    for role in ('body', 'rim', 'accent', 'fill', 'fillacc'):   # fill · fillacc — суцільна фігура кольором лінії / акценту (ICON-2)
         for i in c['layers'].get(role, []):
             if not -n <= i < n:
                 raise SystemExit(f'конфіг layers.{role}: індекс {i} поза гліфом ({n} шляхів)')
             r[i] = role
-    if 'body' not in r:
+    if 'body' not in r and c.get('look', 'glass-1') != 'glass-2026':   # glass-2026: скло — блиск і тінь кожного шару, тіло не обовʼязкове
         raise SystemExit('конфіг layers: нема body — склу нема на чому лежати')
     return r
+
+
+LOOKS = ('glass-1', 'glass-2026')   # манера (ICON-2, Konst 26.11.2026: «не забирати те, що вже вміє, лише доповнювати… перемикатися між пресетами»)
+# glass-1 — як було (типова: значки EquipLens і Маршруту не міняються, зуб — --check). glass-2026 — направлений блиск по краю кожного шару
+# (світло згори-зліва; Apple Icon Composer: specular по краю шару, developer.apple.com/icon-composer, 26.11.2026), тінь під кожним шаром,
+# акцент — градієнт зі світлим верхом. Практика «старий пресет лишається, новий обирають явно» — @vite-pwa/assets-generator minimal → minimal-2023.
+
+
+def shapes(inner):
+    """Шляхи гліфа по порядку появи: path — як є; rect · circle → path (гліф із фігур — QR Lens, ICON-2). Як usvg (docs.rs usvg shapes.rs,
+    26.11.2026): радіус обрізано до половини сторони, ry = rx, коло — двома півдугами."""
+    inner = re.sub(r'<defs>.*?</defs>', '', inner, flags=re.S); out = []
+    for m in re.finditer(r'<(path|rect|circle)\b([^>]*)>', inner):
+        tag, a = m.group(1), m.group(2)
+        def g(k, d=0.0):
+            v = re.search(r'\s' + k + r'="([^"]+)"', a)
+            return float(v.group(1)) if v else d
+        if tag == 'path':
+            v = re.search(r'\sd="([^"]+)"', a)
+            if v: out.append(v.group(1))
+        elif tag == 'rect':
+            x, y, w, h = g('x'), g('y'), g('width'), g('height'); r = min(g('rx', g('ry')), w / 2, h / 2)
+            out.append(f'M{num(x + r)} {num(y)}H{num(x + w - r)}A{num(r)} {num(r)} 0 0 1 {num(x + w)} {num(y + r)}V{num(y + h - r)}'
+                       f'A{num(r)} {num(r)} 0 0 1 {num(x + w - r)} {num(y + h)}H{num(x + r)}A{num(r)} {num(r)} 0 0 1 {num(x)} {num(y + h - r)}'
+                       f'V{num(y + r)}A{num(r)} {num(r)} 0 0 1 {num(x + r)} {num(y)}Z')
+        else:
+            cx, cy, r = g('cx'), g('cy'), g('r')
+            out.append(f'M{num(cx - r)} {num(cy)}A{num(r)} {num(r)} 0 1 0 {num(cx + r)} {num(cy)}A{num(r)} {num(r)} 0 1 0 {num(cx - r)} {num(cy)}Z')
+    return out
+
+
+def mix(h, w, t):
+    a, b = [int(h[i:i + 2], 16) for i in (1, 3, 5)], [int(w[i:i + 2], 16) for i in (1, 3, 5)]
+    return '#%02X%02X%02X' % tuple(round(x + (y - x) * t) for x, y in zip(a, b))
+
+
+def lift(h, light):
+    """Світліший тон того самого кольору без вицвітання: світлота в HLS → light, насиченість не нижча за 0,6 (mix із білим сірить — ряд 3 QR, 26.11)."""
+    import colorsys
+    r, g, b = [int(h[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+    hh, _, ss = colorsys.rgb_to_hls(r, g, b)
+    return '#%02X%02X%02X' % tuple(round(x * 255) for x in colorsys.hls_to_rgb(hh, light, max(ss, .6)))
 
 
 def icon_html(c, pr, kind, style):
@@ -164,7 +209,7 @@ def icon_html(c, pr, kind, style):
     x, y, w, h = x - sw / 2, y - sw / 2, w + sw, h + sw
     side = max(w, h) / FRAC[kind]
     vx, vy = x + w / 2 - side / 2, y + h / 2 - side / 2
-    ps = re.findall(r'<path[^>]*\sd="([^"]+)"', re.sub(r'<defs>.*?</defs>', '', L['inner'], flags=re.S))
+    ps = shapes(L['inner']); new = c.get('look', 'glass-1') == 'glass-2026'
     rl = roles(c, len(ps))
     by = lambda *k: [p for p, r in zip(ps, rl) if r in k]
     cl = lambda d: d if d.rstrip()[-1:] in ('Z', 'z') else d + 'Z'
@@ -173,18 +218,26 @@ def icon_html(c, pr, kind, style):
     tr = 'url(#acc)' if st['tray'] == 'acc' else st['tray']
     k = f' stroke-linecap="{L["cap"]}" stroke-linejoin="{L["join"]}"'
     svg = (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{num(vx)} {num(vy)} {num(side)} {num(side)}">'
-           f'<defs><linearGradient id="acc" x1="0" y1="0" x2="1" y2="1"><stop stop-color="{g1}"/><stop offset="1" stop-color="{g2}"/></linearGradient>'
-           f'<linearGradient id="fill" x1="0" y1="0" x2=".4" y2="1"><stop stop-color="{st["fill"][0]}"/><stop offset="1" stop-color="{st["fill"][1]}"/></linearGradient>'
+           + (f'<defs><linearGradient id="acc" x1="0" y1="0" x2="1" y2="1"><stop stop-color="{lift(g1, .7)}"/><stop offset=".45" stop-color="{g1}"/><stop offset="1" stop-color="{g2}"/></linearGradient>'
+              '<linearGradient id="spec" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff" stop-opacity=".95"/><stop offset=".5" stop-color="#fff" stop-opacity=".35"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>'
+              if new else f'<defs><linearGradient id="acc" x1="0" y1="0" x2="1" y2="1"><stop stop-color="{g1}"/><stop offset="1" stop-color="{g2}"/></linearGradient>')
+           + f'<linearGradient id="fill" x1="0" y1="0" x2=".4" y2="1"><stop stop-color="{st["fill"][0]}"/><stop offset="1" stop-color="{st["fill"][1]}"/></linearGradient>'
            '<filter id="sh" filterUnits="userSpaceOnUse" x="-20" y="-20" width="64" height="64"><feGaussianBlur stdDeviation=".9"/></filter>'
            '<filter id="glow" filterUnits="userSpaceOnUse" x="-20" y="-20" width="64" height="64"><feGaussianBlur stdDeviation=".6"/></filter></defs>'
            f'<g fill="none"{k}>'
            + ''.join(f'<path d="{cl(d)}" fill="rgba(0,0,0,{st["shadow"]})" transform="translate(0 .9)" filter="url(#sh)"/>' for d in by('body'))   # тінь шару
+           + (''.join(f'<path d="{d}" stroke="rgba(0,0,0,{st["shadow"]})" stroke-width="{num(sw * 1.15)}" transform="translate(0 .9)" filter="url(#sh)"/>' for d in by('rim', 'accent', 'ink'))
+              + ''.join(f'<path d="{cl(d)}" fill="rgba(0,0,0,{st["shadow"]})" transform="translate(0 .9)" filter="url(#sh)"/>' for d in by('fill', 'fillacc')) if new else '')
            + ''.join(f'<path d="{cl(d)}" fill="url(#fill)"/>' for d in by('body'))                                                             # тіло скла
            + ''.join(f'<path d="{d}" stroke="{st["rim"]}" stroke-width="{num(sw * .87)}"/>' for d in by('body', 'rim'))                       # один обідок
            + ''.join(f'<path d="{d}" stroke="{ink}" stroke-width="{num(sw)}"/>' for d in by('ink'))
            + ''.join(f'<path d="{d}" stroke="{tr}" stroke-width="{num(sw * 1.25)}" opacity=".28" filter="url(#glow)"/>' for d in by('accent'))   # ледь-ореол (S38: глоу був сильний)
-           + ''.join(f'<path d="{d}" stroke="{tr}" stroke-width="{num(sw * 1.15)}"/>' for d in by('accent')) + '</g></svg>')
+           + ''.join(f'<path d="{d}" stroke="{tr}" stroke-width="{num(sw * (1 if new else 1.15))}"/>' for d in by('accent'))   # glass-2026: штрих гліфа дослівно
+           + ''.join(f'<path d="{cl(d)}" fill="{ink}"/>' for d in by('fill')) + ''.join(f'<path d="{cl(d)}" fill="{tr}"/>' for d in by('fillacc'))
+           + (''.join(f'<path d="{d}" stroke="url(#spec)" stroke-width="{num(sw * .3)}" transform="translate({num(-sw * .2)} {num(-sw * .2)})" opacity=".75"/>'
+                      for d in by('body', 'rim', 'accent', 'ink')) if new else '') + '</g></svg>')   # glass-2026: блиск по верхньо-лівому краю шару
     bg = f'background:linear-gradient(150deg,{g1},{g2})' if style == 'accent' else f'background-color:{L["bgc"]};background-image:{L["aur"]}'
+    if c.get('bg'): bg = f'background:{c["bg"]}'   # свій фон продукту літералом CSS (ICON-2: у сторінки нема аврори — QR Lens)
     return (f'<!-- іконка «{kind}» · стиль {style} · згенеровано {SELF} icons зі сторінки {os.path.basename(c["stand"])} (A75); руками не правити -->\n'
             f'<!doctype html><style>html,body{{margin:0}}.i{{position:relative;width:{ICON_CSS}px;height:{ICON_CSS}px;overflow:hidden;{bg}}}'
             f'.i svg{{position:absolute;inset:0;width:100%;height:100%}}</style><div class="i">{svg}{rim_svg() if kind == "any" else ""}</div>\n')
@@ -452,6 +505,21 @@ def selftest():
             icon_html(c2, pr, 'any', 'aurora-dark'); t(False, 'шари поза гліфом → помилка конфігу')
         except SystemExit as x:
             t('поза гліфом' in str(x), 'шари поза гліфом → помилка конфігу')
+        # ICON-2: манера glass-2026 — новий пресет поруч зі старим; фігури rect · circle; суцільні ролі
+        t('id="spec"' not in fa and 'translate(-' not in fa, 'glass-1 (типова): кадр без нового блиску — старий пресет не змінено')
+        sp = shapes('<rect x="2" y="2" width="7.5" height="7.5" rx="1.6"/><circle cx="12" cy="12" r="3"/><path d="M1 1L2 2"/>')
+        t(len(sp) == 3 and sp[0].startswith('M3.6 2H7.9A1.6') and sp[1].count('A3 3') == 2 and sp[2] == 'M1 1L2 2', 'фігури: rect → шлях з дугами · circle → дві півдуги · path як є')
+        q = cp_pr(pr); q['light']['inner'] = q['dark']['inner'] = ('<rect x="2" y="2" width="7.5" height="7.5" rx="1.6"/><rect x="4.4" y="4.4" width="2.7" height="2.7" rx=".7"/>'
+                                                                  '<rect x="14.5" y="14.5" width="3" height="3" rx=".5"/>')
+        c3 = load(cp); c3['look'] = 'glass-2026'; c3['layers'] = {'body': [0], 'fill': [1], 'fillacc': [2]}; c3['bg'] = 'linear-gradient(#123,#456)'
+        h3 = icon_html(c3, q, 'any', 'aurora-dark')
+        t('id="spec"' in h3 and 'stroke="url(#spec)"' in h3 and h3.count('fill="url(#acc)"') == 1 and 'background:linear-gradient(#123,#456)' in h3,
+          'glass-2026: блиск по краю шару · fillacc — суцільний акцент · свій фон з конфігу')
+        c4 = load(cp); c4['look'] = 'glass-2099'; json.dump(dict(cfg, look='glass-2099'), open(cp, 'w', encoding='utf-8'))
+        try:
+            load(cp); t(False, 'невідома манера → помилка конфігу')
+        except SystemExit as x:
+            t('манера' in str(x), 'невідома манера → помилка конфігу')
     finally:
         shutil.rmtree(d, ignore_errors=True)
     print(f'pwa_icon selftest: {ok}/{ok + bad}' + (' · є ✗' if bad else ''))

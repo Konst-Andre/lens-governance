@@ -30,7 +30,7 @@
  "profile_check.sh selftest": 3,
  "promise-guard.sh selftest": 56,
  "pw_quiet.py selftest": 8,
- "pwa_icon.py selftest": 9,
+ "pwa_icon.py selftest": 13,
  "rejected-guard.py selftest": 13,
  "review-remind.sh selftest": 9,
  "route-remind.sh selftest": 16,
