@@ -2,7 +2,7 @@
 
 > живе доки: пункт `SYN-1` відкритий; закрито → §7 заповнено, файл → `archive/` (у черзі — рядок прибрано).
 > читається коли: беруся за `SYN-1` · правлю один прилад чи гачок і бачу, що він зачіпає інший · не читається: на старті сесії (рядок черги веде сюди).
-> дім: `kernel/Lens_SYN-1_brief.md` · оголошено: `kernel/Lens_INDEX.md` · створено: 25.11.2026, EquipLens S45 · джерела: `EquipLens:sessions/EquipLens_session_summary_S45_TOOLS.md` §0 п.1, журнал гачків 25.11.
+> дім: `kernel/Lens_SYN-1_brief.md` · оголошено: `kernel/Lens_INDEX.md` · створено: 25.11.2026, EquipLens S45 · джерела: `EquipLens:archive/summaries/EquipLens_session_summary_S45_TOOLS.md` §0 п.1, журнал гачків 25.11.
 > стежить за: `tools/claude-code/hooks/` · `tools/claude-code/doc_prune.py` · `tools/claude-code/doc_health.py` · `kernel/Lens_validate.py` · `tools/claude-code/frame_check.sh`
 
 ## §0 Коротко — зараз і далі (оновлено 25.11.2026, EquipLens S45)
