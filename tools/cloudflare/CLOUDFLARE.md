@@ -136,7 +136,7 @@ fresh_days=30
 | `qr-lens` | **воркер** `[assets]`=`docs/` (`qr-lens.konstandre.workers.dev`) + Pages (тека `docs`, на час переходу людей) | QR-Lens | воркер: Workers Builds `main`, include `*`, exclude `lens/*` `archive/*` `sessions/*` `tools/*` `.claude/*` `CLAUDE.md` `README.md` (06.10, перевірено двома комітами) | Pages: усі гілки | ⚠ Pages: старі деплої віддають список PSR — видалити, коли люди перейдуть (`QR-Lens` `QRL-1`) |
 | ~~`drive-lens-preview`~~ | Pages | Drive-Lens-preview | — | — | видалено Konst 05.10 (репо поки лишається) |
 | `lens-gh` | воркер | lens-governance (`tools/lens-gh/`) | — (деплой руками) | — | сервер конектора «Lens GitHub» для Project — **живий, не сирітка** (Project працює: Routes та ін., Konst 06.10) |
-| `equiplens` | воркер + `[assets]`=`docs/` (`equiplens.konstandre.workers.dev`); прев'ю-аліас `stand` — стенд | EquipLens | Workers Builds `main` (`EquipLens:wrangler.toml`; крок Б ✅ 22.11.2026 — `EquipLens:lens/HOST-1_brief.md`) | `stand-equiplens` (з контейнера) | створено 20.11.2026, «так» Konst (EquipLens S37); Pages EquipLens ще живі (GitHub Pages, не Cloudflare) |
+| `equiplens` | воркер + `[assets]`=`docs/` (`equiplens.konstandre.workers.dev`); прев'ю-аліас `stand` — стенд | EquipLens | Workers Builds `main` (`EquipLens:wrangler.toml`; крок Б ✅ 22.11.2026 — `EquipLens:lens/HOST-1_brief.md`) | `stand-equiplens` (з контейнера) | створено 20.11.2026, «так» Konst (EquipLens S37); GitHub Pages EquipLens вимкнено 22.11.2026, репо приватне (`EquipLens:lens/HOST-1_brief.md` §2) |
 
 ## 4. Як репо підключається (раз)
 
