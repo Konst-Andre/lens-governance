@@ -130,7 +130,8 @@ def live_url(repo):
 def live_sha(url):
     """Хеш карти з <meta name="route-map-commit"> живої сторінки (urllib; file:// — для selftest)."""
     import urllib.request
-    html = urllib.request.urlopen(url, timeout=8).read().decode('utf-8', 'replace')
+    req = urllib.request.Request(url, headers={'User-Agent': 'lens-route-check/1'})   # типовий UA Python-urllib Cloudflare віддає 403 (наживо 26.11.2026, EquipLens S47); curl — 200
+    html = urllib.request.urlopen(req, timeout=8).read().decode('utf-8', 'replace')
     m = re.search(r'<meta name="route-map-commit" content="([0-9a-f?]+)"', html)
     return m.group(1) if m else None
 
