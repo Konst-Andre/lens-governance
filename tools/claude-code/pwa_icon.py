@@ -10,7 +10,7 @@
 @vite-pwa/assets-generator (pwa-assets.config, vite-pwa-org.netlify.app/assets-generator, 20.11.2026); джерелом у нас — не картинка, а гліф.
 
   python3 pwa_icon.py icons <конфіг.json> [--sheet <тека>]   — кадри (mark.svg · icon-any.html · icon-mask.html) і PNG; --sheet — аркуш
-                                                              стилів на трьох шпалерах для вироку (у git — ні)
+                                                              стилів × манер (рядок на манеру) на трьох шпалерах для вироку (у git — ні)
   python3 pwa_icon.py --check <конфіг.json> [--inject]       — кадри знову виходять зі сторінки ≡ закоміченим · PNG розмір / тип 2 /
                                                               печатка · маніфест (id, any і maskable окремо, розміри, фон ≡ полотну) ·
                                                               meta оболонки (A1, A55) · safe-area; --inject — 4 підкидання → «ЗЛОВИВ»
@@ -22,7 +22,10 @@
   предка, чий color = лінії; нема — батько svg) · theme_js (JS перемикання теми, THEME — 'light'/'dark') · vars {g1, g2, canvas} (імена
   CSS-змінних акценту й полотна) · layers {body, rim, accent, fill, fillacc} — індекси фігур гліфа (path · rect · circle; від'ємні — з кінця), решта — ink · style (пресет
   STYLES) · styles (перекриття пресетів) · look (манера: glass-1 — типова, як було · glass-2026 — блиск по краю шару, ICON-2) · bg (свій
-  фон літералом CSS, коли сторінка аврори не має) · stroke · out {brand, icons, manifest, shell, css} · seal (ключ tEXt) · template (regex мітки
+  фон літералом CSS, коли сторінка аврори не має) · frac {any, mask} (частка гліфа до сторони; нема — FRAC) · deco (шар-прикраса, ICON-3:
+  {"kind": "magnifier", "cx", "cy", "r", "deg", "len", "w"} — лінза зі склом, ручка-циліндр і муфта в одиницях кадру 100; гліф — у центрі
+  лінзи; тон ручки — від теми стилю, "tone" перекриває; "colors" {ring, dot, handle, ferrule} — точні кольори замість виведених з акценту;
+  "shadow" — тінь гліфа) · stroke · out {brand, icons, manifest, shell, css} · seal (ключ tEXt) · template (regex мітки
   збірки в маніфесті, група 1 = шлях) · glyph_name (для шапки mark.svg) · icons (список [файл, розмір, any|mask]; нема — ICONS).
 Нова роль шару (гліф інакшої будови) — правка тут разом із selftest, не обхід у продукті.
 Генерація — Chromium (Playwright), Pillow; --check — stdlib + Chromium (лише для сторінки).
@@ -66,6 +69,7 @@ def load(p):
     c['_styles'] = {k: dict(v, **c.get('styles', {}).get(k, {})) for k, v in STYLES.items()}
     if c.get('look', 'glass-1') not in LOOKS:
         raise SystemExit(f'конфіг: манера «{c["look"]}» не з {list(LOOKS)}')
+    deco_check(c)
     if c['style'] not in c['_styles']:
         raise SystemExit(f'конфіг: стиль «{c["style"]}» не з {list(c["_styles"])}')
     return c
@@ -200,6 +204,103 @@ def lift(h, light):
     return '#%02X%02X%02X' % tuple(round(x * 255) for x in colorsys.hls_to_rgb(hh, light, max(ss, .6)))
 
 
+DECO = ('magnifier',)   # шар-прикраса (ICON-3, Konst 26.11.2026: «навчити генератор шару-прикраси… хоча б на 90 %, потім доробити руками»)
+# Зразок — ручний значок 12 QR Lens (QR-Lens:lens/shots/QRL-22_ikonka/gen_ikonka_r3.py): тоноване скло · тінь під обідком · відблиск-
+# півмісяць · ручка-циліндр (градієнт поперек осі) · муфта свого металу (Konst 26.11: на темному «розчиняється»). Кольори — від акценту.
+# Практика: Icon Composer — до 4 груп, скло · тінь · блиск — на рівні групи; тінь на білому — кольорова, на темному — нейтральна
+# (developer.apple.com/videos/play/wwdc2026/8012, 26.11.2026) → прикраса — окремі групи під і над гліфом, тон — від теми. Заломлення — ні:
+# у SVG дороге (feDisplacementMap) і ріже дрібний гліф.
+
+
+def frac(c, kind):
+    """Частка гліфа до сторони: конфіг frac → FRAC; з прикрасою — гліф у лінзі (0,53 діаметра), mask — уся композиція × FRAC mask / any."""
+    f = dict(FRAC, **c.get('frac', {}))
+    if c.get('deco') and 'any' not in c.get('frac', {}):
+        f['any'] = c['deco']['r'] * 2 / 100 * .53
+    if c.get('deco') and 'mask' not in c.get('frac', {}):
+        f['mask'] = f['any'] * FRAC['mask'] / FRAC['any']
+    return f[kind]
+
+
+def deco_check(c):
+    """Прикраса не закриває гліф: півдіагональ гліфа (частка any) — у внутрішньому колі лінзи з зазором (премортем ICON-3)."""
+    d = c.get('deco')
+    if not d:
+        return
+    if d.get('kind', 'magnifier') not in DECO:
+        raise SystemExit(f'конфіг deco: вид «{d.get("kind")}» не з {list(DECO)}')
+    for k in ('cx', 'cy', 'r'):
+        if k not in d:
+            raise SystemExit(f'конфіг deco: нема «{k}»')
+    half, inner = frac(c, 'any') * 100 * math.sqrt(2) / 2, d['r'] - 2.6 - 1.9
+    if half > inner:
+        raise SystemExit(f'конфіг deco: гліф не влазить у лінзу — півдіагональ {half:.1f} > внутрішнього кола {inner:.1f} (менше frac.any чи більше r)')
+
+
+def deco_svg(c, L, st, kind):
+    """→ (під гліфом, над гліфом): дві SVG 0..100 (mask — стиснуто до центру). id з префіксом d — у кадрі три SVG в одному документі."""
+    d = c['deco']
+    k = frac(c, 'mask') / frac(c, 'any') if kind == 'mask' else 1
+    vb = f'{num(50 - 50 / k)} {num(50 - 50 / k)} {num(100 / k)} {num(100 / k)}'
+    cx, cy, r = d['cx'], d['cy'], d['r']
+    g1, g2 = hexc(L['g1']), hexc(L['g2'])
+    light = d.get('tone', st['theme']) == 'light'
+    a = math.radians(d.get('deg', 45)); ca, sa = math.cos(a), math.sin(a)
+    w, ln = d.get('w', 10), d.get('len', 15 * math.sqrt(2))
+    x1, y1 = cx + (r - 4) * ca, cy + (r - 4) * sa
+    x2, y2 = cx + (r + .5 + ln) * ca, cy + (r + .5 + ln) * sa
+    px, py = -sa * w / 2, ca * w / 2
+
+    def cap(ax, ay, bx, by, m):
+        return (f'M{num(ax + px * m)} {num(ay + py * m)}L{num(bx + px * m)} {num(by + py * m)}A{num(w / 2 * m)} {num(w / 2 * m)} 0 0 0 {num(bx - px * m)} {num(by - py * m)}'
+                f'L{num(ax - px * m)} {num(ay - py * m)}A{num(w / 2 * m)} {num(w / 2 * m)} 0 0 0 {num(ax + px * m)} {num(ay + py * m)}Z')
+
+    def lg(i, m, stops):
+        return (f'<linearGradient id="{i}" gradientUnits="userSpaceOnUse" x1="{num(x1 + px * m)}" y1="{num(y1 + py * m)}" x2="{num(x1 - px * m)}" y2="{num(y1 - py * m)}">'
+                + ''.join(f'<stop offset="{o}" stop-color="{col}"/>' for o, col in stops) + '</linearGradient>')
+    if light:   # світлий фон: ручка й муфта — тони акценту (значок 15)
+        body = [(0, lift(g2, .24)), (.3, lift(g1, .6)), (.55, g1), (1, lift(g2, .2))]
+        ferr = [(0, lift(g2, .11)), (.28, lift(g1, .62)), (.5, g1), (1, lift(g2, .09))]
+    else:       # темний фон: ручка — світла, муфта — свій темніший метал (значок 12)
+        body = [(0, mix('#888888', g1, .2)), (.3, '#FFFFFF'), (.55, mix('#FFFFFF', g1, .12)), (1, mix('#777777', g1, .2))]
+        ferr = [(0, mix('#333333', g1, .25)), (.28, mix('#FFFFFF', g1, .1)), (.5, mix('#AAAAAA', g1, .25)), (1, mix('#262626', g1, .25))]
+    co = d.get('colors', {})   # точні кольори продукту (QR Lens — літерали ручного 12); нема — від акценту
+    body = list(zip((0, .3, .55, 1), co['handle'])) if 'handle' in co else body
+    ferr = list(zip((0, .28, .5, 1), co['ferrule'])) if 'ferrule' in co else ferr
+    fx, fy = x1 + (x2 - x1) * .38, y1 + (y2 - y1) * .38
+    ro = num(r + 1.6)
+    defs = ('<defs>'
+            f'<radialGradient id="dtint" cx=".3" cy=".26" r=".9"><stop stop-color="{lift(g1, .94)}" stop-opacity=".42"/>'
+            f'<stop offset=".42" stop-color="{lift(g1, .69)}" stop-opacity=".2"/><stop offset=".8" stop-color="{g1}" stop-opacity=".16"/>'
+            f'<stop offset="1" stop-color="{mix(g2, "#000000", .85)}" stop-opacity=".5"/></radialGradient>'
+            '<linearGradient id="dsp" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff" stop-opacity=".98"/><stop offset=".5" stop-color="#fff" stop-opacity=".5"/>'
+            '<stop offset="1" stop-color="#fff" stop-opacity=".18"/></linearGradient>'
+            '<filter id="dsh" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="1.8"/></filter>'
+            '<filter id="dins" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="1.6"/></filter>'
+            + lg('dcy', 1, body) + lg('dfe', 1.1, ferr)
+            + f'<clipPath id="dout"><path clip-rule="evenodd" d="M-10 -10H110V110H-10Z M{num(cx + r + 1.6)} {num(cy)}A{ro} {ro} 0 1 0 {num(cx - r - 1.6)} {num(cy)}'
+              f'A{ro} {ro} 0 1 0 {num(cx + r + 1.6)} {num(cy)}Z"/></clipPath></defs>')
+    hb, fb = cap(x1, y1, x2, y2, 1), cap(x1, y1, fx, fy, 1.08)
+    C = f'cx="{num(cx)}" cy="{num(cy)}"'
+    under = (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{vb}">{defs}<g clip-path="url(#dout)">'
+             f'<path d="{hb}" fill="#000" opacity=".35" filter="url(#dsh)" transform="translate(1.2 2.2)"/><path d="{hb}" fill="url(#dcy)"/>'   # ручка-циліндр
+             f'<path d="{fb}" fill="url(#dfe)"/>'                                                                                                 # муфта
+             f'<path d="M{num(fx + px * 1.08)} {num(fy + py * 1.08)}L{num(fx - px * 1.08)} {num(fy - py * 1.08)}" stroke="#000" stroke-opacity=".45" stroke-width=".7"/>'
+             f'<path d="{fb}" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width=".5"/></g>'
+             f'<circle {C} r="{num(r + 2)}" fill="#000" opacity=".3" filter="url(#dsh)" transform="translate(0 2)"/>'
+             f'<circle {C} r="{num(r)}" fill="url(#dtint)"/></svg>')                                                                              # тоноване скло
+    top = (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{vb}">'
+           f'<circle {C} r="{num(r - 2.6)}" fill="none" stroke="#000" stroke-opacity=".35" stroke-width="3.2" filter="url(#dins)" transform="translate(.6 .9)"/>'   # тінь під обідком
+           f'<path d="M{num(cx - r * .78)} {num(cy + r * .05)}A{num(r * .8)} {num(r * .8)} 0 0 1 {num(cx + r * .05)} {num(cy - r * .78)}'
+           f'A{num(r * .92)} {num(r * .92)} 0 0 0 {num(cx - r * .78)} {num(cy + r * .05)}Z" fill="#fff" opacity=".1"/>'                             # півмісяць
+           f'<circle {C} r="{num(r)}" fill="none" stroke="url(#dsp)" stroke-width="3.8"/>'
+           f'<circle {C} r="{num(r - 2.5)}" fill="none" stroke="#000" stroke-opacity=".22" stroke-width=".7"/>'
+           f'<path d="M{num(cx - r * .72)} {num(cy - r * .34)}A{num(r * .8)} {num(r * .8)} 0 0 1 {num(cx - r * .3)} {num(cy - r * .74)}" fill="none" stroke="#fff"'
+           ' stroke-opacity=".85" stroke-width="1.7" stroke-linecap="round"/>'
+           f'<path d="M{num(cx + r * .5)} {num(cy + r * .62)}A{num(r * .82)} {num(r * .82)} 0 0 0 {num(cx + r * .66)} {num(cy + r * .44)}" fill="none" stroke="#fff"'
+           ' stroke-opacity=".35" stroke-width="1.1" stroke-linecap="round"/></svg>')
+    return under, top
+
 def icon_html(c, pr, kind, style):
     """Кадр 390×390: фон теми сторінки + гліф шаром скла. Кольори — літералами (окремий файл)."""
     st = c['_styles'][style]
@@ -207,9 +308,13 @@ def icon_html(c, pr, kind, style):
     sw = float(c['stroke'])
     x, y, w, h = L['bbox']
     x, y, w, h = x - sw / 2, y - sw / 2, w + sw, h + sw
-    side = max(w, h) / FRAC[kind]
+    side = max(w, h) / frac(c, kind)
     vx, vy = x + w / 2 - side / 2, y + h / 2 - side / 2
+    if c.get('deco'):   # гліф — у центрі лінзи (mask — композиція стиснута до центру кадру)
+        k = frac(c, 'mask') / frac(c, 'any') if kind == 'mask' else 1
+        vx, vy = x + w / 2 - side * (.5 + (c['deco']['cx'] / 100 - .5) * k), y + h / 2 - side * (.5 + (c['deco']['cy'] / 100 - .5) * k)
     ps = shapes(L['inner']); new = c.get('look', 'glass-1') == 'glass-2026'
+    dk = bool(c.get('deco'))
     rl = roles(c, len(ps))
     by = lambda *k: [p for p, r in zip(ps, rl) if r in k]
     cl = lambda d: d if d.rstrip()[-1:] in ('Z', 'z') else d + 'Z'
@@ -236,11 +341,26 @@ def icon_html(c, pr, kind, style):
            + ''.join(f'<path d="{cl(d)}" fill="{ink}"/>' for d in by('fill')) + ''.join(f'<path d="{cl(d)}" fill="{tr}"/>' for d in by('fillacc'))
            + (''.join(f'<path d="{d}" stroke="url(#spec)" stroke-width="{num(sw * .3)}" transform="translate({num(-sw * .2)} {num(-sw * .2)})" opacity=".75"/>'
                       for d in by('body', 'rim', 'accent', 'ink')) if new else '') + '</g></svg>')   # glass-2026: блиск по верхньо-лівому краю шару
+    if dk:   # гліф у лінзі — рецепт ручного значка 12 (ICON-3, Konst 26.11: «чому не 100 %?»): тінь групою, блиск лише по штрихах, без ореолу
+        col = c['deco'].get('colors', {})
+        ring = col.get('ring', [lift(g1, .86), lift(g1, .61), g1])   # під склом гліф на тон світліший — тонування його гасить
+        dot, u = col.get('dot', mix('#FFFFFF', g1, .05)), side / 100   # u — одиниць гліфа на одиницю кадру
+        strk, flat = by('body', 'rim', 'accent', 'ink'), by('fill', 'fillacc')
+        svg = (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{num(vx)} {num(vy)} {num(side)} {num(side)}"><defs>'
+               f'<linearGradient id="acc" x1="0" y1="0" x2="1" y2="1"><stop stop-color="{ring[0]}"/><stop offset=".45" stop-color="{ring[1]}"/><stop offset="1" stop-color="{ring[2]}"/></linearGradient>'
+               f'<filter id="sh" filterUnits="userSpaceOnUse" x="-20" y="-20" width="64" height="64"><feGaussianBlur stdDeviation="{num(1.8 * u)}"/></filter></defs>'
+               f'<g transform="translate(0 {num(1.2)})" filter="url(#sh)" opacity="{c["deco"].get("shadow", .3)}"><g fill="none" stroke="#000" stroke-width="{num(sw)}"{k}>'
+               + ''.join(f'<path d="{d}"/>' for d in strk) + '</g><g fill="#000">' + ''.join(f'<path d="{cl(d)}"/>' for d in flat) + '</g></g>'
+               f'<g fill="none" stroke="url(#acc)" stroke-width="{num(sw)}"{k}>' + ''.join(f'<path d="{d}"/>' for d in strk) + '</g>'
+               f'<g fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="{num(.35)}" transform="translate({num(-.35)} {num(-.35)})"{k}>'   # блиск по верхньо-лівому краю
+               + ''.join(f'<path d="{d}"/>' for d in strk) + '</g>'
+               + ''.join(f'<path d="{cl(d)}" fill="{dot}"/>' for d in by('fill')) + ''.join(f'<path d="{cl(d)}" fill="url(#acc)"/>' for d in by('fillacc')) + '</svg>')
     bg = f'background:linear-gradient(150deg,{g1},{g2})' if style == 'accent' else f'background-color:{L["bgc"]};background-image:{L["aur"]}'
     if c.get('bg'): bg = f'background:{c["bg"]}'   # свій фон продукту літералом CSS (ICON-2: у сторінки нема аврори — QR Lens)
+    du, dt = deco_svg(c, L, st, kind) if c.get('deco') else ('', '')
     return (f'<!-- іконка «{kind}» · стиль {style} · згенеровано {SELF} icons зі сторінки {os.path.basename(c["stand"])} (A75); руками не правити -->\n'
             f'<!doctype html><style>html,body{{margin:0}}.i{{position:relative;width:{ICON_CSS}px;height:{ICON_CSS}px;overflow:hidden;{bg}}}'
-            f'.i svg{{position:absolute;inset:0;width:100%;height:100%}}</style><div class="i">{svg}{rim_svg() if kind == "any" else ""}</div>\n')
+            f'.i svg{{position:absolute;inset:0;width:100%;height:100%}}</style><div class="i">{du}{svg}{dt}{rim_svg() if kind == "any" else ""}</div>\n')
 
 
 def sources(c, pr, style=None):
@@ -295,20 +415,22 @@ def sheet(c, pr, d):
     """Аркуш вироку стилю (A75 «фон — device-рішення»): кожен стиль 180 px під маскою iOS на світлих, темних і фото-шпалерах."""
     from PIL import Image, ImageDraw
     os.makedirs(d, exist_ok=True)
-    big = raster({s: icon_html(c, pr, 'any', s) for s in c['_styles']})
+    big = raster({(lk, s): icon_html(dict(c, look=lk), pr, 'any', s) for lk in LOOKS for s in c['_styles']})   # рядок на манеру (ICON-3: вибір — Konst з аркуша)
     n, walls, S = 180, [('#F2F2F7', 'світлі'), ('#1C1C1E', 'темні'), ('#6B8FA8', 'фото')], list(c['_styles'])
     mask = Image.new('L', (n * 4, n * 4), 0)
     ImageDraw.Draw(mask).rounded_rectangle([0, 0, n * 4 - 1, n * 4 - 1], radius=int(n * 4 * .225), fill=255)   # лише показ маски iOS
     mask = mask.resize((n, n), Image.LANCZOS)
-    W = Image.new('RGB', (len(walls) * (len(S) * 200 + 20), 260), '#FFFFFF')
+    W = Image.new('RGB', (len(walls) * (len(S) * 200 + 20), 20 + 240 * len(LOOKS)), '#FFFFFF')
     for i, (col, _) in enumerate(walls):
         x0 = i * (len(S) * 200 + 20)
-        ImageDraw.Draw(W).rectangle([x0 + 10, 10, x0 + len(S) * 200 + 10, 250], fill=col)
-        for j, s in enumerate(S):
-            W.paste(big[s].resize((n, n), Image.LANCZOS), (x0 + 20 + j * 200, 40), mask)
+        ImageDraw.Draw(W).rectangle([x0 + 10, 10, x0 + len(S) * 200 + 10, 10 + 240 * len(LOOKS)], fill=col)
+        for r, lk in enumerate(LOOKS):
+            for j, s in enumerate(S):
+                W.paste(big[(lk, s)].resize((n, n), Image.LANCZOS), (x0 + 20 + j * 200, 40 + 240 * r), mask)
     p = os.path.join(d, 'icon_compare.png')
     W.save(p)
-    print(f'  аркуш стилів: {p} (у кожній групі: ' + ' · '.join(S) + '; шпалери: ' + ' · '.join(nm for _, nm in walls) + ')')
+    print(f'  аркуш стилів: {p} (рядки — манери: ' + ' · '.join(LOOKS) + f' (у конфігу — {c.get("look", "glass-1")}); у групі: ' + ' · '.join(S)
+          + '; шпалери: ' + ' · '.join(nm for _, nm in walls) + ')')
 
 
 def png_meta(path):
@@ -515,6 +637,24 @@ def selftest():
         h3 = icon_html(c3, q, 'any', 'aurora-dark')
         t('id="spec"' in h3 and 'stroke="url(#spec)"' in h3 and h3.count('fill="url(#acc)"') == 1 and 'background:linear-gradient(#123,#456)' in h3,
           'glass-2026: блиск по краю шару · fillacc — суцільний акцент · свій фон з конфігу')
+        # ICON-3: шар-прикраса «лупа» · frac · тон · зазор (QR Lens, значок 12)
+        c5 = load(cp); c5['look'] = 'glass-2026'; c5['layers'] = c3['layers']; c5['deco'] = {'kind': 'magnifier', 'cx': 44, 'cy': 44, 'r': 32}
+        a5, m5 = icon_html(c5, q, 'any', 'aurora-dark'), icon_html(c5, q, 'mask', 'aurora-dark')
+        t(a5.count('<svg') == 4 and 'id="dtint"' in a5 and 'id="dfe"' in a5 and a5.index('id="dtint"') < a5.index('id="acc"') < a5.index('stroke="url(#dsp)"'),
+          'прикраса: скло й ручка під гліфом, обідок і блиск над ним (4 SVG: під · гліф · над · кант)')
+        t(abs(frac(c5, 'any') - .3392) < 1e-3 and 'viewBox="0 0 100 100"' in a5 and 'viewBox="-16' in m5, 'frac: гліф 0,34 у лінзі r 32 · mask — композиція стиснута (FRAC mask / any)')
+        lt = icon_html(c5, q, 'any', 'aurora-light'); dkc = re.search(r'id="dfe".*?stop-color="(#\w+)"', a5).group(1)
+        t(dkc != re.search(r'id="dfe".*?stop-color="(#\w+)"', lt).group(1), 'тон: муфта на темному й світлому — різний метал')
+        t(icon_html(dict(c5, deco=None), q, 'any', 'aurora-dark').count('<svg') == 2, 'без deco — кадр як був (гліф · кант)')
+        c7 = dict(c5, deco=dict(c5['deco'], colors={'ring': ['#B8FFF0', '#5FD6C2', '#2A8C84'], 'dot': '#F4FBFA', 'handle': ['#7F9C99', '#FFFFFF', '#E3EFED', '#6F8A88']}))
+        a7 = icon_html(c7, q, 'any', 'aurora-dark')
+        t('stop-color="#B8FFF0"' in a7 and 'fill="#F4FBFA"' in a7 and 'stop-color="#7F9C99"' in a7 and 'filter="url(#glow)"' not in a7,
+          'colors: точні кольори гліфа й ручки з конфігу · гліф у лінзі без ореолу (рецепт ручного 12)')
+        c6 = dict(c5, frac={'any': .5})
+        try:
+            deco_check(c6); t(False, 'гліф більший за лінзу → помилка конфігу')
+        except SystemExit as x:
+            t('не влазить' in str(x), 'гліф більший за лінзу → помилка конфігу')
         c4 = load(cp); c4['look'] = 'glass-2099'; json.dump(dict(cfg, look='glass-2099'), open(cp, 'w', encoding='utf-8'))
         try:
             load(cp); t(False, 'невідома манера → помилка конфігу')
