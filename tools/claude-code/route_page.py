@@ -316,7 +316,7 @@ stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;color:var(--ink-2)}}
 .barl{{color:var(--ink-2);font-size:13px;margin:6px 0 0}}
 code{{font-family:inherit;font-weight:650;font-size:.92em;overflow-wrap:anywhere}}a{{color:inherit;text-underline-offset:2px}}
 .card,.blk,.steps{{background:var(--glass);border:1px solid var(--glass-rim);box-shadow:var(--lift);border-radius:20px;
-}}   /* без backdrop-filter: блок росте, коли відкривається крок, і iOS перемальовує розмиття — ще одне джерело «блимання» */
+}}   /* натискання кроку (summary:active) — прямокутник; різав скруглення кутів (Konst 26.11, знімок): радіус крайнім рядкам (19 = 20 − рамка) + overflow:hidden — WebKit губить обріз overflow, коли дитина міняє фон (bugs.webkit.org 107853), тож радіус — головне · без backdrop-filter: блок росте, коли відкривається крок, і iOS перемальовує розмиття — ще одне джерело «блимання» */
 .card{{padding:16px 16px 12px;margin-bottom:18px}}.card h2{{font-size:21px;line-height:1.3;font-weight:700;margin:6px 0 6px;letter-spacing:-.01em}}
 .kick{{display:flex;align-items:center;gap:6px;margin:0;color:var(--accent);font-weight:700;font-size:13px}}.kick code{{color:var(--ink-3)}}
 .why{{color:var(--ink-2);margin:0 0 8px}}
@@ -329,7 +329,7 @@ code{{font-family:inherit;font-weight:650;font-size:.92em;overflow-wrap:anywhere
 .ic{{display:inline-flex;width:20px;height:20px;flex:none}}.ic svg,.gi svg{{width:100%;height:100%}}
 .gi{{display:inline-flex;width:1em;height:1em;vertical-align:-.12em;color:var(--ink-2)}}
 .gh{{font-size:13px;font-weight:700;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;margin:0 6px 8px}}
-.steps{{list-style:none;margin:0 0 18px;padding:4px 0}}.steps>li{{border-top:1px solid var(--line)}}.steps>li:first-child{{border-top:0}}
+.steps{{list-style:none;margin:0 0 18px;padding:0;overflow:hidden}}.steps>li:first-child>details>summary{{border-radius:19px 19px 0 0}}.steps>li:last-child>details:not([open])>summary{{border-radius:0 0 19px 19px}}.steps>li:only-child>details:not([open])>summary{{border-radius:19px}}.steps>li{{border-top:1px solid var(--line)}}.steps>li:first-child{{border-top:0}}
 summary{{cursor:pointer;list-style:none}}summary::-webkit-details-marker{{display:none}}
 .st>details>summary{{display:grid;grid-template-columns:20px 1fr;column-gap:12px;row-gap:1px;align-items:start;min-height:44px;padding:11px 14px}}
 .st .ic{{grid-row:span 2;margin-top:1px}}.sx{{font-size:15px;font-weight:600}}.sid{{color:var(--ink-3);font-size:13px}}.sid code{{font-weight:500}}
@@ -413,6 +413,7 @@ document.addEventListener('visibilitychange',function(){if(document.visibilitySt
 </main><script>{js}</script></body></html>
 """
     if inject == 'emoji': page = page.replace('</footer>', ' ✅</footer>')   # зуб: емодзі у видимому тексті
+    if inject == 'press': page = re.sub(r'overflow:hidden}\.steps>li:first-child.*?border-radius:19px}', '}', page, flags=re.S)   # зуб: натискання вилазить за скруглення
     if inject == 'md': page = page.replace('</footer>', ' **жирне**</footer>')   # зуб: markdown не перетворено
     facts = dict(sha=git(repo, 'log', '-1', '--format=%h', '--', qrel) or '?', ids=[r['id'] for r in rows], play=play['id'] if play else None)
     facts.update(tok=tok, title=title, files=[qrel] + ([os.path.relpath(wp, repo)] if wp else []),
@@ -438,6 +439,45 @@ def verify(page, facts):
     em = sorted(set(EMOJI.findall(visible_text(page))))
     if em: bad.append('емодзі у видимому тексті: ' + ' '.join(em))
     if '**' in visible_text(page): bad.append('сирий markdown «**» у видимому тексті')
+    return bad
+
+
+def press_leak(page):
+    """Натиснутий рядок кроку не вилазить за скруглення коробки: кути `.steps` однакові з :active і без, обидві теми
+    (Konst 26.11, знімок: прямокутне натискання різало кути). [] — чисто; None — Playwright нема (не перевірено)."""
+    try:
+        from playwright.sync_api import sync_playwright
+        from PIL import Image, ImageChops
+        import io
+    except Exception:
+        return None
+    bad = []
+    with sync_playwright() as p:
+        b = p.chromium.launch(); pg = b.new_page(viewport={'width': 390, 'height': 844})
+        pg.route('**/*', lambda r: r.abort()); pg.set_content(page)
+        pg.add_style_tag(content='*{transition:none!important}'); pg.evaluate('document.querySelectorAll("details.donegrp").forEach(d=>d.open=true)')
+        cdp = pg.context.new_cdp_session(pg); cdp.send('DOM.enable'); cdp.send('CSS.enable')
+        shot = lambda el: Image.open(io.BytesIO(el.screenshot())).convert('RGB')
+        for th in ('light', 'dark'):
+            pg.evaluate(f'document.documentElement.dataset.theme="{th}"')
+            for i, el in enumerate(pg.query_selector_all('.steps')):
+                if not el.is_visible(): continue
+                for end in ('first', 'last'):
+                    h = el.query_selector(f':scope>li:{end}-child>details>summary')
+                    if not h: continue
+                    before = shot(el); h.evaluate('e=>e.setAttribute("data-pk","1")')
+                    root = cdp.send('DOM.getDocument', {'depth': 0})['root']['nodeId']
+                    nid = cdp.send('DOM.querySelector', {'nodeId': root, 'selector': '[data-pk]'})['nodeId']
+                    cdp.send('CSS.forcePseudoState', {'nodeId': nid, 'forcedPseudoClasses': ['active']})
+                    after = shot(el)
+                    cdp.send('CSS.forcePseudoState', {'nodeId': nid, 'forcedPseudoClasses': []}); h.evaluate('e=>e.removeAttribute("data-pk")')
+                    w, ht = before.size; k = 5   # кут: квадрат 5×5 біля самого краю — поза скругленням 20 px
+                    y0 = 1 if end == 'first' else ht - 1 - k
+                    if ImageChops.difference(before, after).getbbox() is None: bad.append(f'{th}: коробка {i + 1}, {end} — натискання не видно')
+                    for x0 in (1, w - 1 - k):
+                        d = ImageChops.difference(before.crop((x0, y0, x0 + k, y0 + k)), after.crop((x0, y0, x0 + k, y0 + k))).getextrema()
+                        if max(c[1] for c in d) > 6: bad.append(f'{th}: коробка {i + 1}, {end}-рядок, кут x={x0}')
+        b.close()
     return bad
 
 
@@ -581,6 +621,15 @@ def selftest():
                 ok = ok and 'background-attachment:fixed;' not in page and 'Для Claude — попутно' not in page
         finally: shutil.rmtree(tmp, ignore_errors=True)
         fails += not ok; print(f'{"✓" if ok else "✗"} {name}' + ('' if ok else f' — {bad}'))
+    tmp = tempfile.mkdtemp(prefix='route_page_')   # натискання кроку не ріже скруглення (Konst 26.11, знімок); зуб — --inject press
+    try:
+        rc._repo(tmp, rc.GOOD, rc.SUM, rc.BRIEF); good = press_leak(build(tmp, probe=False)[0])
+        if good is None: ok = True; print('ⓘ Playwright / Pillow нема — натискання в кутах не перевірено')
+        else:
+            badp = press_leak(build(tmp, probe=False, inject='press')[0]); ok = good == [] and bool(badp)
+            if not ok: print(f'   чисте: {good} · зуб: {badp}')
+    finally: shutil.rmtree(tmp, ignore_errors=True)
+    fails += not ok; print(f'{"✓" if ok else "✗"} натиснутий крок не ріже скруглення кутів (обидві теми) · --inject press → ✗')
     tmp = tempfile.mkdtemp(prefix='route_page_')
     try:
         rc._repo(tmp, '# Черга\n\n| id | x |\n|---|---|\n', rc.SUM, None); page, _, notes = build(tmp, probe=False)
@@ -599,7 +648,7 @@ def selftest():
         ok = ok and sv.count('<svg') == 2 and 'scale(.8)' in sv
     finally: shutil.rmtree(tmp, ignore_errors=True)
     fails += not ok; print(f'{"✓" if ok else "✗"} post-commit: коміт без карти → не видає, з картою → видає · install · значок (maskable 80 %)')
-    n = len(cases) + 2; print(f'─── route_page selftest: {n - fails}/{n} ───'); return 1 if fails else 0
+    n = len(cases) + 3; print(f'─── route_page selftest: {n - fails}/{n} ───'); return 1 if fails else 0
 
 
 def main(a):
