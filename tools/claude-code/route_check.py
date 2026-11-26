@@ -5,7 +5,7 @@
 #   обсягу «хто · коли · чому» (Atlassian «Scope creep», пошук 22.11.2026) — бриф §5. Розбір таблиці — за GFM: нерозекранований `|` ріже
 #   клітинку й усередині бектиків, `\|` — ні (GFM spec «Tables (extension)»; rumdl table_utils — «для GFM pipes in inline code ARE delimiters»,
 #   пошук 22.11.2026) → зайва клітинка — ✗: на GitHub ця таблиця теж зламана.
-#   python3 route_check.py check <репо> [--queue F] [--inject two|next|summary]   → звіт, exit 1 на ✗
+#   python3 route_check.py check <репо> [--queue F] [--inject two|next|summary|words|page]   → звіт, exit 1 на ✗
 #   python3 route_check.py line  <репо> [--queue F]                                  → один рядок для звіту / гачка
 #   python3 route_check.py selftest                                                  → зуби: тимчасові репо
 #   python3 route_check.py page  <репо> [--out ТЕКА] …                               → сторінка маршруту для телефона (`route_page.py`, §5-б «Крок 5»)
@@ -13,9 +13,10 @@
 # ✗: крок ▶ не рівно один · стан не з ▶ ○ ⏸ ✅ · клітинок ≠ заголовку · крок без «що» / «готово, коли» / «далі» (у ▶ і його «далі» «—» теж ✗;
 #    далі за ланцюгом «—» = ще не визначено, норма) · «далі» на неіснуючий id · дубль id.
 # ⚠: самері §0 п.1 чи рядок «ЗАРАЗ:» стартового не називає id ▶ · черга «**Зараз**» не називає ▶ і не веде на карту · «Далі» §0 брифу без живого id
-#    · ✅ без дати · крок ○ / ⏸, до якого ланцюг «далі» від ▶ не доходить · рядок «Вхідні» без «→».
+#    · ✅ без дати · крок ○ / ⏸, до якого ланцюг «далі» від ▶ не доходить · рядок «Вхідні» без «→»
+#    · крок без людського рядка / рядок без кроку (файл «words» з tools/route_page.json) · сторінка маршруту не пройшла свою перевірку.
 # ⓘ: дрейф — коміти сесії з id кроку в бектиках ⟂ усі коміти сесії (лише рахунок).
-import sys, os, re, glob, subprocess, tempfile, shutil
+import sys, os, re, glob, json, subprocess, tempfile, shutil
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -75,6 +76,25 @@ def parse_map(text):
             elif l.strip(): in_inbox = False
     inbox = [x for x in inbox if not re.fullmatch(r'[-*]\s+—\s*', x)]
     return dict(rows=rows, inbox=inbox, width_bad=width_bad)
+
+
+def words_path(repo):
+    """Файл людських слів маршруту — ключ «words» у `<репо>/tools/route_page.json` (нема → None, перевірки нема).
+    Перевірка в обидва боки — як ключі перекладу проти еталона: нема рядка · зайвий рядок (github.com/lingualdev/i18n-check, 26.11.2026)."""
+    cp = os.path.join(repo, 'tools', 'route_page.json')
+    try: w = json.load(open(cp, encoding='utf-8')).get('words') if os.path.isfile(cp) else None
+    except Exception: w = None
+    return os.path.join(repo, w) if w else None
+
+
+def parse_words(path):
+    """Таблиця «крок · що це · навіщо» → {id: (що це, навіщо)}."""
+    out = {}
+    for l in open(path, encoding='utf-8').read().splitlines():
+        if not l.strip().startswith('|'): continue
+        c = cells(l); rid = ids(c[0]) if c else []
+        if rid and len(c) >= 3: out[rid[0]] = (c[1], c[2])
+    return out
 
 
 def state_of(r): return next((x for x in STATES if r['state'].strip().startswith(x)), None)
@@ -153,6 +173,23 @@ def check(repo, queue=None, inject=None):
     for b in sorted(glob.glob(os.path.join(os.path.dirname(qp), '*_brief.md'))):
         for dl in re.findall(r'(?m)^\s*[-*]\s+\*\*Далі[^\n]*', section0(open(b, encoding='utf-8').read())):
             if not any(has_id(dl, x) for x in live): warn.append(f'{os.path.relpath(b, repo)}: §0 «Далі» без живого id карти')
+    wp = words_path(repo)   # людські слова сторінки (ROUTE-1 §5-б «Вимоги Konst 26.11»): кожен крок має рядок, сиріт нема
+    if wp:
+        wrel = os.path.relpath(wp, repo)
+        if not os.path.isfile(wp): warn.append(f'{wrel}: файла людських слів нема (ключ «words» у tools/route_page.json)')
+        else:
+            words = parse_words(wp)
+            if inject == 'words' and words: words.pop(next(iter(words)))   # зуб: крок без людського рядка
+            for r in rows:
+                if r['id'] not in words or not all(x.strip() for x in words[r['id']]): warn.append(f'`{r["id"]}`: нема людського рядка в {wrel}')
+            for w in words:
+                if w not in seen: warn.append(f'{wrel}: `{w}` — такого кроку в карті нема')
+    try:   # сторінка маршруту збирається з карти без помилок (емодзі, сирий markdown) — ловимо в мить правки карти, не на телефоні
+        import route_page
+        pg, facts, _ = route_page.build(repo, queue=qp, probe=False, inject='emoji' if inject == 'page' else None)
+        if pg: warn += [f'сторінка маршруту: {b}' for b in route_page.verify(pg, facts)]
+    except Exception as e:
+        info.append(f'сторінку не перевірено ({type(e).__name__})')
     open_in = [x for x in m['inbox'] if '→' not in x]
     warn += [f'вхідні без «→ куди»: {x[:80]}' for x in open_in]
     if hc:
@@ -210,6 +247,15 @@ def _repo(tmp, q, s, b):
         subprocess.run(['git', '-C', tmp, *a], capture_output=True)
 
 
+WORDS = "| крок | що це | навіщо |\n|---|---|---|\n" + ''.join(f"| `A-{i}` | крок {i}. | бо треба. |\n" for i in range(1, 5))
+
+
+def _words(tmp, words):
+    os.makedirs(os.path.join(tmp, 'tools'), exist_ok=True)
+    json.dump({'words': 'lens/X_ROUTE_words.md'}, open(os.path.join(tmp, 'tools', 'route_page.json'), 'w'))
+    open(os.path.join(tmp, 'lens', 'X_ROUTE_words.md'), 'w', encoding='utf-8').write(words)
+
+
 def selftest():
     R = str.replace
     cases = [   # (назва, черга, самері, бриф, inject, чекаємо ✗, підрядок у звіті)
@@ -241,7 +287,18 @@ def selftest():
         _repo(tmp, '# Черга\n\n| id | x |\n|---|---|\n', SUM, None); r = check(tmp); ok = r is None and report(r)[1] == 0 and line(r) == 'маршрут: карти нема'
     finally: shutil.rmtree(tmp, ignore_errors=True)
     bad += not ok; print(f'{"✓" if ok else "✗"} карти нема (старий репо) → мовчить, exit 0')
-    n = len(cases) + 1
+    wcases = [('людські слова повні → ⚠ 0', WORDS, None, '✗ 0 · ⚠ 0'),
+              ('--inject words → ⚠ крок без людського рядка', WORDS, 'words', 'нема людського рядка'),
+              ('рядок слів без кроку → ⚠ сирота', WORDS + '| `Z-9` | зайвий. | так. |\n', None, '`Z-9` — такого кроку'),
+              ('--inject page → ⚠ сторінка (емодзі)', WORDS, 'page', 'сторінка маршруту: емодзі')]
+    for name, w, inj, sub in wcases:
+        tmp = tempfile.mkdtemp(prefix='route_check_')
+        try:
+            _repo(tmp, GOOD, SUM, BRIEF); _words(tmp, w); res = check(tmp, inject=inj); txt, code = report(res)
+            ok = not res['bad'] and code == 0 and sub in txt
+        finally: shutil.rmtree(tmp, ignore_errors=True)
+        bad += not ok; print(f'{"✓" if ok else "✗"} {name}' + ('' if ok else '\n    ' + txt.replace('\n', '\n    ')))
+    n = len(cases) + 1 + len(wcases)
     print(f'─── route_check selftest: {n - bad}/{n} ───'); return 1 if bad else 0
 
 

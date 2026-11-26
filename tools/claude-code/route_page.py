@@ -4,6 +4,10 @@
 #   Вигляд успадковує продукт: `<репо>/tools/route_page.json` — назва, шрифт, зібрана сторінка продукту (`probe`), з якої Chromium читає
 #   обчислені токени обох тем (полотно, аврора, чорнило, скло) — копії токенів у ядрі нема. Конфігу чи Playwright нема → нейтральні токени, ⓘ.
 #   Свіжість: <meta name="route-map-commit"> — останній коміт ФАЙЛА карти (не HEAD репо; рішення агента 26.11.2026, EquipLens S45).
+#   Людині — людські слова (Konst 26.11.2026, EquipLens S46: «технічний шум… для агента, а не для людини»): файл «words» конфігу
+#   (крок · що це · навіщо; повноту стереже route_check), групи «Зараз · Далі · Пізніше · Зроблено» (Now-Next-Later, prodpad.com, 26.11.2026),
+#   «Після · Далі» словами, посилання «Крок у черзі» (рядок на GitHub) і «Бриф», кнопки «Зробити першим» · «Коментар» (копіюють повідомлення
+#   в чат — бекенду нема), технічне — за «Для Claude — технічно»; хеш — у підвалі.
 # Практика (26.11.2026): список кроків — `ol` з `aria-current="step"` на поточному, стан — значком і словом, не кольором
 #   (docs.tabler.io/ui/components/progress-step · piccalil.li «solution 008 progress stepper»); копіювання — `clipboard.writeText` прямо
 #   в обробнику тапу, https; інакше — `execCommand('copy')` (webkit.org «Async Clipboard API» · MDN Clipboard.writeText).
@@ -155,35 +159,92 @@ def build(repo, queue=None, probe=True, inject=None):
     play = next((r for r in rows if rc.state_of(r) == '▶'), None)
     by = {r['id']: r for r in rows}
     I = lambda s: inline(s, repo, kbase)
+    wp = rc.words_path(repo)
+    words = rc.parse_words(wp) if wp and os.path.isfile(wp) else {}
+    qlines = text.splitlines()
+    lineno = {r['id']: next((i + 1 for i, l in enumerate(qlines) if re.match(rf'\s*\|\s*`{re.escape(r["id"])}`\s*\|', l)), None) for r in rows}
+    BRIEF = re.compile(r'`((?:lens-governance:)?[\w./-]*?_brief\.md)`')
+
+    def human(r):   # (що це, навіщо) — людський рядок; нема — «що» карти без коду й вказівників (⚠ дає route_check)
+        if r['id'] in words: return words[r['id']]
+        return re.sub(r'\s*\([^)]*\)|`[^`]*`|\*\*', '', r['what']).strip(' ·;:') or r['id'], ''
+
+    def links(r):
+        out = []
+        if base and lineno.get(r['id']): out.append((f'{base}/blob/main/{qrel}#L{lineno[r["id"]]}', 'Крок у черзі'))
+        b = BRIEF.search(r['what'] + ' ' + r['done'])
+        if b:
+            pth = b.group(1)
+            if pth.startswith('lens-governance:'): out.append((f'{kbase}/blob/main/{pth.split(":", 1)[1]}', 'Бриф'))
+            elif base: out.append((f'{base}/blob/main/{pth}', 'Бриф'))
+        return ''.join(f'<a class="lnk" href="{html.escape(u)}">{t}</a>' for u, t in out)
+
+    def rel(r):   # після чого · що далі — людськими словами
+        prev = [x for x in rows if r['id'] in rc.ids(x['next'])]
+        prev = [x for x in prev if rc.state_of(x) != '✅'] or prev   # найближчий незроблений попередник, не вся історія
+        nxt = [by[i] for i in rc.ids(r['next']) if i in by]
+        f = lambda xs: '; '.join(f'{html.escape(human(x)[0])} <code>{html.escape(x["id"])}</code>' for x in xs)
+        s = ''
+        if prev: s += f'<p class="rel"><span>Після</span>{f(prev)}</p>'
+        s += f'<p class="rel"><span>Далі</span>{f(nxt) if nxt else I(r["next"])}</p>'
+        return s
+
+    def tech(r):
+        cm = commits_for(repo, r['id'], base)
+        cms = ''.join(f'<li><a href="{base}/commit/{h}"><code>{h}</code></a> {I(s[:90])}</li>' for h, s in cm)   # тема коміту — через inline: ✅ → SVG
+        return (f'<details class="tech"><summary>Для Claude — технічно</summary><dl><dt>Що</dt><dd>{I(r["what"])}</dd>'
+                f'<dt>Готово, коли</dt><dd>{I(r["done"])}</dd><dt>Далі</dt><dd>{I(r["next"])}</dd></dl>'
+                + (f'<p class="lbl">Коміти з цим кроком</p><ul class="cm">{cms}</ul>' if cms else '') + '</details>')
+
+    def buttons(r, first=True):
+        w = human(r)[0]
+        cmt = f"Konst про `{r['id']}` ({w}): "
+        b = f'<button type="button" class="cp" data-copy="{html.escape(cmt)}">Коментар</button>'
+        if first and play and r['id'] != play['id']:
+            msg = f"Konst: `{r['id']}` ({w}) — зробити першим, до `{play['id']}`. Чому: "
+            b = f'<button type="button" class="cp" data-copy="{html.escape(msg)}">Зробити першим</button>' + b
+        return f'<div class="acts">{b}</div><p class="cpok" role="status"></p>'
 
     def step_li(r):
         st = rc.state_of(r) or '○'; date = rc.DATE.search(r['state'])
-        word = STATE_WORD[st] + (f' {date.group(0)}' if st == '✅' and date else '')
-        cm = commits_for(repo, r['id'], base)
-        cms = ''.join(f'<li><a href="{base}/commit/{h}"><code>{h}</code></a> {html.escape(s[:90])}</li>' for h, s in cm)
-        copy = f'{r["id"]} · {re.sub(r"[`*]", "", r["what"])[:80]}'
+        word = {'✅': f'зроблено {date.group(0)}' if date else 'зроблено', '▶': 'зараз', '○': '', '⏸': 'чекає тебе'}[st]
+        what, why = human(r)
         cur = ' aria-current="step"' if st == '▶' else ''
         return (f'<li class="st st-{STATE_WORD[st].split()[0]}"{cur}><details><summary>'
-                f'<span class="ic">{SVG[st]}</span><span class="sid"><code>{html.escape(r["id"])}</code></span>'
-                f'<span class="sw">{html.escape(word)}</span><span class="sx">{I(r["what"])}</span></summary>'
-                f'<dl><dt>Готово, коли</dt><dd>{I(r["done"])}</dd><dt>Далі</dt><dd>{I(r["next"])}</dd></dl>'
-                + (f'<p class="lbl">Коміти з цим кроком</p><ul class="cm">{cms}</ul>' if cms else '')
-                + f'<button type="button" class="cp" data-copy="{html.escape(copy)}">Скопіювати для Claude</button>'
-                f'<span class="cpok" role="status"></span></details></li>')
+                f'<span class="ic">{SVG[st]}</span><span class="sx">{html.escape(what)}</span>'
+                f'<span class="sid"><code>{html.escape(r["id"])}</code>{(" · " + html.escape(word)) if word else ""}</span></summary>'
+                f'<div class="body">' + (f'<p class="why">{html.escape(why)}</p>' if why else '') + rel(r)
+                + f'<div class="links">{links(r)}</div>' + buttons(r, st != '✅') + tech(r) + '</div></details></li>')
 
+    # порядок: ланцюг «далі» від ▶ (Зараз · Далі 3 · Пізніше), решта — як у карті; зроблене — окремо, згорнуто
+    chain, k = [], play['id'] if play else None
+    while k and k in by and k not in chain:
+        chain.append(k); nx = rc.ids(by[k]['next']); k = nx[0] if nx else None
+    rest = [r['id'] for r in rows if r['id'] not in chain and rc.state_of(r) != '✅']
+    after = [by[i] for i in chain[1:] + rest]
+    done_rows = [r for r in rows if rc.state_of(r) == '✅']
     card = ''
     if play:
-        nxt = ', '.join(f'<code>{html.escape(x)}</code>' for x in rc.ids(play['next'])) or I(play['next'])
-        card = (f'<section class="card" aria-labelledby="now"><p class="kick" id="now"><span class="ic">{SVG["▶"]}</span>Зараз</p>'
-                f'<h2><code>{html.escape(play["id"])}</code></h2><p class="what">{I(play["what"])}</p>'
-                f'<p class="lbl">Готово, коли</p><p>{I(play["done"])}</p><p class="lbl">Далі</p><p>{nxt}</p></section>')
-    done = sum(1 for r in rows if rc.state_of(r) == '✅')
+        what, why = human(play)
+        card = (f'<section class="card" aria-current="step" aria-labelledby="now"><p class="kick" id="now"><span class="ic">{SVG["▶"]}</span>Зараз · <code>{html.escape(play["id"])}</code></p>'
+                f'<h2>{html.escape(what)}</h2>' + (f'<p class="why">{html.escape(why)}</p>' if why else '') + rel(play)
+                + f'<div class="links">{links(play)}</div>' + buttons(play, False) + tech(play) + '</section>')
+    group = lambda head, xs, cls='': (f'<h3 class="gh">{head}</h3><ol class="steps {cls}" aria-label="{head}">' + ''.join(step_li(r) for r in xs) + '</ol>') if xs else ''
+    steps = group('Далі', after[:3]) + group('Пізніше', after[3:])
+    if done_rows:
+        steps += (f'<details class="donegrp"><summary class="gh">Зроблено · {len(done_rows)}</summary>'
+                  f'<ol class="steps">' + ''.join(step_li(r) for r in done_rows) + '</ol></details>')
+    done = len(done_rows); pct = round(100 * done / len(rows))
     lst = lambda key: ''.join(f'<li>{I(x)}</li>' for x in sec.get(key, []))
     inbox = ''.join(f'<li>{I(re.sub(r"^[-*]\s+", "", x))}</li>' for x in m['inbox'])
-    blocks = ''
-    for key, head in (('Чекає Konst', 'Чекає Konst'), ('Попутно', 'Попутно — не зсуває крок «зараз»'), ('Зміни маршруту', 'Зміни маршруту')):
-        if sec.get(key): blocks += f'<section class="blk"><h3>{head}</h3><ul>{lst(key)}</ul></section>'
-    blocks += f'<section class="blk"><h3>Вхідні</h3>' + (f'<ul>{inbox}</ul>' if inbox else '<p class="mute">Нерозібраного від тебе нема.</p>') + '</section>'
+    wait = f'<section class="blk"><h3>Чекає тебе</h3><ul>{lst("Чекає Konst")}</ul></section>' if sec.get('Чекає Konst') else ''
+    extra = ''.join(f'<h4>{h}</h4><ul>{lst(k2)}</ul>' for k2, h in (('Попутно', 'Попутно — не зсуває «Зараз»'), ('Зміни маршруту', 'Зміни маршруту'))
+                    if sec.get(k2))
+    extra += '<h4>Вхідні</h4>' + (f'<ul>{inbox}</ul>' if inbox else '<p class="mute">Нерозібраного від тебе нема.</p>')
+    blocks = wait + f'<details class="blk more"><summary>Для Claude — попутно, зміни маршруту, вхідні</summary>{extra}</details>'
+    os.environ.setdefault('TZ', 'Europe/Kyiv')
+    today = subprocess.run(['date', '+%d.%m.%Y'], capture_output=True, text=True).stdout.strip()
+    upd = (when.replace(today + ' ', 'сьогодні о ') if when.startswith(today) else when.replace(' ', ' о ', 1)) if when else ''
     L, D = tok['light'], tok['dark']
     var = lambda t: ';'.join(f'{k}:{v}' for k, v in t.items())
     css = f"""{ff}
@@ -192,39 +253,49 @@ def build(repo, queue=None, probe=True, inject=None):
 /* розміри нижче — власні цієї сторінки (не токени продукту): кегль ≥ 13 px, поле дотику ≥ 44 px */
 *{{box-sizing:border-box}}html{{background-color:var(--canvas);background-image:var(--bg-aur);background-attachment:fixed;min-height:100%}}
 body{{margin:0;font-family:{fam};color:var(--ink);font-size:15px;line-height:1.45;-webkit-text-size-adjust:100%;
-padding:max(16px,env(safe-area-inset-top)) 14px max(24px,env(safe-area-inset-bottom))}}
+padding:max(18px,env(safe-area-inset-top)) 14px max(24px,env(safe-area-inset-bottom))}}
 main{{max-width:560px;margin:0 auto}}
-header{{margin:4px 4px 14px}}h1{{font-size:22px;font-weight:700;margin:0 0 2px;letter-spacing:-.01em}}
-.meta{{color:var(--ink-3);font-size:13px;margin:0}}
-code{{font-family:inherit;font-weight:650;font-size:.94em;overflow-wrap:anywhere}}a{{color:inherit;text-decoration-color:var(--line);text-underline-offset:2px}}
+header{{margin:6px 4px 16px}}h1{{font-size:26px;font-weight:750;margin:0;letter-spacing:-.015em}}
+.upd{{color:var(--ink-3);font-size:13px;margin:2px 0 10px}}
+.bar{{height:6px;border-radius:3px;background:var(--line);overflow:hidden}}.bar i{{display:block;height:100%;width:{pct}%;background:var(--accent);border-radius:3px}}
+.barl{{color:var(--ink-2);font-size:13px;margin:6px 0 0}}
+code{{font-family:inherit;font-weight:650;font-size:.92em;overflow-wrap:anywhere}}a{{color:inherit;text-underline-offset:2px}}
 .card,.blk,.steps{{background:var(--glass);border:1px solid var(--glass-rim);box-shadow:var(--lift);border-radius:20px;
 -webkit-backdrop-filter:blur(12px) saturate(170%);backdrop-filter:blur(12px) saturate(170%)}}
-.card{{padding:16px 16px 14px;margin-bottom:14px}}.card h2{{font-size:24px;margin:2px 0 4px}}.card .what{{font-size:16px;margin:0 0 10px}}
-.kick{{display:flex;align-items:center;gap:6px;margin:0;color:var(--accent);font-weight:700;font-size:13px;letter-spacing:.04em;text-transform:uppercase}}
-.lbl{{color:var(--ink-3);font-size:13px;font-weight:600;margin:10px 0 2px}}.card p{{margin:0}}
+.card{{padding:16px 16px 12px;margin-bottom:18px}}.card h2{{font-size:21px;line-height:1.3;font-weight:700;margin:6px 0 6px;letter-spacing:-.01em}}
+.kick{{display:flex;align-items:center;gap:6px;margin:0;color:var(--accent);font-weight:700;font-size:13px}}.kick code{{color:var(--ink-3)}}
+.why{{color:var(--ink-2);margin:0 0 8px}}
+.rel{{margin:4px 0;font-size:14px;color:var(--ink-2)}}.rel span{{display:inline-block;min-width:52px;color:var(--ink-3);font-size:13px;font-weight:600}}
+.rel code{{color:var(--ink-3);font-weight:500}}
+.links{{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 4px}}
+.lnk,.cp{{display:inline-flex;align-items:center;min-height:44px;padding:0 14px;border-radius:var(--r-ctl,10px);font:inherit;font-size:14px;font-weight:600}}
+.lnk{{text-decoration:none;color:var(--accent);border:1px solid var(--line)}}
+.acts{{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 0}}
+.cp{{border:1px solid var(--glass-rim);background:var(--surface);color:var(--ink);cursor:pointer}}.cpok{{font-size:13px;color:var(--ink-3);margin:4px 0;min-height:1em}}
 .ic{{display:inline-flex;width:20px;height:20px;flex:none}}.ic svg,.gi svg{{width:100%;height:100%}}
 .gi{{display:inline-flex;width:1em;height:1em;vertical-align:-.12em;color:var(--ink-2)}}
-.steps{{list-style:none;margin:0 0 14px;padding:6px 0}}.steps>li{{border-top:1px solid var(--line)}}.steps>li:first-child{{border-top:0}}
-summary{{display:grid;grid-template-columns:20px auto 1fr;grid-template-areas:"i d w" "i x x";column-gap:10px;row-gap:2px;
-align-items:center;min-height:44px;padding:10px 14px;cursor:pointer;list-style:none}}summary::-webkit-details-marker{{display:none}}
-summary .ic{{grid-area:i;align-self:start;margin-top:1px}}.sid{{grid-area:d}}.sw{{grid-area:w;color:var(--ink-3);font-size:13px;justify-self:end}}
-.sx{{grid-area:x;color:var(--ink-2);font-size:14px}}
-.st-зроблено .ic{{color:var(--ink-3)}}.st-зроблено .sid,.st-зроблено .sx{{color:var(--ink-3)}}
-.st-зараз .ic,.st-зараз .sw{{color:var(--accent)}}.st-зараз .sw{{font-weight:700}}.st-далі .ic{{color:var(--ink-2)}}
-details>dl,details>.lbl,details>.cm,details>.cp,details>.cpok{{margin-left:44px;margin-right:14px}}
-dl{{margin-top:0;margin-bottom:8px}}dt{{color:var(--ink-3);font-size:13px;font-weight:600;margin-top:6px}}dd{{margin:0}}
-.cm{{padding:0;list-style:none;font-size:13px;color:var(--ink-2);margin-bottom:8px}}.cm li{{margin:2px 0}}
-.cp{{font:inherit;font-size:14px;font-weight:600;min-height:44px;padding:0 16px;border-radius:var(--r-ctl,10px);border:1px solid var(--glass-rim);
-background:var(--surface);color:var(--ink);margin-bottom:12px;cursor:pointer}}.cpok{{font-size:13px;color:var(--ink-3)}}
-.blk{{padding:12px 16px;margin-bottom:14px}}.blk h3{{font-size:13px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.04em;margin:2px 0 6px}}
-.blk ul{{margin:0;padding-left:18px}}.blk li{{margin:4px 0;font-size:14px}}.mute{{color:var(--ink-3);margin:0;font-size:14px}}
-footer{{color:var(--ink-3);font-size:13px;text-align:center;margin-top:6px}}"""
-    js = """document.addEventListener('click',function(e){var b=e.target.closest('.cp');if(!b)return;var t=b.dataset.copy,ok=b.nextElementSibling;
-function done(m){ok.textContent=m;setTimeout(function(){ok.textContent=''},2500)}
+.gh{{font-size:13px;font-weight:700;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;margin:0 6px 8px}}
+.steps{{list-style:none;margin:0 0 18px;padding:4px 0}}.steps>li{{border-top:1px solid var(--line)}}.steps>li:first-child{{border-top:0}}
+summary{{cursor:pointer;list-style:none}}summary::-webkit-details-marker{{display:none}}
+.st>details>summary{{display:grid;grid-template-columns:20px 1fr;column-gap:12px;row-gap:1px;align-items:start;min-height:44px;padding:11px 14px}}
+.st .ic{{grid-row:span 2;margin-top:1px}}.sx{{font-size:15px;font-weight:600}}.sid{{color:var(--ink-3);font-size:13px}}.sid code{{font-weight:500}}
+.st-зроблено .ic,.st-зроблено .sx{{color:var(--ink-3)}}.st-далі .ic{{color:var(--ink-2)}}.st-чекає .ic{{color:var(--accent)}}
+.body{{padding:0 14px 12px 46px}}
+details.tech{{margin-top:8px;border-top:1px solid var(--line);padding-top:6px}}details.tech>summary,details.more>summary{{color:var(--ink-3);font-size:13px;font-weight:600;min-height:36px;display:flex;align-items:center}}
+dl{{margin:4px 0 8px;font-size:14px}}dt{{color:var(--ink-3);font-size:13px;font-weight:600;margin-top:6px}}dd{{margin:0;color:var(--ink-2)}}
+.cm{{padding:0;list-style:none;font-size:13px;color:var(--ink-2);margin:0 0 6px}}.cm li{{margin:2px 0}}.lbl{{color:var(--ink-3);font-size:13px;font-weight:600;margin:8px 0 2px}}
+.donegrp{{margin-bottom:18px}}.donegrp>summary{{min-height:44px;display:flex;align-items:center}}
+.blk{{padding:12px 16px;margin-bottom:14px}}.blk h3{{font-size:13px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;margin:2px 0 6px}}
+.blk h4{{font-size:13px;color:var(--ink-3);margin:12px 0 4px}}.blk ul{{margin:0;padding-left:18px}}.blk li{{margin:4px 0;font-size:14px;color:var(--ink-2)}}
+.mute{{color:var(--ink-3);margin:0;font-size:14px}}
+footer{{color:var(--ink-3);font-size:13px;text-align:center;margin-top:8px}}"""
+    js = """document.addEventListener('click',function(e){var b=e.target.closest('.cp');if(!b)return;var t=b.dataset.copy,ok=b.closest('.acts').nextElementSibling;
+function done(m){ok.textContent=m;setTimeout(function(){ok.textContent=''},3000)}
+var MSG='Скопійовано — встав у чат і допиши своє слово';
 function old(){var a=document.createElement('textarea');a.value=t;a.setAttribute('readonly','');a.style.position='fixed';a.style.opacity='0';
 document.body.appendChild(a);a.select();var r=false;try{r=document.execCommand('copy')}catch(_){}a.remove();
-done(r?'Скопійовано — встав у чат і допиши своє слово':'Не вийшло скопіювати — виділи назву кроку пальцем')}
-if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(t).then(function(){done('Скопійовано — встав у чат і допиши своє слово')},old)}else old()});"""
+done(r?MSG:'Не вийшло скопіювати — спробуй ще раз')}
+if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(t).then(function(){done(MSG)},old)}else old()});"""
     page = f"""<!DOCTYPE html>
 <html lang="uk"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -233,11 +304,13 @@ if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(t)
 <meta name="robots" content="noindex">
 <title>Маршрут {html.escape(title)}</title><style>{css}</style></head>
 <body><main>
-<header><h1>Маршрут {html.escape(title)}</h1><p class="meta">карта з коміту <code>{html.escape(sha)}</code>{(' · ' + html.escape(when)) if when else ''} · зроблено {done} з {len(rows)} кроків</p></header>
+<header><h1>Маршрут {html.escape(title)}</h1>{f'<p class="upd">Оновлено {html.escape(upd)}</p>' if upd else ''}
+<div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="{len(rows)}" aria-valuenow="{done}" aria-label="Зроблено кроків"><i></i></div>
+<p class="barl">Зроблено {done} з {len(rows)}</p></header>
 {card}
-<ol class="steps" aria-label="Усі кроки маршруту">{''.join(step_li(r) for r in rows)}</ol>
+{steps}
 {blocks}
-<footer>Сторінку збирає машина з карти кроків — руками не правиться.</footer>
+<footer>Карта з коміту <code>{html.escape(sha)}</code> · сторінку збирає машина, руками не правиться</footer>
 </main><script>{js}</script></body></html>
 """
     if inject == 'emoji': page = page.replace('</footer>', ' ✅</footer>')   # зуб: емодзі у видимому тексті
@@ -293,7 +366,7 @@ def selftest():
             ok = bool(bad) == want
             if inj is None:   # що бачить людина: картка ▶, стан словом, знак стану з клітинки — SVG, вхідні
                 vt = visible_text(page)
-                ok = ok and 'Зараз' in vt and 'зроблено 01.01' in vt and '✅' not in vt and 'ідея' in vt and page.count('<svg') >= 5
+                ok = ok and 'Зараз' in vt and 'зроблено 01.01' in vt and '✅' not in vt and 'ідея' in vt and page.count('<svg') >= 4
         finally: shutil.rmtree(tmp, ignore_errors=True)
         fails += not ok; print(f'{"✓" if ok else "✗"} {name}' + ('' if ok else f' — {bad}'))
     tmp = tempfile.mkdtemp(prefix='route_page_')
