@@ -210,7 +210,8 @@ case "$ev" in
     run memory-guard.sh stop || run handoff-remind.sh stop || run promise-guard.sh stop || ks || rj || run plan-web.sh stop ;;   # promise-guard (AE S146): «можна /compact» — сам проганяє сторож; «пропуск Konst» — лише з хешем і зубом
   prompt)   # перевірка перед переїздом (HOOK-3.2), інакше — аркуш середовища на прохання (ENV-1), інакше — «пропуск, знайдений Konst» (HOOK-5)
     o="$(run handoff-remind.sh "" || run env-remind.sh "" || run konst-miss.sh "")"
-    y="$(printf '%s' "$in" | bash "$h/konst-miss.sh" yes 2>>"$E")"; [ -n "$y" ] && o="$(mrg "$o" "$(fire konst-yes "$y")")"   # В-372 (AE S145): Konst приймає 💡 → чек-лист підсилення; додається, не витісняє
+    y="$(printf '%s' "$in" | bash "$h/konst-miss.sh" yes 2>>"$E")"; [ -n "$y" ] && o="$(mrg "$o" "$(fire konst-yes "$y")")"
+    w="$(printf '%s' "$in" | bash "$h/konst-miss.sh" word 2>>"$E")"; [ -n "$w" ] && o="$(mrg "$o" "$(fire konst-word "$w")")"   # EquipLens S47: слово Konst → прилад (konst-miss.sh WORDS); додається   # В-372 (AE S145): Konst приймає 💡 → чек-лист підсилення; додається, не витісняє
     hm="$(held UserPromptSubmit)"; [ -n "$hm" ] && o="$(mrg "$o" "$(fire held "$hm")")"   # В-373: стиснення відкладено / зупинено
     pg="$(run promise-guard.sh open)"; [ -n "$pg" ] && o="$(mrg "$o" "$pg")"   # AE S146: відкриті «НЕ ЗРОБЛЕНО» журналу — щоходу, доки не закрито
     r="$(run route-remind.sh "")"   # AE S135 · маршрут для Konst — додається до будь-якого іншого гачка, не витісняє (route-remind.sh)

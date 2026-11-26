@@ -15,7 +15,8 @@
 #   Режим stop (подія Stop, EquipLens S45 25.11.2026 — Konst: «чи хтось слідкує… що ти дійсно виконуєш цей чек-лист?»; до того — лише нагадування,
 #   Stop-суду не було): останнє повідомлення Konst — прийняття 💡 (той самий yes() на звіт перед ним), а у відповіді нема «Підсилення» → block один раз
 #   на одне повідомлення Konst (позначка /tmp/lens-kmstop-<сесія>; stop_hook_active не годиться — першим міг блокувати memory-guard). Слово «Підсилення» — мінімум, що судить машина; повноту ①–⑦ — ні (не виміряти).
-# Зуби: bash konst-miss.sh selftest — 15 випадків пропусків + 13 прийняття (один — на файлі розмови) + 5 суду Stop.
+# Режим word (Konst 26.11, EquipLens S47): слово Konst → прилад, про який нагадати сам (таблиця WORDS; раз на сесію на слово).
+# Зуби: bash konst-miss.sh selftest — 15 випадків пропусків + 13 прийняття (один — на файлі розмови) + 5 суду Stop + 4 слова.
 mode="${1:-run}"
 [ "$mode" = selftest ] && HOOK_IN="{}" || HOOK_IN="$(cat)"
 export HOOK_IN
@@ -109,6 +110,25 @@ def run(d):
             "Не встигаєш — «НЕ ЗРОБЛЕНО: чому · коли» в рядку і «не зроблено: …» першими рядками звіту; запис — не дія, звітувати ним не можна "
             "(сторож promise-guard, Konst S146). Не вада (розмова) — одним рядком «хибне» в журналі.")
 
+WORDS = [   # слово Konst → прилад, про який агент мусить нагадати сам (режим word; раз на сесію на слово — не шум). Konst 26.11 (EquipLens S47):
+    # «скажу „іконка“ — нагадай: у нас є інструмент… головне — що вміє будувати скляну іконку iOS 26/27, а не фон». Новий рядок — тут і в selftest.
+    ('icon', re.compile(r"(?<![\w'’])(іконк\w*|значок|значк\w*|icons?|фавікон\w*|favicon)(?![\w'’])", re.I),
+     "Konst говорить про іконку / значок. Нагадай сам про прилад lens-governance:tools/claude-code/pwa_icon.py і запропонуй, як робити — "
+     "правило й подробиці: рядок «зробимо іконку» кукбук INDEX (A75); проби — примірка в shots/ продукту."),
+]
+
+def word(d):
+    p = d.get('prompt') or ''
+    if SERVICE.match(p): return None
+    md = os.environ.get('LENS_MARK_DIR', '/tmp'); sid = re.sub(r'\W', '', str(d.get('session_id') or 'x'))[:40]
+    out = []
+    for key, rx, msg in WORDS:
+        if not rx.search(p): continue
+        mk = os.path.join(md, f'lens-kmword-{sid}-{key}')
+        if os.path.exists(mk) and os.environ.get('KM_INJECT') != 'word': continue
+        open(mk, 'w').close(); out.append(msg)
+    return '\n\n'.join(out) or None
+
 def selftest():
     cases = [('«капсула прилипла до краю» → нагадування', 'подивись, капсула прилипла до краю картки', True),
              ('«знову технічний текст» → нагадування', 'знову технічний текст у кнопці', True),
@@ -164,6 +184,14 @@ def selftest():
     for name, d, tr, want in sc:
         ok = (stop({'session_id': 'st', **d}, tr) is not None) == want; bad += not ok; print(('✓ ' if ok else '✗ ') + name)
     __import__('shutil').rmtree(md, ignore_errors=True); cases = cases + sc
+    md2 = tempfile.mkdtemp(prefix='kmword_'); os.environ['LENS_MARK_DIR'] = md2
+    wc = [('слово: «давай зробимо іконку» → нагадування про pwa_icon', {'session_id': 'w1', 'prompt': 'давай зробимо іконку для маршруту'}, True),
+          ('слово: те саме вдруге в сесії → тиша (раз на сесію)', {'session_id': 'w1', 'prompt': 'а іконку світлішу'}, False),
+          ('слово: «значок» в іншій сесії → нагадування', {'session_id': 'w2', 'prompt': 'значок на екрані додому темний'}, True),
+          ('слово: без слова → тиша', {'session_id': 'w3', 'prompt': 'зроби капсулу теми'}, False)]
+    for name, d, want in wc:
+        r = word(d); ok = (r is not None and 'pwa_icon' in r) == want if want else r is None; bad += not ok; print(('✓ ' if ok else '✗ ') + name)
+    __import__('shutil').rmtree(md2, ignore_errors=True); cases = cases + wc
     print(f'─── konst-miss selftest: {len(cases) - bad}/{len(cases)} ───'); return 1 if bad else 0
 
 if sys.argv[1] == 'selftest': sys.exit(selftest())
@@ -172,7 +200,7 @@ if sys.argv[1] == 'stop':
     except Exception: __import__('traceback').print_exc(); r = None
     if r: print(json.dumps({'decision': 'block', 'reason': r}, ensure_ascii=False))
     sys.exit(0)
-try: out = (yes if sys.argv[1] == 'yes' else run)(json.loads(os.environ.get('HOOK_IN') or '{}'))
+try: out = {'yes': yes, 'word': word}.get(sys.argv[1], run)(json.loads(os.environ.get('HOOK_IN') or '{}'))
 except Exception: __import__('traceback').print_exc(); out = None
 if out: print(json.dumps({'hookSpecificOutput': {'hookEventName': 'UserPromptSubmit', 'additionalContext': out}}, ensure_ascii=False))
 PY
