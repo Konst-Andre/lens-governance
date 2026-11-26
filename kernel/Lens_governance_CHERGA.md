@@ -16,7 +16,7 @@
 
 -----
 
-Закритий пункт — геть із таблиці в тому ж коміті, що закриває (історія — самері й git); **блоків «Прибрано …» тут не ведемо** — історія прополок: `git log -p kernel/Lens_governance_CHERGA.md` (12 блоків 08.10–21.11.2026 прибрано 22.11.2026, EquipLens S41: черга 39 КБ > 25, doc_health M2). **Закрито тим самим ходом:** `SESS-1` — ✅ 25.11 (EquipLens S45): храповик «нова сесія — нове самері» — `tools/claude-code/hooks/commit_files.py` п. 15, з тестами; перед самері — прополка (`tools/claude-code/templates/CHERGA_template.md`).
+Закритий пункт — геть із таблиці в тому ж коміті, що закриває (історія — самері й git); **блоків «Прибрано …» тут не ведемо** (виняток — один машинний рядок-слід `<!-- doc_prune: прибрано … -->` у кінці, щоразу заміна: `Lens_validate` звіряє зниклий id з HEAD — `kernel/Lens_SYN-1_brief.md` §5 крок 1) — історія прополок: `git log -p kernel/Lens_governance_CHERGA.md` (12 блоків 08.10–21.11.2026 прибрано 22.11.2026, EquipLens S41: черга 39 КБ > 25, doc_health M2). **Закрито тим самим ходом:** `SESS-1` — ✅ 25.11 (EquipLens S45): храповик «нова сесія — нове самері» — `tools/claude-code/hooks/commit_files.py` п. 15, з тестами; перед самері — прополка (`tools/claude-code/templates/CHERGA_template.md`).
 
 ## Відкрите
 
