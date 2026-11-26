@@ -685,24 +685,24 @@ def env_lines(repos, budget=None):
         if len(bad) > 8: out.append(('✗', f'{name}: env_check — ще {len(bad) - 8} ✗ (bash tools/env_check.sh)'))
     return out
 
-# (18) BR-1 (Konst 26.11.2026, EquipLens S45: «так на видалення зайвих гілок, які вже злиті з мейном… щоб це автоматично ти пропонував або робив»;
-#   раніше Konst нагадував щоразу). Влита = верхівка гілки на origin — предок origin/main; гілку сесії й main не чіпаємо. Видаляє агент без питання
-#   (постійне «так»), конектором Lens GitHub `gh_branch delete` з expected_head = sha: git-проксі контейнера пускає push лише в гілку сесії й main (403, 26.11).
+# (18) BR-1 (Konst 26.11.2026, EquipLens S45: «так на видалення зайвих гілок, які вже злиті з мейном… щоб це автоматично ти пропонував або робив»).
+#   Влита = верхівка гілки на origin — предок origin/main; не чіпаємо main, гілку сесії й верхівку ≡ origin/main (свіжа гілка живої сесії — аудит 26.11).
+#   Видаляє агент без питання (постійне «так») за процедурою «Видалити гілку на GitHub» `CLAUDE_CODE.md` (git-проксі видалення не пускає, конектор Lens GitHub).
 #   Світ (26.11.2026): `git branch -r --merged main` — та сама перевірка предка (Baeldung «git-remove-merged-branches»); «Automatically delete head branches»
 #   GitHub — лише для злиття через PR, а ми вливаємо fast-forward — не беремо; squash-злиття предком не буде — у нас його нема.
-#   ⚠, не ✗ — переїзд не блокує. HC_BRANCH=0 — вимкнути (мережа); HC_INJECT=branch — зуб selftest (не бачить влитих).
-def merged_branches(repo, timeout=15):
-    """→ [(гілка, sha)] на origin, повністю влиті в origin/main (крім main і поточної)."""
+#   ⚠, не ✗ — переїзд не блокує; мережа не відповіла — ⓘ «не перевірено», не тиша (як (16)). HC_BRANCH=0 — вимкнути; HC_INJECT=branch — зуб selftest.
+def merged_branches(repo, timeout=5):
+    """→ [(гілка, sha)] на origin, повністю влиті в origin/main (крім main, поточної й верхівки ≡ main); None — не перевірено."""
     if os.environ.get('HC_BRANCH') == '0' or os.environ.get('HC_INJECT') == 'branch': return []
     try: r = subprocess.run(['git', '-C', repo, 'ls-remote', '--heads', 'origin'], capture_output=True, text=True, timeout=timeout)
-    except subprocess.TimeoutExpired: return []
-    if r.returncode: return []
+    except subprocess.TimeoutExpired: return None
+    if r.returncode: return None
     cur = git(repo, 'rev-parse', '--abbrev-ref', 'HEAD'); base = git(repo, 'rev-parse', '--verify', '-q', 'origin/main') or git(repo, 'rev-parse', '--verify', '-q', 'main')
     if not base: return []
     out = []
     for ln in r.stdout.splitlines():
         sha, _, ref = ln.partition('\t'); name = ref.replace('refs/heads/', '', 1)
-        if not sha or name in ('main', 'master', cur): continue
+        if not sha or name in ('main', 'master', cur) or sha == base: continue
         if subprocess.run(['git', '-C', repo, 'cat-file', '-e', sha + '^{commit}'], capture_output=True).returncode:
             try: subprocess.run(['git', '-C', repo, 'fetch', '-q', 'origin', name], capture_output=True, timeout=timeout)
             except subprocess.TimeoutExpired: continue
@@ -713,8 +713,9 @@ def branch_lines(repos):
     L = []
     for r in repos:
         m = merged_branches(r)
-        if m: L.append(('⚠', f'{os.path.basename(os.path.abspath(r))}: влиті в main гілки на origin — {len(m)}: ' + ' · '.join(f'{n} ({s[:7]})' for n, s in m)
-                        + ' → видали сам (Konst 26.11 — постійне «так»): конектор Lens GitHub gh_branch delete, expected_head = повний sha; git з контейнера — 403'))
+        if m is None: L.append(('ⓘ', f'{os.path.basename(os.path.abspath(r))}: влиті гілки не перевірено — origin не відповів'))
+        elif m: L.append(('⚠', f'{os.path.basename(os.path.abspath(r))}: влиті в main гілки на origin — {len(m)}: ' + ' · '.join(f'{n} ({s[:7]})' for n, s in m)
+                        + ' → видали сам (Konst 26.11 — постійне «так») за «Видалити гілку на GitHub» CLAUDE_CODE.md: конектор Lens GitHub gh_branch delete; конектора нема — у «Від тебе»'))
     return L
 
 def revision(root='/home/user', once=None):
@@ -1018,10 +1019,11 @@ def selftest():
     for c in (('config', 'user.email', 't@t'), ('config', 'user.name', 't'), ('checkout', '-q', '-b', 'main')): sh(wk, 'git', *c)
     open(os.path.join(wk, 'a'), 'w').write('1'); sh(wk, 'git', 'add', '-A'); sh(wk, 'git', 'commit', '-qm', 'a')
     sh(wk, 'git', 'push', '-q', 'origin', 'main'); sh(wk, 'git', 'push', '-q', 'origin', 'main:old-merged')
+    open(os.path.join(wk, 'a'), 'w').write('1b'); sh(wk, 'git', 'commit', '-qam', 'a2'); sh(wk, 'git', 'push', '-q', 'origin', 'main'); sh(wk, 'git', 'push', '-q', 'origin', 'main:fresh')
     sh(wk, 'git', 'checkout', '-q', '-b', 'own'); open(os.path.join(wk, 'b'), 'w').write('2'); sh(wk, 'git', 'add', '-A'); sh(wk, 'git', 'commit', '-qm', 'b'); sh(wk, 'git', 'push', '-q', 'origin', 'own')
     sh(wk, 'git', 'checkout', '-q', '-b', 'sess', 'main'); sh(wk, 'git', 'push', '-q', 'origin', 'sess'); sh(wk, 'git', 'fetch', '-q', 'origin')
     mb = merged_branches(wk); bl = branch_lines([wk])
-    rcases += [('(18) BR-1: влита гілка → лише вона (з власним комітом, main і поточна — ні)', [n for n, _ in mb] == ['old-merged']),
+    rcases += [('(18) BR-1: влита гілка → лише вона (з власним комітом, main, поточна й свіжа ≡ main — ні)', [n for n, _ in mb] == ['old-merged']),
                ('(18) рядок ⚠ несе гілку, sha і дію конектора', bool(bl) and bl[0][0] == '⚠' and 'old-merged' in bl[0][1] and 'gh_branch delete' in bl[0][1])]
     os.environ.pop('LENS_REV_MARK'); os.environ.pop('LENS_EXAM_MARK', None)
     for name, ok in rcases:
