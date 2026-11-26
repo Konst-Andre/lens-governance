@@ -29,10 +29,13 @@
 - `apple-mobile-web-app-capable: yes` — БЕЗ нього не стартує у standalone.
 - `black-translucent` — інакше біла смуга статус-бара в PWA. **⚠️ Має побічний ефект:** у standalone зсуває весь документ угору → з `html{height:100%}` оголює голу смугу знизу = висота верхнього inset. Фікс → **A55**.
 - `maximum-scale=1, user-scalable=no` — блок pinch (доповнюється JS, A25 — iOS Safari ігнорує meta-частину).
+- *Світ 26.11.2026:* iOS Safari ігнорує `user-scalable=no` з iOS 10 (webkit.org «New Interaction Behaviors in iOS 10»); meta лишаємо для Android, зуб на iOS — лише A25 + `touch-action:manipulation` (A24). Зум — доступність (adrianroselli.com «Don't Disable Zoom»): блок — лише у PWA з кеглем ≥ 13 px, рішенням власника продукту (EquipLens S47, Konst 26.11).
 
 ## A2. PWA manifest.json
 
 Ключі: `id` / `start_url` / `scope` (під шлях продукту), `display:"standalone"`, `background_color` + `theme_color`, `icons[]` (192/512/512-maskable). `orientation:"portrait"` iOS **ігнорує** → lock через CSS overlay (A23).
+
+*Світ 26.11.2026:* з iOS 26 кожен сайт, доданий «На Початковий екран», відкривається як застосунок (перемикач «Open as Web App» увімкнено за замовчуванням); `display:standalone` маніфесту замінює `apple-mobile-web-app-capable`, але meta лишаємо — без неї не працюють стартові зображення й старі iOS (firt.dev/notes/pwa-ios · heise.de/-10749652). Без `apple-touch-icon` iOS малює літеру назви на сірому — іконка обов'язкова й для службових сторінок (сторінка маршруту, EquipLens S47).
 
 ## A3. Icon pack (7 файлів) + squircle-правило
 
@@ -167,8 +170,9 @@ iOS НЕ підтримує `screen.orientation.lock()` (native-only); `manifest
 *,*::before,*::after{ box-sizing:border-box; margin:0; padding:0; }
 html{ -webkit-text-size-adjust:100%; background:var(--bg); }     /* double-tap autofit / overscroll колір */
 html,body{ height:100%; overflow:hidden; overscroll-behavior:none; }   /* pull-to-refresh + scroll chain */
-html,body,#app{ touch-action:pan-x pan-y; }
-body{ -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; touch-action:manipulation; }  /* long-press menu */
+html{ overscroll-behavior-y:none; }                                /* pull-to-refresh і «гумка» кореня */
+a,button,summary,label,[role=button]{ touch-action:manipulation; } /* double-tap zoom — лише на елементах дії, не на html */
+body{ -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }  /* long-press menu */
 input,select,textarea{ font-size:16px !important; }              /* anti auto-zoom при focus */
 input,textarea{ -webkit-user-select:text; -webkit-touch-callout:default; }
 *{ -webkit-tap-highlight-color:transparent; }                    /* сірий tap highlight */
@@ -178,6 +182,8 @@ button:disabled{ touch-action:none; pointer-events:none; }
 ```
 
 display-only елементи з inline `<em>` → `pointer-events:none` (double-tap autofit).
+
+**Поправка 26.11.2026 (світ ⟂ рецепт).** `touch-action:manipulation` / `pan-x pan-y` на `html`/`body` ламає поведінку полів вводу в iOS (github.com/coder/cmux/pull/372) — лише на елементах дії. `html,body{height:100%;overflow:hidden}` — лише коли скрол живе у власному контейнері (`#app`); документ, що скролиться сам (сторінка-список), його не бере. **Прибрав підсвічування — дай своє натискання:** `:active` з фоном, видимим в обох темах (`var(--line)` або аналог), інакше тап «німий». *Прецедент:* сторінка маршруту EquipLens S47 — без правила на темній темі сіре підсвічування iOS лише гасило текст: «блимає, ніби рендериться» (Konst 26.11).
 
 **❗ `button{background:none}` — критичний, не косметика.** Без нього iOS малює системний `ButtonFace` (≈`#e7e7e9`) на будь-якій `<button>` БЕЗ явного `background`. Кнопки з власним фоном (пілюлі, CTA) виглядають ок → баг невидимий, поки не зʼявиться кнопка, що покладається на фон **батька** (напр. `.theme-item` у дропдауні: фон дає `.theme-menu{background:var(--card)}`, сама кнопка прозора). Тоді ButtonFace перекриває тематичний `--card` → панель «сіра/інвертована» лише в одному компоненті. Симптом-якір: семпл пікселя дає `#e7e7e9`, а сусідні картки — правильний `--card`. *(Прецедент: KPI Lens Batch 14.1 — theme dropdown; root-cause знайдено семплом пікселя, не на око.)*
 
