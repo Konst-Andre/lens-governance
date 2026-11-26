@@ -14,6 +14,11 @@
 #   Емодзі в UI — ні (EquipLens:lens/EquipLens_MASTER_LOCK.md «Емодзі в UI»): знаки стану в тексті клітинок → inline-SVG.
 # Запуск:  python3 tools/claude-code/route_page.py <репо> [--queue F] [--out ТЕКА] [--no-probe] [--inject sha|emoji|md]
 #            → ТЕКА/index.html (типово /tmp/route-page-<репо>/), exit 1 — сторінка не пройшла власну перевірку
+#          python3 tools/claude-code/route_page.py publish <репо>   → зібрати й видати (Worker Preview; ключ «preview» конфігу, CLOUDFLARE_API_TOKEN)
+#          python3 tools/claude-code/route_page.py install <репо>   → git post-commit: коміт зачепив карту чи слова → `hook` видає у фоні
+#   ROUTE-6 (Konst 26.11.2026, EquipLens S47): значок «Додому» і маніфест поруч зі сторінкою, нативне відчуття (кукбук A24/A25),
+#   своє :active (у темній сіре підсвічування iOS лише гасило текст — «блимає»), тема Авто · Світла · Темна (localStorage телефона),
+#   свіжість — видача після коміту карти + самоперевірка на відкритті й поверненні (кукбук A79 + visibilitychange).
 #          python3 tools/claude-code/route_page.py selftest   → зуби на тимчасовому репо (без Chromium)
 #          (те саме — `route_check.py page …`)
 import sys, os, re, json, html, base64, subprocess, tempfile, shutil
@@ -246,17 +251,28 @@ def build(repo, queue=None, probe=True, inject=None):
     today = subprocess.run(['date', '+%d.%m.%Y'], capture_output=True, text=True).stdout.strip()
     upd = (when.replace(today + ' ', 'сьогодні о ') if when.startswith(today) else when.replace(' ', ' о ', 1)) if when else ''
     L, D = tok['light'], tok['dark']
+    built = subprocess.run(['date', '+%d.%m.%Y %H:%M'], capture_output=True, text=True).stdout.strip()
     var = lambda t: ';'.join(f'{k}:{v}' for k, v in t.items())
     css = f"""{ff}
 :root{{{var(L)};color-scheme:light}}
-@media (prefers-color-scheme:dark){{:root{{{var(D)};color-scheme:dark}}}}
+@media (prefers-color-scheme:dark){{:root:not([data-theme=light]){{{var(D)};color-scheme:dark}}}}
+:root[data-theme=dark]{{{var(D)};color-scheme:dark}}
+/* нативне відчуття (кукбук A24, «Нативне відчуття» INDEX §2): без підсвічування тапу iOS — своє натискання, видиме в обох темах */
+*{{-webkit-tap-highlight-color:transparent}}html{{-webkit-text-size-adjust:100%;overscroll-behavior-y:none}}
+body{{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}}a,button,summary{{touch-action:manipulation}}
+summary,.lnk,.cp,.seg button{{transition:background-color .12s}}summary:active,.lnk:active,.cp:active,.seg button:active{{background-color:var(--line)}}
 /* розміри нижче — власні цієї сторінки (не токени продукту): кегль ≥ 13 px, поле дотику ≥ 44 px */
 *{{box-sizing:border-box}}html{{background-color:var(--canvas);background-image:var(--bg-aur);background-attachment:fixed;min-height:100%}}
 body{{margin:0;font-family:{fam};color:var(--ink);font-size:15px;line-height:1.45;-webkit-text-size-adjust:100%;
 padding:max(18px,env(safe-area-inset-top)) 14px max(24px,env(safe-area-inset-bottom))}}
 main{{max-width:560px;margin:0 auto}}
 header{{margin:6px 4px 16px}}h1{{font-size:26px;font-weight:750;margin:0;letter-spacing:-.015em}}
-.upd{{color:var(--ink-3);font-size:13px;margin:2px 0 10px}}
+.top{{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:6px 0 0}}.top .barl{{margin:0}}
+.upd{{display:block;color:var(--ink-3);margin:2px 0 8px;background:none;border:0;padding:4px 0;font:inherit;font-size:13px;line-height:1.45;text-align:left;min-height:44px;cursor:pointer;border-radius:8px}}
+.upd b{{font-weight:600;color:var(--ink-2)}}
+.seg{{display:inline-flex;flex:none;padding:2px;border-radius:12px;background:var(--line)}}
+.seg button{{font:inherit;font-size:13px;font-weight:600;color:var(--ink-2);background:none;border:0;border-radius:10px;min-height:36px;padding:0 10px;cursor:pointer}}
+.seg button[aria-pressed=true]{{background:var(--surface);color:var(--ink);box-shadow:var(--lift)}}
 .bar{{height:6px;border-radius:3px;background:var(--line);overflow:hidden}}.bar i{{display:block;height:100%;width:{pct}%;background:var(--accent);border-radius:3px}}
 .barl{{color:var(--ink-2);font-size:13px;margin:6px 0 0}}
 code{{font-family:inherit;font-weight:650;font-size:.92em;overflow-wrap:anywhere}}a{{color:inherit;text-underline-offset:2px}}
@@ -295,27 +311,57 @@ var MSG='Скопійовано — встав у чат і допиши сво�
 function old(){var a=document.createElement('textarea');a.value=t;a.setAttribute('readonly','');a.style.position='fixed';a.style.opacity='0';
 document.body.appendChild(a);a.select();var r=false;try{r=document.execCommand('copy')}catch(_){}a.remove();
 done(r?MSG:'Не вийшло скопіювати — спробуй ще раз')}
-if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(t).then(function(){done(MSG)},old)}else old()});"""
+if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(t).then(function(){done(MSG)},old)}else old()});
+/* щипок (кукбук A25: iOS ігнорує user-scalable=no) */
+['gesturestart','gesturechange','gestureend'].forEach(function(v){document.addEventListener(v,function(e){e.preventDefault()},{passive:false})});
+/* тема: Авто · Світла · Темна — пам'ять у браузері телефона, сторінка — та сама для всіх */
+var R=document.documentElement,TC=__TC__;
+function theme(v){if(v==='light'||v==='dark')R.dataset.theme=v;else{delete R.dataset.theme;v='auto'}
+document.querySelectorAll('.seg button').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.th===v))});
+document.querySelectorAll('meta[name=theme-color]').forEach(function(m){m.content=v==='auto'?TC[m.dataset.cs]:TC[v]})}
+theme(R.dataset.theme);
+document.querySelector('.seg').addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;
+try{localStorage.setItem('route-theme',b.dataset.th)}catch(_){}theme(b.dataset.th)});
+/* свіжість (кукбук A79 + visibilitychange): на відкритті, поверненні в застосунок і тапі сторінка питає сервер про новішу карту;
+   є — переходить на ?v=<хеш> (інший URL обходить кеш браузера) */
+var SHA=document.querySelector('meta[name=route-map-commit]').content,CK=document.getElementById('chk');
+function hm(){var d=new Date();return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)}
+function fresh(){CK.textContent='перевіряю, чи нема новішого…';
+fetch(location.pathname+'?_='+Date.now(),{cache:'no-store'}).then(function(r){return r.text()}).then(function(t){var m=t.match(/route-map-commit" content="([^"]+)"/);
+if(m&&m[1]!==SHA){CK.textContent='є новіше — оновлюю';location.replace(location.pathname+'?v='+m[1]);return}CK.textContent='свіже · перевірено о '+hm()})
+.catch(function(){CK.textContent='без мережі — показано останнє завантажене'})}
+fresh();document.getElementById('upd').addEventListener('click',fresh);
+document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')fresh()});"""
+    js = js.replace('__TC__', json.dumps({'light': L['--canvas'], 'dark': D['--canvas']}))
     page = f"""<!DOCTYPE html>
 <html lang="uk"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Маршрут"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" data-cs="light" media="(prefers-color-scheme: light)" content="{html.escape(L['--canvas'])}">
+<meta name="theme-color" data-cs="dark" media="(prefers-color-scheme: dark)" content="{html.escape(D['--canvas'])}">
+<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="apple-touch-icon.png"><link rel="icon" href="icon.svg" type="image/svg+xml">
+<script>try{{var t=localStorage.getItem('route-theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}}catch(_){{}}</script>
 <meta name="route-map-commit" content="{html.escape(sha)}">
 <meta name="route-map-file" content="{html.escape(qrel)}">
 <meta name="robots" content="noindex">
 <title>Маршрут {html.escape(title)}</title><style>{css}</style></head>
 <body><main>
-<header><h1>Маршрут {html.escape(title)}</h1>{f'<p class="upd">Оновлено {html.escape(upd)}</p>' if upd else ''}
+<header><h1>Маршрут {html.escape(title)}</h1>
+<button type="button" class="upd" id="upd" aria-label="Перевірити, чи нема новішого">{f'Маршрут змінено <b>{html.escape(upd)}</b><br>' if upd else ''}<span id="chk" role="status">свіже на момент збирання</span></button>
 <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="{len(rows)}" aria-valuenow="{done}" aria-label="Зроблено кроків"><i></i></div>
-<p class="barl">Зроблено {done} з {len(rows)}</p></header>
+<div class="top"><p class="barl">Зроблено {done} з {len(rows)}</p>
+<div class="seg" role="group" aria-label="Тема"><button type="button" data-th="auto">Авто</button><button type="button" data-th="light">Світла</button><button type="button" data-th="dark">Темна</button></div></div></header>
 {card}
 {steps}
 {blocks}
-<footer>Карта з коміту <code>{html.escape(sha)}</code> · сторінку збирає машина, руками не правиться</footer>
+<footer>Сторінка оновлюється сама: Claude змінив маршрут — за хвилину тут нова версія, а відкрита сторінка підтягне її, щойно повернешся в неї. Нема змін — нема й оновлень.<br>Карта з коміту <code>{html.escape(sha)}</code> · зібрано {html.escape(built)}</footer>
 </main><script>{js}</script></body></html>
 """
     if inject == 'emoji': page = page.replace('</footer>', ' ✅</footer>')   # зуб: емодзі у видимому тексті
     if inject == 'md': page = page.replace('</footer>', ' **жирне**</footer>')   # зуб: markdown не перетворено
     facts = dict(sha=git(repo, 'log', '-1', '--format=%h', '--', qrel) or '?', ids=[r['id'] for r in rows], play=play['id'] if play else None)
+    facts.update(tok=tok, title=title, files=[qrel] + ([os.path.relpath(wp, repo)] if wp else []))
     return page, facts, notes
 
 
@@ -340,6 +386,87 @@ def verify(page, facts):
     return bad
 
 
+def icon_svg(t, mask=False):
+    """Значок «Додому»: шлях із трьох точок — зроблено · зараз · далі (мова значків сторінки), кольори — темна тема продукту.
+    Повне полотно без своїх полів (iOS сам накладає маску, кукбук A3); maskable — вміст у безпечних 80 % (Android)."""
+    bg, ac, ink = t['--canvas'], t['--accent'], t['--ink-2']
+    g = ('<g transform="translate(256 256) scale(.8) translate(-256 -256)">' if mask else '<g>')
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" fill="{bg}"/>'
+            f'<radialGradient id="a" cx=".5" cy=".42" r=".6"><stop offset="0" stop-color="{ac}" stop-opacity=".28"/><stop offset="1" stop-color="{ac}" stop-opacity="0"/></radialGradient>'
+            f'<rect width="512" height="512" fill="url(#a)"/>{g}'
+            f'<path d="M146 372C146 300 256 318 256 256" fill="none" stroke="{ac}" stroke-width="18" stroke-linecap="round"/>'
+            f'<path d="M256 256C256 194 366 212 366 140" fill="none" stroke="{ink}" stroke-width="16" stroke-linecap="round" stroke-dasharray="2 34"/>'
+            f'<circle cx="146" cy="372" r="40" fill="{ac}"/><path d="M127 373l13 13 26-27" fill="none" stroke="{bg}" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>'
+            f'<circle cx="256" cy="256" r="44" fill="{bg}" stroke="{ac}" stroke-width="15"/><circle cx="256" cy="256" r="20" fill="{ac}"/>'
+            f'<circle cx="366" cy="140" r="32" fill="{bg}" stroke="{ink}" stroke-width="13"/></g></svg>')
+
+
+def assets(out, facts):
+    """Поруч зі сторінкою: icon.svg, manifest.webmanifest і PNG (180 · 192 · 512 · 512-maskable) через Chromium. → примітки."""
+    t = facts['tok']['dark']
+    open(os.path.join(out, 'icon.svg'), 'w').write(icon_svg(t))
+    icons = [('apple-touch-icon.png', 180, False), ('icon-192.png', 192, False), ('icon-512.png', 512, False), ('icon-512-mask.png', 512, True)]
+    man = {'id': './', 'start_url': './', 'scope': './', 'name': f"Маршрут {facts['title']}", 'short_name': 'Маршрут', 'lang': 'uk',
+           'display': 'standalone', 'background_color': t['--canvas'], 'theme_color': t['--canvas'],
+           'icons': [{'src': f, 'sizes': f'{n}x{n}', 'type': 'image/png', 'purpose': 'maskable' if m else 'any'} for f, n, m in icons[1:]]}
+    json.dump(man, open(os.path.join(out, 'manifest.webmanifest'), 'w'), ensure_ascii=False, indent=1)
+    try:
+        from playwright.sync_api import sync_playwright
+    except Exception:
+        return ['ⓘ Playwright нема — PNG-значків нема (iOS покаже літеру)']
+    with sync_playwright() as p:
+        b = p.chromium.launch()
+        for f, n, m in icons:
+            pg = b.new_page(viewport={'width': n, 'height': n})
+            pg.set_content(f'<body style="margin:0">{icon_svg(t, m).replace("<svg ", f"<svg width={n} height={n} ", 1)}</body>')
+            pg.screenshot(path=os.path.join(out, f)); pg.close()
+        b.close()
+    return [f'значки: {len(icons)} PNG + icon.svg · маніфест']
+
+
+def publish(repo, out=None):
+    """Зібрати й видати сторінку (Worker Preview, lens-governance:tools/cloudflare/CLOUDFLARE.md §2-б): конфіг — ключ «preview»
+    `tools/route_page.json` ({"worker": …, "name": …}); токен — CLOUDFLARE_API_TOKEN середовища (нема → ⓘ, нічого не робимо)."""
+    cfg = json.load(open(os.path.join(repo, 'tools', 'route_page.json'), encoding='utf-8'))
+    pv = cfg.get('preview') or {}
+    if not pv.get('worker') or not os.environ.get('CLOUDFLARE_API_TOKEN'):
+        print('ⓘ видачі нема: ключа «preview» у tools/route_page.json чи CLOUDFLARE_API_TOKEN у середовищі'); return 0
+    out = out or os.path.join(tempfile.gettempdir(), 'route-page-' + os.path.basename(os.path.abspath(repo)))
+    if run(repo, out=out): return 1
+    d = tempfile.mkdtemp(prefix='route_pub_'); c = os.path.join(d, 'wrangler.toml')
+    open(c, 'w').write(f'name = "{pv["worker"]}"\ncompatibility_date = "2026-11-01"\nworkers_dev = true\npreview_urls = true\n'
+                       f'previews = {{}}\n[assets]\ndirectory = "{out}"\n')
+    r = subprocess.run(['npx', '--yes', 'wrangler@4', 'preview', '--name', pv.get('name', 'route'), '--config', c], capture_output=True, text=True, cwd=d)
+    shutil.rmtree(d, ignore_errors=True)
+    print((r.stdout + r.stderr)[-600:]); print(f'─── видача сторінки маршруту: exit {r.returncode} ───'); return r.returncode
+
+
+def changed_map(repo):
+    """Чи останній коміт змінив карту чи людські слова (файли — з build)."""
+    page, facts, _ = build(repo, probe=False)
+    if not page: return False
+    ch = set(git(repo, 'diff-tree', '--no-commit-id', '--name-only', '-r', 'HEAD').splitlines())
+    return bool(ch & set(facts['files']))
+
+
+HOOK = '#!/bin/sh\n# поставив lens-governance:tools/claude-code/route_page.py install — сторінка маршруту видається сама після коміту, що змінив карту\nexec python3 "{me}" hook "$(git rev-parse --show-toplevel)"\n'
+
+
+def install(repo):
+    hp = os.path.join(repo, git(repo, 'rev-parse', '--git-path', 'hooks')); os.makedirs(hp, exist_ok=True); f = os.path.join(hp, 'post-commit')
+    if os.path.exists(f) and 'route_page.py' not in open(f).read(): return f'⚠ {f} уже є і не наш — не перезаписую'
+    open(f, 'w').write(HOOK.format(me=os.path.abspath(__file__))); os.chmod(f, 0o755); return f'✓ post-commit: {f}'
+
+
+def hook(repo):
+    """git post-commit: карта змінилась → видача у фоні (коміт не чекає); журнал — <git-dir>/route-publish.log."""
+    if not changed_map(repo): return 0
+    log = os.path.join(repo, git(repo, 'rev-parse', '--git-dir'), 'route-publish.log')
+    subprocess.Popen([sys.executable, os.path.abspath(__file__), 'publish', repo], stdout=open(log, 'w'), stderr=subprocess.STDOUT,
+                     start_new_session=True)
+    print('сторінка маршруту: карта змінилась — видаю у фоні (журнал — .git/route-publish.log)'); return 0
+
+
 def run(repo, queue=None, out=None, probe=True, inject=None):
     page, facts, notes = build(repo, queue, probe, inject)
     if page is None: print(f'сторінка маршруту: {notes[0]} — нічого не зібрано'); return 0
@@ -347,6 +474,7 @@ def run(repo, queue=None, out=None, probe=True, inject=None):
     os.makedirs(out, exist_ok=True); path = os.path.join(out, 'index.html')
     open(path, 'w', encoding='utf-8').write(page)
     bad = verify(page, facts)
+    if not inject: notes += assets(out, facts)
     for n in notes: print(n)
     for b in bad: print(f'✗ {b}')
     print(f'─── сторінка маршруту: {path} · {len(page) // 1024} КБ · кроків {len(facts["ids"])} · ▶ {facts["play"] or "?"} · '
@@ -367,6 +495,9 @@ def selftest():
             if inj is None:   # що бачить людина: картка ▶, стан словом, знак стану з клітинки — SVG, вхідні
                 vt = visible_text(page)
                 ok = ok and 'Зараз' in vt and 'зроблено 01.01' in vt and '✅' not in vt and 'ідея' in vt and page.count('<svg') >= 4
+                # ROUTE-6: тема, своє натискання замість підсвічування iOS, «Додому», самоперевірка свіжості
+                ok = ok and all(x in page for x in ('data-th="dark"', ':root[data-theme=dark]', '-webkit-tap-highlight-color:transparent',
+                                                     'summary:active', 'rel="apple-touch-icon"', 'rel="manifest"', 'gesturestart', "cache:'no-store'"))
         finally: shutil.rmtree(tmp, ignore_errors=True)
         fails += not ok; print(f'{"✓" if ok else "✗"} {name}' + ('' if ok else f' — {bad}'))
     tmp = tempfile.mkdtemp(prefix='route_page_')
@@ -375,12 +506,28 @@ def selftest():
         ok = page is None and 'карти' in notes[0]
     finally: shutil.rmtree(tmp, ignore_errors=True)
     fails += not ok; print(f'{"✓" if ok else "✗"} карти нема → нічого не збирає')
-    n = len(cases) + 1; print(f'─── route_page selftest: {n - fails}/{n} ───'); return 1 if fails else 0
+    tmp = tempfile.mkdtemp(prefix='route_page_')   # git post-commit: видає лише коли коміт зачепив карту (зуб — коміт без карти)
+    try:
+        rc._repo(tmp, rc.GOOD, rc.SUM, rc.BRIEF)
+        cm = lambda f: (open(os.path.join(tmp, f), 'a').write('\n'), subprocess.run(['git', '-C', tmp, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qam', 'x'], capture_output=True))
+        cm('sessions/X_session_summary_S1_T.md'); a1 = changed_map(tmp)
+        cm('lens/X_CHERGA.md'); a2 = changed_map(tmp)
+        ok = a1 is False and a2 is True
+        ok = ok and install(tmp).startswith('✓') and 'route_page.py' in open(os.path.join(tmp, '.git', 'hooks', 'post-commit')).read()
+        t = {k: v[1] for k, v in TOKENS.items()}; sv = icon_svg(t) + icon_svg(t, True)
+        ok = ok and sv.count('<svg') == 2 and 'scale(.8)' in sv
+    finally: shutil.rmtree(tmp, ignore_errors=True)
+    fails += not ok; print(f'{"✓" if ok else "✗"} post-commit: коміт без карти → не видає, з картою → видає · install · значок (maskable 80 %)')
+    n = len(cases) + 2; print(f'─── route_page selftest: {n - fails}/{n} ───'); return 1 if fails else 0
 
 
 def main(a):
     if not a: print(__doc__ or 'route_page.py <репо> [--queue F] [--out ТЕКА] [--no-probe] [--inject sha|emoji|md] | selftest'); return 2
     if a[0] == 'selftest': return selftest()
+    if a[0] in ('publish', 'install', 'hook') and len(a) == 2:
+        r = {'publish': publish, 'install': install, 'hook': hook}[a[0]](os.path.abspath(a[1]))
+        if isinstance(r, str): print(r); return 0
+        return r
     repo = os.path.abspath(a[0]); opt, i = {}, 1
     while i < len(a):
         if a[i] in ('--queue', '--out', '--inject') and i + 1 < len(a): opt[a[i][2:]] = a[i + 1]; i += 2
