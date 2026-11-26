@@ -11,6 +11,7 @@
 #          HC_INJECT=rev4 … selftest → ✗ (зуб REV-4: коміти без запису не бачить, печатку не звіряє)
 #          HC_INJECT=envx … selftest → ✗ (зуб (16): ✗ свіжого env_check ревізія не бачить) · HC_ENV=0 — вимкнути (16) · HC_ENV_TIMEOUT=<с> (20)
 #          HC_INJECT=kept … selftest → ✗ (зуб (17) REV-6: мертвий якір «Свідомо лишено» не бачить)
+#          HC_INJECT=branch … selftest → ✗ (зуб (18) BR-1: влитих гілок на origin не бачить) · HC_BRANCH=0 — вимкнути (18)
 # «Свої» коміти — за трейлером Claude-Session ≡ CLAUDE_CODE_REMOTE_SESSION_ID (cse_X ↔ session_X); нема змінної — усі коміти агента.
 import glob, json, os, re, subprocess, sys, tempfile, time
 
@@ -684,6 +685,38 @@ def env_lines(repos, budget=None):
         if len(bad) > 8: out.append(('✗', f'{name}: env_check — ще {len(bad) - 8} ✗ (bash tools/env_check.sh)'))
     return out
 
+# (18) BR-1 (Konst 26.11.2026, EquipLens S45: «так на видалення зайвих гілок, які вже злиті з мейном… щоб це автоматично ти пропонував або робив»;
+#   раніше Konst нагадував щоразу). Влита = верхівка гілки на origin — предок origin/main; гілку сесії й main не чіпаємо. Видаляє агент без питання
+#   (постійне «так»), конектором Lens GitHub `gh_branch delete` з expected_head = sha: git-проксі контейнера пускає push лише в гілку сесії й main (403, 26.11).
+#   Світ (26.11.2026): `git branch -r --merged main` — та сама перевірка предка (Baeldung «git-remove-merged-branches»); «Automatically delete head branches»
+#   GitHub — лише для злиття через PR, а ми вливаємо fast-forward — не беремо; squash-злиття предком не буде — у нас його нема.
+#   ⚠, не ✗ — переїзд не блокує. HC_BRANCH=0 — вимкнути (мережа); HC_INJECT=branch — зуб selftest (не бачить влитих).
+def merged_branches(repo, timeout=15):
+    """→ [(гілка, sha)] на origin, повністю влиті в origin/main (крім main і поточної)."""
+    if os.environ.get('HC_BRANCH') == '0' or os.environ.get('HC_INJECT') == 'branch': return []
+    try: r = subprocess.run(['git', '-C', repo, 'ls-remote', '--heads', 'origin'], capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired: return []
+    if r.returncode: return []
+    cur = git(repo, 'rev-parse', '--abbrev-ref', 'HEAD'); base = git(repo, 'rev-parse', '--verify', '-q', 'origin/main') or git(repo, 'rev-parse', '--verify', '-q', 'main')
+    if not base: return []
+    out = []
+    for ln in r.stdout.splitlines():
+        sha, _, ref = ln.partition('\t'); name = ref.replace('refs/heads/', '', 1)
+        if not sha or name in ('main', 'master', cur): continue
+        if subprocess.run(['git', '-C', repo, 'cat-file', '-e', sha + '^{commit}'], capture_output=True).returncode:
+            try: subprocess.run(['git', '-C', repo, 'fetch', '-q', 'origin', name], capture_output=True, timeout=timeout)
+            except subprocess.TimeoutExpired: continue
+        if subprocess.run(['git', '-C', repo, 'merge-base', '--is-ancestor', sha, base], capture_output=True).returncode == 0: out.append((name, sha))
+    return out
+
+def branch_lines(repos):
+    L = []
+    for r in repos:
+        m = merged_branches(r)
+        if m: L.append(('⚠', f'{os.path.basename(os.path.abspath(r))}: влиті в main гілки на origin — {len(m)}: ' + ' · '.join(f'{n} ({s[:7]})' for n, s in m)
+                        + ' → видали сам (Konst 26.11 — постійне «так»): конектор Lens GitHub gh_branch delete, expected_head = повний sha; git з контейнера — 403'))
+    return L
+
 def revision(root='/home/user', once=None):
     """→ (текст, є ✗). once — файл-позначка: той самий HEAD усіх репо, що й минулого разу → ('', False) (повтор не шумить)."""
     import contextlib, io
@@ -696,6 +729,8 @@ def revision(root='/home/user', once=None):
     txt = buf.getvalue().strip()
     ev = env_lines(rs)   # (16) REV-5 Л5: ✗ свіжого env_check — ✗ ревізії
     if ev: txt += '\n— env_check (свіжий прогін)\n' + '\n'.join(f'  {g} {t}' for g, t in ev); bad = bad or any(g == '✗' for g, _ in ev)
+    br = branch_lines(rs)   # (18) BR-1: влиті гілки — агент видаляє сам
+    if br: txt += '\n— гілки\n' + '\n'.join(f'  {g} {t_}' for g, t_ in br)
     miss = uncovered_commits(rs)   # REV-4 (а): те саме, що судить гачок Stop REV-2 на переїзді
     if miss: txt += (f'\n  ✗ коміти сесії без запису в самері — {len(miss)}: ' + ' · '.join(miss[:10]) + (' …' if len(miss) > 10 else '')
                      + ' → рядком §1 самері (що · дім · коміт)')
@@ -977,6 +1012,17 @@ def selftest():
                ('(17) пункт без якоря → ⚠ «без якоря»', k_bare and k_bare[0][0] == '⚠' and '1 без якоря' in k_bare[0][1]),
                ('(17) якір у самому самері — лише поза розділом: сам себе не живить → ⚠; є в §0 → ✓', k_self and k_self[0][0] == '⚠' and k_own and k_own[0][0] == '✓'),
                ('(17) нема розділу → тиша', k_none == [])]
+    # (18) BR-1: влита гілка → ⚠ з sha; гілка з власним комітом, main і поточна — тиша
+    ob = tempfile.mkdtemp(prefix='hc-br-'); org = os.path.join(ob, 'o.git'); wk = os.path.join(ob, 'w')
+    sh(ob, 'git', 'init', '-q', '--bare', org); sh(ob, 'git', 'clone', '-q', org, wk)
+    for c in (('config', 'user.email', 't@t'), ('config', 'user.name', 't'), ('checkout', '-q', '-b', 'main')): sh(wk, 'git', *c)
+    open(os.path.join(wk, 'a'), 'w').write('1'); sh(wk, 'git', 'add', '-A'); sh(wk, 'git', 'commit', '-qm', 'a')
+    sh(wk, 'git', 'push', '-q', 'origin', 'main'); sh(wk, 'git', 'push', '-q', 'origin', 'main:old-merged')
+    sh(wk, 'git', 'checkout', '-q', '-b', 'own'); open(os.path.join(wk, 'b'), 'w').write('2'); sh(wk, 'git', 'add', '-A'); sh(wk, 'git', 'commit', '-qm', 'b'); sh(wk, 'git', 'push', '-q', 'origin', 'own')
+    sh(wk, 'git', 'checkout', '-q', '-b', 'sess', 'main'); sh(wk, 'git', 'push', '-q', 'origin', 'sess'); sh(wk, 'git', 'fetch', '-q', 'origin')
+    mb = merged_branches(wk); bl = branch_lines([wk])
+    rcases += [('(18) BR-1: влита гілка → лише вона (з власним комітом, main і поточна — ні)', [n for n, _ in mb] == ['old-merged']),
+               ('(18) рядок ⚠ несе гілку, sha і дію конектора', bool(bl) and bl[0][0] == '⚠' and 'old-merged' in bl[0][1] and 'gh_branch delete' in bl[0][1])]
     os.environ.pop('LENS_REV_MARK'); os.environ.pop('LENS_EXAM_MARK', None)
     for name, ok in rcases:
         print(('✓' if ok else '✗') + ' ' + name); bad += not ok
