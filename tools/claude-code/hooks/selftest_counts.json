@@ -34,7 +34,7 @@
  "rejected-guard.py selftest": 13,
  "review-remind.sh selftest": 9,
  "route-remind.sh selftest": 16,
- "route_check.py selftest": 19,
+ "route_check.py selftest": 22,
  "route_page.py selftest": 5,
  "rules-guard.py selftest": 18,
  "run-guard.sh selftest": 16,

@@ -120,8 +120,25 @@ def section0(text):
     return '\n'.join(out)
 
 
-def check(repo, queue=None, inject=None):
-    """→ dict(bad, warn, info, play, nxt, inbox_open, qrel) або None (карти нема)."""
+def live_url(repo):
+    """Адреса живої сторінки маршруту — ключ «live» у `<репо>/tools/route_page.json` (нема → звіру нема)."""
+    cp = os.path.join(repo, 'tools', 'route_page.json')
+    try: return json.load(open(cp, encoding='utf-8')).get('live') if os.path.isfile(cp) else None
+    except Exception: return None
+
+
+def live_sha(url):
+    """Хеш карти з <meta name="route-map-commit"> живої сторінки (urllib; file:// — для selftest)."""
+    import urllib.request
+    html = urllib.request.urlopen(url, timeout=8).read().decode('utf-8', 'replace')
+    m = re.search(r'<meta name="route-map-commit" content="([0-9a-f?]+)"', html)
+    return m.group(1) if m else None
+
+
+def check(repo, queue=None, inject=None, live=False):
+    """→ dict(bad, warn, info, play, nxt, inbox_open, qrel) або None (карти нема).
+    live=True (режим `check`, його кличе env_check) — ще й звір живої сторінки з останнім комітом файла карти; режим `line`
+    (гачок route-remind, щоповідомлення) у мережу не ходить (ROUTE-1 §5-б «Свіжість»: гачок сам не завантажує)."""
     qp = queue or find_queue(repo)
     if qp and not os.path.isabs(qp): qp = os.path.join(repo, qp)
     if not qp or not os.path.isfile(qp): return None
@@ -190,6 +207,16 @@ def check(repo, queue=None, inject=None):
         if pg: warn += [f'сторінка маршруту: {b}' for b in route_page.verify(pg, facts)]
     except Exception as e:
         info.append(f'сторінку не перевірено ({type(e).__name__})')
+    lu = live_url(repo) if live else None
+    if lu:   # ROUTE-5 хід 2 (EquipLens S47): жива сторінка ≡ останньому коміту файла карти, інакше ⚠ «відстає»
+        want = subprocess.run(['git', '-C', repo, 'log', '-1', '--format=%h', '--', qrel], capture_output=True, text=True).stdout.strip()
+        try:
+            got = '0000000' if inject == 'live' else live_sha(lu)   # зуб: підкинутий старий хеш
+            if not got or not want or not (got.startswith(want) or want.startswith(got)):
+                warn.append(f'жива сторінка маршруту відстає: {got or "без хешу"} ≠ карта {want} — онови: route_check.py page . і `npx wrangler@4 preview --name route` (lens-governance:tools/cloudflare/CLOUDFLARE.md §2-б)')
+            else: info.append(f'жива сторінка ≡ карті {want}')
+        except Exception as e:
+            info.append(f'живу сторінку не звірено ({type(e).__name__})')
     open_in = [x for x in m['inbox'] if '→' not in x]
     warn += [f'вхідні без «→ куди»: {x[:80]}' for x in open_in]
     if hc:
@@ -298,7 +325,21 @@ def selftest():
             ok = not res['bad'] and code == 0 and sub in txt
         finally: shutil.rmtree(tmp, ignore_errors=True)
         bad += not ok; print(f'{"✓" if ok else "✗"} {name}' + ('' if ok else '\n    ' + txt.replace('\n', '\n    ')))
-    n = len(cases) + 1 + len(wcases)
+    lcases = [('жива сторінка ≡ карті → ⚠ 0, ⓘ «≡ карті»', None, None, 'жива сторінка ≡ карті'),
+              ('--inject live → ⚠ жива сторінка відстає', None, 'live', 'жива сторінка маршруту відстає'),
+              ('жива сторінка зі старим хешем → ⚠', 'abc1234', None, 'жива сторінка маршруту відстає')]
+    for name, fake, inj, sub in lcases:
+        tmp = tempfile.mkdtemp(prefix='route_check_')
+        try:
+            _repo(tmp, GOOD, SUM, BRIEF); _words(tmp, WORDS)
+            sha = subprocess.run(['git', '-C', tmp, 'log', '-1', '--format=%h', '--', 'lens/X_CHERGA.md'], capture_output=True, text=True).stdout.strip()
+            pg = os.path.join(tmp, 'live.html'); open(pg, 'w').write(f'<meta name="route-map-commit" content="{fake or sha}">')
+            cp = os.path.join(tmp, 'tools', 'route_page.json'); c = json.load(open(cp)); c['live'] = 'file://' + pg; json.dump(c, open(cp, 'w'))
+            res = check(tmp, inject=inj, live=True); txt, code = report(res)
+            ok = not res['bad'] and code == 0 and sub in txt and (('⚠ 0' in txt) == (fake is None and inj is None))
+        finally: shutil.rmtree(tmp, ignore_errors=True)
+        bad += not ok; print(f'{"✓" if ok else "✗"} {name}' + ('' if ok else '\n    ' + txt.replace('\n', '\n    ')))
+    n = len(cases) + 1 + len(wcases) + len(lcases)
     print(f'─── route_check selftest: {n - bad}/{n} ───'); return 1 if bad else 0
 
 
@@ -313,7 +354,7 @@ def main(a):
     while i < len(a):
         if a[i] in ('--queue', '--inject') and i + 1 < len(a): opt[a[i][2:]] = a[i + 1]; i += 2
         else: i += 1
-    res = check(repo, opt.get('queue'), opt.get('inject'))
+    res = check(repo, opt.get('queue'), opt.get('inject'), live=a[0] == 'check')
     if a[0] == 'line': print(line(res)); return 0
     txt, code = report(res); print(txt); return code
 
