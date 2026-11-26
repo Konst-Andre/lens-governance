@@ -8,6 +8,7 @@
 #   python3 route_check.py check <репо> [--queue F] [--inject two|next|summary]   → звіт, exit 1 на ✗
 #   python3 route_check.py line  <репо> [--queue F]                                  → один рядок для звіту / гачка
 #   python3 route_check.py selftest                                                  → зуби: тимчасові репо
+#   python3 route_check.py page  <репо> [--out ТЕКА] …                               → сторінка маршруту для телефона (`route_page.py`, §5-б «Крок 5»)
 # Карти нема → «маршрут: карти нема», exit 0 (старі репо — без змін).
 # ✗: крок ▶ не рівно один · стан не з ▶ ○ ⏸ ✅ · клітинок ≠ заголовку · крок без «що» / «готово, коли» / «далі» (у ▶ і його «далі» «—» теж ✗;
 #    далі за ланцюгом «—» = ще не визначено, норма) · «далі» на неіснуючий id · дубль id.
@@ -245,9 +246,11 @@ def selftest():
 
 
 def main(a):
-    if not a or a[0] not in ('check', 'line', 'selftest'):
-        print('route_check.py check|line <репо> [--queue F] [--inject two|next|summary] | selftest'); return 2
+    if not a or a[0] not in ('check', 'line', 'selftest', 'page'):
+        print('route_check.py check|line <репо> [--queue F] [--inject two|next|summary] | page <репо> … | selftest'); return 2
     if a[0] == 'selftest': return selftest()
+    if a[0] == 'page':   # сторінку збирає сусід, карту читає цей модуль (parse_map) — читач один
+        import route_page; return route_page.main(a[1:])
     repo = os.path.abspath(a[1]) if len(a) > 1 and not a[1].startswith('--') else os.getcwd()
     opt, i = {}, 1
     while i < len(a):
