@@ -15,7 +15,7 @@
  "ghlink.py selftest": 8,
  "handoff-remind.sh selftest": 31,
  "handoff_check.py selftest": 97,
- "handoff_exam.py selftest": 19,
+ "handoff_exam.py selftest": 25,
  "journal_rotate.py selftest": 7,
  "konst-miss.sh selftest": 34,
  "lens-hooks.sh profile-test": 12,

@@ -20,6 +20,11 @@
 #   sei.cmu.edu «Evaluating static analysis alerts with LLMs» · arxiv 2510.02534 ZeroFalse, 21.11.2026).
 #   Печатка: «справжніх 0 з K» = ✓ (K видно — скільки відкинуто, Konst може звірити); «справжніх R з K» — ні; вирок не дано — як було, «незрозуміло K».
 #   Справжні виправляються → новий HEAD → новий іспит: вирок живе лише на HEAD своєї мітки.
+# Журнал після іспиту (💡 EquipLens S46, «так» Konst 26.11.2026 — делегував): запис результату іспиту рядком §1 самері старив печатку, і кожна
+#   ревізія кінчалась зайвим іспитом або «⚠». Тепер іспит живий, якщо від HEAD мітки до HEAD кожного репо — лише ДОДАНІ рядки таблиці §1
+#   найновішого самері (≤ JOURNAL_MAX, без видалень, інших файлів і §0 · §6; HEAD мітки — предок). Не «ігнор шляху»: path-filter дає
+#   «зелену заглушку, що нічого не тестує» (mergify.com «path filters are not a CI gate»; docs.github.com troubleshooting required status
+#   checks, 26.11.2026) — тут перевірка щоразу розбирає diff і печатка каже «після іспиту — лише рядки §1 (N)». Зуб: EXAM_INJECT=journal.
 # Effort — завжди явно (S40 21.11.2026: без --effort рівень обирав CLI, і його не видно ні в init stream-json, ні в --debug-file — Konst не знав,
 #   на чому йшли 4 іспити). Обирає агент, не питаючи («так» Konst 21.11.2026): medium — типово (новий агент сесії працює на medium,
 #   профіль EFFORT — іспит міряє саме його); high — щоб розвести «діра у файлах» ⟂ «слабке читання», коли пункт «незрозумілого»
@@ -141,20 +146,52 @@ def verdict(src, root='/home/user'):
     open(mark_path(), 'w', encoding='utf-8').write(txt + '\n<!--VERDICT-->\n' + json.dumps({'head': ls[0], 'k': k, 'real': real, 'items': items}, ensure_ascii=False) + '\n')
     return f'вирок прийнято: справжніх {real} з {k}' + (' — виправ, закоміть, новий іспит' if real else ' — печатка «іспит ✓»'), 0
 
+JOURNAL_MAX = 3   # рядків §1 після іспиту: запис результату — 1–2; більше — це вже новий зміст, нехай його читає іспит
+
+def journal_only(rs, old):
+    """Від HEAD мітки (old — рядок hc.heads) до HEAD кожного репо — лише додані рядки таблиці §1 найновішого самері? → (так/ні, N рядків)."""
+    olds = old.split(' ')
+    if len(olds) != len(rs): return False, 0
+    n = 0
+    for r, h0 in zip(rs, olds):
+        h = hc.git(r, 'rev-parse', 'HEAD')
+        if h == h0: continue
+        if subprocess.run(['git', '-C', r, 'merge-base', '--is-ancestor', h0, h], capture_output=True).returncode: return False, 0
+        full = hc.latest_summary(r)
+        rel = os.path.relpath(full, r) if full else ''
+        if os.environ.get('EXAM_INJECT') == 'journal': n += 1; continue   # зуб: без розбору diff
+        if not rel or hc.git(r, 'diff', '--name-only', h0, h).split('\n') != [rel]: return False, 0
+        L = hc.git(r, 'show', f'{h}:{rel}').split('\n')
+        i1 = next((i for i, x in enumerate(L) if re.match(r'## §1\b', x)), None)
+        if i1 is None: return False, 0
+        i2 = next((i for i in range(i1 + 1, len(L)) if L[i].startswith('## ')), len(L))
+        for m in re.finditer(r'^@@ -\d+(?:,(\d+))? \+(\d+)(?:,(\d+))? @@', hc.git(r, 'diff', '-U0', h0, h, '--', rel), re.M):
+            dele, c, d = int(m.group(1) or 1), int(m.group(2)), int(m.group(3) or 1)
+            if dele: return False, 0
+            for ln in range(c - 1, c - 1 + d):
+                if not (i1 < ln < i2 and L[ln].startswith('| ')): return False, 0
+            n += d
+    return n <= JOURNAL_MAX, n
+
 def state(rs):
     """→ (на_HEAD, K або None, рядок). Для печатки ревізії (Л3)."""
     try: ls = open(mark_path(), encoding='utf-8').read().split('\n')
     except OSError: return False, None, 'іспит не робився'
     m = re.search(r'незрозуміло (\d+)', ls[1] if len(ls) > 1 else '')
     k = int(m.group(1)) if m else None
-    if ls[0] != hc.heads(rs) or os.environ.get('EXAM_INJECT') == 'stale': return False, k, 'іспит застарів (HEAD змінився після нього)'
+    jn = 0
+    if os.environ.get('EXAM_INJECT') == 'stale': return False, k, 'іспит застарів (HEAD змінився після нього)'
+    if ls[0] != hc.heads(rs):
+        ok, jn = journal_only(rs, ls[0])
+        if not ok or not jn: return False, k, 'іспит застарів (HEAD змінився після нього; не лише рядки §1 самері)'
+    tail = f' · після іспиту — лише рядки §1 ({jn})' if jn else ''
     vj = '\n'.join(ls).split('\n<!--VERDICT-->\n')
     if k and len(vj) > 1:
         try: v = json.loads(vj[1].strip().split('\n')[0])
         except ValueError: v = {}
         if v.get('head') == ls[0] and v.get('k') == k:   # вирок на k пунктів цього HEAD → печатку судить кількість справжніх
-            return True, v['real'], (f'іспит ✓ · справжніх 0 з {k} (✗ {k} з доказом)' if v['real'] == 0 else f'іспит · справжніх {v["real"]} з {k}')
-    return True, k, (f'іспит ✓ · незрозуміло 0' if k == 0 else f'іспит · незрозуміло {k}' if k is not None else 'іспит неповний')
+            return True, v['real'], (f'іспит ✓ · справжніх 0 з {k} (✗ {k} з доказом)' if v['real'] == 0 else f'іспит · справжніх {v["real"]} з {k}') + tail
+    return True, k, (f'іспит ✓ · незрозуміло 0' if k == 0 else f'іспит · незрозуміло {k}' if k is not None else 'іспит неповний') + tail
 
 def selftest():
     bad = n = 0
@@ -163,7 +200,7 @@ def selftest():
     d = tempfile.mkdtemp(prefix='hx-'); r = os.path.join(d, 'Prod'); os.makedirs(os.path.join(r, 'docs/summary'))
     sh = lambda *c: subprocess.run(c, cwd=r, check=True, capture_output=True)
     sh('git', 'init', '-q'); sh('git', 'config', 'user.email', 't@t'); sh('git', 'config', 'user.name', 't')
-    open(os.path.join(r, 'docs/summary/P_SUMMARY_2026-11-18.md'), 'w').write('# S\n## §0 ВІДКРИТЕ\n- AE-Q зараз\n## Стартове\n```text\nСТАРТ: AE-Q крок 2\n```\n')
+    open(os.path.join(r, 'docs/summary/P_SUMMARY_2026-11-18.md'), 'w').write('# S\n## §0 ВІДКРИТЕ\n- AE-Q зараз\n## §1 · ХІД\n| # | що |\n|---|---|\n| 1 | a |\n## Стартове\n```text\nСТАРТ: AE-Q крок 2\n```\n')
     sh('git', 'add', '-A'); sh('git', 'commit', '-qm', 'c')
     os.environ['LENS_EXAM_MARK'] = os.path.join(d, 'mark.md')
     stub = os.path.join(d, 'stub.py'); seen = os.path.join(d, 'seen.txt')
@@ -195,6 +232,25 @@ def selftest():
     case('модель не дала всі блоки → «іспит неповний», вихід 1', code == 1 and 'неповний' in out and state(rs)[2] == 'іспит неповний')
     fake(full + '—\n'); run(d); open(os.path.join(r, 'x'), 'w').write('1'); sh('git', 'add', '-A'); sh('git', 'commit', '-qm', 'новий')
     case('новий коміт після іспиту → «іспит застарів», не ✓', not state(rs)[0] and 'застарів' in state(rs)[2])
+    SP = os.path.join(r, 'docs/summary/P_SUMMARY_2026-11-18.md')
+    def edit(old, new, extra=None):   # правка самері (+ інший файл) → коміт
+        t = open(SP).read(); assert old in t; open(SP, 'w').write(t.replace(old, new, 1))
+        if extra: open(os.path.join(r, extra), 'w').write('1')
+        sh('git', 'add', '-A'); sh('git', 'commit', '-qm', 'j')
+    fresh = lambda: (fake(full + '—\n'), run(d))
+    fresh(); edit('| 1 | a |\n', '| 1 | a |\n| 2 | іспит 17 |\n')
+    case('журнал: після іспиту лише 1 рядок §1 → іспит живий, печатка каже «лише рядки §1 (1)»', state(rs)[0] and 'лише рядки §1 (1)' in state(rs)[2])
+    edit('- AE-Q зараз', '- AE-Q далі')
+    case('журнал: потім правка §0 → «застарів»', not state(rs)[0] and 'застарів' in state(rs)[2])
+    fresh(); edit('| 1 | a |\n', '| 1 | a |\n| 3 | b |\n', extra='y')
+    case('журнал: рядок §1 + інший файл → «застарів»', not state(rs)[0])
+    fresh(); edit('| 1 | a |\n', '| 1 | a |\n' + ''.join(f'| {i} | c |\n' for i in range(4, 8)))
+    case(f'журнал: {JOURNAL_MAX + 1} рядки §1 → «застарів» (новий зміст читає іспит)', not state(rs)[0])
+    fresh(); edit('| 1 | a |\n', '| 1 | А |\n')
+    case('журнал: зміна наявного рядка §1 (видалення) → «застарів»', not state(rs)[0])
+    fresh(); edit('| 1 | А |\n', '| 1 | А |\n| 9 | d |\n', extra='z')
+    os.environ['EXAM_INJECT'] = 'journal'; inj = state(rs)[0]; os.environ.pop('EXAM_INJECT')
+    case('зуб: EXAM_INJECT=journal (без розбору diff) → інший файл пройшов би; без зуба — «застарів»', inj and not state(rs)[0])
     os.remove(mark_path())
     case('effort явно в команді моделі (S40: без нього рівень не видно)', exam_argv('haiku', 'medium')[3:6] == ['haiku', '--effort', 'medium'])
     case('effort не з переліку → вихід 2, моделі не кличе', run(d, 'haiku', 'ultra')[1] == 2)
