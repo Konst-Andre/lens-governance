@@ -17,8 +17,10 @@
 #          python3 tools/claude-code/route_page.py publish <репо>   → зібрати й видати (Worker Preview; ключ «preview» конфігу, CLOUDFLARE_API_TOKEN)
 #          python3 tools/claude-code/route_page.py install <репо>   → git post-commit: коміт зачепив карту чи слова → `hook` видає у фоні
 #   ROUTE-6 (Konst 26.11.2026, EquipLens S47): значок «Додому» і маніфест поруч зі сторінкою, нативне відчуття (кукбук A24/A25),
-#   своє :active (у темній сіре підсвічування iOS лише гасило текст — «блимає»), тема Авто · Світла · Темна (localStorage телефона),
-#   свіжість — видача після коміту карти + самоперевірка на відкритті й поверненні (кукбук A79 + visibilitychange).
+#   своє :active (у темній сіре підсвічування iOS лише гасило текст — «блимає»); фон — шар position:fixed (iOS без attachment:fixed).
+#   Компоненти — продукту, не свої (Konst 26.11: «у нас є навіть кращі…»): капсула теми — токени й значки його капсули (конфіг «capsule»),
+#   значок «Додому» — його скляний генератор pwa_icon.py (конфіг «icon»). Свіжість — видача після коміту карти + кукбук A115
+#   (підміна на місці: відкриті кроки й прокрутка лишаються). «Чекає тебе» — з кроків ⏸ карти, не з тексту черги.
 #          python3 tools/claude-code/route_page.py selftest   → зуби на тимчасовому репо (без Chromium)
 #          (те саме — `route_check.py page …`)
 import sys, os, re, json, html, base64, subprocess, tempfile, shutil
@@ -35,7 +37,20 @@ TOKENS = {
     '--accent': ('#E4005A', '#FF5C93'), '--accent-ink': ('#FFFFFF', '#22040F'),
     '--glass': ('rgba(255,255,255,.80)', 'rgba(23,23,30,.80)'), '--glass-rim': ('rgba(18,18,28,.09)', 'rgba(255,255,255,.11)'),
     '--lift': ('0 1px 1px rgba(16,16,24,.05),0 5px 14px rgba(16,16,24,.07)', '0 0 0 1px rgba(255,255,255,.055)'),
+    # капсула шапки продукту (Konst 26.11, S47: «капсула з перемикачем теми, така ж сама, як у проді») — її токени, не копія
+    '--hp-bg': ('rgba(255,255,255,.08)', 'rgba(255,255,255,.06)'), '--hp-rim': ('rgba(20,20,30,.055)', 'rgba(255,255,255,.06)'),
+    '--hp-sh': ('none', 'none'), '--bh': ('30px', '30px'), '--br': ('18px', '18px'), '--hbSz': ('18px', '18px'),
+    '--hbSw': ('1.8', '1.8'), '--hp-px': ('7px', '7px'),
 }
+# значки теми — із набору продукту (id символів спрайта; конфіг «capsule.icons»), нема — свої прості
+THEME_ICON = {'light': '<circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4L7 17M17 7l1.4-1.4"/>',
+              'dark': '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>',
+              'auto': '<circle cx="12" cy="12" r="8"/><path d="M12 4v16" /><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/>'}
+# гліф значка «Додому» для скляного генератора продукту (pwa_icon.py, кукбук A75): 0 — «зараз» (тіло скла), 1–2 — «далі» (лінії),
+#   3–4 — «зроблено» (акцент); координати — поле 24×24, як гліфи продукту
+ROUTE_GLYPH = ['M17.2 11.2a4.2 4.2 0 1 1-8.4 0a4.2 4.2 0 1 1 8.4 0Z', 'M21.4 4.4a1.9 1.9 0 1 1-3.8 0a1.9 1.9 0 1 1 3.8 0',
+               'M16.1 8.1L18.1 6.1', 'M5.9 17.6C7.4 16.3 8.4 15.6 9.9 14.3', 'M6.4 19.2a2.1 2.1 0 1 1-4.2 0a2.1 2.1 0 1 1 4.2 0']
+ROUTE_LAYERS = {'body': [0], 'accent': [3, 4]}
 # Знаки, які iOS малює кольоровим емодзі (Emoji_Presentation і часті з VS16): у видимому тексті сторінки — ні. Монохромні гліфи
 #   (✓ ✗ → ⟂ ≡ ★) — можна (правило продукту «inline-SVG або монохромні гліфи»); знаки стану карти все одно стають SVG.
 EMOJI = re.compile('[☀-⛿✅✊✋✨❌❎❓-❕❗➕-➗➰➿'
@@ -119,6 +134,10 @@ def probe_tokens(repo, cfg):
             pg.goto('file://' + os.path.abspath(os.path.join(repo, page))); pg.wait_for_timeout(300)
             v = pg.evaluate('(V)=>{const s=getComputedStyle(document.documentElement);return Object.fromEntries(V.map(k=>[k,s.getPropertyValue(k).trim()]))}', list(TOKENS))
             res[cs] = {k: (v.get(k) or TOKENS[k][i]) for k in TOKENS}
+            if cs == 'light':
+                ids = (cfg.get('capsule') or {}).get('icons') or {}
+                res['icons'] = pg.evaluate('(I)=>Object.fromEntries(Object.entries(I).map(([k,id])=>{const s=document.getElementById(id);return [k,s?s.innerHTML:null]}))', ids)
+                res['capfx'] = pg.evaluate('(q)=>{const e=q&&document.querySelector(q);return e?(getComputedStyle(e).backdropFilter||getComputedStyle(e).webkitBackdropFilter||""):""}', (cfg.get('capsule') or {}).get('sel'))
         b.close()
     return res, f'токени — з {page} (обидві теми)'
 
@@ -157,6 +176,12 @@ def build(repo, queue=None, probe=True, inject=None):
     tok, note = probe_tokens(repo, cfg) if probe else (None, 'ⓘ без заміру токенів (--no-probe)')
     notes.append(note)
     if not tok: tok = {cs: {k: v[i] for k, v in TOKENS.items()} for i, cs in enumerate(('light', 'dark'))}
+    ico = {k: (tok.get('icons') or {}).get(k) or v for k, v in THEME_ICON.items()}
+    capfx = tok.get('capfx') or 'blur(18px) saturate(190%)'
+    menu_html = ''.join(f'<button type="button" class="mi" role="menuitemradio" aria-checked="false" data-th="{k}"><svg viewBox="0 0 24 24" aria-hidden="true">{ico[k]}</svg>{w}'
+                        '<svg class="ok" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>'
+                        for k, w in (('light', 'Світла'), ('dark', 'Темна'), ('auto', 'Як у телефоні')))
+    icons_js = json.dumps(ico, ensure_ascii=False)
     ff, fam = font_face(repo, cfg)
     title = cfg.get('title') or os.path.basename(os.path.abspath(repo))
     base, kbase = gh_base(repo), cfg.get('kernel_github', 'https://github.com/Konst-Andre/lens-governance')
@@ -201,25 +226,25 @@ def build(repo, queue=None, probe=True, inject=None):
                 f'<dt>Готово, коли</dt><dd>{I(r["done"])}</dd><dt>Далі</dt><dd>{I(r["next"])}</dd></dl>'
                 + (f'<p class="lbl">Коміти з цим кроком</p><ul class="cm">{cms}</ul>' if cms else '') + '</details>')
 
-    def buttons(r, first=True):
+    def buttons(r, first=True, lk=''):
         w = human(r)[0]
         cmt = f"Konst про `{r['id']}` ({w}): "
         b = f'<button type="button" class="cp" data-copy="{html.escape(cmt)}">Коментар</button>'
         if first and play and r['id'] != play['id']:
             msg = f"Konst: `{r['id']}` ({w}) — зробити першим, до `{play['id']}`. Чому: "
             b = f'<button type="button" class="cp" data-copy="{html.escape(msg)}">Зробити першим</button>' + b
-        return f'<div class="acts">{b}</div><p class="cpok" role="status"></p>'
+        return f'<div class="acts">{lk}{b}</div><p class="cpok" role="status"></p>'
 
     def step_li(r):
         st = rc.state_of(r) or '○'; date = rc.DATE.search(r['state'])
         word = {'✅': f'зроблено {date.group(0)}' if date else 'зроблено', '▶': 'зараз', '○': '', '⏸': 'чекає тебе'}[st]
         what, why = human(r)
         cur = ' aria-current="step"' if st == '▶' else ''
-        return (f'<li class="st st-{STATE_WORD[st].split()[0]}"{cur}><details><summary>'
+        return (f'<li class="st st-{STATE_WORD[st].split()[0]}"{cur}><details data-id="{html.escape(r["id"])}"><summary>'
                 f'<span class="ic">{SVG[st]}</span><span class="sx">{html.escape(what)}</span>'
                 f'<span class="sid"><code>{html.escape(r["id"])}</code>{(" · " + html.escape(word)) if word else ""}</span></summary>'
                 f'<div class="body">' + (f'<p class="why">{html.escape(why)}</p>' if why else '') + rel(r)
-                + f'<div class="links">{links(r)}</div>' + buttons(r, st != '✅') + tech(r) + '</div></details></li>')
+                + buttons(r, st != '✅', links(r)) + tech(r) + '</div></details></li>')
 
     # порядок: ланцюг «далі» від ▶ (Зараз · Далі 3 · Пізніше), решта — як у карті; зроблене — окремо, згорнуто
     chain, k = [], play['id'] if play else None
@@ -233,20 +258,22 @@ def build(repo, queue=None, probe=True, inject=None):
         what, why = human(play)
         card = (f'<section class="card" aria-current="step" aria-labelledby="now"><p class="kick" id="now"><span class="ic">{SVG["▶"]}</span>Зараз · <code>{html.escape(play["id"])}</code></p>'
                 f'<h2>{html.escape(what)}</h2>' + (f'<p class="why">{html.escape(why)}</p>' if why else '') + rel(play)
-                + f'<div class="links">{links(play)}</div>' + buttons(play, False) + tech(play) + '</section>')
+                + buttons(play, False, links(play)) + tech(play) + '</section>')
     group = lambda head, xs, cls='': (f'<h3 class="gh">{head}</h3><ol class="steps {cls}" aria-label="{head}">' + ''.join(step_li(r) for r in xs) + '</ol>') if xs else ''
     steps = group('Далі', after[:3]) + group('Пізніше', after[3:])
     if done_rows:
-        steps += (f'<details class="donegrp"><summary class="gh">Зроблено · {len(done_rows)}</summary>'
+        steps += (f'<details class="donegrp" data-id="__done"><summary class="gh">Зроблено · {len(done_rows)}<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></summary>'
                   f'<ol class="steps">' + ''.join(step_li(r) for r in done_rows) + '</ol></details>')
     done = len(done_rows); pct = round(100 * done / len(rows))
     lst = lambda key: ''.join(f'<li>{I(x)}</li>' for x in sec.get(key, []))
     inbox = ''.join(f'<li>{I(re.sub(r"^[-*]\s+", "", x))}</li>' for x in m['inbox'])
-    wait = f'<section class="blk"><h3>Чекає тебе</h3><ul>{lst("Чекає Konst")}</ul></section>' if sec.get('Чекає Konst') else ''
+    held = [r for r in rows if rc.state_of(r) == '⏸']
+    wait = (f'<section class="blk"><h3>Чекає тебе</h3><ul>' + ''.join(f'<li>{html.escape(human(r)[0])} <code>{html.escape(r["id"])}</code></li>' for r in held)
+            + '</ul></section>') if held else ''
     extra = ''.join(f'<h4>{h}</h4><ul>{lst(k2)}</ul>' for k2, h in (('Попутно', 'Попутно — не зсуває «Зараз»'), ('Зміни маршруту', 'Зміни маршруту'))
                     if sec.get(k2))
     extra += '<h4>Вхідні</h4>' + (f'<ul>{inbox}</ul>' if inbox else '<p class="mute">Нерозібраного від тебе нема.</p>')
-    blocks = wait + f'<details class="blk more"><summary>Для Claude — попутно, зміни маршруту, вхідні</summary>{extra}</details>'
+    blocks = wait + (f'<section class="blk"><h3>Ти написав — ще не розібрано</h3><ul>{inbox}</ul></section>' if inbox else '')
     os.environ.setdefault('TZ', 'Europe/Kyiv')
     today = subprocess.run(['date', '+%d.%m.%Y'], capture_output=True, text=True).stdout.strip()
     upd = (when.replace(today + ' ', 'сьогодні о ') if when.startswith(today) else when.replace(' ', ' о ', 1)) if when else ''
@@ -260,33 +287,44 @@ def build(repo, queue=None, probe=True, inject=None):
 /* нативне відчуття (кукбук A24, «Нативне відчуття» INDEX §2): без підсвічування тапу iOS — своє натискання, видиме в обох темах */
 *{{-webkit-tap-highlight-color:transparent}}html{{-webkit-text-size-adjust:100%;overscroll-behavior-y:none}}
 body{{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}}a,button,summary{{touch-action:manipulation}}
-summary,.lnk,.cp,.seg button{{transition:background-color .12s}}summary:active,.lnk:active,.cp:active,.seg button:active{{background-color:var(--line)}}
+summary:active,.lnk:active,.cp:active,.mi:active{{background-color:var(--line)}}.cb:active{{transform:scale(.92)}}
 /* розміри нижче — власні цієї сторінки (не токени продукту): кегль ≥ 13 px, поле дотику ≥ 44 px */
-*{{box-sizing:border-box}}html{{background-color:var(--canvas);background-image:var(--bg-aur);background-attachment:fixed;min-height:100%}}
+/* фон: iOS не знає background-attachment:fixed (WebKit 196327, 275247) — аврора на html тягнулась за висотою документа й «світлішала»,
+   коли відкривався крок; тому — окремий шар position:fixed під усім (EquipLens S47, Konst 26.11) */
+*{{box-sizing:border-box}}html{{background-color:var(--canvas);min-height:100%}}
+body::before{{content:"";position:fixed;inset:0;z-index:-1;background-color:var(--canvas);background-image:var(--bg-aur);pointer-events:none}}
 body{{margin:0;font-family:{fam};color:var(--ink);font-size:15px;line-height:1.45;-webkit-text-size-adjust:100%;
 padding:max(18px,env(safe-area-inset-top)) 14px max(24px,env(safe-area-inset-bottom))}}
 main{{max-width:560px;margin:0 auto}}
-header{{margin:6px 4px 16px}}h1{{font-size:26px;font-weight:750;margin:0;letter-spacing:-.015em}}
-.top{{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:6px 0 0}}.top .barl{{margin:0}}
+header{{margin:6px 4px 16px}}h1{{font-size:26px;font-weight:750;margin:0;letter-spacing:-.015em;line-height:1.2}}
+.hrow{{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;position:relative}}
+/* капсула — як у проді (.el-hgrp[data-g=glass] + .el-hbtn: його токени), лише кнопка теми; випадайка — поки звичайна (скляна — після Ф3-1д) */
+.cap{{flex:none;display:flex;align-items:center;padding:2px var(--hp-px);border-radius:calc(var(--br) + 3px);background:var(--hp-bg);border:1px solid var(--hp-rim);
+box-shadow:var(--hp-sh);-webkit-backdrop-filter:{capfx};backdrop-filter:{capfx}}}
+.cb{{position:relative;display:inline-flex;align-items:center;justify-content:center;width:var(--bh);height:var(--bh);border:0;padding:0;border-radius:var(--br);
+background:transparent;color:var(--ink-2);cursor:pointer;transition:transform 280ms cubic-bezier(.34,1.5,.64,1)}}.cb::after{{content:"";position:absolute;inset:-7px}}
+.cb svg{{width:var(--hbSz);height:var(--hbSz);fill:none;stroke:currentColor;stroke-width:var(--hbSw);stroke-linecap:round;stroke-linejoin:round}}
+.menu{{position:absolute;right:0;top:calc(100% + 8px);z-index:10;min-width:200px;padding:6px;border-radius:16px;background:var(--surface);
+border:1px solid var(--glass-rim);box-shadow:0 10px 30px rgba(0,0,0,.18),var(--lift)}}.menu[hidden]{{display:none}}
+.mi{{display:flex;align-items:center;gap:12px;width:100%;min-height:44px;padding:0 12px;border:0;border-radius:10px;background:transparent;
+color:var(--ink);font:inherit;font-size:15px;text-align:left;cursor:pointer}}.mi svg{{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;
+stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;color:var(--ink-2)}}.mi .ok{{margin-left:auto;color:var(--accent);visibility:hidden}}
+.mi[aria-checked=true] .ok{{visibility:visible}}
 .upd{{display:block;color:var(--ink-3);margin:2px 0 8px;background:none;border:0;padding:4px 0;font:inherit;font-size:13px;line-height:1.45;text-align:left;min-height:44px;cursor:pointer;border-radius:8px}}
 .upd b{{font-weight:600;color:var(--ink-2)}}
-.seg{{display:inline-flex;flex:none;padding:2px;border-radius:12px;background:var(--line)}}
-.seg button{{font:inherit;font-size:13px;font-weight:600;color:var(--ink-2);background:none;border:0;border-radius:10px;min-height:36px;padding:0 10px;cursor:pointer}}
-.seg button[aria-pressed=true]{{background:var(--surface);color:var(--ink);box-shadow:var(--lift)}}
 .bar{{height:6px;border-radius:3px;background:var(--line);overflow:hidden}}.bar i{{display:block;height:100%;width:{pct}%;background:var(--accent);border-radius:3px}}
 .barl{{color:var(--ink-2);font-size:13px;margin:6px 0 0}}
 code{{font-family:inherit;font-weight:650;font-size:.92em;overflow-wrap:anywhere}}a{{color:inherit;text-underline-offset:2px}}
 .card,.blk,.steps{{background:var(--glass);border:1px solid var(--glass-rim);box-shadow:var(--lift);border-radius:20px;
--webkit-backdrop-filter:blur(12px) saturate(170%);backdrop-filter:blur(12px) saturate(170%)}}
+}}   /* без backdrop-filter: блок росте, коли відкривається крок, і iOS перемальовує розмиття — ще одне джерело «блимання» */
 .card{{padding:16px 16px 12px;margin-bottom:18px}}.card h2{{font-size:21px;line-height:1.3;font-weight:700;margin:6px 0 6px;letter-spacing:-.01em}}
 .kick{{display:flex;align-items:center;gap:6px;margin:0;color:var(--accent);font-weight:700;font-size:13px}}.kick code{{color:var(--ink-3)}}
 .why{{color:var(--ink-2);margin:0 0 8px}}
 .rel{{margin:4px 0;font-size:14px;color:var(--ink-2)}}.rel span{{display:inline-block;min-width:52px;color:var(--ink-3);font-size:13px;font-weight:600}}
 .rel code{{color:var(--ink-3);font-weight:500}}
-.links{{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 4px}}
 .lnk,.cp{{display:inline-flex;align-items:center;min-height:44px;padding:0 14px;border-radius:var(--r-ctl,10px);font:inherit;font-size:14px;font-weight:600}}
 .lnk{{text-decoration:none;color:var(--accent);border:1px solid var(--line)}}
-.acts{{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 0}}
+.acts{{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 0}}
 .cp{{border:1px solid var(--glass-rim);background:var(--surface);color:var(--ink);cursor:pointer}}.cpok{{font-size:13px;color:var(--ink-3);margin:4px 0;min-height:1em}}
 .ic{{display:inline-flex;width:20px;height:20px;flex:none}}.ic svg,.gi svg{{width:100%;height:100%}}
 .gi{{display:inline-flex;width:1em;height:1em;vertical-align:-.12em;color:var(--ink-2)}}
@@ -300,7 +338,8 @@ summary{{cursor:pointer;list-style:none}}summary::-webkit-details-marker{{displa
 details.tech{{margin-top:8px;border-top:1px solid var(--line);padding-top:6px}}details.tech>summary,details.more>summary{{color:var(--ink-3);font-size:13px;font-weight:600;min-height:36px;display:flex;align-items:center}}
 dl{{margin:4px 0 8px;font-size:14px}}dt{{color:var(--ink-3);font-size:13px;font-weight:600;margin-top:6px}}dd{{margin:0;color:var(--ink-2)}}
 .cm{{padding:0;list-style:none;font-size:13px;color:var(--ink-2);margin:0 0 6px}}.cm li{{margin:2px 0}}.lbl{{color:var(--ink-3);font-size:13px;font-weight:600;margin:8px 0 2px}}
-.donegrp{{margin-bottom:18px}}.donegrp>summary{{min-height:44px;display:flex;align-items:center}}
+.donegrp{{margin-bottom:18px}}.donegrp>summary{{min-height:44px;display:flex;align-items:center;gap:6px;border-radius:10px}}
+.chev{{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;transition:transform .2s}}.donegrp[open] .chev{{transform:rotate(90deg)}}
 .blk{{padding:12px 16px;margin-bottom:14px}}.blk h3{{font-size:13px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;margin:2px 0 6px}}
 .blk h4{{font-size:13px;color:var(--ink-3);margin:12px 0 4px}}.blk ul{{margin:0;padding-left:18px}}.blk li{{margin:4px 0;font-size:14px;color:var(--ink-2)}}
 .mute{{color:var(--ink-3);margin:0;font-size:14px}}
@@ -314,25 +353,39 @@ done(r?MSG:'Не вийшло скопіювати — спробуй ще ра�
 if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(t).then(function(){done(MSG)},old)}else old()});
 /* щипок (кукбук A25: iOS ігнорує user-scalable=no) */
 ['gesturestart','gesturechange','gestureend'].forEach(function(v){document.addEventListener(v,function(e){e.preventDefault()},{passive:false})});
-/* тема: Авто · Світла · Темна — пам'ять у браузері телефона, сторінка — та сама для всіх */
-var R=document.documentElement,TC=__TC__;
+/* iOS: без слухача touchstart :active на дотик не спрацьовує (кукбук A24; продукт — js/main.js) */
+document.addEventListener('touchstart',function(){},{passive:true});
+/* тема — капсула як у проді: кнопка зі значком поточної теми → випадайка «Світла · Темна · Як у телефоні»; пам'ять — у телефоні */
+var R=document.documentElement,TC=__TC__,IC=__IC__;
 function theme(v){if(v==='light'||v==='dark')R.dataset.theme=v;else{delete R.dataset.theme;v='auto'}
-document.querySelectorAll('.seg button').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.th===v))});
+var b=document.getElementById('thb');if(b)b.querySelector('svg').innerHTML=IC[v];
+document.querySelectorAll('.mi').forEach(function(x){x.setAttribute('aria-checked',String(x.dataset.th===v))});
 document.querySelectorAll('meta[name=theme-color]').forEach(function(m){m.content=v==='auto'?TC[m.dataset.cs]:TC[v]})}
+function menu(open){var m=document.getElementById('thm'),b=document.getElementById('thb');if(!m)return;m.hidden=!open;b.setAttribute('aria-expanded',String(open))}
 theme(R.dataset.theme);
-document.querySelector('.seg').addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;
-try{localStorage.setItem('route-theme',b.dataset.th)}catch(_){}theme(b.dataset.th)});
-/* свіжість (кукбук A79 + visibilitychange): на відкритті, поверненні в застосунок і тапі сторінка питає сервер про новішу карту;
-   є — переходить на ?v=<хеш> (інший URL обходить кеш браузера) */
-var SHA=document.querySelector('meta[name=route-map-commit]').content,CK=document.getElementById('chk');
+document.addEventListener('click',function(e){
+if(e.target.closest('#thb')){menu(document.getElementById('thm').hidden);return}
+var i=e.target.closest('.mi');if(i){try{localStorage.setItem('route-theme',i.dataset.th)}catch(_){}theme(i.dataset.th);menu(false);return}
+if(!e.target.closest('#thm'))menu(false);
+if(e.target.closest('#upd'))fresh()});
+document.addEventListener('keydown',function(e){if(e.key==='Escape')menu(false)});
+/* свіжість — кукбук A115 «м'яке оновлення» (адмінка QR): на відкритті, поверненні (сховано ≥ 5 с), раз на 60 с на екрані й на тап
+   сторінка питає сервер; нова карта → підміна вмісту на місці: відкриті кроки й прокрутка лишаються, без перезавантаження.
+   Не під пальцем: відкрита випадайка — чекаємо наступної перевірки. */
+var SHA=document.querySelector('meta[name=route-map-commit]').content,HID=0,BUSY=0;
 function hm(){var d=new Date();return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)}
-function fresh(){CK.textContent='перевіряю, чи нема новішого…';
-fetch(location.pathname+'?_='+Date.now(),{cache:'no-store'}).then(function(r){return r.text()}).then(function(t){var m=t.match(/route-map-commit" content="([^"]+)"/);
-if(m&&m[1]!==SHA){CK.textContent='є новіше — оновлюю';location.replace(location.pathname+'?v='+m[1]);return}CK.textContent='свіже · перевірено о '+hm()})
-.catch(function(){CK.textContent='без мережі — показано останнє завантажене'})}
-fresh();document.getElementById('upd').addEventListener('click',fresh);
-document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')fresh()});"""
-    js = js.replace('__TC__', json.dumps({'light': L['--canvas'], 'dark': D['--canvas']}))
+function say(t){var c=document.getElementById('chk');if(c)c.textContent=t}
+function fresh(){if(BUSY||!document.getElementById('thm').hidden)return;BUSY=1;say('перевіряю, чи нема новішого…');
+fetch(location.pathname+'?_='+Date.now(),{cache:'no-store'}).then(function(r){return r.text()}).then(function(t){
+var d=new DOMParser().parseFromString(t,'text/html'),m=d.querySelector('meta[name=route-map-commit]'),nm=d.querySelector('main');
+if(m&&nm&&m.content!==SHA){var open=[].map.call(document.querySelectorAll('details[open][data-id]'),function(x){return x.dataset.id}),y=scrollY;
+document.querySelector('main').innerHTML=nm.innerHTML;SHA=m.content;document.querySelector('meta[name=route-map-commit]').content=SHA;
+open.forEach(function(id){var x=document.querySelector('details[data-id="'+id+'"]');if(x)x.open=true});
+theme(R.dataset.theme);scrollTo(0,y);say('оновлено о '+hm())}else say('свіже · перевірено о '+hm())})
+.catch(function(){say('без мережі — показано останнє завантажене')}).then(function(){BUSY=0})}
+fresh();setInterval(function(){if(document.visibilityState==='visible')fresh()},60000);
+document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')HID=Date.now();else if(Date.now()-HID>=5000)fresh()});"""
+    js = js.replace('__TC__', json.dumps({'light': L['--canvas'], 'dark': D['--canvas']})).replace('__IC__', icons_js)
     page = f"""<!DOCTYPE html>
 <html lang="uk"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
@@ -347,21 +400,23 @@ document.addEventListener('visibilitychange',function(){if(document.visibilitySt
 <meta name="robots" content="noindex">
 <title>Маршрут {html.escape(title)}</title><style>{css}</style></head>
 <body><main>
-<header><h1>Маршрут {html.escape(title)}</h1>
+<header><div class="hrow"><h1>Маршрут {html.escape(title)}</h1>
+<div class="cap"><button type="button" class="cb" id="thb" aria-haspopup="menu" aria-expanded="false" aria-label="Тема"><svg viewBox="0 0 24 24" aria-hidden="true">{ico['auto']}</svg></button></div>
+<div class="menu" id="thm" role="menu" hidden>{menu_html}</div></div>
 <button type="button" class="upd" id="upd" aria-label="Перевірити, чи нема новішого">{f'Маршрут змінено <b>{html.escape(upd)}</b><br>' if upd else ''}<span id="chk" role="status">свіже на момент збирання</span></button>
 <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="{len(rows)}" aria-valuenow="{done}" aria-label="Зроблено кроків"><i></i></div>
-<div class="top"><p class="barl">Зроблено {done} з {len(rows)}</p>
-<div class="seg" role="group" aria-label="Тема"><button type="button" data-th="auto">Авто</button><button type="button" data-th="light">Світла</button><button type="button" data-th="dark">Темна</button></div></div></header>
+<p class="barl">Зроблено {done} з {len(rows)}</p></header>
 {card}
 {steps}
 {blocks}
-<footer>Сторінка оновлюється сама: Claude змінив маршрут — за хвилину тут нова версія, а відкрита сторінка підтягне її, щойно повернешся в неї. Нема змін — нема й оновлень.<br>Карта з коміту <code>{html.escape(sha)}</code> · зібрано {html.escape(built)}</footer>
+<footer>Сторінка оновлюється сама, щойно змінюється маршрут.</footer>
 </main><script>{js}</script></body></html>
 """
     if inject == 'emoji': page = page.replace('</footer>', ' ✅</footer>')   # зуб: емодзі у видимому тексті
     if inject == 'md': page = page.replace('</footer>', ' **жирне**</footer>')   # зуб: markdown не перетворено
     facts = dict(sha=git(repo, 'log', '-1', '--format=%h', '--', qrel) or '?', ids=[r['id'] for r in rows], play=play['id'] if play else None)
-    facts.update(tok=tok, title=title, files=[qrel] + ([os.path.relpath(wp, repo)] if wp else []))
+    facts.update(tok=tok, title=title, files=[qrel] + ([os.path.relpath(wp, repo)] if wp else []),
+                 icon_cfg=os.path.join(repo, cfg['icon']) if cfg.get('icon') else None)
     return page, facts, notes
 
 
@@ -401,6 +456,28 @@ def icon_svg(t, mask=False):
             f'<circle cx="366" cy="140" r="32" fill="{bg}" stroke="{ink}" stroke-width="13"/></g></svg>')
 
 
+def glass_icons(out, icons, facts):
+    """Скляний значок тим самим приладом, що й значок продукту (pwa_icon.py, кукбук A75; Konst 26.11, S47: «у продукті вона скляна…
+    адаптувати його»): фон і скло — з конфігу продукту (`route_page.json` «icon» → його `icon.json`), гліф — ROUTE_GLYPH.
+    Конфігу чи приладу нема → None (тоді плаский запасний)."""
+    ip = facts.get('icon_cfg')
+    if not ip or not os.path.isfile(ip): return None
+    try:
+        import pwa_icon as pi
+        from PIL import Image
+        c = pi.load(ip); pr = pi.probe(c)
+        xs = [2.2, 21.4]; ys = [2.5, 21.3]   # габарит ROUTE_GLYPH (поле 24)
+        for t in pr.values():
+            t.update(inner=''.join(f'<path d="{d}"/>' for d in ROUTE_GLYPH), viewBox='0 0 24 24', bbox=[xs[0], ys[0], xs[1] - xs[0], ys[1] - ys[0]])
+        c['layers'] = ROUTE_LAYERS
+        big = pi.raster({k: pi.icon_html(c, pr, k, c['style']) for k in ('any', 'mask')})
+        for f, n, m in icons:
+            big['mask' if m else 'any'].resize((n, n), Image.LANCZOS).save(os.path.join(out, f), optimize=True)
+        return [f'значки: {len(icons)} PNG скляні (pwa_icon, стиль {c["style"]}) + icon.svg · маніфест']
+    except BaseException as e:   # pwa_icon кидає SystemExit на ваду конфігу
+        return None if not isinstance(e, KeyboardInterrupt) else (_ for _ in ()).throw(e)
+
+
 def assets(out, facts):
     """Поруч зі сторінкою: icon.svg, manifest.webmanifest і PNG (180 · 192 · 512 · 512-maskable) через Chromium. → примітки."""
     t = facts['tok']['dark']
@@ -410,6 +487,8 @@ def assets(out, facts):
            'display': 'standalone', 'background_color': t['--canvas'], 'theme_color': t['--canvas'],
            'icons': [{'src': f, 'sizes': f'{n}x{n}', 'type': 'image/png', 'purpose': 'maskable' if m else 'any'} for f, n, m in icons[1:]]}
     json.dump(man, open(os.path.join(out, 'manifest.webmanifest'), 'w'), ensure_ascii=False, indent=1)
+    g = glass_icons(out, icons, facts)
+    if g: return g
     try:
         from playwright.sync_api import sync_playwright
     except Exception:
@@ -497,7 +576,9 @@ def selftest():
                 ok = ok and 'Зараз' in vt and 'зроблено 01.01' in vt and '✅' not in vt and 'ідея' in vt and page.count('<svg') >= 4
                 # ROUTE-6: тема, своє натискання замість підсвічування iOS, «Додому», самоперевірка свіжості
                 ok = ok and all(x in page for x in ('data-th="dark"', ':root[data-theme=dark]', '-webkit-tap-highlight-color:transparent',
-                                                     'summary:active', 'rel="apple-touch-icon"', 'rel="manifest"', 'gesturestart', "cache:'no-store'"))
+                                                     'summary:active', 'rel="apple-touch-icon"', 'rel="manifest"', 'gesturestart', "cache:'no-store'",
+                                                     'class="cap"', 'role="menu"', 'DOMParser', 'body::before', 'touchstart'))
+                ok = ok and 'background-attachment:fixed;' not in page and 'Для Claude — попутно' not in page
         finally: shutil.rmtree(tmp, ignore_errors=True)
         fails += not ok; print(f'{"✓" if ok else "✗"} {name}' + ('' if ok else f' — {bad}'))
     tmp = tempfile.mkdtemp(prefix='route_page_')

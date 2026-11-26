@@ -176,7 +176,7 @@ if mode == "mark":
 TOPICS = [   # (назва, слова в коді, слова в запиті пошуку, рецепт / зразок)
     ("пуш і сповіщення", r"PushManager|pushManager|showNotification|applicationServerKey|vapid", r"push|пуш|сповіщ|notif|vapid", "кукбук A111 (том 1: SW лише для пушу, свої ключі, cron, вигляд на iOS) · зразок — QR-Lens `admin/worker.js`"),
     ("service worker", r"serviceWorker\.register|self\.addEventListener\(\s*.(fetch|install|activate)", r"service.?worker|sw\.js", "зразок — QR-Lens `admin/worker.js` SW_JS (без кешу — рішення Konst 08.10)"),
-    ("кеш і свіжість сторінки", r"cache-control|location\.reload\(|caches\.(open|match)|if-none-match|[\x27\x22]etag[\x27\x22]", r"cache|кеш|etag|stale|reload|свіж|fresh", "кукбук A79 (самоперевірка версії) · `kernel/modules/Lens_module_1_maint_v1.md`"),
+    ("кеш і свіжість сторінки", r"cache-control|location\.reload\(|caches\.(open|match)|if-none-match|[\x27\x22]etag[\x27\x22]", r"cache|кеш|etag|stale|reload|свіж|fresh", "кукбук A115 («мʼяке оновлення»: дані — на місці, код — мʼяко й на те саме місце; QR-адмінка) · A79 (самоперевірка версії) · `kernel/modules/Lens_module_1_maint_v1.md`"),
     ("лічильник і аналітика", r"sendBeacon|[\x27\x22]/hit|cloudflareinsights|rumPageload|workersInvocationsAdaptive", r"analytic|аналіт|beacon|visit|відвід|лічильн|count|track", "`tools/cloudflare/CLOUDFLARE.md` §2 п.16 (Web Analytics з iPhone не доходить; свій лічильник)"),
 ]
 code = ""

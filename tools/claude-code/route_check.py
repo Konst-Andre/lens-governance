@@ -175,6 +175,12 @@ def check(repo, queue=None, inject=None, live=False):
         got = reach(rows, play)
         lost = [r['id'] for r in rows if state_of(r) in ('○', '⏸') and r['id'] not in got]
         if lost: warn.append(f'ланцюг «далі» від ▶ `{play}` не доходить до {", ".join(f"`{x}`" for x in lost)}')
+        # «Чекає Konst» у черзі вказує на вже зроблений крок — застаріло (EquipLens S47: сторінка показувала Konst «відкрити з iPhone» після ✅)
+        wk = re.search(r'\*\*Чекає Konst[^\n]*', text)
+        if wk:
+            st = {r['id']: state_of(r) for r in rows}
+            old = [i for i in re.findall(r'`([^`]+)`', wk.group(0)) if st.get(i) == '✅']
+            if old: warn.append(f'«Чекає Konst» називає зроблений крок {", ".join(f"`{x}`" for x in old)} — застаріло')
         zm = re.search(r'\*\*Зараз[^\n]*', text)
         if not zm: warn.append(f'{qrel}: рядка «**Зараз**» нема')
         elif not has_id(zm.group(0), play) and not re.search(r'карт\w* (маршруту|кроків)', zm.group(0)):
@@ -300,6 +306,7 @@ def selftest():
         ('«Далі» брифу лише на ✅ → ⚠', GOOD, SUM, R(BRIEF, '`A-3` після `A-2`', 'після `A-1`'), None, False, '«Далі» без живого'),
         ('стартове ЗАРАЗ без ▶ → ⚠', GOOD, R(SUM, 'ЗАРАЗ: крок A-2', 'ЗАРАЗ: щось'), BRIEF, None, False, 'стартове «ЗАРАЗ:»'),
         ('«Зараз» черги — переказ без ▶ → ⚠', R(GOOD, 'крок ▶ карти маршруту нижче', 'робимо щось'), SUM, BRIEF, None, False, '«Зараз» не називає'),
+        ('«Чекає Konst» на ✅-крок → ⚠', R(GOOD, '**Вхідні**', '**Чекає Konst:** відкрити `A-1`\n\n**Вхідні**'), SUM, BRIEF, None, False, 'застаріло'),
         ('невідомий стан → ✗', R(GOOD, '| `A-4` | ○ |', '| `A-4` | ? |'), SUM, BRIEF, None, True, 'не з'),
     ]
     bad = 0
