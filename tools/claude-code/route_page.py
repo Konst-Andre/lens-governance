@@ -23,7 +23,7 @@
 #   (підміна на місці: відкриті кроки й прокрутка лишаються). «Чекає тебе» — з кроків ⏸ карти, не з тексту черги.
 #          python3 tools/claude-code/route_page.py selftest   → зуби на тимчасовому репо (без Chromium)
 #          (те саме — `route_check.py page …`)
-import sys, os, re, json, html, base64, subprocess, tempfile, shutil
+import sys, os, re, json, html, base64, subprocess, tempfile, shutil, hashlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -343,7 +343,13 @@ dl{{margin:4px 0 8px;font-size:14px}}dt{{color:var(--ink-3);font-size:13px;font-
 .blk{{padding:12px 16px;margin-bottom:14px}}.blk h3{{font-size:13px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;margin:2px 0 6px}}
 .blk h4{{font-size:13px;color:var(--ink-3);margin:12px 0 4px}}.blk ul{{margin:0;padding-left:18px}}.blk li{{margin:4px 0;font-size:14px;color:var(--ink-2)}}
 .mute{{color:var(--ink-3);margin:0;font-size:14px}}
-footer{{color:var(--ink-3);font-size:13px;text-align:center;margin-top:8px}}"""
+footer{{color:var(--ink-3);font-size:13px;text-align:center;margin-top:8px}}
+/* напис «оновлено» — 6 с і закрити самому (кукбук A115; Konst 27.11, EquipLens S48: 2,5 с — «ледь помітив»); поле дотику 44 px */
+.note{{position:fixed;left:50%;bottom:max(24px,calc(env(safe-area-inset-bottom) + 12px));transform:translateX(-50%);z-index:50;max-width:calc(100% - 32px);
+white-space:nowrap;display:flex;align-items:center;gap:2px;min-height:44px;padding:0 0 0 16px;border-radius:999px;border:1px solid var(--line);
+background:var(--surface);color:var(--ink);font-size:13px;font-weight:600;cursor:pointer;transition:opacity .4s}}.note[data-off]{{opacity:0;pointer-events:none}}
+.nx{{flex:none;width:44px;height:44px;border:0;padding:0;background:none;color:var(--ink-2);font:inherit;font-size:18px;font-weight:500;cursor:pointer}}
+@media (prefers-reduced-motion:reduce){{.note{{transition:none}}}}"""
     js = """document.addEventListener('click',function(e){var b=e.target.closest('.cp');if(!b)return;var t=b.dataset.copy,ok=b.closest('.acts').nextElementSibling;
 function done(m){ok.textContent=m;setTimeout(function(){ok.textContent=''},3000)}
 var MSG='Скопійовано — встав у чат і допиши своє слово';
@@ -373,19 +379,36 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape')menu(false)}
    сторінка питає сервер; нова карта → підміна вмісту на місці: відкриті кроки й прокрутка лишаються, без перезавантаження.
    Не під пальцем: відкрита випадайка — чекаємо наступної перевірки. */
 var SHA=document.querySelector('meta[name=route-map-commit]').content,HID=0,BUSY=0;
+/* новий КОД сторінки (не карта) — підміна вмісту його не принесе → одне м'яке перезавантаження на те саме місце (A115 гілка 2):
+   відкриті кроки й прокрутка — у sessionStorage, назад лише при reload; мітка версії, на яку йшли, — без циклу */
+var CODE=document.querySelector('meta[name=route-page-code]').content;
+function note(s){var n=document.createElement('div');n.className='note';n.setAttribute('role','status');
+n.innerHTML='<span></span><button type="button" class="nx" aria-label="Закрити напис">×</button>';n.firstChild.textContent=s;
+var g=0;function off(){if(g)return;g=1;n.dataset.off='';setTimeout(function(){n.remove()},500)}n.addEventListener('click',off);document.body.appendChild(n);setTimeout(off,6000)}
+var HERE='Маршрут оновлено — ви там, де й були';
+(function(){var s=null,tg=null;try{s=sessionStorage.getItem('rt-place');tg=sessionStorage.getItem('rt-tag');sessionStorage.removeItem('rt-place')}catch(_){}
+var nt=(performance.getEntriesByType&&performance.getEntriesByType('navigation')[0])||{};
+if(s&&nt.type==='reload'){try{var p=JSON.parse(s);(p.open||[]).forEach(function(id){var x=document.querySelector('details[data-id="'+id+'"]');if(x)x.open=true});
+if(p.y)requestAnimationFrame(function(){scrollTo(0,p.y)})}catch(_){}}
+if(tg===CODE){try{sessionStorage.removeItem('rt-tag')}catch(_){}note(HERE)}})();
+function retry(c){var tg=null;try{tg=sessionStorage.getItem('rt-tag')}catch(_){}if(tg===c)return false;
+try{sessionStorage.setItem('rt-place',JSON.stringify({open:[].map.call(document.querySelectorAll('details[open][data-id]'),function(x){return x.dataset.id}),y:scrollY}));
+sessionStorage.setItem('rt-tag',c)}catch(_){return false}location.reload();return true}
 function hm(){var d=new Date();return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)}
 function say(t){var c=document.getElementById('chk');if(c)c.textContent=t}
 function fresh(){if(BUSY||!document.getElementById('thm').hidden)return;BUSY=1;say('перевіряю, чи нема новішого…');
 fetch(location.pathname+'?_='+Date.now(),{cache:'no-store'}).then(function(r){return r.text()}).then(function(t){
 var d=new DOMParser().parseFromString(t,'text/html'),m=d.querySelector('meta[name=route-map-commit]'),nm=d.querySelector('main');
+var nc=d.querySelector('meta[name=route-page-code]');if(nc&&nc.content!==CODE&&retry(nc.content))return;
 if(m&&nm&&m.content!==SHA){var open=[].map.call(document.querySelectorAll('details[open][data-id]'),function(x){return x.dataset.id}),y=scrollY;
 document.querySelector('main').innerHTML=nm.innerHTML;SHA=m.content;document.querySelector('meta[name=route-map-commit]').content=SHA;
 open.forEach(function(id){var x=document.querySelector('details[data-id="'+id+'"]');if(x)x.open=true});
-theme(R.dataset.theme);scrollTo(0,y);say('оновлено о '+hm())}else say('свіже · перевірено о '+hm())})
+theme(R.dataset.theme);scrollTo(0,y);say('оновлено о '+hm());note(HERE)}else say('свіже · перевірено о '+hm())})
 .catch(function(){say('без мережі — показано останнє завантажене')}).then(function(){BUSY=0})}
 fresh();setInterval(function(){if(document.visibilityState==='visible')fresh()},60000);
 document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')HID=Date.now();else if(Date.now()-HID>=5000)fresh()});"""
     js = js.replace('__TC__', json.dumps({'light': L['--canvas'], 'dark': D['--canvas']})).replace('__IC__', icons_js)
+    code = hashlib.sha1((css + js).encode()).hexdigest()[:10]   # версія коду сторінки (не карти): змінилась → відкрита сторінка перезавантажиться
     page = f"""<!DOCTYPE html>
 <html lang="uk"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
@@ -396,6 +419,7 @@ document.addEventListener('visibilitychange',function(){if(document.visibilitySt
 <link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="apple-touch-icon.png"><link rel="icon" href="icon.svg" type="image/svg+xml">
 <script>try{{var t=localStorage.getItem('route-theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}}catch(_){{}}</script>
 <meta name="route-map-commit" content="{html.escape(sha)}">
+<meta name="route-page-code" content="{code}">
 <meta name="route-map-file" content="{html.escape(qrel)}">
 <meta name="robots" content="noindex">
 <title>Маршрут {html.escape(title)}</title><style>{css}</style></head>
@@ -617,7 +641,8 @@ def selftest():
                 # ROUTE-6: тема, своє натискання замість підсвічування iOS, «Додому», самоперевірка свіжості
                 ok = ok and all(x in page for x in ('data-th="dark"', ':root[data-theme=dark]', '-webkit-tap-highlight-color:transparent',
                                                      'summary:active', 'rel="apple-touch-icon"', 'rel="manifest"', 'gesturestart', "cache:'no-store'",
-                                                     'class="cap"', 'role="menu"', 'DOMParser', 'body::before', 'touchstart'))
+                                                     'class="cap"', 'role="menu"', 'DOMParser', 'body::before', 'touchstart',
+                                                     'name="route-page-code"', "getEntriesByType('navigation')", 'class="nx"', 'setTimeout(off,6000)'))
                 ok = ok and 'background-attachment:fixed;' not in page and 'Для Claude — попутно' not in page
         finally: shutil.rmtree(tmp, ignore_errors=True)
         fails += not ok; print(f'{"✓" if ok else "✗"} {name}' + ('' if ok else f' — {bad}'))
