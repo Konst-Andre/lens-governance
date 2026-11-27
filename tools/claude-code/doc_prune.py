@@ -55,7 +55,7 @@ def prune_text(t):
                 k += 1
             if is_map and done:   # карта: найновіший ✅ лишається
                 def key(x):   # аудит №5: дата без року — цього року, не «найстаріша»
-                    d = DATE.search(x[2]); return (int(d.group(3) or datetime.date.today().year), int(d.group(2)), int(d.group(1))) if d else (0, 0, 0)
+                    d = DATE.search(x[2]); return ((int(d.group(3) or datetime.date.today().year), int(d.group(2)), int(d.group(1))) if d else (0, 0, 0), x[0])   # та сама дата — нижчий рядок карти (останній у ланцюгу; S48: лишався ROUTE-5, «далі» → прибраний ROUTE-6 → route_check ✗)
                 done.remove(max(done, key=key))
             drop |= {(i, idv) for i, idv, _ in done}
             continue
@@ -118,6 +118,8 @@ def selftest():
         m7, _ = run(tmp); cases.append(('`L-2` при `XL-10_brief.md` — не «бриф є» (підрядок не рахується)', '`L-2`' in m7 and 'бриф є' not in m7))
         k = prune_text('| крок | що | далі | стан |\n|---|---|---|---|\n| `S1` | а | `S2` | ✅ 20.11.' + str(datetime.date.today().year - 1) + ' |\n| `S2` | б | `S3` | ✅ 22.11 |\n')
         cases.append(('карта: «22.11» без року новіше за «20.11.<торік>» (аудит №5)', k[1] == ['S1']))
+        k2 = prune_text('| крок | що | далі | стан |\n|---|---|---|---|\n| `R5` | а | `R6` | ✅ 26.11 |\n| `R6` | б | `N1` | ✅ 26.11 |\n| `N1` | в | `U1` | ✅ 26.11 |\n| `U1` | г | `F1` | ▶ |\n')
+        cases.append(('карта: та сама дата — лишається нижчий ✅, «далі» якого — відкритий крок (S48)', k2[1] == ['R5', 'R6'] and '| `N1` |' in k2[0]))
         m5, c5 = run(tmp, inject=True); cases.append(('--inject: підкинутий закритий → ЗЛОВИВ', 'ЗЛОВИВ' in m5 and c5 == 0))
         for n, ok in cases: bad += not ok; print(f'{"✓" if ok else "✗"} {n}')
     finally:
