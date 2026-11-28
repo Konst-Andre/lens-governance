@@ -50,7 +50,7 @@ html.pwa-full .nav-i{ padding-top:8px; padding-bottom:calc(8px + var(--sab)); } 
 @media(prefers-reduced-motion:reduce){ .sh-bg,.sh-box{ transition:none } }
 ```
 
-**Що під аркушем** (чорна 0,5 тут — найпростіше; тон теми, розмиття, відступ застосунку — варіанти й заміри iPhone) — `A124`.
+**Що під аркушем** (чорна 0,5 тут — найпростіше; тон теми, розмиття, відступ застосунку — варіанти й заміри iPhone) — `A124` (вказівник — EquipLens S48, 28.11.2026).
 
 **Обов’язково:** `pointer-events:none` на закритому (бо тепер завжди flex); delayed `visibility` (лишається видимим весь слайд, ховається після); **без `will-change`** (постійний GPU-шар = композитинг-шви); ніде не покладатись на `display:none`.
 
